@@ -22,6 +22,7 @@ chose. À chacune correspond un écran, et cette page vous dit lequel.
 | Qui a appelé quoi, et avec quel résultat | [Les journaux](/docs/operations/logs) |
 | Où sont passées les secondes de CETTE requête | [Les traces](/docs/operations/tracing) |
 | L'appel planifié a-t-il eu lieu, et comment s'est-il passé | [Les appels planifiés](/docs/operations/scheduler), l'entrée **Scheduler** du rail |
+| Qu'a dit un service à ses utilisateurs, et qui l'a lu | [Les notifications](/docs/console/notifications), l'entrée **Notifications** du rail |
 | Comment les traces, les métriques, l'audit et les journaux parviennent à mon collecteur | [L'export OpenTelemetry](/docs/operations/tracing#exporter-vers-votre-collecteur), dans **Infra, OpenTelemetry** |
 | Ce nœud est-il prêt à recevoir du trafic | [Les health checks](/docs/operations/health) |
 | Quand ce certificat expire-t-il | [TLS et certificats](/docs/operations/tls) |

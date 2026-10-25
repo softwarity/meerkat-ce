@@ -137,7 +137,7 @@ export class LocaleTabComponent {
       error: (e: { error?: { error?: string } }) => {
         this.saving.set(false);
         this.snack.open(
-          e.error?.error ?? $localize`:@@Locale_save_failed:The wordings could not be saved.`,
+          e.error?.error ?? $localize`:@@Locale_save_failed:The texts could not be saved.`,
           undefined,
           { duration: 6000 },
         );
@@ -171,7 +171,7 @@ export class LocaleTabComponent {
         });
       },
       error: (e: { error?: { error?: string } }) =>
-        this.snack.open(e.error?.error ?? 'reset failed', undefined, { duration: 6000 }),
+        this.snack.open(e.error?.error ?? $localize`:@@Reset_failed:Reset failed`, undefined, { duration: 6000 }),
     });
   }
 
@@ -214,7 +214,7 @@ export class LocaleTabComponent {
         parsed = JSON.parse(text);
       } catch {
         this.snack.open(
-          $localize`:@@Locale_import_not_json:That file is not JSON.`,
+          $localize`:@@Locale_import_not_json:This file is not JSON.`,
           undefined,
           { duration: 6000 },
         );
@@ -225,7 +225,7 @@ export class LocaleTabComponent {
       const whole = parsed.scope === 'all';
       if (!Object.keys(entries).length) {
         this.snack.open(
-          $localize`:@@Locale_import_empty:That file carries no strings.`,
+          $localize`:@@Locale_import_empty:This file contains no strings.`,
           undefined,
           { duration: 6000 },
         );
@@ -240,18 +240,18 @@ export class LocaleTabComponent {
           this.scope.reloadLocales();
         },
         error: (e: { error?: { error?: string } }) =>
-          this.snack.open(e.error?.error ?? 'import failed', undefined, { duration: 8000 }),
+          this.snack.open(e.error?.error ?? $localize`:@@Import_failed:Import failed`, undefined, { duration: 8000 }),
       });
     });
   }
 
   private deleteWarning(code: string): string {
-    return $localize`:@@Locale_delete_confirm:Delete ${code}:code: and everything written in it?`;
+    return $localize`:@@Locale_delete_confirm:Delete ${code}:code: and all its translations?`;
   }
 
   private importWarning(code: string, n: number, whole: boolean): string {
     return whole
-      ? $localize`:@@Locale_import_whole:Replace everything ${code}:code: holds with the ${n}:n: strings in this file?`
+      ? $localize`:@@Locale_import_whole:Replace all ${code}:code: translations with the ${n}:n: strings in this file?`
       : $localize`:@@Locale_import_partial:Apply ${n}:n: strings to ${code}:code:?`;
   }
 }

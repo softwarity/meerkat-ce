@@ -86,14 +86,14 @@ export class SecretFieldComponent {
       case 'typed':
         return {
           blocking: true,
-          text: $localize`:@@Secret_must_go_to_the_vault:A secret is not saved in clear. Move it into the vault to continue.`,
+          text: $localize`:@@Secret_must_go_to_the_vault:Secrets are not saved in clear: move it into the vault.`,
           canMove: true,
         };
       case 'held':
         return {
           blocking: false,
           text: this.at()
-            ? $localize`:@@Secret_stored_in_clear:A secret is stored in clear in the configuration.`
+            ? $localize`:@@Secret_stored_in_clear:This secret is stored in clear. Move it into the vault.`
             : $localize`:@@Secret_stored_leave_empty_to_keep:A secret is stored. Leave empty to keep it.`,
           canMove: !!this.at(),
         };

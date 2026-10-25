@@ -54,6 +54,18 @@ var migrations = []migration{
 	{Version: 80, Name: "a route's custom code is an ordered list", Up: injectionsFromBlocks},
 	{Version: 83, Name: "the signing keys are sealed", Up: signingKeysSealed},
 	{Version: 90, Name: "the internal plane keeps asking for the tokens it handed out", Up: internalAccessKept},
+	{Version: 95, Name: "a zone nobody chose follows the browser", Up: zoneUnchosen},
+}
+
+// zoneUnchosen empties the zone of the accounts that hold UTC (v95). UTC was
+// what an account got when nobody chose, so a stored UTC cannot tell a choice
+// from the default; following the browser is the better guess, and whoever
+// really wants UTC picks it again on their profile.
+func zoneUnchosen(ctx context.Context, tx *transaction) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET timezone = '' WHERE timezone = 'UTC'`); err != nil {
+		return fmt.Errorf("users: emptying the zones left at UTC: %w", err)
+	}
+	return nil
 }
 
 // signingKeysSealed seals, under the master key, the two settings that were

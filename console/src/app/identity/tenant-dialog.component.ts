@@ -61,7 +61,7 @@ export interface TenantDialogResult {
         </mat-select>
       </mat-form-field>
       <p class="mode-hint" i18n="@@Tenant_group_mode_hint">
-        Cumulative merges the roles of every group; exclusive makes members pick one at sign-in.
+        Cumulative: members get the roles of all their groups. Exclusive: they pick one group at sign-in.
       </p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">

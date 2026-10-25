@@ -2,7 +2,7 @@
   <mat-expansion-panel expanded>
     <mat-expansion-panel-header>
       <mat-panel-title i18n="@@Sched_api_where"
-        >The API, and its token</mat-panel-title
+        >Endpoints and token</mat-panel-title
       >
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
@@ -11,7 +11,7 @@
         <tbody>
           <tr>
             <th><code>GET /</code></th>
-            <td i18n="@@Sched_ep_list">The list, narrowed by <code>meta.&lt;key&gt;</code>, <code>tenant</code>, <code>route</code>.</td>
+            <td i18n="@@Sched_ep_list">List schedules, filtered by <code>meta.&lt;key&gt;</code>, <code>tenant</code>, <code>route</code>.</td>
           </tr>
           <tr>
             <th><code>GET /&#123;id&#125;</code></th>
@@ -19,39 +19,39 @@
           </tr>
           <tr>
             <th><code>POST /</code></th>
-            <td i18n="@@Sched_ep_post">Create one; the id comes back.</td>
+            <td i18n="@@Sched_ep_post">Create a schedule. Returns its id.</td>
           </tr>
           <tr>
             <th><code>PUT /&#123;id&#125;</code></th>
-            <td i18n="@@Sched_ep_put">Change it.</td>
+            <td i18n="@@Sched_ep_put">Replace a schedule.</td>
           </tr>
           <tr>
             <th><code>DELETE /&#123;id&#125;</code></th>
-            <td i18n="@@Sched_ep_delete">Remove one. Its run in flight is told to stop.</td>
+            <td i18n="@@Sched_ep_delete">Delete a schedule. A current run is told to stop.</td>
           </tr>
           <tr>
             <th><code>POST /&#123;id&#125;/pause</code></th>
-            <td i18n="@@Sched_ep_pause">Stop it firing. Its run in flight is told to stop.</td>
+            <td i18n="@@Sched_ep_pause">Pause a schedule. A current run is told to stop.</td>
           </tr>
           <tr>
             <th><code>POST /&#123;id&#125;/resume</code></th>
-            <td i18n="@@Sched_ep_resume">Let it fire again.</td>
+            <td i18n="@@Sched_ep_resume">Resume a paused schedule.</td>
           </tr>
           <tr>
             <th><code>POST /&#123;id&#125;/run</code></th>
-            <td i18n="@@Sched_ep_run">Owe a turn now.</td>
+            <td i18n="@@Sched_ep_run">Run it now.</td>
           </tr>
           <tr>
             <th><code>PATCH /&#123;id&#125;/run</code></th>
-            <td i18n="@@Sched_ep_report">Report on a run you answered 202 to. The answer may tell you to stop.</td>
+            <td i18n="@@Sched_ep_report">Report on a run you answered with 202. The response may tell you to stop.</td>
           </tr>
           <tr>
             <th><code>DELETE /&#123;id&#125;/run</code></th>
-            <td i18n="@@Sched_ep_cancel">Cancel the run in flight.</td>
+            <td i18n="@@Sched_ep_cancel">Cancel the current run.</td>
           </tr>
           <tr>
             <th><code>GET /&#123;id&#125;/runs</code></th>
-            <td i18n="@@Sched_ep_runs">What each turn did, newest first.</td>
+            <td i18n="@@Sched_ep_runs">Run history, newest first.</td>
           </tr>
           <tr>
             <th><code>POST /pause?meta.&lt;key&gt;=...</code></th>
@@ -64,16 +64,15 @@
         </tbody>
       </table>
       <p class="hint" i18n="@@Sched_api_where_2">
-        A token minted for it reaches only this API. What the calls may reach is
-        set by each schedule's <code>roles</code>, so one token serves all your
-        endpoints.
+        A token created for this API works only here. What each call may reach
+        is set by the schedule's <code>roles</code>, so one token is enough for
+        all your endpoints.
       </p>
       <p class="hint" i18n="@@Sched_api_where_3">
-        This is the <b>internal plane</b>: a port inside the cluster, never
-        behind an ingress. What a service presents there - nothing, this token,
-        or its pod's ServiceAccount token - is set under <b>Access</b>.
-        Services write their schedules there. This console reads them,
-        pauses, resumes, runs, cancels or deletes them, and writes only their
+        This API is on the <b>internal plane</b>: a port inside the cluster,
+        never exposed through an ingress. The credential a service must present
+        is set under <b>Access</b>. Services create the schedules; this console
+        can pause, resume, run, cancel or delete them, and edit their
         description.
       </p>
     </ng-template>
@@ -87,8 +86,8 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_write_1">
-        <code>POST</code> returns an id. Or file the schedule under your own
-        <code>metadata</code> and find it that way.
+        <code>POST</code> returns an id. You can also tag the schedule with
+        your own <code>metadata</code> and find it that way.
       </p>
       <app-snippet filename="write-schedule.sh" [content]="writeCmd()" />
       <p class="hint" i18n="@@Sched_api_write_2">
@@ -101,8 +100,8 @@
       </p>
       <app-snippet filename="calendar.jsonc" [content]="calendar" />
       <p class="hint" i18n="@@Sched_api_write_4">
-        <b>Or one date</b>: the call goes out once, then the schedule is
-        finished. A past date still goes out if <code>catchUp</code> allows it.
+        <b>Or a single date</b>: the call is made once, then the schedule is
+        finished. A past date still runs if <code>catchUp</code> allows it.
       </p>
       <app-snippet filename="delayed-action.jsonc" [content]="once" />
       <table class="fields">
@@ -116,17 +115,18 @@
           <tr>
             <th><code>description</code></th>
             <td i18n="@@Sched_field_description">
-              What it is for, 500 characters at most, shown under the name. An
-              operator can write it here; a <code>PUT</code> without it keeps
-              it.
+              What it is for, 500 characters at most, shown under the name.
+              Editable in this console; a <code>PUT</code> without it keeps the
+              current one.
             </td>
           </tr>
           <tr>
             <th><code>roles</code></th>
             <td i18n="@@Sched_field_roles">
-              The roles the call carries, as <code>meerkat</code>; the route's
-              rule checks them. <code>role</code> for one, <code>roles</code>
-              for several, never both. No role: only open endpoints.
+              The roles the call is made with, as user <code>meerkat</code>;
+              the route's rules check them. <code>role</code> for one,
+              <code>roles</code> for several, never both. Without a role, only
+              public endpoints can be called.
             </td>
           </tr>
           <tr>
@@ -161,9 +161,9 @@
           <tr>
             <th><code>body</code></th>
             <td i18n="@@Sched_field_body">
-              JSON. An object or array goes out as
-              <code>application/json</code>; a JSON <b>string</b> goes out as
-              its content (form, XML). <code>contentType</code> overrides.
+              JSON. An object or array is sent as
+              <code>application/json</code>; a JSON <b>string</b> is sent as is
+              (form, XML). <code>contentType</code> sets another type.
             </td>
           </tr>
           <tr>
@@ -184,55 +184,54 @@
           <tr>
             <th><code>at</code></th>
             <td i18n="@@Sched_field_at">
-              One date, RFC 3339 with its offset
-              (<code>2026-10-03T04:00:00Z</code>). Refuses
-              <code>timezone</code> and <code>startAt</code>. Give
-              <code>every</code>, <code>cron</code> or <code>at</code>, never
-              two.
+              A single date, RFC 3339 with its offset
+              (<code>2026-10-03T04:00:00Z</code>). Cannot be combined with
+              <code>timezone</code> or <code>startAt</code>. Give only one of
+              <code>every</code>, <code>cron</code> or <code>at</code>.
             </td>
           </tr>
           <tr>
             <th><code>timezone</code></th>
             <td i18n="@@Sched_field_timezone">
-              IANA name for reading the cron, UTC by default. Daylight saving
-              is followed.
+              IANA time zone for the cron, UTC by default. Daylight saving time
+              is applied.
             </td>
           </tr>
           <tr>
             <th><code>metadata</code></th>
             <td i18n="@@Sched_field_metadata">
-              Your own keys and text values, twenty at most, to find schedules
-              again. Never sent with the call.
+              Your own keys and text values, twenty at most, to find schedules.
+              Not sent with the call.
             </td>
           </tr>
           <tr>
             <th><code>overlap</code></th>
             <td i18n="@@Sched_field_overlap">
-              <code>skip</code> only: a turn due while a run is in flight waits
-              for it to close. <code>run</code> is refused.
+              <code>skip</code> only: a run due while another is still running
+              waits for it to end. <code>run</code> is refused.
             </td>
           </tr>
           <tr>
             <th><code>catchUp</code></th>
             <td i18n="@@Sched_field_catchup">
-              Seconds, <code>0</code> by default: how late a missed turn may
-              still go out (only the last one). <code>0</code> means however
-              late.
+              Seconds, <code>0</code> by default: how late a missed run may
+              still be made (only the last one missed). <code>0</code> means no
+              limit.
             </td>
           </tr>
           <tr>
             <th><code>timeout</code></th>
             <td i18n="@@Sched_field_timeout">
-              ISO duration, 30 seconds by default, two minutes at most. It
-              bounds the answer, not the work (see 202 below).
+              ISO duration, 30 seconds by default, two minutes at most. Limits
+              the wait for the response, not the work (see 202 below).
             </td>
           </tr>
           <tr>
             <th><code>retryLost</code></th>
             <td i18n="@@Sched_field_retrylost">
-              ISO duration, one minute to one day, none by default: how long
-              after a <b>lost</b> run (202, then silent) the same run is sent
-              again. Only if your service can pick its work up again.
+              ISO duration, one minute to one day, none by default: delay
+              before a <b>lost</b> run (202, then no report) is sent again. Use
+              it only if your service can resume its work.
             </td>
           </tr>
         </tbody>
@@ -248,27 +247,28 @@
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_protected_1">
-        <b>Guarded by the gateway</b>: set the <code>roles</code> the call
-        needs. The service receives <code>meerkat</code> with them, as the
-        route hands identity over. A wrong role shows as a 403 here.
+        <b>Protected by the gateway</b>: set the <code>roles</code> the call
+        needs. The service receives user <code>meerkat</code> with those
+        roles, like any identity the route passes on. A missing role shows as
+        a 403 here.
       </p>
       <p class="hint" i18n="@@Sched_api_protected_2">
-        <b>Guarded by the service's own secret</b>: put it in
-        <code>headers</code> as a vault reference, never in clear.
+        <b>Protected by the service's own secret</b>: put it in
+        <code>headers</code> as a vault reference, never in plain text.
       </p>
     </ng-template>
   </mat-expansion-panel>
 
   <mat-expansion-panel>
     <mat-expansion-panel-header>
-      <mat-panel-title i18n="@@Sched_api_read">Find them again</mat-panel-title>
+      <mat-panel-title i18n="@@Sched_api_read">Find schedules</mat-panel-title>
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_read_1">
         <code>meta.&lt;key&gt;=&lt;value&gt;</code> matches exactly,
         <code>meta.&lt;key&gt;=~&lt;expression&gt;</code> by regular
-        expression; all conditions apply. <code>tenant</code> and
-        <code>route</code> also filter.
+        expression; all conditions must match. You can also filter by
+        <code>tenant</code> and <code>route</code>.
       </p>
       <app-snippet filename="read-schedules.sh" [content]="readCmd()" />
     </ng-template>
@@ -285,13 +285,13 @@
       <p class="hint" i18n="@@Sched_api_incoming_1">
         A normal request on the <b>application</b> port, through the route's
         rules. <b>Keep the run identifier</b> and ignore a run you already
-        handled: delivery is at least once.
+        handled: a call may arrive more than once.
       </p>
       <p class="hint" i18n="@@Sched_api_incoming_2">
-        <b>Sent twice</b> only if the calling gateway stops before your answer:
-        another one resends it with the same run identifier,
-        <code>Meerkat-Job-Attempt</code> counting, three attempts at most. An
-        answer you gave is never replayed.
+        <b>Sent again</b> only if the gateway stops before your response:
+        another gateway resends it with the same run identifier and the next
+        <code>Meerkat-Job-Attempt</code>, three attempts at most. A call you
+        answered is never sent again.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -299,14 +299,14 @@
   <mat-expansion-panel>
     <mat-expansion-panel-header>
       <mat-panel-title i18n="@@Sched_api_long"
-        >Long work answers 202</mat-panel-title
+        >Long tasks: answer 202</mat-panel-title
       >
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_long_1">
-        Answer <code>202 Accepted</code> to keep the run open and report its
-        progress, then its end. Any other answer closes it: 2xx done, the rest
-        failed.
+        Answer <code>202 Accepted</code> to keep the run open, then report its
+        progress and its end. Any other response closes it: 2xx as done,
+        anything else as failed.
       </p>
       <app-snippet filename="report-run.sh" [content]="reportCmd()" />
       <table class="fields">
@@ -314,8 +314,8 @@
           <tr>
             <th><code>run</code></th>
             <td i18n="@@Sched_report_run">
-              Required: the <code>Meerkat-Job-Run</code> of the call. It is
-              the proof, no token is needed.
+              Required: the call's <code>Meerkat-Job-Run</code> header. It
+              authenticates the report, no token needed.
             </td>
           </tr>
           <tr>
@@ -328,47 +328,46 @@
           <tr>
             <th><code>progress</code></th>
             <td i18n="@@Sched_report_progress">
-              0 to 100: the bar on this screen.
+              0 to 100, shown as a progress bar on this screen.
             </td>
           </tr>
           <tr>
             <th><code>detail</code></th>
             <td i18n="@@Sched_report_detail">
-              Your words. While it runs, shown live under the name
-              (<code>7 233 / 9 882 records</code>, 200 characters); at the
-              end, kept in the history.
+              Free text, 200 characters at most
+              (<code>7 233 / 9 882 records</code>). Shown under the name while
+              it runs, then kept in the history.
             </td>
           </tr>
           <tr>
             <th><code>retryIn</code></th>
             <td i18n="@@Sched_report_retryin">
-              With <code>failed</code>: call me back then (see below).
+              With <code>failed</code>: when to call again (see below).
             </td>
           </tr>
         </tbody>
       </table>
       <p class="hint" i18n="@@Sched_api_long_answers">
-        <b>The answer</b>: <code>204</code> carry on (or, at the end,
+        <b>Responses</b>: <code>204</code> continue (or, for a final report,
         recorded). <code>410 Gone</code> <b>stop</b>: the run is already
-        closed on our side, report nothing more. Its
-        <code>stop</code> says why: <code>paused</code>,
-        <code>cancelled</code>, <code>deleted</code>, <code>lost</code> or
-        <code>closed</code>. <code>409</code>: a run id you were never given.
+        closed, send no more reports; its <code>stop</code> field says why:
+        <code>paused</code>, <code>cancelled</code>, <code>deleted</code>,
+        <code>lost</code> or <code>closed</code>. <code>409</code>: unknown
+        run id.
       </p>
       <p class="hint" i18n="@@Sched_api_long_stop">
-        <b>Paused</b> while it runs: your next progress report gets the 410
-        and the run closes as <code>cancelled</code>; the next turn comes after
-        a resume. A final report on a paused schedule is still taken.
+        <b>Paused</b> while running: your next progress report gets the 410
+        and the run ends as <code>cancelled</code>; the next run comes after a
+        resume. A final report on a paused schedule is still accepted.
         <b>Cancelled</b> (here, or <code>DELETE /&#123;id&#125;/run</code>):
-        closed at once, any later report gets the 410.
+        ended at once, any later report gets the 410.
       </p>
       <p class="hint" i18n="@@Sched_api_long_2">
-        Every report renews the lease. Without one for five minutes the run is
-        <b>lost</b>. It is not sent again unless the schedule says
-        <code>retryLost</code>: then, after that delay, the same run is sent
-        again (same <code>Meerkat-Job-Run</code>, next
-        <code>Meerkat-Job-Attempt</code>), three attempts per turn at most.
-        A report arriving meanwhile takes the run back.
+        Report at least every five minutes, or the run is <b>lost</b>. A lost
+        run is sent again only if the schedule sets <code>retryLost</code>:
+        after that delay, with the same <code>Meerkat-Job-Run</code> and the
+        next <code>Meerkat-Job-Attempt</code>, three attempts at most. A
+        report arriving before then resumes the run.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -383,15 +382,15 @@
       <p class="hint" i18n="@@Sched_api_notnow_1">
         If the work cannot be done yet, answer
         <code>424 Failed Dependency</code> with a <code>Retry-After</code>
-        (seconds or HTTP date): the turn comes back then. Not
+        (seconds or HTTP date): the call is made again at that time. Do not use
         <code>503</code>.
       </p>
       <app-snippet filename="not-yet.http" [content]="notYet" />
       <p class="hint" i18n="@@Sched_api_notnow_2">
         After a <code>202</code>, report
         <code>{{ "{" }}"state":"failed","retryIn":"PT10M"{{ "}" }}</code
-        >. The reason stays on the run. One minute to one day, five times in a
-        row at most.
+        >. The reason is kept on the run. From one minute to one day, five
+        times in a row at most.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -399,20 +398,20 @@
   <mat-expansion-panel>
     <mat-expansion-panel-header>
       <mat-panel-title i18n="@@Sched_api_history"
-        >The history of a schedule</mat-panel-title
+        >Run history</mat-panel-title
       >
     </mat-expansion-panel-header>
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Sched_api_history_1">
         Every finished run is kept: when, how (<code>done</code>,
         <code>failed</code>, <code>lost</code>, <code>cancelled</code>,
-        <code>dropped</code> when too late), the answer, the node and the
+        <code>dropped</code> when too late), the response, the gateway and the
         attempt.
       </p>
       <app-snippet filename="schedule-runs.sh" [content]="runsCmd()" />
       <p class="hint" i18n="@@Sched_api_history_2">
-        Replay a run by its id: it goes out as a new run with today's payload,
-        and the history says which one it replays.
+        Replay a run by its id: it is sent as a new run with the current
+        payload, and the history shows which run it replays.
       </p>
     </ng-template>
   </mat-expansion-panel>
@@ -429,11 +428,11 @@
         are not affected. A call past the timeout is closed and says so.
       </p>
       <p class="hint" i18n="@@Sched_api_fails_2">
-        <b>Three attempts, then the next turn.</b> <code>401</code>,
+        <b>Three attempts, then the next scheduled run.</b> <code>401</code>,
         <code>403</code>, <code>404</code>, <code>502</code>, <code>503</code>,
-        <code>504</code> or no answer are retried after 30 seconds, then 2
-        minutes, within <code>catchUp</code>. Anything else, <code>500</code>
-        included, waits for the next turn. Each attempt is a new run.
+        <code>504</code> or no response are retried after 30 seconds, then 2
+        minutes, within <code>catchUp</code>. Any other error, <code>500</code>
+        included, waits for the next scheduled run. Each attempt is a new run.
       </p>
     </ng-template>
   </mat-expansion-panel>

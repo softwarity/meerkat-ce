@@ -72,6 +72,9 @@ func (a *API) createRole(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	role := in.Role
+	// System is the product's own mark, never a caller's: set here, it would
+	// mint a role nobody can delete again.
+	role.System = false
 	// No id is invented: a role IS its name. Creating one that exists would be
 	// an update, so it is refused by name rather than silently merged.
 	if _, err := a.st.GetRole(r.Context(), strings.TrimSpace(role.Name)); err == nil {
@@ -260,7 +263,7 @@ func (a *API) checkGroupHours(ctx context.Context, g store.Group, current store.
 		return http.StatusForbidden, err
 	}
 	if a.st.EffectiveGroupMode(ctx, g.TenantID) != store.GroupModeSingle {
-		return http.StatusUnprocessableEntity, fmt.Errorf("group %q: working hours of its own need its organisation in exclusive group mode, "+
+		return http.StatusUnprocessableEntity, fmt.Errorf("group %q: working hours of its own need its tenant in exclusive group mode, "+
 			"where one group is chosen per session; in cumulative mode leave them inherited", g.Name)
 	}
 	if err := checkBusinessAccess(g.BusinessAccess); err != nil {
@@ -312,6 +315,18 @@ func (a *API) putMemberGroups(w http.ResponseWriter, r *http.Request, actor stor
 	var ids []string
 	if err := decodeStrict(r, &ids); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed group list: expected a JSON array of group ids")
+		return
+	}
+	// A JSON null decodes to no list at all: it clears the groups like [] does,
+	// and is answered as the empty list the console indexes into.
+	if ids == nil {
+		ids = []string{}
+	}
+	// Groups are held IN an organisation, so only by one of its members. Rows
+	// for somebody outside it would grant nothing today and come back to life
+	// the day they join - rights nobody granted at that moment.
+	if _, err := a.st.GetMembership(r.Context(), userID, tenantID); err != nil {
+		writeErr(w, http.StatusNotFound, "member not found: add the account to this tenant first")
 		return
 	}
 	old, _ := a.st.MemberGroupIDs(r.Context(), tenantID, userID)

@@ -3,6 +3,8 @@ package admin
 import (
 	"cmp"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -124,7 +126,9 @@ func (a *API) secretHolders() map[string]secretHolder {
 			load: func(ctx context.Context, id string) (string, map[string]string, error) {
 				auth, ok := a.st.RawTLS(ctx).ACME.AuthorityByID(id)
 				if !ok {
-					return "", nil, fmt.Errorf("no ACME authority %q", id)
+					// Said the way the store says it, so the handler reads
+					// one "not found" for every holder.
+					return "", nil, fmt.Errorf("no ACME authority %q: %w", id, sql.ErrNoRows)
 				}
 				return "ACME authority " + auth.Name, map[string]string{"eabHmacKey": auth.EABHMACKey}, nil
 			},
@@ -210,8 +214,12 @@ func (a *API) stashSecret(w http.ResponseWriter, r *http.Request, actor store.Us
 		return
 	}
 	label, secrets, err := h.load(ctx, req.ID)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		writeErr(w, http.StatusNotFound, "unknown "+req.Holder+" "+req.ID)
+		return
+	}
+	if err != nil {
+		a.internal(w, err)
 		return
 	}
 	literal, declared := secrets[req.Field]

@@ -103,6 +103,16 @@ Entries render as the icon alone, the label alone, or both - one setting for the
 whole bar. The brand's application name can sit beside the logo; it is off by
 default, because the logo alone is the mark.
 
+## The Notifications entry
+
+With [notifications](/docs/console/notifications) on (Enterprise), the
+catalogue may hold one special entry, **Notifications**: no route, it opens the
+person's notifications page, and it carries the **one badge** of their unread
+notifications, live. It is added with **Add notifications** in Portal mode, then
+placed, moved and removed like any other entry; left without a label, it reads
+Notifications in each user's language. Without it, the entry and the badge are
+on the account button. The entries of the applications carry no badge.
+
 ## What the bar replaces
 
 In **Portal** mode it takes the place of the per-route user button on **every**
@@ -127,8 +137,6 @@ a list of fields.
 
 ## What is not built
 
-- **The badge channel.** An entry carries a badge key and the slot is reserved,
- but nothing pushes a count onto it yet - that is planned on the live channel.
 - **Landing on the first reachable application.** A visitor who cannot open the
  application they arrive on is not redirected to one they can.
 - **Drag and drop**: reordering by hand, or dragging an entry to change level.

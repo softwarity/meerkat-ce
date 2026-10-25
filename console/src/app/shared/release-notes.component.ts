@@ -114,10 +114,10 @@ export interface ReleaseNotes {
             @if (p.html) {
               <div class="notes" [innerHTML]="p.html"></div>
             } @else {
-              <p class="missing" i18n="@@Release_notes_missing">Missing information.</p>
+              <p class="missing" i18n="@@Release_notes_missing">No notes for this release.</p>
             }
           } @empty {
-            <p class="missing" i18n="@@Release_notes_missing">Missing information.</p>
+            <p class="missing" i18n="@@Release_notes_missing">No notes for this release.</p>
           }
         </div>
       </div>

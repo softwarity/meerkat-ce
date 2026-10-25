@@ -228,3 +228,91 @@ func TestPortalLogoRadiusHasTwoEnds(t *testing.T) {
 		t.Errorf("a circle with the logo out was refused: %v", err)
 	}
 }
+
+// The notifications entry (NOTIF-05) is offered once, wherever it is placed,
+// opens no route and holds nothing; it wears the bell when no icon is chosen.
+func TestTheNotificationsEntry(t *testing.T) {
+	cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{
+		{RouteID: "a"},
+		{Label: "Tools", Children: []PortalSubEntry{{RouteID: "b"}, {Special: PortalSpecialNotifications, Label: " Inbox "}}},
+		{Special: PortalSpecialNotifications}, // a second one: dropped
+	}}
+	if err := SanitizePortalConfig(&cfg, portalRoutes(), nil); err != nil {
+		t.Fatalf("the notifications entry was refused: %v", err)
+	}
+	if len(cfg.Entries) != 2 || len(cfg.Entries[1].Children) != 2 {
+		t.Fatalf("the second notifications entry should be dropped, got %+v", cfg.Entries)
+	}
+	bell := cfg.Entries[1].Children[1]
+	if bell.Label != "Inbox" || !strings.Contains(bell.Icon, "<svg") {
+		t.Fatalf("the entry keeps its label and wears the bell, got %+v", bell)
+	}
+	if !cfg.NotificationsEntry() {
+		t.Fatal("the catalogue places the entry")
+	}
+	cfg.Entries[1].Disabled = true
+	if cfg.NotificationsEntry() {
+		t.Fatal("inside a container turned off, the entry is not placed")
+	}
+	if cfg.Entries[1].IsContainer() != true || (PortalEntry{Special: PortalSpecialNotifications}).IsContainer() {
+		t.Fatal("the notifications entry is no container, its own container is one")
+	}
+
+	for name, bad := range map[string]PortalEntry{
+		"unknown":  {Special: "weather"},
+		"route":    {Special: PortalSpecialNotifications, RouteID: "a"},
+		"children": {Special: PortalSpecialNotifications, Children: []PortalSubEntry{{RouteID: "a"}}},
+	} {
+		cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{bad}}
+		if err := SanitizePortalConfig(&cfg, portalRoutes(), nil); err == nil {
+			t.Errorf("%s: a special entry %+v should be refused", name, bad)
+		}
+	}
+}
+
+// The notifications page is the built-in one, or a UI route and a path under
+// it; anything else is refused naming why.
+func TestTheNotificationsPage(t *testing.T) {
+	ok := map[string]NotifyPage{
+		"built-in": {},
+		"root":     {RouteID: "a"},
+		"path":     {RouteID: "a", Path: "/inbox"},
+		"fragment": {RouteID: "a", Path: "/#/inbox?unread=1"},
+		"off":      {RouteID: "off", Path: "/inbox"},
+	}
+	for name, np := range ok {
+		cfg := PortalConfig{Layout: PortalHeader, NotifyPage: np}
+		if err := SanitizePortalConfig(&cfg, portalRoutes(), nil); err != nil {
+			t.Errorf("%s: %+v refused: %v", name, np, err)
+		}
+		if np.RouteID != "" && !strings.HasPrefix(cfg.NotifyPage.Path, "/") {
+			t.Errorf("%s: the path should default to /, got %q", name, cfg.NotifyPage.Path)
+		}
+	}
+	bad := map[string]struct {
+		np   NotifyPage
+		says string
+	}{
+		"path alone": {NotifyPage{Path: "/inbox"}, "pick the UI route"},
+		"no route":   {NotifyPage{RouteID: "zzz"}, "no such route"},
+		"service":    {NotifyPage{RouteID: "svc"}, "not a UI route"},
+		"relative":   {NotifyPage{RouteID: "a", Path: "inbox"}, "must start with /"},
+		"other host": {NotifyPage{RouteID: "a", Path: "//evil.test/x"}, "another host"},
+		"out":        {NotifyPage{RouteID: "a", Path: "/x/../../admin"}, "leaves the route"},
+		"space":      {NotifyPage{RouteID: "a", Path: "/in box"}, "no space"},
+		"quote":      {NotifyPage{RouteID: "a", Path: `/x"onclick`}, "quote"},
+	}
+	for name, c := range bad {
+		cfg := PortalConfig{Layout: PortalHeader, NotifyPage: c.np}
+		err := SanitizePortalConfig(&cfg, portalRoutes(), nil)
+		if err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("%s: %+v should be refused saying %q, got %v", name, c.np, c.says, err)
+		}
+	}
+	// A route gone since it was chosen does not block the save.
+	stored := PortalConfig{NotifyPage: NotifyPage{RouteID: "gone", Path: "/inbox"}}
+	cfg := PortalConfig{Layout: PortalHeader, NotifyPage: stored.NotifyPage}
+	if err := SanitizePortalConfig(&cfg, portalRoutes(), &stored); err != nil {
+		t.Fatalf("a stored page whose route is gone blocked the save: %v", err)
+	}
+}

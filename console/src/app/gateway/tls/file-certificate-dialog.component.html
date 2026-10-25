@@ -7,7 +7,7 @@
     <p class="note">{{ w }}</p>
   } @else {
     <p class="note" i18n="@@Mounted_note">
-      What is mounted in this container. Only the paths are kept: a renewal written over the files is served on its own.
+      Certificates mounted in this container. Only the paths are stored: renewed files are picked up automatically.
     </p>
     <mat-radio-group class="list" [value]="picked()" (change)="picked.set($event.value)">
       @for (m of mounts(); track m.mount) {
@@ -25,12 +25,12 @@
                 } @else {
                   <span class="nokey" i18n="@@Mounted_no_key">no private key beside it</span>
                 }
-                - <ng-container i18n="@@Mounted_until">until {{ until(c.notAfter) | date: 'mediumDate' }}</ng-container>
+                - <span class="nowrap" i18n="@@Mounted_until">until {{ c.notAfter | zoned: zone() : "day" }}</span>
                 @if (internalNames.length) {
                   @if (fitsInternal(c)) {
                     - <span class="fits" i18n="@@Fits_the_internal_plane">fits the internal plane</span>
                   } @else {
-                    - <ng-container i18n="@@Not_the_internal_names">not the internal plane's names</ng-container>
+                    - <ng-container i18n="@@Not_the_internal_names">covers no internal name</ng-container>
                   }
                 }
               </span>

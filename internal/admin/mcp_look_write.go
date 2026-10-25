@@ -33,9 +33,9 @@ func (a *API) lookWriteTools() []mcp.Tool {
 	return []mcp.Tool{
 		{
 			Name: "save_portal", Allow: administersIdentity, Title: "Write the application catalogue",
-			Description: "Set the application catalogue (PORTAL-03) and how it is offered: none, links (the account " +
+			Description: "Set the application catalogue and how it is offered: none, links (the account " +
 				"button's Applications menu, a container as a heading over its modules) or portal - the bar the " +
-				"proxied applications wear (PORTAL-01, Enterprise: refused on the community image) - and for the " +
+				"proxied applications wear (Enterprise edition: refused in the Community edition) - and for the " +
 				"bar, header or rail, which side, what an entry shows. " +
 				"It takes the shape get_settings returns under \"portal\", so read it, change it, and send it " +
 				"back whole: what you leave out is removed. " +
@@ -62,22 +62,24 @@ func (a *API) lookWriteTools() []mcp.Tool {
 }
 
 func portalSchema() map[string]any {
+	special := str("\"notifications\" makes this the notifications entry (Enterprise edition): no route, no children, " +
+		"it opens the notifications page and wears the unread badge. Once in the whole catalogue.")
 	sub := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"routeId":     str("The id of a UI route, from list_routes. Required. A route turned off is shown greyed out until it is back on."),
+			"routeId":     str("The id of a UI route, from list_routes. Required, except on the notifications entry. A route turned off is shown greyed out until it is back on."),
 			"label":       str("What the bar shows. Empty uses the route's own name."),
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
+			"special":     special,
 		},
-		"required": []any{"routeId"},
 	}
 	entry := map[string]any{
 		"type": "object",
-		"description": "A MODULE (routeId set, no children) or a CONTAINER (no routeId, a label, and its modules " +
-			"in children). A container opens its first module the visitor may open, and is not shown when " +
-			"the visitor may open none of them.",
+		"description": "A MODULE (routeId set, no children), a CONTAINER (no routeId, a label, and its modules " +
+			"in children) or the notifications entry (special). A container opens its first module the visitor " +
+			"may open, and is not shown when the visitor may open none of them.",
 		"properties": map[string]any{
 			"routeId":     str("A module's route: the id of a UI route, from list_routes. Leave out for a container. A route turned off is shown greyed out until it is back on."),
 			"label":       str("What the bar shows. Required on a container; on a module, empty uses the route's own name."),
@@ -85,6 +87,7 @@ func portalSchema() map[string]any {
 			"description": str("The entry's tooltip."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
 			"children":    map[string]any{"type": "array", "description": "A container's modules, in order. Never on a module.", "items": sub},
+			"special":     special,
 		},
 	}
 	return object(map[string]any{
@@ -97,6 +100,14 @@ func portalSchema() map[string]any {
 		"hideLogo":   map[string]any{"type": "boolean", "description": "Take the branding's logo out of the bar."},
 		"logoRadius": map[string]any{"type": "integer", "description": "Round the logo, 0 (as drawn) to 50 (a circle)."},
 		"entries":    map[string]any{"type": "array", "description": "The top-level entries, in display order.", "items": entry},
+		"notifyPage": map[string]any{"type": "object",
+			"description": "Where users read their notifications (Enterprise edition): leave out or empty for the built-in " +
+				"page, or a UI route and a path under it (\"/inbox\", \"/#/inbox\"). A user who may not open the route " +
+				"gets the built-in page, which stays reachable either way.",
+			"properties": map[string]any{
+				"routeId": str("The id of a UI route, from list_routes."),
+				"path":    str("The path under the route's address; default /."),
+			}},
 	})
 }
 

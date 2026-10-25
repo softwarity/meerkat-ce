@@ -23,9 +23,9 @@
         class="clear"
         (click)="$event.stopPropagation(); logo.set(''); changed.emit()"
         i18n-matTooltip="@@Reset_to_placeholder"
-        matTooltip="Reset to the placeholder"
+        matTooltip="Remove the logo"
         i18n-aria-label="@@Reset_to_placeholder"
-        aria-label="Reset to the placeholder"
+        aria-label="Remove the logo"
       >
         <mat-icon>close</mat-icon>
       </button>
@@ -57,19 +57,19 @@
       }
     </div>
     <div class="tab-text">
-      <div class="tab-title">Browser tab icon</div>
+      <div class="tab-title" i18n="@@Browser_tab_icon">Browser tab icon</div>
       <div class="tab-hint">
         @if (favicon()) {
-          Its own image. Drop or click to replace.
+          <ng-container i18n="@@Tab_icon_own">Custom image. Drop or click to replace.</ng-container>
         } @else if (logo()) {
-          Follows the logo above. Drop one here to differ.
+          <ng-container i18n="@@Tab_icon_logo">Uses the logo. Drop an image here to use another one.</ng-container>
         } @else {
-          Meerkat's mark, until you set a logo.
+          <ng-container i18n="@@Tab_icon_default">Meerkat icon, until you set a logo.</ng-container>
         }
       </div>
     </div>
     @if (favicon()) {
-      <button matIconButton (click)="favicon.set(''); changed.emit()" matTooltip="Follow the logo again" aria-label="Follow the logo again">
+      <button matIconButton (click)="favicon.set(''); changed.emit()" i18n-matTooltip="@@Use_the_logo_again" matTooltip="Use the logo again" i18n-aria-label="@@Use_the_logo_again" aria-label="Use the logo again">
         <mat-icon>close</mat-icon>
       </button>
     }
@@ -87,7 +87,7 @@
         [checked]="backgroundBoth()"
         (change)="backgroundBoth.set($event.checked); changed.emit()"
         i18n-matTooltip="@@Bg_both_hint"
-        matTooltip="Off gives the dark scheme its own picture, fit and dim"
+        matTooltip="Turn off to set a separate picture for the dark scheme"
         i18n="@@Bg_same_both"
       >Same picture in light and dark</mat-checkbox>
     }
@@ -139,7 +139,7 @@
           <span
             class="dim-label"
             i18n-matTooltip="@@Dim_hint"
-            matTooltip="Surface colour laid over the picture. Raise it until the card reads easily."
+            matTooltip="Covers the picture with the page colour so the form stays readable."
           ><ng-container i18n="@@Dim">Dim</ng-container></span>
           <mat-slider min="0" max="90" step="5">
             <input
@@ -202,7 +202,7 @@
             <span
               class="dim-label"
               i18n-matTooltip="@@Dim_hint"
-              matTooltip="Surface colour laid over the picture. Raise it until the card reads easily."
+              matTooltip="Covers the picture with the page colour so the form stays readable."
             ><ng-container i18n="@@Dim">Dim</ng-container></span>
             <mat-slider min="0" max="90" step="5">
               <input

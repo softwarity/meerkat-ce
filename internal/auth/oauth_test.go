@@ -238,6 +238,52 @@ func TestAnAgentConnectsWithoutACopiedSecret(t *testing.T) {
 // Approving hands an agent the approver's own powers over the whole gateway.
 // That has always been a root decision here, and the flow does not become a
 // way around it.
+// A registration answers what was registered: the name trimmed, cut or
+// defaulted, the redirects normalised - what the consent page will show and
+// what a redirect is compared with.
+func TestARegistrationAnswersWhatWasStored(t *testing.T) {
+	srv, _, _ := setupAgentFlow(t)
+	for _, c := range []struct{ name, wantName string }{
+		{"   ", "an agent"},
+		{"  Claude Code  ", "Claude Code"},
+		{strings.Repeat("x", 70), strings.Repeat("x", 60)},
+	} {
+		body, _ := json.Marshal(map[string]any{
+			"client_name": c.name, "redirect_uris": []string{"  http://127.0.0.1:51713/callback  "},
+		})
+		res, err := http.Post(srv.URL+"/oauth/register", "application/json", strings.NewReader(string(body)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reg struct {
+			Name      string   `json:"client_name"`
+			Redirects []string `json:"redirect_uris"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&reg); err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusCreated || reg.Name != c.wantName {
+			t.Errorf("registered %q: %d, answered name %q, want %q", c.name, res.StatusCode, reg.Name, c.wantName)
+		}
+		if len(reg.Redirects) != 1 || reg.Redirects[0] != "http://127.0.0.1:51713/callback" {
+			t.Errorf("answered redirects %q, want the trimmed one", reg.Redirects)
+		}
+	}
+}
+
+// The metadata offers no scope: the perimeter is chosen on the consent page,
+// and a scope a client asked for would be one it was told it could ask for
+// to no effect.
+func TestTheMetadataOffersNoScopeItWouldIgnore(t *testing.T) {
+	srv, _, _ := setupAgentFlow(t)
+	var meta map[string]any
+	getJSON(t, srv.URL+"/.well-known/oauth-authorization-server", &meta)
+	if s, ok := meta["scopes_supported"]; ok {
+		t.Fatalf("scopes advertised that the flow does not read: %v", s)
+	}
+}
+
 func TestConnectingAnAgentIsRootOnly(t *testing.T) {
 	srv, st, _ := setupAgentFlow(t)
 	ctx := context.Background()

@@ -118,8 +118,9 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
           <div class="grow">
             <h1 i18n="@@Configuration">Configuration</h1>
             <p class="hint" i18n="@@Configuration_intro">
-              Routes, roles, authorities, mail relay, themes and gateway settings travel as one
-              file. Users, organisations, sessions and the vault are not part of it.
+              Routes, roles, authorities, OIDC clients, tenants and their groups, mail relay,
+              themes and gateway settings, in one file. Users, memberships, sessions and the vault
+              are not part of it.
             </p>
           </div>
           <!-- Above the tabs because it belongs to none of them: the same

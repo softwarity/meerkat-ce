@@ -39,8 +39,8 @@ export class DoorNamesComponent {
   // comma ends one, so a list typed or pasted in one go is several chips.
   protected readonly separators = [ENTER, COMMA, SPACE];
 
-  protected readonly namesInfo = $localize`:@@Door_names_info:The full names browsers reach this plane by, one each, never a wildcard. Served by this gateway, each needs a certificate here that covers it. Behind a proxy, the proxy serves them over HTTPS, and the gateway knows a request for one of them is https without asking a header.`;
-  protected readonly addressesInfo = $localize`:@@Door_proxy_addresses_info2:Meerkat learns the visitor's real address and scheme from the X-Forwarded-For and X-Forwarded-Proto headers the proxy adds, and believes them only from the proxy. Empty, any private address counts as the proxy. A proxy reaching Meerkat from public addresses has to be named, or every visitor is counted as that proxy.`;
+  protected readonly namesInfo = $localize`:@@Door_names_info:The exact names browsers use to reach this plane, no wildcards. When Meerkat serves HTTPS, each one needs a certificate here that covers it.`;
+  protected readonly addressesInfo = $localize`:@@Door_proxy_addresses_info2:Meerkat reads the visitor's address and scheme from the X-Forwarded-For and X-Forwarded-Proto headers, trusted only from these addresses. Empty, any private address counts as the proxy.`;
 
   protected addName(event: MatChipInputEvent): void {
     if (this.saving()) return;

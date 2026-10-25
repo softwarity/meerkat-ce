@@ -15,6 +15,8 @@ import { RowActionsDirective } from '@softwarity/row-actions';
 import { DateTime } from 'luxon';
 import { ApiService, LiveSession } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // Who is signed in where, right now (CONSOLE-08, CONSOLE-01), and a way to
 // end any one session - the laptop left open at a client's, the account being
@@ -37,6 +39,7 @@ import { DialogsService } from '../../shared/dialogs.service';
     MatTooltipModule,
     LoadingIndicatorComponent,
     RowActionsDirective,
+    ZonedDatePipe,
   ],
   styleUrl: './sessions-page.component.scss',
   template: `
@@ -50,11 +53,11 @@ import { DialogsService } from '../../shared/dialogs.service';
     <p class="hint">
       @if (plane === 'admin') {
         <ng-container i18n="@@Sessions_console_hint">
-          Who is signed in to this console, right now. Signing a session out ends it at once, on every gateway.
+          People signed in to the console now. Signing a session out ends it immediately.
         </ng-container>
       } @else {
         <ng-container i18n="@@Sessions_hint">
-          Who is signed in, right now. Signing a session out ends it at once, on every gateway.
+          People signed in now. Signing a session out ends it immediately.
         </ng-container>
       }
     </p>
@@ -90,7 +93,7 @@ import { DialogsService } from '../../shared/dialogs.service';
             <ng-container matColumnDef="since">
               <mat-header-cell *matHeaderCellDef i18n="@@Signed_in">Signed in</mat-header-cell>
               <mat-cell *matCellDef="let s">
-                <span class="when" [title]="full(s.createdAt)">{{ rel(s.createdAt) }}</span>
+                <span class="when nowrap" [title]="rel(s.createdAt)">{{ s.createdAt | zoned: zone() }}</span>
                 <span rowActions="tonal">
                   @if (!s.current) {
                     <button
@@ -128,6 +131,7 @@ export class SessionsPageComponent {
   private readonly dialogs = inject(DialogsService);
   private readonly snack = inject(MatSnackBar);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly zone = inject(MeService).timezone;
 
   protected readonly plane = (inject(ActivatedRoute).snapshot.data['sessions'] as 'data' | 'admin') ?? 'data';
   protected readonly columns = ['who', 'browser', 'since'];
@@ -197,11 +201,8 @@ export class SessionsPageComponent {
     });
   }
 
+  // The moment is written in the cell; how long ago, on hover.
   protected rel(at: number): string {
-    return at ? (DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toRelative() ?? '') : '-';
-  }
-
-  protected full(at: number): string {
-    return at ? DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED) : '';
+    return at ? (DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toRelative() ?? '') : '';
   }
 }

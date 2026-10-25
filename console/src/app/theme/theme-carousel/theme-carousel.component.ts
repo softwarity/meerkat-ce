@@ -45,7 +45,7 @@ export class ThemeCarouselComponent {
   readonly pick = output<Theme>();
   readonly activateTheme = output<Theme>();
 
-  protected readonly tipActivate = $localize`:@@Set_active:Not live - click to activate`;
+  protected readonly tipActivate = $localize`:@@Set_active:Not active. Click to activate.`;
   protected readonly tipActive = $localize`:@@Active_theme:Active theme`;
 
   // Stored themes first, then EVERY preset, under a namespaced id.

@@ -3,7 +3,9 @@ package admin
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -129,9 +131,9 @@ func (a *API) toolScheduleRuns(ctx context.Context, raw json.RawMessage) (any, e
 	if in.ID == "" {
 		return nil, fmt.Errorf("which schedule: pass the id list_schedules gives")
 	}
-	sc, err := a.st.GetSchedule(ctx, in.ID)
+	sc, err := a.toolSchedule(ctx, in.ID)
 	if err != nil {
-		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+		return nil, err
 	}
 	runs, err := a.st.ListScheduleRuns(ctx, sc.ID, in.Limit)
 	if err != nil {
@@ -255,9 +257,9 @@ func (a *API) toolPauseSchedule(ctx context.Context, raw json.RawMessage) (any, 
 	if in.Paused == nil {
 		return nil, fmt.Errorf("say whether to pause: paused true stops it firing, false lets it fire again")
 	}
-	sc, err := a.st.GetSchedule(ctx, in.ID)
+	sc, err := a.toolSchedule(ctx, in.ID)
 	if err != nil {
-		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+		return nil, err
 	}
 	if err := a.st.PauseSchedule(ctx, sc.ID, *in.Paused); err != nil {
 		return nil, err
@@ -286,9 +288,9 @@ func (a *API) toolCancelRun(ctx context.Context, raw json.RawMessage) (any, erro
 	if in.ID == "" {
 		return nil, fmt.Errorf("which schedule: pass the id list_schedules gives")
 	}
-	sc, err := a.st.GetSchedule(ctx, in.ID)
+	sc, err := a.toolSchedule(ctx, in.ID)
 	if err != nil {
-		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+		return nil, err
 	}
 	if sc.RunID == "" {
 		return nil, fmt.Errorf("%q has no run in flight: there is nothing to cancel", sc.Name)
@@ -317,9 +319,9 @@ func (a *API) toolDescribeSchedule(ctx context.Context, raw json.RawMessage) (an
 	if in.Description == nil {
 		return nil, fmt.Errorf("say what the schedule is for: description, empty to remove it")
 	}
-	sc, err := a.st.GetSchedule(ctx, in.ID)
+	sc, err := a.toolSchedule(ctx, in.ID)
 	if err != nil {
-		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+		return nil, err
 	}
 	d := *in.Description
 	if err := store.SanitizeScheduleDescription(&d); err != nil {
@@ -345,9 +347,9 @@ func (a *API) toolRunSchedule(ctx context.Context, raw json.RawMessage) (any, er
 	if in.ID == "" {
 		return nil, fmt.Errorf("which schedule: pass the id list_schedules gives")
 	}
-	sc, err := a.st.GetSchedule(ctx, in.ID)
+	sc, err := a.toolSchedule(ctx, in.ID)
 	if err != nil {
-		return nil, fmt.Errorf("no schedule %q on this gateway", in.ID)
+		return nil, err
 	}
 	if sc.Paused {
 		return nil, fmt.Errorf("%q is paused: resume it before asking for a run", sc.Name)
@@ -356,6 +358,9 @@ func (a *API) toolRunSchedule(ctx context.Context, raw json.RawMessage) (any, er
 	cause, of := store.CauseManual, ""
 	if in.ReplayOf != "" {
 		past, err := a.st.GetScheduleRun(ctx, sc.ID, in.ReplayOf)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
 		if err != nil {
 			return nil, fmt.Errorf("no run %q in the history of %q: replay names one of its own runs, "+
 				"as list_schedule_runs gives them", in.ReplayOf, sc.Name)
@@ -389,4 +394,15 @@ func runWords(sc store.Schedule) string {
 		out += ": " + sc.RunDetail
 	}
 	return out
+}
+
+// toolSchedule reads the schedule a tool names. Only an id the store does not
+// hold is "no schedule": a store that fails says so, or the agent would go
+// looking for a typo in an id that is right.
+func (a *API) toolSchedule(ctx context.Context, id string) (store.Schedule, error) {
+	sc, err := a.st.GetSchedule(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sc, fmt.Errorf("no schedule %q on this gateway", id)
+	}
+	return sc, err
 }

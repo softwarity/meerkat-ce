@@ -56,7 +56,7 @@ func (a *API) sessionScope(ctx context.Context, actor store.User) (narrowed bool
 func (a *API) listSessions(w http.ResponseWriter, r *http.Request, actor store.User) {
 	narrowed, tenants, ok := a.sessionScope(r.Context(), actor)
 	if !ok {
-		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering an organisation")
+		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering a tenant")
 		return
 	}
 	q := r.URL.Query()
@@ -98,7 +98,7 @@ func (a *API) revokeSession(w http.ResponseWriter, r *http.Request, actor store.
 	id := r.PathValue("id")
 	narrowed, tenants, ok := a.sessionScope(r.Context(), actor)
 	if !ok {
-		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering an organisation")
+		writeErr(w, http.StatusForbidden, "sessions require root, the app-admin capability, or administering a tenant")
 		return
 	}
 	_, userID, plane, err := a.st.SessionHashByID(r.Context(), id)

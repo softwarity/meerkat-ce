@@ -170,7 +170,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Name"
           label="Name"
           i18n-info="@@Acme_authority_name_info"
-          info="What the Add certificate menu and the certificate lists call it."
+          info="Shown in Add certificate and in the certificate lists."
         >
           <input matInput [value]="form().name || ''" (input)="set('name', $any($event.target).value)" />
         </app-form-field>
@@ -181,7 +181,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             i18n-label="@@Directory_URL"
             label="Directory URL"
             i18n-info="@@Directory_URL_info"
-            info="The address of the authority's ACME service, given by whoever runs it. For step-ca: https://host/acme/provisioner-name/directory."
+            info="The authority's ACME directory address. For step-ca: https://host/acme/provisioner-name/directory."
           >
             <input
               matInput
@@ -196,7 +196,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             i18n-label="@@Authority_root_certificate_optional"
             label="Root certificate (PEM, optional)"
             i18n-info="@@Authority_root_info"
-            info="Only when the authority's own address is served with a certificate this gateway does not trust - usually the authority's own root. For step-ca: the output of step ca root."
+            info="Only if the authority's address uses a certificate this gateway does not trust, usually its own root. For step-ca: the output of step ca root."
           >
             <textarea
               matInput
@@ -235,7 +235,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             i18n-label="@@Contact_email_optional"
             label="Contact email (optional)"
             i18n-info="@@Contact_email_info"
-            info="Some authorities require one to open the account. Expiry is watched by the daily digest, not by this address."
+            info="Some authorities require one to open an account. Expiry warnings come in the daily digest, not to this address."
           >
             <input matInput [value]="form().email || ''" (input)="set('email', $any($event.target).value)" />
           </app-form-field>
@@ -276,7 +276,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
       <div class="list">
         @if (authorities().length === 0) {
           <p class="empty" i18n="@@No_acme_authority">
-            None yet. Pick a provider above: each one saved becomes a way in of Add certificate.
+            None yet. Pick a provider above: each one saved is offered in Add certificate.
           </p>
         } @else {
           <mat-table [dataSource]="authorities()">
@@ -290,7 +290,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
                 <span class="where">
                   <span class="url">{{ host(a.directoryUrl) }}</span>
                   @if (a.uses?.length) {
-                    <span class="uses" i18n="@@Asked_for">asked for {{ a.uses.join(', ') }}</span>
+                    <span class="uses" i18n="@@Asked_for">used for {{ a.uses.join(', ') }}</span>
                   }
                 </span>
                 <span rowActions="tonal">
@@ -345,7 +345,7 @@ export class AuthoritiesPanelComponent {
   protected readonly eabInfo = computed(() => {
     const p = this.provider();
     if (p?.needsEab && p.where) return p.where;
-    return $localize`:@@EAB_info:Only if the authority refuses anonymous accounts: it shows a key ID and an HMAC key in its own console, or its administrator hands them over.`;
+    return $localize`:@@EAB_info:Only if the authority refuses anonymous accounts. Its console or its administrator gives you the key ID and HMAC key.`;
   });
 
   protected readonly complete = computed(() => {
@@ -424,7 +424,7 @@ export class AuthoritiesPanelComponent {
   protected async remove(a: AcmeAuthority): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_the_authority:Delete the authority`,
-      message: $localize`:@@Delete_authority_message:Delete ${a.name}:name:? Certificates are no longer asked of it.`,
+      message: $localize`:@@Delete_authority_message:Delete ${a.name}:name:? No more certificates are requested from it.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

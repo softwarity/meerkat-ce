@@ -7,12 +7,12 @@
     <app-ee-lock
       feature="white-label"
       i18n-why="@@Layout_ee_why"
-      why="Try any arrangement here. Keeping one, like removing the Meerkat mark, is Enterprise."
+      why="Try any arrangement here. Saving one requires the Enterprise edition."
     />
   </h3>
   <p class="hint text-muted" i18n="@@Arrangement_hint">
-    Where the brand, the picture and the form sit on every page. In an iframe, the page drops the
-    brand and fills the frame.
+    Where the brand, the picture and the form go. Inside an iframe, pages hide the brand and
+    fill the frame.
   </p>
 
   <div class="gallery">
@@ -41,7 +41,7 @@
 <mat-card appearance="outlined" class="size-card">
   <h3 i18n="@@Logo_size">Logo size</h3>
   <p class="hint text-muted" i18n="@@Logo_size_hint">
-    The box the logo is drawn in. Needs a logo, and Banner ignores it.
+    Needs a logo. Not used by Banner.
   </p>
   <mat-button-toggle-group
     [value]="scope.logoSize()"
@@ -58,7 +58,7 @@
 <mat-card appearance="outlined" class="side-card">
   <h3 i18n="@@Which_side">Which side</h3>
   <p class="hint text-muted" i18n="@@Which_side_hint">
-    The edge the brand takes, for Split and Drawer only.
+    Side of the brand, for Split and Drawer only.
   </p>
   <mat-button-toggle-group
     [value]="side()"

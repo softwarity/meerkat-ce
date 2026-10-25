@@ -71,6 +71,9 @@ var agentCovers = map[string][]string{
 	// door but a rename that FOLLOWS its references (roleref.go) and a deletion
 	// that says what still names the role. Both paths share that code now.
 	"roles": {"list_roles", "list_role_references", "save_role", "delete_role"},
+	// What the services told their users (NOTIF-05): read, and taken back.
+	// Publishing stays the services' own, on the internal plane.
+	"notifications": {"list_notifications", "withdraw_notification"},
 	// The applications signing their people in against this gateway: the
 	// other half of a route bound with the oidc mechanism, which an agent
 	// writes with save_route. The secret is shown once, in the answer of the
@@ -188,7 +191,16 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 	// writesSomething is the other half of admin.readsNothing. Together they
 	// must cover every non-GET endpoint exactly once.
 	writesSomething := map[string]bool{
-		"POST /api/admin-tokens": true, "POST /api/admin-tokens/{id}/toggle": true,
+		// Try it out on the other planes: whatever the reader sends, writes included.
+		"/apidocs/call/{plane}/{rest...}": true,
+		"DELETE /api/notifications/{id}":  true, "PUT /api/notifications/settings": true,
+		"PUT /api/notifications/access": true,
+		// The tenant level of the notifications: its switch, and a withdrawal
+		// limited to what was sent to that tenant.
+		"PUT /api/tenants/{id}/notifications/settings": true, "DELETE /api/tenants/{id}/notifications/{nid}": true,
+		// A notification sent from the tenant's page: stored, and delivered.
+		"POST /api/tenants/{id}/notifications": true,
+		"POST /api/admin-tokens":               true, "POST /api/admin-tokens/{id}/toggle": true,
 		"PUT /api/admin-tokens/{id}": true, "POST /api/admin-tokens/{id}/renew": true,
 		"DELETE /api/admin-tokens/{id}": true, "POST /api/apidocs/token": true,
 		"POST /api/certificates/import": true, "POST /api/certificates/self-signed": true,
@@ -367,6 +379,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"list_groups",
 		"list_languages",
 		"list_members",
+		"list_notifications",
 		"list_oidc_clients",
 		"list_operations",
 		"list_role_references",
@@ -404,6 +417,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"set_issuer",
 		"test_routing",
 		"try_oidc_sign_in",
+		"withdraw_notification",
 		"write_language",
 	}
 	var got []string

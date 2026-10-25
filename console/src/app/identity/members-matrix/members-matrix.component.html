@@ -86,7 +86,7 @@
               [indeterminate]="columnState(g.id).some"
               (change)="toggleColumn(g.id, $event.checked)"
               i18n-aria-label="@@Assign_every_visible_member"
-              aria-label="Assign every visible member"
+              aria-label="Add every visible member to this group"
             />
           </mat-header-cell>
         </ng-container>
@@ -113,8 +113,8 @@
       <ng-container matColumnDef="lastConn" stickyEnd>
         <mat-header-cell *matHeaderCellDef i18n="@@Last_connection">Last connection</mat-header-cell>
         <mat-cell *matCellDef="let u">
-          <span class="last-seen" [title]="lastSeenFull(u.lastConnectionAt)">
-            {{ lastSeen(u.lastConnectionAt) }}
+          <span class="last-seen nowrap" [title]="lastSeen(u.lastConnectionAt)">
+            {{ u.lastConnectionAt ? (u.lastConnectionAt | zoned: zone()) : '-' }}
           </span>
           <span rowActions="tonal">
             <!-- The member drawer, opened on the page each button names. -->

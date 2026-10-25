@@ -56,7 +56,7 @@ import { IdentityDrawerPanelComponent } from '../identity-drawer-panel.component
               <mat-select-trigger>{{ modeLabel() }}</mat-select-trigger>
               <mat-option value="MULTIPLE">
                 <span i18n="@@Cumulative">Cumulative</span>
-                <small class="what" i18n="@@Cumulative_what">merges the roles of every group</small>
+                <small class="what" i18n="@@Cumulative_what">members get the roles of all their groups</small>
               </mat-option>
               <mat-option value="SINGLE">
                 <span i18n="@@Exclusive">Exclusive</span>

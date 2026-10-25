@@ -595,8 +595,8 @@
     "CE",
     "EE"
    ],
-   "en": "Roles reach the upstream in the configured header shape.",
-   "fr": "Les rôles arrivent à l'upstream dans le format d'en-tête configuré."
+   "en": "Roles reach the upstream in the configured header shape; `timezone` is absent when the person chose no zone.",
+   "fr": "Les rôles arrivent à l'upstream dans le format d'en-tête configuré ; `timezone` est absent quand la personne n'a choisi aucun fuseau."
   },
   {
    "id": "RBAC-10",
@@ -1326,8 +1326,8 @@
     "CE",
     "EE"
    ],
-   "en": "Application catalogue renders.",
-   "fr": "Le catalogue d'applications s'affiche."
+   "en": "Application catalogue renders; the profile offers one way back to the applications (Back, the portal, a list of links or routes, or the page saying none is open).",
+   "fr": "Le catalogue d'applications s'affiche ; le profil offre un seul chemin de retour vers les applications (Retour, le portail, une liste de liens ou de routes, ou la page qui dit qu'aucune n'est ouverte)."
   },
   {
    "id": "SAUTH-01",
@@ -1774,14 +1774,17 @@
   },
   {
    "id": "NOTIF-05",
-   "priority": "-",
-   "feasibility": "blocked",
-   "targets": [],
-   "editions": [
-    "CE"
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "I",
+    "CC"
    ],
-   "en": "Not built (notify users by organisation, group, role or user).",
-   "fr": "Non construite (notifier des utilisateurs par organisation, groupe, rôle ou utilisateur)."
+   "editions": [
+    "EE"
+   ],
+   "en": "A service publishes on the internal plane and the recipients it may reach see it live, on another node too: refusals named (service not found or ambiguous, untranslatable path, tenant missing or off with the level that turned it off, non https URL, unknown role, audience above the cap, caller outside the list), each audience rule, the three levels each only taking away, one badge on the portal's Notifications entry or else on the user button, falling on reading; an action reaching the service with its method (GET by default, POST, PUT, PATCH, DELETE) and its JSON body under the user's identity, a body refused with GET; a message sent to every tenant (`*`) giving one copy per tenant and naming the tenants skipped, seen once by a reader in several of them (one row, one count, read and deleted at once, one mail); an acknowledgement asked of one reader or of all, Delete refused while it is owed, the sender's onAck called with `complete` on the closing one, `GET /{id}/acks`; withdrawal seen live; the times in the reader's chosen zone, else the browser's; and no trace of it in the community image.",
+   "fr": "Un service publie sur le plan interne et les destinataires qu'il peut atteindre la voient en direct, sur un autre nœud aussi : refus nommés (service introuvable ou ambigu, chemin intraduisible, tenant manquant ou coupé avec le niveau qui l'a coupé, URL non https, rôle inconnu, audience au-delà du plafond, appelant hors de la liste), chaque règle d'audience, les trois niveaux qui ne font que retirer, un seul badge sur l'entrée Notifications du portail ou à défaut sur le bouton utilisateur, qui descend à la lecture ; une action qui atteint le service avec sa méthode (GET par défaut, POST, PUT, PATCH, DELETE) et son corps JSON sous l'identité de l'utilisateur, un corps refusé avec GET ; un message envoyé à tous les tenants (`*`) qui donne un exemplaire par tenant et nomme les tenants écartés, vu une seule fois par un lecteur de plusieurs d'entre eux (une rangée, un compte, lu et supprimé d'un coup, un mail) ; un acquittement demandé à un lecteur ou à tous, Supprimer refusé tant qu'il est dû, le onAck de l'émetteur appelé avec `complete` sur celui qui clôt, `GET /{id}/acks` ; le retrait vu en direct ; les heures dans le fuseau choisi par le lecteur, sinon celui du navigateur ; et aucune trace dans l'image communautaire."
   },
   {
    "id": "SCHED-01",
@@ -2244,8 +2247,8 @@
     "CE",
     "EE"
    ],
-   "en": "Profile edits saved.",
-   "fr": "Les modifications du profil sont enregistrées."
+   "en": "Profile edits saved; with no zone chosen every time follows the browser's zone, a chosen zone (UTC included) applies to the console and the gateway's pages, and every time is written in one ISO form on one line.",
+   "fr": "Les modifications du profil sont enregistrées ; sans fuseau choisi, toute heure suit celui du navigateur, un fuseau choisi (UTC compris) vaut pour la console et les pages de la gateway, et toute heure s'écrit sous une seule forme ISO, sur une ligne."
   },
   {
    "id": "CONSOLE-10",
@@ -2389,8 +2392,8 @@
     "CE",
     "EE"
    ],
-   "en": "API docs pages served.",
-   "fr": "Les pages de documentation d'API sont servies."
+   "en": "The API reference shows the three planes' documents from one selector, the control plane's tried with the session, the other two read only, each naming the address its plane is reached at.",
+   "fr": "La référence d'API montre les documents des trois plans depuis un seul sélecteur : celui du plan de contrôle s'essaie avec la session, les deux autres se lisent, chacun avec l'adresse où son plan se joint."
   },
   {
    "id": "LIFE-05",

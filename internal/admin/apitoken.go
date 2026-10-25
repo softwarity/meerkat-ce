@@ -178,12 +178,17 @@ func (a *API) revokeAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 // that happened.
 func (a *API) updateAdminToken(w http.ResponseWriter, r *http.Request, actor store.User) {
 	id := r.PathValue("id")
+	// No domain: nothing sets a token's domain any more, and a field taken
+	// and dropped let the caller believe their token was narrowed when it was
+	// not. Refused as unknown, it says so.
 	var body struct {
-		Name   string `json:"name"`
-		Days   int    `json:"days"`   // 0 = never expires
-		Scope  string `json:"scope"`  // schedules | readonly | full
-		Domain string `json:"domain"` // gateway | app, empty = the whole plane
-		From   string `json:"from"`   // CIDR ranges, empty = anywhere
+		Name string `json:"name"`
+		// Days left out keeps the expiry the token has: an edit of the name
+		// or the perimeter is not a decision about the deadline, and reading
+		// the missing field as 0 made the token never expire.
+		Days  *int   `json:"days"`  // 0 = never expires, n = n days from now
+		Scope string `json:"scope"` // schedules | readonly | full
+		From  string `json:"from"`  // CIDR ranges, empty = anywhere
 	}
 	if err := decodeStrict(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
@@ -203,9 +208,12 @@ func (a *API) updateAdminToken(w http.ResponseWriter, r *http.Request, actor sto
 		writeErr(w, http.StatusNotFound, "token not found")
 		return
 	}
-	var expiresAt int64
-	if body.Days > 0 {
-		expiresAt = time.Now().Add(time.Duration(body.Days) * 24 * time.Hour).Unix()
+	expiresAt := before.ExpiresAt
+	if body.Days != nil {
+		expiresAt = 0
+		if *body.Days > 0 {
+			expiresAt = time.Now().Add(time.Duration(*body.Days) * 24 * time.Hour).Unix()
+		}
 	}
 	edit := store.TokenEdit{Name: name, Scope: body.Scope,
 		FromCIDRs: body.From, ExpiresAt: expiresAt}

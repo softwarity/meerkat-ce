@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>
   @if (switches()) {
-    <ng-container i18n="@@Trust_title_switch">Routes that can go in HTTPS</ng-container>
+    <ng-container i18n="@@Trust_title_switch">Routes that can switch to HTTPS</ng-container>
   } @else {
     <ng-container i18n="@@Trust_title_platform">Authorities from the cluster</ng-container>
   }
@@ -9,8 +9,8 @@
 <mat-dialog-content class="body">
   @if (switches(); as list) {
     <p class="note" i18n="@@Trust_switch_note">
-      These routes still call their service in HTTP. The gateway tried each one in HTTPS, with the authority just
-      trusted: it answered, on the port and under the name shown. Switch the ones you want.
+      These routes still call their service over HTTP, and each one answered over HTTPS, with the authority just
+      trusted, at the address shown. Select the ones to switch.
     </p>
     <mat-selection-list [disabled]="switching()" (selectionChange)="toSwitch.set($event.source.selectedOptions.selected.map((o) => o.value))">
       @for (s of list; track s.routeId) {
@@ -27,8 +27,8 @@
   } @else if (result(); as r) {
     @if (r.found.length) {
       <p class="note" i18n="@@Trust_platform_note2">
-        What this cluster publishes, without the authorities trusted already, and what each signs here. The one that
-        unblocks a route refused today is picked.
+        Authorities this cluster publishes that are not trusted yet, and what each one signs. Those that fix a refused
+        route are selected.
       </p>
       <!-- A checkbox and a free block per authority, not a list option: an
            option is three fixed-height lines, and an authority may sign many
@@ -41,10 +41,10 @@
           <div class="detail">
             <div class="source">{{ sourceLabel[a.source] }}</div>
             @for (c of a.certificates; track c.fingerprint) {
-              <div class="cert">{{ c.subject }} <span i18n="@@Trust_until">until {{ expiry(c.notAfter) | date: 'mediumDate' }}</span></div>
+              <div class="cert">{{ c.subject }} <span class="nowrap" i18n="@@Trust_until">until {{ c.notAfter | zoned: zone() : "day" }}</span></div>
             }
             @if (routes(a).length) {
-              <div class="label" i18n="@@Trust_unblocks">Unblocks, refused today:</div>
+              <div class="label" i18n="@@Trust_unblocks">Fixes these refused routes:</div>
               <ul>
                 @for (s of routes(a); track s.routeId) {
                   <li class="refused">{{ s.name }}</li>
@@ -62,7 +62,7 @@
               }
             }
             @if (!a.signs.length) {
-              <div class="nothing" i18n="@@Trust_signs_nothing">Nothing seen signed by it here</div>
+              <div class="nothing" i18n="@@Trust_signs_nothing">Signs nothing seen here</div>
             }
             @if (failed()[a.ref] ?? a.why; as why) {
               <div class="why">{{ why }}</div>
@@ -72,8 +72,8 @@
       }
     } @else {
       <p class="note" i18n="@@Trust_platform_none">
-        This cluster publishes no authority the gateway can see. A cert-manager issuer that signs with its own
-        authority is one way; trust-manager, or the certificate imported by hand, are others.
+        The gateway sees no authority published by this cluster. Publish one with a cert-manager issuer (example
+        below) or trust-manager, or import its certificate by hand.
       </p>
       @for (n of r.notes; track n.source) {
         @if (n.absent) {
@@ -84,7 +84,7 @@
     }
     @if (r.unmatched.length) {
       <p class="note" i18n="@@Trust_unmatched2">
-        Refused today, and signed by an authority this cluster does not publish - import it with Add authority:
+        Refused routes signed by an authority this cluster does not publish (import it with Add authority):
       </p>
       @for (u of r.unmatched; track u.routeId) {
         <p class="problem"><mat-icon>block</mat-icon><span><b>{{ u.name }}</b>: {{ u.why }}</span></p>
@@ -100,7 +100,7 @@
 
 <mat-dialog-actions align="end">
   @if (switches()) {
-    <button matButton (click)="close()" i18n="@@Trust_leave_http">Leave in HTTP</button>
+    <button matButton (click)="close()" i18n="@@Trust_leave_http">Keep HTTP</button>
     <button matButton="filled" [disabled]="!toSwitch().length || switching()" (click)="switchRoutes()" i18n="@@Trust_switch">Switch to HTTPS</button>
   } @else {
     <button matButton (click)="close()" i18n="@@Cancel">Cancel</button>

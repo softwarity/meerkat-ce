@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -209,9 +210,6 @@ func TestConsoleIdentityStamp(t *testing.T) {
 		`class="root`,
 		`data-meerkat-user-id="root"`,
 		`data-meerkat-username="root"`,
-		// The zone the console's own screens render dates in: the scheduler
-		// reads it from here, so a missing stamp is an hour shown wrong.
-		`data-meerkat-timezone="UTC"`,
 		`data-meerkat-primary-tenant="default"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -220,6 +218,17 @@ func TestConsoleIdentityStamp(t *testing.T) {
 	}
 	if body := get(nil); !strings.Contains(body, "<body>") {
 		t.Fatalf("anonymous body must stay untouched: %q", body)
+	}
+	// The zone the console's screens write dates in: the one chosen on the
+	// profile, stamped; none chosen, no stamp, and the browser's zone is used.
+	if strings.Contains(body, "data-meerkat-timezone") {
+		t.Fatalf("no zone chosen, none stamped: %q", body)
+	}
+	if err := f.api.st.SetUserTimezone(context.Background(), "root", "Europe/Paris"); err != nil {
+		t.Fatal(err)
+	}
+	if body := get(f.rootC); !strings.Contains(body, `data-meerkat-timezone="Europe/Paris"`) {
+		t.Fatalf("the chosen zone is stamped: %q", body)
 	}
 }
 

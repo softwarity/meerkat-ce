@@ -39,6 +39,40 @@ func specUpstream(t *testing.T) *httptest.Server {
 	return srv
 }
 
+// The OpenAPI screens write the route back at the revision they read: a save
+// landing in between is the store's stale refusal, and that is a 409 (read
+// again), never the 500 that says the gateway broke.
+func TestARouteRewriteBuiltOnAReplacedRevisionIsAConflict(t *testing.T) {
+	f := setup(t)
+	ctx := t.Context()
+	body := strings.Replace(validRoute, "%s", "http://up.invalid", 1)
+	if code, out := f.call(t, "PUT", "/api/routes/r1", body, f.rootC); code != http.StatusOK {
+		t.Fatalf("put: %d %s", code, out)
+	}
+	read, err := f.api.st.GetRoute(ctx, "r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Somebody else saves first; the screen's write is then built on the past.
+	if err := f.api.st.SaveRoute(ctx, read); err != nil {
+		t.Fatal(err)
+	}
+	stale := f.api.st.SaveRoute(ctx, read)
+	if stale == nil {
+		t.Fatal("a write at a replaced revision was taken")
+	}
+	rec := httptest.NewRecorder()
+	f.api.routeWriteFailed(rec, stale)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("stale route write answered %d, want 409 (%s)", rec.Code, rec.Body)
+	}
+	rec = httptest.NewRecorder()
+	f.api.routeWriteFailed(rec, fmt.Errorf("disk on fire"))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("a real failure answered %d, want 500", rec.Code)
+	}
+}
+
 func TestRouteOperationsProjection(t *testing.T) {
 	f := setup(t)
 	up := specUpstream(t)

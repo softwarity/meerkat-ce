@@ -49,7 +49,7 @@ func (a *API) roleTools() []mcp.Tool {
 				"hold, which looks complete and is not. Changing a name is declaring the new role " +
 				"and deleting the old one once the rules naming it have been changed; " +
 				"list_role_references says which those are. \n\nGranting a role to somebody is a " +
-				"group's business, per organisation, and no tool does it: who gets what is a " +
+				"group's business, per tenant, and no tool does it: who gets what is a " +
 				"decision, not a task.",
 			Schema: object(map[string]any{
 				"name": str("The role's name, exactly as the rules and the services spell it, e.g. ROLE_ADMIN."),

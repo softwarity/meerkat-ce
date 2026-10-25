@@ -15,7 +15,7 @@
         <mat-icon>domain</mat-icon>
         <div class="grow">
           <div class="title">
-            <ng-container i18n="@@Several_organisations">Several organisations</ng-container>
+            <ng-container i18n="@@Several_organisations">Several tenants</ng-container>
             <app-ee-lock
               feature="multi-tenant"
               i18n-why="@@Multi_tenant_ee_why"
@@ -23,7 +23,7 @@
             />
           </div>
           <p class="hint text-muted" i18n="@@Several_organisations_hint">
-            Off, one unnamed organisation managed here. On, organisations get their own section.
+            Off: a single tenant, managed here. On: each tenant is managed under Tenants.
           </p>
         </div>
         <mat-slide-toggle
@@ -40,11 +40,11 @@
         <app-ee-lock
           feature="business-hours"
           i18n-why="@@Working_hours_ee_why"
-          why="Refuse access outside declared hours, gateway-wide or per person."
+          why="Allow access only during set hours, for everyone or per person."
         />
       </h3>
       <p class="hint text-muted" i18n="@@Working_hours_global_hint">
-        Inherited by every tenant that sets none.
+        Apply to every tenant that has no hours of its own.
       </p>
       <app-business-access-form
         [value]="businessAccess()"

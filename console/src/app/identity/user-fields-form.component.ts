@@ -45,7 +45,7 @@ import { FormFieldComponent } from '../shared/form-field.component';
         </app-form-field>
       </div>
       <p class="hint" i18n="@@Window_hint">
-        Empty means no bound. The last day counts in full; outside the window, sign-in is refused.
+        Leave empty for no limit. The last day is included. Outside these dates, sign-in is refused.
       </p>
     }
 

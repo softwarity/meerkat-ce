@@ -40,6 +40,7 @@ import (
 	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
+	"github.com/softwarity/meerkat/internal/notifier"
 	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/scheduler"
@@ -313,8 +314,6 @@ func run(o options) error {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", healthz)
-	mux.HandleFunc("GET /readyz", readyz(st, router))
 	authHandler := auth.New(st, sessions)
 	// What a developer's machine is serving right now, and who by. The
 	// registry lives in the trunk because trunk code READS it; only the
@@ -335,27 +334,20 @@ func run(o options) error {
 	// writes, so what every page reads is an empty list.
 	authHandler.WatchServed(served)
 	authHandler.Mailer = mailer
-	authHandler.Register(mux)
-	router.RegisterDevDocs(mux) // /meerkat/apidocs - developer docs (dev capability)
-	router.RegisterUISim(mux)   // /meerkat/dev-sim - UI test mode (dev capability)
 	// The OpenID provider (SAUTH-05): the applications behind the routes sign
 	// their people in through this gateway. Enterprise code; in the community
 	// image the provider mounts nothing and wraps nothing, and its paths fall
 	// through to the routes like any other.
 	oidc := oidcprovider.New(oidcprovider.Deps{Store: st, Sessions: sessions, Router: router,
 		Refuse: authHandler.ServeAppRefused})
-	oidc.MountData(mux)
 	mux.Handle("/", oidc.WrapData(router))
 
 	// Control plane (:9090): admin API and the console. Keep this port off
 	// the public load balancer. Login/logout are mounted here too, so the
 	// console origin is self-sufficient for authentication.
 	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("GET /healthz", healthz)
-	adminMux.HandleFunc("GET /readyz", readyz(st, router))
 	adminAuth := auth.NewAdmin(st, adminSessions)
 	adminAuth.Mailer = mailer
-	adminAuth.Register(adminMux)
 	adminAPI := admin.New(st, adminSessions, router)
 	adminAPI.OIDC = oidc
 	adminAPI.Mailer = mailer
@@ -448,6 +440,37 @@ func run(o options) error {
 			bus.Signal(context.Background(), store.TopicEvent, topic+" "+string(payload))
 		})
 	}
+	// The notifications (NOTIF-05): what the services behind the routes tell
+	// their users. Enterprise code; in the community image nothing is
+	// mounted, no badge is drawn, and the internal plane has no such API. One
+	// signal per notification crosses the nodes, whatever its audience: each
+	// node reads the recipients from the rows and tells the pages it holds.
+	// A reader's acknowledgement calls the sender's service through the data
+	// plane's own handler, built further down: reached through this.
+	var notifyPlane http.Handler
+	notify := notifier.New(notifier.Deps{Store: st, Sessions: sessions, Router: router, Hub: authHandler.Events(),
+		Pages: authHandler, Signal: func(ctx context.Context, arg string) { bus.Signal(ctx, store.TopicNotification, arg) },
+		Plane: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if notifyPlane == nil {
+				http.Error(w, "the data plane is not up yet", http.StatusServiceUnavailable)
+				return
+			}
+			notifyPlane.ServeHTTP(w, r)
+		}),
+		Audit: adminAPI.Record})
+	// Everything of the data plane's own is known now: mount it.
+	mountData(mux, readyz(st, router), authHandler, router, oidc, notify)
+	adminAPI.Notify = notify
+	authHandler.NotifyBadge = func(ctx context.Context, sess store.Session) (auth.NotifyBadge, bool) {
+		b, ok := notify.Badge(ctx, sess)
+		return auth.NotifyBadge{Total: b.Total, Page: b.Page, InBar: b.InBar}, ok
+	}
+	bus.OnSignalFrom(store.TopicNotification, func(from, arg string) {
+		if from == bus.Node() {
+			return // already told here, before it left
+		}
+		notify.Receive(arg)
+	})
 	bus.OnSignal(store.TopicEvent, func(arg string) {
 		topic, payload, ok := strings.Cut(arg, " ")
 		if !ok {
@@ -698,7 +721,7 @@ func run(o options) error {
 			changes.Record(ev)
 		}
 	})
-	adminAPI.Register(adminMux)
+	mountAdmin(adminMux, readyz(st, router), adminAuth, adminAPI)
 	if err := admin.RegisterConsole(adminMux, consoleURL, st, adminSessions); err != nil {
 		return err
 	}
@@ -744,6 +767,7 @@ func run(o options) error {
 		// traffic, not an administrator's write.
 		oidcprovider.PathPrefix)))
 	adminAPI.DataPlane = dataPlane
+	notifyPlane = dataPlane
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           dataPlane,
@@ -791,11 +815,12 @@ func run(o options) error {
 	// session slides here and no write changes an identity, so neither
 	// wrapper the control plane carries has anything to do.
 	internalMux := http.NewServeMux()
-	internalMux.HandleFunc("GET /healthz", healthz)
-	adminAPI.RegisterInternal(internalMux)
+	mountInternal(internalMux, adminAPI)
+	internalPlane := whilePaused(st, refusesWhilePaused, refusePaused, internalMux)
+	adminAPI.InternalPlane = internalPlane
 	internalSrv := &http.Server{
 		Addr:              o.internalAddr,
-		Handler:           whilePaused(st, refusesWhilePaused, refusePaused, internalMux),
+		Handler:           internalPlane,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -1303,6 +1328,13 @@ func purge(ctx context.Context, sessions *session.Manager, st *store.Store) {
 	}
 	if _, err := st.PurgeOIDCLeftovers(ctx, time.Now().Unix()); err != nil {
 		slog.Error("oidc leftover purge failed", "err", err)
+	}
+	// The notifications past the life their sender gave them (NOTIF-05), with
+	// each recipient's state: personal data is not kept beyond it.
+	if n, err := st.PurgeNotifications(ctx, time.Now().Unix()); err != nil {
+		slog.Error("notification purge failed", "err", err)
+	} else if n > 0 {
+		slog.Debug("purged expired notifications", "count", n)
 	}
 	// The audited calls of the data plane (AUD-04), on their own, shorter
 	// lifetime: the one kind of the trail whose volume follows the traffic.

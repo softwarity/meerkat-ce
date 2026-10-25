@@ -106,8 +106,8 @@ export class GeneralPageComponent {
   protected async setTenancy(multi: boolean): Promise<void> {
     if (!multi) {
       const ok = await this.dialogs.confirm({
-        title: $localize`:@@Serve_one_organisation:Serve a single organisation?`,
-        message: $localize`:@@Serve_one_organisation_message:The other organisations stop being served and their people lose access. Nothing is deleted: switching back restores them.`,
+        title: $localize`:@@Serve_one_organisation:Serve a single tenant?`,
+        message: $localize`:@@Serve_one_organisation_message:The other tenants are no longer served and their users lose access. Nothing is deleted: switching back restores them.`,
         confirmLabel: $localize`:@@Switch:Switch`,
         danger: true,
       });

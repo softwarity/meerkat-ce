@@ -17,9 +17,12 @@ import (
 // key; the mail relay as one object. An update names the fields that moved.
 // Generic over the document's JSON: a section added to the document later is
 // compared without anyone remembering to add it here.
+//
+// Never nil: two documents that differ in nothing answer an empty list, which
+// the API hands on as [] rather than null.
 func Compare(from, to *Document) []Change {
 	a, b := sections(from), sections(to)
-	var out []Change
+	out := []Change{}
 	for _, key := range sortedKeys(a, b) {
 		kind := sectionKind[key]
 		if kind == "" {

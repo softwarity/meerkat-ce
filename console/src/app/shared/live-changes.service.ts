@@ -25,6 +25,7 @@ export type ChangeKind =
   | 'token'
   | 'settings'
   | 'schedule'
+  | 'notification'
   | 'configuration'
   | 'config'
   | 'config-remote'

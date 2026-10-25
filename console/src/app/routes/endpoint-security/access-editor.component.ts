@@ -38,9 +38,9 @@ export function levelShort(a: AccessState): string {
     case 'auth':
       return $localize`:@@Level_short_auth:AUTH`;
     case 'tenant':
-      return $localize`:@@Level_short_tenant:ORG`;
+      return $localize`:@@Level_short_tenant:TENANT`;
     case 'tenants':
-      return $localize`:@@Level_short_tenants:ORG` + '\u00b7' + a.tenants.length;
+      return $localize`:@@Level_short_tenants:TENANT` + '\u00b7' + a.tenants.length;
     case 'deny':
       return $localize`:@@Level_short_deny:DENY`;
     default:
@@ -56,23 +56,23 @@ export function levelShort(a: AccessState): string {
 export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[] = [
   {
     value: '',
-    label: $localize`:@@Access_delegated:Delegated`,
-    hint: $localize`:@@Access_delegated_hint:Everyone gets through, signed in or not: the service decides.`,
+    label: $localize`:@@Access_delegated:Anyone`,
+    hint: $localize`:@@Access_delegated_hint:Signed in or not: the service decides.`,
   },
   {
     value: 'auth',
     label: $localize`:@@Access_authenticated:Signed in`,
-    hint: $localize`:@@Access_authenticated_hint:Anyone with an account, even with no organisation yet.`,
+    hint: $localize`:@@Access_authenticated_hint:Anyone with an account, even with no tenant yet.`,
   },
   {
     value: 'tenant',
-    label: $localize`:@@Access_in_an_organisation:In an organisation`,
-    hint: $localize`:@@Access_in_an_organisation_hint:An organisation must be active on the session.`,
+    label: $localize`:@@Access_in_an_organisation:In a tenant`,
+    hint: $localize`:@@Access_in_an_organisation_hint:A tenant must be active on the session.`,
   },
   {
     value: 'tenants',
-    label: $localize`:@@Access_in_one_of_these:In one of these organisations`,
-    hint: $localize`:@@Access_in_one_of_these_hint:The active organisation must be one of those named below.`,
+    label: $localize`:@@Access_in_one_of_these:In one of these tenants`,
+    hint: $localize`:@@Access_in_one_of_these_hint:The active tenant must be one of those named below.`,
   },
   {
     value: 'deny',
@@ -120,7 +120,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
       <div class="depends">
         @if (value().level === 'tenants') {
           <mat-form-field class="field" subscriptSizing="dynamic">
-            <mat-label i18n="@@Organisations_any_of">Organisations (any one grants access)</mat-label>
+            <mat-label i18n="@@Organisations_any_of">Tenants (any one grants access)</mat-label>
             <mat-select multiple [value]="value().tenants" (selectionChange)="patch({ tenants: $event.value })">
               <mat-select-trigger>
                 @if (value().tenants.length) {
@@ -174,7 +174,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
               </mat-option>
             }
           </mat-select>
-          <mat-hint align="end" i18n="@@Roles_in_active_org_hint">Held in the active organisation. Left empty, any role passes.</mat-hint>
+          <mat-hint align="end" i18n="@@Roles_in_active_org_hint">Held in the active tenant. Left empty, any role passes.</mat-hint>
         </mat-form-field>
       </div>
     }

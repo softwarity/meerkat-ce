@@ -1,4 +1,4 @@
-import { Component, computed, inject, output, signal, viewChild } from "@angular/core";
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from "@angular/core";
 import { HttpErrorResponse, httpResource } from "@angular/common/http";
 import { COMMA, ENTER } from "@angular/cdk/keycodes";
 import { FormField, disabled, form } from "@angular/forms/signals";
@@ -57,6 +57,10 @@ export class SchedulerAccessComponent {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
 
+  // Which API of the internal plane this drawer guards: the scheduler's, or
+  // the notifications' (NOTIF-05), each with its own mode and list.
+  readonly target = input<"schedules" | "notifications">("schedules");
+
   // Said when the drawer may close: saved, or put down.
   readonly closed = output<void>();
 
@@ -86,9 +90,14 @@ export class SchedulerAccessComponent {
   protected readonly problem = signal("");
 
   constructor() {
-    this.api.internalAccess().subscribe({
-      next: (a) => this.take(a),
-      error: (e: HttpErrorResponse) => this.problem.set(e.error?.error ?? e.message),
+    effect(() => {
+      const target = this.target();
+      untracked(() =>
+        (target === "notifications" ? this.api.notifyAccess() : this.api.internalAccess()).subscribe({
+          next: (a) => this.take(a),
+          error: (e: HttpErrorResponse) => this.problem.set(e.error?.error ?? e.message),
+        }),
+      );
     });
   }
 
@@ -101,7 +110,8 @@ export class SchedulerAccessComponent {
   // What the mode's list can offer, asked when the mode changes.
   private readonly candidatesRes = httpResource<InternalAccessCandidates>(() =>
     this.stored()
-      ? `/api/settings/internal-access/candidates?mode=${this.draft().mode}`
+      ? `/api/settings/internal-access/candidates?mode=${this.draft().mode}` +
+        (this.target() === "notifications" ? "&for=notifications" : "")
       : undefined,
   );
   protected readonly unavailable = computed(() => this.candidatesRes.value()?.unavailable ?? "");
@@ -196,13 +206,18 @@ export class SchedulerAccessComponent {
     const { mode, callers } = this.payload();
     this.saving.set(true);
     this.problem.set("");
-    this.api.setInternalAccess(mode, callers).subscribe({
+    const notifications = this.target() === "notifications";
+    (notifications ? this.api.setNotifyAccess(mode, callers) : this.api.setInternalAccess(mode, callers)).subscribe({
       next: (a) => {
         this.saving.set(false);
         this.take(a);
-        this.snack.open($localize`:@@Access_saved:Access to the scheduler saved`, undefined, {
-          duration: 2500,
-        });
+        this.snack.open(
+          notifications
+            ? $localize`:@@Access_notifications_saved:Who may publish notifications saved`
+            : $localize`:@@Access_saved:Access to the scheduler saved`,
+          undefined,
+          { duration: 2500 },
+        );
         this.closed.emit();
       },
       error: (e: HttpErrorResponse) => {

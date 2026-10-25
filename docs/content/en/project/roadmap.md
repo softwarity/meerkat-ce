@@ -77,9 +77,15 @@ line, what is missing from each.
   token, organisation, address - and going over answers 429 with the standard
   headers. What is missing is the screen that shows consumption, throttling
   rather than refusing, and counters that stay right across a cluster.
-- **Notifications** - the SMTP relay is shipped, with one template in the
-  theme's colours, and the daily summary of accesses about to close goes out on
-  its own. What is missing is one template per event, each of them translated.
+- **Notifying your users** (Enterprise) - a service publishes, its users see it
+  in the application they have open, on their desktop and by mail, and can be
+  asked to acknowledge it. See [Notifying your users](/docs/operations/notifications).
+  What is missing is a mail queue that survives a restart, the console's list
+  following a service's publication live, messages in several languages, and
+  unsubscribing from the mails.
+- **Mails** - the SMTP relay is shipped, with one template in the theme's
+  colours, and the daily summary of accesses about to close goes out on its
+  own. What is missing is one template per event, each of them translated.
 - **Identity to upstreams** - the signed token is emitted, with its published
   JWKS and key rotation. What is missing is an exchange endpoint handing back
   an access and refresh pair, and the modes that carry a secret to the
@@ -112,8 +118,8 @@ line, what is missing from each.
   secrets, for installations that already run one and do not want a second.
 - **Issues pushed to GitHub, GitLab or Jira**, rather than read in one more
   screen.
-- **Web Push notifications**, for what an operator has to know without keeping
-  a tab open.
+- **Web Push**, so that a desktop notification reaches a person, an operator
+  first, even when no application is open.
 
 ## Not on the list
 

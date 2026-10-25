@@ -6,10 +6,10 @@
 </div>
 <div class="drawer-body">
   <p class="lead" i18n="@@Internal_help_lead3">
-    Every service of the platform serves HTTPS the same way: a certificate from the platform's PKI
-    for the names it is called by, mounted in its pod, and its authority trusted by the others.
-    For Meerkat that is the Internal plane, and the Console or the Application when a proxy in
-    front re-encrypts to it; on Kubernetes, Add certificate, Ask cert-manager on the plane does it.
+    A service on the platform serves HTTPS with a certificate from the platform's authority, which
+    the other services trust. In Meerkat this is for the Internal plane, and for the Console or the
+    Application behind a proxy that re-encrypts. On Kubernetes, Add certificate, Ask cert-manager
+    does it for you.
   </p>
   <div class="bar">
     <mat-button-toggle-group class="os" [value]="platform()" (change)="platform.set($event.value)" hideSingleSelectionIndicator>
@@ -31,8 +31,8 @@
           @if (only()) {
             <app-snippet filename="mount.sh" [downloadable]="false" [content]="certManagerApply()" />
             <p class="spare" i18n="@@Internal_help_cm_spare">
-              Nobody to write it? With <code>internalTls.certManager=true</code>, <b>Ask cert-manager</b>
-              has the gateway request it itself.
+              Or set <code>internalTls.certManager=true</code> and use <b>Ask cert-manager</b>: the
+              gateway requests it itself.
             </p>
           } @else {
             <app-snippet filename="deployment.yaml" [downloadable]="false" [content]="k8sMount()" />
@@ -68,14 +68,14 @@
       <li>
         <p i18n="@@Internal_help_2">
           <b>Place it here</b>: Add certificate, From the file system, pick <code>tls.crt</code>, then
-          click its Internal tag. Only the paths are kept; a renewal is served on its own.
+          click its Internal tag. Only the paths are stored; renewals are picked up automatically.
         </p>
       </li>
     } @else {
       <li>
         <p i18n="@@Internal_help_meerkat_trust">
           <b>Let Meerkat call it over HTTPS</b>: add the authority's <code>ca.crt</code> to Trusted
-          authorities, once - every service it signed is then verified.
+          authorities, once: every service it signed is then verified.
         </p>
       </li>
     }

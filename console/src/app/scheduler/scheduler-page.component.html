@@ -5,7 +5,7 @@
       <!-- The three filters live in the banner, like the routes' search: they
        narrow the list below, and a list that narrows keeps its header. -->
       <mat-form-field subscriptSizing="dynamic">
-        <mat-label i18n="@@Organization">Organization</mat-label>
+        <mat-label i18n="@@Tenant">Tenant</mat-label>
         <mat-select
           [value]="tenant()"
           (selectionChange)="tenant.set($event.value); subscribe()"
@@ -39,7 +39,7 @@
         subscriptSizing="dynamic"
         [error]="metaError()"
         i18n-info="@@Metadata_filter_info"
-        info="Filter by metadata: key=value, or key=~expression. All conditions apply."
+        info="Filter by metadata: key=value or key=~regex. Separate conditions with spaces; all must match."
       >
         <input
           matInput
@@ -129,7 +129,7 @@
                         >
                       } @else if (s.runState === "waiting") {
                         <ng-container i18n="@@Run_waiting"
-                          >lost, to be sent again</ng-container
+                          >interrupted, will be sent again</ng-container
                         >
                       } @else {
                         <ng-container i18n="@@Run_calling"
@@ -145,7 +145,7 @@
                       @if (s.claimedBy) {
                         -
                         <ng-container i18n="@@Claimed_by"
-                          >claimed by</ng-container
+                          >run by</ng-container
                         >
                         {{ s.claimedBy }}
                       }
@@ -191,7 +191,7 @@
                   @if (s.at) {
                     <!-- A single date is read in the hours of whoever is
                      looking, like every other date on this screen. -->
-                    <span>{{ momentOf(s) | zoned: zone() }}</span>
+                    <span class="nowrap">{{ momentOf(s) | zoned: zone() }}</span>
                     <span class="muted" i18n="@@Once">once</span>
                   } @else {
                     <span class="mono">{{ s.cron || s.every }}</span>
@@ -220,7 +220,7 @@
                 } @else if (finished(s)) {
                   <span class="muted" i18n="@@Finished">finished</span>
                 } @else {
-                  {{ s.nextAt | zoned: zone() }}
+                  <span class="nowrap">{{ s.nextAt | zoned: zone() }}</span>
                 }
               </mat-cell>
             </ng-container>
@@ -244,7 +244,7 @@
                       <span class="dot"></span
                       ><ng-container i18n="@@Running">running</ng-container>
                     </span>
-                    <span class="muted">{{ s.runStarted | zoned: zone() }}</span>
+                    <span class="muted nowrap">{{ s.runStarted | zoned: zone() }}</span>
                   </span>
                 } @else if (s.lastAt > 0) {
                   <span class="lines">
@@ -256,7 +256,7 @@
                     >
                       <span class="dot"></span>{{ s.lastState }}
                     </span>
-                    <span class="muted">{{ s.lastAt | zoned: zone() }}</span>
+                    <span class="muted nowrap">{{ s.lastAt | zoned: zone() }}</span>
                   </span>
                 } @else {
                   <span class="muted" i18n="@@Never_run">never run</span>
@@ -424,7 +424,7 @@
           <dt i18n="@@When">When</dt>
           @if (s.at) {
             <dd>
-              {{ momentOf(s) | zoned: zone() : "long" }}
+              <span class="nowrap">{{ momentOf(s) | zoned: zone() : "long" }}</span>
               <span class="muted" i18n="@@Once_delayed_action"
                 >- once, then finished</span
               >
@@ -446,14 +446,14 @@
               >
             } @else if (finished(s)) {
               <span class="muted" i18n="@@Finished_long"
-                >None: the single date has passed</span
+                >None: the one-time date has passed</span
               >
             } @else {
-              {{ s.nextAt | zoned: zone() : "long" }}
+              <span class="nowrap">{{ s.nextAt | zoned: zone() : "long" }}</span>
             }
           </dd>
           @if (s.tenantId) {
-            <dt i18n="@@Organization">Organization</dt>
+            <dt i18n="@@Tenant">Tenant</dt>
             <dd>{{ s.tenantId }}</dd>
           }
           <!-- Who wrote it on the internal plane. A schedule older than that
@@ -478,7 +478,7 @@
         }
 
         @if (running(s)) {
-          <h3 i18n="@@Run_in_flight">Run in flight</h3>
+          <h3 i18n="@@Run_in_flight">Current run</h3>
           <mat-progress-bar
             [mode]="s.progress > 0 ? 'determinate' : 'indeterminate'"
             [value]="s.progress"
@@ -488,15 +488,15 @@
             <dd>
               @if (s.runState === "accepted") {
                 <ng-container i18n="@@Run_accepted_long"
-                  >Accepted: the service reports on it</ng-container
+                  >Accepted: the service reports its progress</ng-container
                 >
               } @else if (s.runState === "waiting") {
                 <ng-container i18n="@@Run_waiting_long"
-                  >Lost, to be sent again</ng-container
+                  >Interrupted, will be sent again</ng-container
                 >
               } @else {
                 <ng-container i18n="@@Run_calling_long"
-                  >Calling - waiting for the answer</ng-container
+                  >Waiting for the service to answer</ng-container
                 >
               }
             </dd>
@@ -505,18 +505,18 @@
               <dd>{{ s.runDetail }}</dd>
             }
             <dt i18n="@@Started">Started</dt>
-            <dd>{{ s.runStarted | zoned: zone() : "long" }}</dd>
+            <dd class="nowrap">{{ s.runStarted | zoned: zone() : "long" }}</dd>
             @if (s.attempts > 1) {
               <dt i18n="@@Attempt">Attempt</dt>
               <dd>{{ s.attempts }}</dd>
             }
-            <dt i18n="@@Claimed_by">claimed by</dt>
+            <dt i18n="@@Claimed_by">run by</dt>
             <dd>
               @if (s.claimedBy) {
                 {{ s.claimedBy }}
               } @else {
                 <span class="muted" i18n="@@Handed_back"
-                  >handed back, waiting for another gateway</span
+                  >waiting for a gateway to take it over</span
                 >
               }
             </dd>
@@ -555,7 +555,7 @@
                   >
                     <span class="dot"></span>{{ run.state }}
                   </span>
-                  <span class="when">{{ run.endedAt | zoned: zone() }}</span>
+                  <span class="when nowrap">{{ run.endedAt | zoned: zone() }}</span>
                   <span class="muted">
                     {{ run.status }}
                     @if (runFacts(run); as facts) {

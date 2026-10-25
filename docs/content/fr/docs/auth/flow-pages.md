@@ -33,6 +33,7 @@ ne doit jamais séjourner dans un cache partagé.
 | `/account-pending` | la salle d'attente : un compte qui existe mais auquel rien n'a encore été accordé |
 | `/refused` | la personne est connectée, mais refusée. La page nomme la règle qui a refusé et propose ce que cette session *peut* ouvrir |
 | `/profile/...` | les pages personnelles : identité, mot de passe, second facteur, passkeys, autorités, historique des connexions, sessions actives, jetons d'API, départ d'une organisation |
+| `/meerkat/notifications` | les notifications de la personne, de tous ses tenants. Enterprise : voir [Notifier vos utilisateurs](/docs/operations/notifications) |
 
 La page d'indisponibilité n'a pas de chemin propre : pendant une maintenance, elle répond
 `503` sur **tous** les chemins, donne un motif tiré d'une liste fermée et laisse à un
@@ -42,6 +43,41 @@ La page de connexion de la console repose sur le même mécanisme, sur le port
 d'administration, à une différence près : elle est toujours en anglais et toujours sombre.
 La console est la porte de Meerkat lui-même, elle ne reprend pas les réglages de
 l'intégrateur.
+
+## Le profil
+
+`/profile` est la page personnelle de chacun, la même côté applications et côté
+console. Deux choses y dépassent la page elle-même.
+
+**Le chemin du retour vers les applications.** Le profil propose un seul
+contrôle pour retourner au travail, le premier de ceux-ci qui s'applique :
+
+1. **Retour**, vers la page d'où vient la personne, tant qu'elle lui est encore
+   ouverte dans le tenant où elle travaille ;
+2. en mode Portal, un bouton au nom de l'application, qui mène au premier module
+   qu'elle peut ouvrir ;
+3. en mode Links, une liste d'une ligne du [catalogue](/docs/customise/portal),
+   ses conteneurs en groupes ;
+4. en mode None, une liste des routes UI qu'elle peut ouvrir.
+
+Une liste d'un seul choix est un simple bouton à son nom, et une route sur un
+autre hôte est proposée à son adresse complète. Quand rien ne lui est ouvert, un
+bouton **Applications** mène à la page qui dit qu'aucune application n'est
+encore ouverte à son compte.
+
+**Le fuseau horaire.** Choisi une fois, il sert partout où la personne lit une
+heure : les pages de la gateway, la console pour un administrateur, et les
+applications qui le demandent.
+
+- Sans choix, la première option, **Fuseau du navigateur**, chaque écran suit le
+  navigateur. **UTC** est proposé comme n'importe quel fuseau.
+- Toute date et toute heure s'écrivent d'une seule façon, en ISO sur une ligne :
+  `2026-10-25T17:41`, suivi de `Z` en UTC, et `2026-10-25` pour un jour seul.
+- Une application reçoit le fuseau que la personne a choisi. Sans choix, elle ne
+  reçoit pas de `timezone` du tout, et prend celui du navigateur.
+
+Un compte qui était en UTC seulement parce que personne n'avait choisi suit le
+navigateur depuis que ce choix existe ; qui veut UTC le choisit de nouveau.
 
 ## Les couleurs
 

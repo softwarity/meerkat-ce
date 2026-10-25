@@ -92,8 +92,8 @@ func TestTheDevCapabilityClosesEveryDoor(t *testing.T) {
 	if code := call("GET", "/meerkat/apidocs/catalog.json", ""); code == http.StatusOK {
 		t.Fatal("the route API docs answered a developer without the capability")
 	}
-	if code := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane"}`); code != http.StatusUnauthorized {
-		t.Fatalf("UI test mode without the capability: %d, want 401", code)
+	if code := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane"}`); code != http.StatusForbidden {
+		t.Fatalf("UI test mode without the capability: %d, want 403", code)
 	}
 	// And the identity simulation the docs and the bar drive: refused at the
 	// source, so a bar left open in a tab cannot keep posing as someone else.

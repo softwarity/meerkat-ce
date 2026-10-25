@@ -15,10 +15,11 @@ export class MeService {
   readonly me = signal<Me | null>(null);
   readonly user = computed(() => this.me()?.user ?? null);
   readonly isRoot = computed(() => this.user()?.root ?? false);
-  // The zone this operator reads dates in, set on their own profile. UTC is
-  // the store's default, so an account that never chose one reads the gateway's
-  // own hours - which is the honest answer, not a guess from the browser.
-  readonly timezone = computed(() => this.user()?.timezone || 'UTC');
+  // The zone this operator reads dates in: the one chosen on their profile,
+  // else their browser's. Changing it on the profile reloads the page.
+  readonly timezone = computed(
+    () => this.user()?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  );
   readonly isTenantCreator = computed(() => this.user()?.tenantCreator ?? false);
   // Split administration (RBAC-05): root implies both scopes.
   readonly isInfraAdmin = computed(() => this.isRoot() || (this.user()?.infraAdmin ?? false));
@@ -116,7 +117,7 @@ export class MeService {
       // The zone this operator's own screens write dates in (their profile
       // sets it, on either plane). Stamped rather than asked for: a screen
       // that shows an hour must show the right one on the first paint.
-      timezone: b.getAttribute('data-meerkat-timezone') || 'UTC',
+      timezone: b.getAttribute('data-meerkat-timezone') ?? '',
       root: has('root'),
       dev: has('dev'),
       tenantCreator: has('tenant-creator'),

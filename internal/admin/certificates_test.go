@@ -178,6 +178,25 @@ func signCSR(t *testing.T, csrPEM string) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
 
+// A signing request takes what it uses: the signer sets the validity, and it
+// is placed once signed. Asking for either is refused rather than ignored.
+func TestASigningRequestRefusesWhatItWouldIgnore(t *testing.T) {
+	f := setup(t)
+	for _, body := range []string{
+		`{"names":["x.example.com"],"days":30}`,
+		`{"names":["x.example.com"],"app":true}`,
+		`{"names":["x.example.com"],"console":true,"replace":true}`,
+	} {
+		code, out := f.call(t, "POST", "/api/certificates/signing-request", body, f.rootC)
+		if code != http.StatusBadRequest {
+			t.Errorf("%s: %d %s, want 400", body, code, out)
+		}
+	}
+	if _, list := f.call(t, "GET", "/api/certificates", "", f.rootC); strings.Contains(list, "x.example.com") {
+		t.Fatalf("a refused request was kept: %s", list)
+	}
+}
+
 func TestAdoptRefusesTheCertificateOfAnotherOrder(t *testing.T) {
 	f := setup(t)
 	code, out := f.call(t, "POST", "/api/certificates/signing-request",
@@ -253,6 +272,32 @@ func TestTheExternalAccountKeyFollowsTheVaultRule(t *testing.T) {
 	got, _ := f.api.st.RawTLS(ctx).ACME.AuthorityByID(v.ID)
 	if got.EABHMACKey != "c2VjcmV0LWhtYWMta2V5" || got.EABKeyID != "kid-2" {
 		t.Fatalf("a blank field keeps the secret, the rest saves: %+v", got)
+	}
+}
+
+// An authority goes back as it was listed: what only the server writes
+// (eabSecretSet, uses) is taken and dropped, never a 400, and the held secret
+// stays held.
+func TestAnAuthorityGoesBackAsItWasListed(t *testing.T) {
+	f := setupEE(t)
+	authority(t, f, `{"provider":"zerossl","acceptTos":true,"eabKeyId":"kid-1","eabHmacKey":"c2VjcmV0LWhtYWMta2V5"}`)
+	_, out := f.call(t, "GET", "/api/acme/authorities", "", f.rootC)
+	var listed struct {
+		Authorities []map[string]any `json:"authorities"`
+	}
+	if err := json.Unmarshal([]byte(out), &listed); err != nil || len(listed.Authorities) != 1 {
+		t.Fatalf("list: %v %s", err, out)
+	}
+	v := listed.Authorities[0]
+	v["name"], v["uses"] = "Renamed", []string{"shop.example.com"}
+	body, _ := json.Marshal(v)
+	code, out := f.call(t, "PUT", "/api/acme/authorities/"+v["id"].(string), string(body), f.rootC)
+	if code != http.StatusOK || !strings.Contains(out, `"eabSecretSet":true`) || strings.Contains(out, "shop.example.com") {
+		t.Fatalf("the listed view sent back: %d %s", code, out)
+	}
+	got, _ := f.api.st.RawTLS(t.Context()).ACME.AuthorityByID(v["id"].(string))
+	if got.Name != "Renamed" || got.EABHMACKey != "c2VjcmV0LWhtYWMta2V5" {
+		t.Fatalf("the rename saves and the secret stays: %+v", got)
 	}
 }
 

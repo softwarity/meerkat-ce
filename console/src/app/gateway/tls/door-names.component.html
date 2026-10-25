@@ -38,7 +38,7 @@
 @if (!door().proxied && door().uncovered.length) {
   <p class="problem">
     <mat-icon>warning</mat-icon>
-    <span i18n="@@Door_names_uncovered">No certificate here covers {{ door().uncovered.join(', ') }}: browsers will refuse its HTTPS.</span>
+    <span i18n="@@Door_names_uncovered">No certificate here covers {{ door().uncovered.join(', ') }}: browsers will refuse HTTPS.</span>
   </p>
 }
 
@@ -75,7 +75,7 @@
     ><mat-icon>info</mat-icon></button>
   </div>
   <p class="hint" i18n="@@Proxy_addresses_hint">
-    Leave empty when the proxy runs in the cluster or on a private network. Name its addresses
-    when it reaches Meerkat from public ones: a CDN, a cloud load balancer.
+    Leave empty for a proxy on a private network. List them for a proxy with public addresses
+    (a CDN, a cloud load balancer), or every visitor is seen as the proxy.
   </p>
 }

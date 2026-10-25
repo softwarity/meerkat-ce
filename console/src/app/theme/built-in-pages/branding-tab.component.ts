@@ -59,11 +59,11 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         <app-ee-lock
           feature="white-label"
           i18n-why="@@White_label_ee_why"
-          why="Serve these pages under your own name alone."
+          why="Show only your own brand on these pages."
         />
       </div>
       <p class="hint text-muted" i18n="@@Meerkat_mark_hint">
-        The pages carry a "powered by softwarity/meerkat" line at the foot.
+        Pages show "powered by softwarity/meerkat" at the bottom.
       </p>
       <mat-slide-toggle
         [checked]="scope.hideMark()"

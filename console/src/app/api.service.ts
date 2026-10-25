@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 // The developer tunnel (DEV-11), Infra, Plug. Mirrors admin.plugAnswer.
 export interface PlugSetting {
@@ -1504,6 +1504,136 @@ export interface InternalAccessCandidates {
   unavailable?: string;
 }
 
+// The notifications (NOTIF-05): three levels decide whether a tenant receives
+// them - root (with a switch for the whole gateway), the application admin and
+// the tenant admin - and each one can only take away.
+export type NotifyLevel = 'root' | 'app-admin' | 'tenant-admin';
+// on: allowed by the reader's level and received; off: turned off by it;
+// offBelow: allowed by it, turned off below; offAbove: turned off above.
+export type NotifyState = 'on' | 'off' | 'offBelow' | 'offAbove';
+
+export interface NotifyTenant {
+  id: string;
+  name: string;
+  state: NotifyState;
+  offBy?: NotifyLevel;
+  // The first level below the reader's that turned it off, whatever the
+  // reader decided: what allowing it again finds.
+  belowBy?: NotifyLevel;
+  effective: boolean;
+}
+
+export interface NotifySettings {
+  enabled: boolean;
+  // The reader's level; '' for a reader who decides nothing.
+  level: 'root' | 'app-admin' | '';
+  tenants: NotifyTenant[];
+  // One tenant: the screen shows one switch and never names it.
+  single: boolean;
+  cap: number;
+  defaultCap: number;
+  access: InternalAccess;
+  // Where the services publish, on the internal plane.
+  path: string;
+  editable: boolean;
+  rootEditable: boolean;
+  accessEditable: boolean;
+}
+
+// One level's decision: the tenants it turns off, allows again, or forces on
+// (clearing what the levels below decided). The switch and the cap: root's.
+export interface NotifySettingsWrite {
+  enabled?: boolean;
+  cap?: number;
+  off: string[];
+  on: string[];
+  force: string[];
+}
+
+// A tenant's switch, as its administrator sees it.
+export interface TenantNotify {
+  state: NotifyState;
+  offBy?: NotifyLevel;
+  effective: boolean;
+}
+
+export type NotificationLevel = 'info' | 'success' | 'warning' | 'error';
+
+// One notification a service sent, as the console lists it.
+export interface SentNotification {
+  id: string;
+  tenantId: string;
+  sender: string;
+  senderVia: string;
+  key?: string;
+  level: NotificationLevel;
+  title: Record<string, string>;
+  body: Record<string, string>;
+  detailUrl?: string;
+  // How the reader's browser calls each action, and the JSON it sends.
+  actions?: { label: Record<string, string>; url: string; route?: string; method?: string; body?: unknown }[];
+  meta?: Record<string, string>;
+  mail?: boolean;
+  recipients: number;
+  reads: number;
+  createdAt: number;
+  expiresAt: number;
+  withdrawnAt?: number;
+  // Asked of its readers: one acknowledgement closes it (single), or every
+  // reader's (all). How many gave theirs, when it was closed, and by whom
+  // when one closed it for everyone.
+  ack?: NotificationAck;
+  ackCompleteAt?: number;
+  acknowledged: number;
+  ackBy?: { id: string; username: string; name?: string };
+}
+
+export type NotificationAck = 'single' | 'all';
+
+// A route a notification's link may lead to, named the way a service names
+// it: the service, and the path that service starts at.
+export interface NotifyRoute {
+  route: string;
+  name: string;
+  ui: boolean;
+  service: string;
+  base?: string;
+  // The public address base leads to.
+  public?: string;
+  // Why an action, or a detail, leading here would be refused.
+  problem?: string;
+  detailProblem?: string;
+}
+
+// What a notification to one tenant may name, for the builder on its page.
+export interface NotifyCompose {
+  tenant: string;
+  levels: NotificationLevel[];
+  roles: { name: string; description?: string }[];
+  members: { username: string; fullname?: string }[];
+  routes: NotifyRoute[];
+  mail: boolean;
+  maxActions: number;
+  path: string;
+}
+
+// What a publication answers.
+export interface NotifyPublished {
+  id: string;
+  recipients: number;
+  existing?: boolean;
+}
+
+// One recipient of a notification: who was told, and when they read it.
+export interface NotificationReader {
+  userId: string;
+  username: string;
+  fullname?: string;
+  readAt?: number;
+  hiddenAt?: number;
+  ackedAt?: number;
+}
+
 // What the License screen shows of a license: never the file itself.
 export interface License {
   id?: string;
@@ -1667,7 +1797,7 @@ export interface Issue {
 // credential sits in a deployment manifest, often another team's repository,
 // and a read-only token there would hand whoever finds it the whole
 // configuration.
-export type TokenScope = 'schedules' | 'readonly' | 'full';
+export type TokenScope = 'schedules' | 'notifications' | 'readonly' | 'full';
 
 // The second axis: what a token may act ON. It MASKS its owner's capabilities
 // rather than adding a rights model of its own - a gateway token minted by
@@ -2346,7 +2476,20 @@ export interface PortalConfig {
   // 0 (as drawn) to 50 (circle), in percent of the logo's box.
   logoRadius?: number;
   entries?: PortalEntry[];
+  // Where users read their notifications (NOTIF-05): the built-in page when
+  // absent or empty, or a UI route and a path under it.
+  notifyPage?: NotifyPage;
 }
+
+// The notifications page: both empty for the built-in one, never a path alone.
+export interface NotifyPage {
+  routeId?: string;
+  path?: string;
+}
+
+// The one entry the gateway provides rather than a route: it opens the
+// notifications page and wears the unread badge.
+export type PortalSpecial = 'notifications';
 
 // A top-level module: a full application (a route), which may gather children
 // shown in the secondary surface. label/icon override what the route offers.
@@ -2359,11 +2502,11 @@ export interface PortalEntry {
   icon?: string;
   label?: string;
   description?: string;
-  // Reserved: the channel a future notifier writes a count onto (PORTAL-01).
-  badge?: string;
   // Turned off for everyone but kept in the config (not served).
   disabled?: boolean;
   children?: PortalSubEntry[];
+  // The notifications entry: no route, no children.
+  special?: PortalSpecial;
 }
 
 // A sub-module of a parent, shown in the secondary surface.
@@ -2372,8 +2515,8 @@ export interface PortalSubEntry {
   icon?: string;
   label?: string;
   description?: string;
-  badge?: string;
   disabled?: boolean;
+  special?: PortalSpecial;
 }
 
 export const PORTAL_LAYOUTS = ['header', 'rail'] as const;
@@ -3543,6 +3686,74 @@ export class ApiService {
     return this.http.put<InternalAccess>('/api/settings/internal-access', { mode, callers });
   }
 
+  // The notifications (NOTIF-05). 404 on the community image.
+  notifySettings(): Observable<NotifySettings> {
+    return this.http.get<NotifySettings>('/api/notifications/settings');
+  }
+
+  setNotifySettings(write: NotifySettingsWrite): Observable<NotifySettings> {
+    return this.http.put<NotifySettings>('/api/notifications/settings', write);
+  }
+
+  // Who may publish, in the shape the access drawer edits.
+  notifyAccess(): Observable<InternalAccess> {
+    return this.notifySettings().pipe(map((s) => s.access));
+  }
+
+  setNotifyAccess(mode: InternalAccessMode, callers: string[]): Observable<InternalAccess> {
+    return this.http
+      .put<NotifySettings>('/api/notifications/access', { mode, callers })
+      .pipe(map((s) => s.access));
+  }
+
+  sentNotifications(tenant = ''): Observable<SentNotification[]> {
+    const params = tenant ? new HttpParams().set('tenant', tenant) : undefined;
+    return this.http.get<SentNotification[]>('/api/notifications', { params });
+  }
+
+  notificationReaders(id: string): Observable<NotificationReader[]> {
+    return this.http.get<NotificationReader[]>(`/api/notifications/${encodeURIComponent(id)}/readers`);
+  }
+
+  withdrawNotification(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/notifications/${encodeURIComponent(id)}`);
+  }
+
+  // The tenant level: its administrator's switch, and what was sent to it.
+  tenantNotify(tenantId: string): Observable<TenantNotify> {
+    return this.http.get<TenantNotify>(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`);
+  }
+
+  setTenantNotify(tenantId: string, on: boolean): Observable<TenantNotify> {
+    return this.http.put<TenantNotify>(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/settings`, { on });
+  }
+
+  tenantNotifications(tenantId: string): Observable<SentNotification[]> {
+    return this.http.get<SentNotification[]>(`/api/tenants/${encodeURIComponent(tenantId)}/notifications`);
+  }
+
+  tenantNotificationReaders(tenantId: string, id: string): Observable<NotificationReader[]> {
+    return this.http.get<NotificationReader[]>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/notifications/${encodeURIComponent(id)}/readers`,
+    );
+  }
+
+  withdrawTenantNotification(tenantId: string, id: string): Observable<void> {
+    return this.http.delete<void>(
+      `/api/tenants/${encodeURIComponent(tenantId)}/notifications/${encodeURIComponent(id)}`,
+    );
+  }
+
+  // The notification builder on the tenant's page: what it offers, and the
+  // message sent the way a service sends it.
+  tenantNotifyCompose(tenantId: string): Observable<NotifyCompose> {
+    return this.http.get<NotifyCompose>(`/api/tenants/${encodeURIComponent(tenantId)}/notifications/compose`);
+  }
+
+  publishTenantNotification(tenantId: string, message: object): Observable<NotifyPublished> {
+    return this.http.post<NotifyPublished>(`/api/tenants/${encodeURIComponent(tenantId)}/notifications`, message);
+  }
+
   // The trail as a CSV file (STORE-06): the same filters, the same perimeter.
   auditExportUrl(q: AuditQuery = {}): string {
     let params = new HttpParams();
@@ -3674,13 +3885,14 @@ export class ApiService {
   updateAdminToken(
     id: string,
     name: string,
-    days: number,
+    days: number | null,
     scope: TokenScope,
     from: string,
   ): Observable<AdminToken> {
+    // null leaves `days` out, which keeps the expiry the token has.
     return this.http.put<AdminToken>(`/api/admin-tokens/${encodeURIComponent(id)}`, {
       name,
-      days,
+      ...(days === null ? {} : { days }),
       scope,
       from,
     });

@@ -60,6 +60,11 @@ func (h *Handler) showRefused(w http.ResponseWriter, r *http.Request) {
 		reason = chrome.T["refusedRoles"]
 	case "user":
 		reason = chrome.T["refusedUser"]
+	case "apps":
+		// Not one page refused: nothing at all is open to them yet. The
+		// profile's Applications button leads here when it has nowhere else
+		// to go (profileapps.go).
+		reason = chrome.T["refusedApps"]
 	}
 	writeFlow(w, refusedPage, refusedData{
 		flowChrome: chrome,

@@ -2,7 +2,7 @@
 
 <mat-dialog-content class="body" appFileDrop dropClass="over" (filesDropped)="take($event)">
   <p class="note" i18n="@@Trust_pem_note">
-    The authority's certificate, or several in one file: choose the file, drop it here, or paste it.
+    Choose, drop or paste the authority's certificate. One file can hold several.
   </p>
   <div class="file">
     <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.txt" (picked)="take($event)">

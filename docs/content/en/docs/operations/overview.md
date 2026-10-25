@@ -22,6 +22,7 @@ changed something. Each has one screen, and this page says which.
 | Who called what, and how it went | [Logs](/docs/operations/logs) |
 | Where the seconds of THAT request went | [Traces](/docs/operations/tracing) |
 | Did the scheduled call run, and how | [Scheduled calls](/docs/operations/scheduler), the **Scheduler** entry of the rail |
+| What did a service tell its users, and who read it | [Notifications](/docs/console/notifications), the **Notifications** entry of the rail |
 | How traces, metrics, audit and logs reach my collector | [OpenTelemetry export](/docs/operations/tracing#exporting-to-your-collector), under **Infra, OpenTelemetry** |
 | Is this node ready for traffic | [Health probes](/docs/operations/health) |
 | When does that certificate expire | [TLS and certificates](/docs/operations/tls) |

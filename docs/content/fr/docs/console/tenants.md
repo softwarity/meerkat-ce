@@ -29,6 +29,7 @@ vers l'une d'elles.
 | **Groups** | La matrice des rôles par groupe, et le mode de groupe |
 | **Members** | Qui fait partie de cette organisation, et de quels groupes |
 | **Group rules** | Ce que déclare une autorité, traduit ici en appartenances |
+| **Notifications** | Si ce tenant reçoit des notifications, ce qui lui a été envoyé et qui l'a lu, et un tiroir pour en envoyer une. Enterprise : voir [Notifications](/docs/console/notifications#la-section-notifications-dun-tenant) |
 | **Danger zone** | Le transfert de propriété et la suppression |
 
 **Groups**, **Members** et **Group rules** sont les écrans décrits dans

@@ -56,7 +56,7 @@
         matButton="tonal"
         (click)="openKeys()"
         i18n-matTooltip="@@What_signs_identity_tokens_and_oidc_clients"
-        matTooltip="What signs the identity tokens, and the applications that sign in through Meerkat"
+        matTooltip="Signing keys and OIDC clients"
       >
         <mat-icon svgIcon="jwt" />
         <ng-container i18n="@@OIDC_JWT">OIDC / JWT</ng-container>
@@ -67,14 +67,14 @@
       @if (loading()) {
         <loading-indicator withContainer />
       } @else if (routes().length === 0) {
-        <div class="empty" i18n="@@No_route_yet_create_the_first_one">No route yet, create the first one.</div>
+        <div class="empty" i18n="@@No_route_yet_create_the_first_one">No route yet. Create the first one.</div>
       } @else if (shown().length === 0) {
         @if (query().trim()) {
           <div class="empty" i18n="@@No_route_matches_NAME">No route matches "{{ query() }}".</div>
         } @else if (kind() === 'ui') {
-          <div class="empty" i18n="@@No_UI_route">No route serves pages in a browser.</div>
+          <div class="empty" i18n="@@No_UI_route">No UI route.</div>
         } @else {
-          <div class="empty" i18n="@@No_service_route">Every route serves pages in a browser.</div>
+          <div class="empty" i18n="@@No_service_route">No service route.</div>
         }
       } @else {
         <app-routes-table

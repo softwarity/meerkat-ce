@@ -750,7 +750,7 @@ export class RouteEditorComponent {
   // Audit names operations of an API, and a redirect has none: the block
   // stays on screen, greyed, with the reason.
   protected readonly noAuditTip = $localize`:@@No_audit_on_redirect:A redirect has no operations to audit.`;
-  protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:This route answers by itself: nothing goes upstream, so no incoming filters and no identity.`;
+  protected readonly notProxiedTip = $localize`:@@Not_proxied_tip:Only for a route that proxies to a service.`;
 
   protected onSectionPick(s: Section): void {
     this.section.set(s);
@@ -849,8 +849,8 @@ export class RouteEditorComponent {
   // would be a lie; on a community one, the mode is what the licence covers.
   protected readonly frozenTip = computed(() =>
     this.me.enterprise()
-      ? $localize`:@@Frozen_single_mode:Single-organisation mode: the value is the same on every request. See Application, General.`
-      : $localize`:@@Frozen_single_mode_ce:One organisation only: the value is the same on every request. Several organisations is an Enterprise feature.`,
+      ? $localize`:@@Frozen_single_mode:Single-tenant mode: the value is the same on every request. See Application, General.`
+      : $localize`:@@Frozen_single_mode_ce:One tenant only: the value is the same on every request. Several tenants need the Enterprise edition.`,
   );
   // WHAT IDENTITY DECLARED, minus the roles. The page used to carry its own
   // list of facts, ticked separately from the identity one - the same eight
@@ -1130,7 +1130,7 @@ export class RouteEditorComponent {
       }
       if (reserved.includes(name)) {
         out.push(
-          $localize`:@@Gap_claim_reserved:claim ${name}:claim: is written by the provider itself`,
+          $localize`:@@Gap_claim_reserved:claim ${name}:claim: is reserved`,
         );
       }
       if (seen.has(name)) {
@@ -1341,7 +1341,7 @@ export class RouteEditorComponent {
         errors.push(
           gapError(
             "predicates",
-            $localize`:@@Gap_no_predicate:at least one - a path of "/**" if this route is meant to catch everything`,
+            $localize`:@@Gap_no_predicate:at least one (a path of /** to catch everything)`,
           ),
         );
       }
@@ -1528,7 +1528,7 @@ export class RouteEditorComponent {
     const ct = String(this.terminalSpec()?.args?.["contentType"] ?? "");
     return ct.trim().toLowerCase().startsWith("text/html");
   });
-  protected readonly uiTip = $localize`:@@UI_serves_pages_in_a_browser:UI: serves pages in a browser`;
+  protected readonly uiTip = $localize`:@@UI_serves_pages_in_a_browser:This route serves pages to a browser`;
   protected readonly uiImpossibleTip = computed(() =>
     this.mode() === "redirect"
       ? $localize`:@@UI_not_for_a_redirect:A redirect has no page to inject into.`
@@ -1576,7 +1576,7 @@ export class RouteEditorComponent {
   // own hint rather than in a column at the end of the row: it is about what
   // THIS row sends, and a column of its own left every other row with an empty
   // one.
-  protected readonly remoteUserWhy = $localize`:@@Remote_user_why:No standard header names the signed-in account. Meerkat sends Spring's and its dashed form (nginx drops underscores by default); incoming ones are removed.`;
+  protected readonly remoteUserWhy = $localize`:@@Remote_user_why:Also sent for services that read these headers. Any the caller sends are removed.`;
 
   protected alsoSends(field: string): string {
     return field === "username" && this.draft().identityMechanism === "headers"
@@ -1840,7 +1840,7 @@ export class RouteEditorComponent {
     if (!this.listOnly() || this.loadedNamespace() !== ns) return "";
     return this.matchChoice(raw)
       ? ""
-      : $localize`:@@Gap_upstream_not_in_namespace:the upstream is no service of namespace ${ns}:NS:: pick one from the list, or choose External`;
+      : $localize`:@@Gap_upstream_not_in_namespace:the upstream is not a service of namespace ${ns}:NS:: pick one from the list, or choose External`;
   }
 
   // The offered service an upstream names, null when none. The host alone:
@@ -2223,7 +2223,7 @@ export class RouteEditorComponent {
             // The signature IS the explanation: a body whose argument nobody
             // names is a body written by guesswork.
             title: $localize`:@@On_scheme_change:function (colorScheme: "light" | "dark" | "auto")`,
-            hint: $localize`:@@Scheme_script_hint2:Called on every change and on page load, before and after the page is parsed: it must cope with finding nothing. On "auto", follow the system.`,
+            hint: $localize`:@@Scheme_script_hint2:Called on every change and on page load, possibly before the page exists: handle missing elements. On "auto", follow the system.`,
           }
         : kind === "onLocaleChange"
         ? {

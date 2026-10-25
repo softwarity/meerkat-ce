@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -102,6 +103,11 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 	if err := s.checkRevBy(ctx, "roles", "name", "role", r.Name, r.Rev); err != nil {
 		return err
 	}
+	// The system mark is set when a role is FIRST written and never changed by
+	// a later save: it is what protects the product's own roles from deletion,
+	// and an edit that cleared it - a console form, an imported file - made a
+	// system role deletable at the next call.
+	//
 	// [] rather than null when there are none: the column is read back into the
 	// API's answer, and a list the console indexes into must never arrive null.
 	if r.Tags == nil {
@@ -118,7 +124,7 @@ func (s *Store) SaveRole(ctx context.Context, r Role) error {
 		 VALUES (?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(name) DO UPDATE SET
 		   description = excluded.description, parent = excluded.parent,
-		   tags = excluded.tags, system = excluded.system,
+		   tags = excluded.tags,
 		   updated_at = excluded.updated_at, rev = roles.rev + 1`,
 		r.Name, r.Description, parent, string(tags), r.System, now, now)
 	if err != nil {
@@ -389,6 +395,21 @@ func (s *Store) SetMemberGroups(ctx context.Context, tenantID, userID string, gr
 		return fmt.Errorf("store: set member groups: %w", err)
 	}
 	for _, gid := range groupIDs {
+		// The group must be THIS tenant's. The foreign key only says it exists
+		// somewhere, and the roles resolve from member_groups by tenant alone:
+		// another organisation's group, attached here, would hand its roles to
+		// a session acting in this one - an administrator of one organisation
+		// granting what another organisation decided.
+		var owner string
+		if err = tx.QueryRowContext(ctx, `SELECT tenant_id FROM groups WHERE id = ?`, gid).Scan(&owner); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("group %q does not exist in this tenant", gid)
+			}
+			return fmt.Errorf("store: set member groups: %w", err)
+		}
+		if owner != tenantID {
+			return fmt.Errorf("group %q belongs to another tenant", gid)
+		}
 		if _, err = tx.ExecContext(ctx,
 			`INSERT INTO member_groups (tenant_id, user_id, group_id, source) VALUES (?, ?, ?, '')
 			 ON CONFLICT DO NOTHING`,

@@ -16,6 +16,8 @@ import {
   TrafficSample,
   TrafficService,
 } from './traffic.service';
+import { MeService } from '../me.service';
+import { zoned } from '../shared/zoned-date.pipe';
 
 // What the gateway has actually served (OBS-01).
 //
@@ -40,6 +42,7 @@ import {
 })
 export class MetricsPageComponent {
   private readonly traffic = inject(TrafficService);
+  private readonly zone = inject(MeService).timezone;
 
   // Built here rather than in the service, and that is the library's own rule:
   // the source repaints the view it was created in, so one built outside a
@@ -156,7 +159,7 @@ export class MetricsPageComponent {
       s.routes.reduce((n, r) => n + (r.byClass[i] ?? 0), 0) / Math.max(s.seconds, 1);
     return this.lines(at, [
       {
-        name: $localize`:@@Metrics_ok:Answered`,
+        name: $localize`:@@Metrics_ok:Succeeded`,
         colour: '#4caf50',
         data: samples.map((s) => classAt(s, 2) + classAt(s, 3)),
       },
@@ -231,7 +234,7 @@ export class MetricsPageComponent {
     },
     {
       key: 'costly' as const,
-      label: $localize`:@@Metrics_axis_costly:Costliest`,
+      label: $localize`:@@Metrics_axis_costly:Most time spent`,
     },
   ];
 
@@ -335,14 +338,18 @@ export class MetricsPageComponent {
     at: number[],
     series: { name: string; colour: string; data: (number | null)[] }[],
   ): EChartsCoreOption {
+    const zone = this.zone();
     return {
       animation: false,
       grid: { left: 48, right: 12, top: 24, bottom: 24 },
       tooltip: { trigger: 'axis' },
       legend: { top: 0, textStyle: { color: '#9aa4c0' } },
+      // The chart library writes times in the browser's zone: the reader's
+      // own one is given to it, the clock on the axis, the moment on hover.
       xAxis: {
         type: 'time',
-        axisLabel: { color: '#9aa4c0' },
+        axisLabel: { color: '#9aa4c0', formatter: (v: number) => zoned(v / 1000, zone, 'time') },
+        axisPointer: { label: { formatter: (p: { value: number }) => zoned(p.value / 1000, zone, 'long') } },
         splitLine: { show: false },
       },
       yAxis: {

@@ -217,7 +217,7 @@ func TestSingleModeRefusesASecondOrganisation(t *testing.T) {
 	if code != http.StatusConflict {
 		t.Fatalf("create tenant in single mode = %d %s, want 409", code, body)
 	}
-	if !strings.Contains(body, "single organisation") {
+	if !strings.Contains(body, "single tenant") {
 		t.Errorf("the refusal should say what is in the way: %s", body)
 	}
 

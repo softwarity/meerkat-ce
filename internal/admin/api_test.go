@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -274,5 +275,60 @@ func TestPutRejectsUnknownJSONFields(t *testing.T) {
 		`{"name": "x", "upstrem": "typo"}`, f.rootC)
 	if code != http.StatusBadRequest || !strings.Contains(body, "upstrem") {
 		t.Fatalf("%d %s", code, body)
+	}
+}
+
+// The answer to a save is the route as stored: the editor builds its next save
+// on it, so an answer carrying the revision it was sent would make the second
+// save of the same screen a 409, and one carrying the access rule as typed
+// would show what the gateway does not apply.
+func TestPutAnswersTheRouteAsStored(t *testing.T) {
+	f := setup(t)
+	body := strings.Replace(validRoute, "%s", "http://up.invalid", 1)
+	body = strings.Replace(body, `"name": "api",`, `"name": "api", "access": {"level": " AUTH ", "tenants": ["t1"], "roles": ["ops"]},`, 1)
+	code, out := f.call(t, "PUT", "/api/routes/r1", body, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("create: %d %s", code, out)
+	}
+	var saved store.Route
+	if err := json.Unmarshal([]byte(out), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if saved.Rev != 1 {
+		t.Fatalf("created route answered at rev %d, want 1", saved.Rev)
+	}
+	if saved.Access.Level != store.AccessAuth || saved.Access.Tenants != nil || !slices.Equal(saved.Access.Roles, []string{"ops"}) {
+		t.Fatalf("access answered as sent, not as stored: %+v", saved.Access)
+	}
+	// Twice more on the answer alone, as the editor does: each must be taken.
+	for i := 2; i <= 3; i++ {
+		next, _ := json.Marshal(saved)
+		code, out = f.call(t, "PUT", "/api/routes/r1", string(next), f.rootC)
+		if code != http.StatusOK {
+			t.Fatalf("save %d built on the previous answer: %d %s", i, code, out)
+		}
+		saved = store.Route{}
+		if err := json.Unmarshal([]byte(out), &saved); err != nil {
+			t.Fatal(err)
+		}
+		if saved.Rev != int64(i) {
+			t.Fatalf("save %d answered rev %d, want %d", i, saved.Rev, i)
+		}
+	}
+}
+
+// A route read with its problem goes back as it was read: the console's enable
+// toggle sends the listed route with one field changed, and a field only the
+// server writes must not make a broken route the one nobody can touch.
+func TestPutTakesBackTheProblemItAnswered(t *testing.T) {
+	f := setup(t)
+	body := strings.Replace(validRoute, "%s", "http://up.invalid", 1)
+	body = strings.Replace(body, `"name": "api",`, `"name": "api", "problem": "references vault entries that hold nothing: x",`, 1)
+	code, out := f.call(t, "PUT", "/api/routes/r1", body, f.rootC)
+	if code != http.StatusOK {
+		t.Fatalf("put with the read-only problem: %d %s, want 200", code, out)
+	}
+	if strings.Contains(out, "references vault entries") {
+		t.Fatalf("the problem a client sent was kept: %s", out)
 	}
 }

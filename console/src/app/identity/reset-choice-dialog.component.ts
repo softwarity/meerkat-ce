@@ -21,8 +21,8 @@ export interface ResetChoiceData {
     <h2 mat-dialog-title i18n="@@Reset_password_USERNAME">Reset password for "{{ data.username }}"?</h2>
     <mat-dialog-content>
       <p i18n="@@Reset_choice_hint">
-        Show a temporary password to hand over, or mail a link to choose a new one. With the link,
-        the current password keeps working until it is followed.
+        Show a temporary password to give to the person, or mail them a link to choose a new one.
+        With the link, the current password works until the link is used.
       </p>
       @if (why) {
         <p class="why">{{ why }}</p>
@@ -52,7 +52,7 @@ export class ResetChoiceDialogComponent {
   // Why the link cannot be mailed, said under the choice rather than as a
   // button that does nothing.
   protected readonly why = !this.data.email
-    ? $localize`:@@No_email_to_mail_to:This account has no e-mail address to mail a link to.`
+    ? $localize`:@@No_email_to_mail_to:This account has no e-mail address.`
     : this.data.mailReady
       ? ''
       : $localize`:@@No_link_can_be_mailed_WHY:No link can be mailed: ${this.data.mailWhy}:WHY:.`;

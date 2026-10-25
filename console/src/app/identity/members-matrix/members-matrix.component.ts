@@ -15,6 +15,8 @@ import { IdentityDrawer, MemberEditorView } from '../identity-drawer';
 import { resetAccess } from '../reset-access';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { PresenceComponent, PresenceService } from '../../shared/presence';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 interface UserRow {
   id: string;
@@ -45,6 +47,7 @@ interface UserRow {
     MatTooltipModule,
     LoadingIndicatorComponent,
     RowActionsDirective,
+    ZonedDatePipe,
   ],
   templateUrl: './members-matrix.component.html',
   styleUrl: './members-matrix.component.scss',
@@ -63,6 +66,7 @@ export class MembersMatrixComponent {
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly zone = inject(MeService).timezone;
 
   protected readonly loading = signal(true);
   protected readonly rows = signal<UserRow[]>([]);
@@ -310,14 +314,10 @@ export class MembersMatrixComponent {
 
   // ── last connection + tenant-scoped password reset ────────────────────────
 
+  // The moment is written in the cell; how long ago, on hover.
   protected lastSeen(ts: number): string {
-    if (!ts) return '-';
-    return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toRelative() ?? '-';
-  }
-
-  protected lastSeenFull(ts: number): string {
     if (!ts) return '';
-    return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED);
+    return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toRelative() ?? '';
   }
 
   protected resetPassword(u: UserRow): void {

@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse, httpResource, HttpResourceRef } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, input, linkedSignal, LOCALE_ID, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, linkedSignal, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -40,6 +40,7 @@ import { TrustedAuthoritiesComponent } from './trusted-authorities.component';
 import { InternalHelpComponent } from './internal-help.component';
 import { DoorNamesComponent } from './door-names.component';
 import { SnippetComponent } from '../../shared/snippet.component';
+import { zoned } from '../../shared/zoned-date.pipe';
 import { AuthoritiesPanelComponent } from './authorities-panel.component';
 import { MeService } from '../../me.service';
 import { EeLockComponent } from '../../shared/ee-lock.component';
@@ -107,7 +108,7 @@ export class TlsPageComponent {
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
   private readonly dialogs = inject(DialogsService);
-  private readonly locale = inject(LOCALE_ID);
+  private readonly zone = inject(MeService).timezone;
 
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
@@ -117,7 +118,7 @@ export class TlsPageComponent {
   // ACME is Enterprise (SSL-05): on the community image the button is locked
   // and no Ask entry is offered.
   protected readonly enterprise = inject(MeService).enterprise;
-  protected readonly acmeTip = $localize`:@@Acme_tooltip:ACME is how an authority - Let's Encrypt, ZeroSSL, your own - issues a certificate once it has checked that the name reaches this gateway, and renews it on its own. Set the authorities up here: each one becomes an Ask entry of Add certificate.`;
+  protected readonly acmeTip = $localize`:@@Acme_tooltip:Authorities (Let's Encrypt, ZeroSSL, your own) that issue and renew certificates automatically. Each one set up here is offered in Add certificate.`;
 
   // The ACME authorities set up: one Ask entry each in Add certificate.
   protected readonly authorities = signal<AcmeAuthority[]>([]);
@@ -185,7 +186,7 @@ export class TlsPageComponent {
     const r = this.certManager[plane];
     if (r.isLoading()) return $localize`:@@Cert_manager_looking:Looking for cert-manager...`;
     const err = r.error();
-    if (err) return $localize`:@@Cert_manager_unknown:Could not ask the gateway: ${message(err)}:error:`;
+    if (err) return $localize`:@@Cert_manager_unknown:Could not check for cert-manager: ${message(err)}:error:`;
     const v = r.value();
     return v && !v.available ? (v.why ?? '') : '';
   }
@@ -406,7 +407,7 @@ export class TlsPageComponent {
     if (fit.length === 1) {
       this.api.askCertManager({ kind: fit[0].kind, name: fit[0].name, plane }).subscribe({
         next: () => {
-          this.snack.open($localize`:@@Asked_issuer:Asked ${fit[0].name}:issuer:`, undefined, { duration: 4000 });
+          this.snack.open($localize`:@@Asked_issuer:Certificate requested from ${fit[0].name}:issuer:`, undefined, { duration: 4000 });
           this.loadCertificates();
         },
         error: (e) => this.snack.open(message(e), undefined, { duration: 8000 }),
@@ -500,7 +501,7 @@ export class TlsPageComponent {
           ' ' +
           $localize`:@@Delete_destroys_key:Its private key is destroyed.`
         : doors
-          ? $localize`:@@Delete_served_certificate:${name}:name: is served on ${doors}:doors:. Deleting it destroys its private key, and what it answered for goes back to plain HTTP.`
+          ? $localize`:@@Delete_served_certificate:${name}:name: is served on ${doors}:doors:. Deleting it destroys its private key, and its names go back to plain HTTP.`
           : $localize`:@@Delete_spare_certificate:Delete ${name}:name:? Its private key is destroyed.`,
       confirmLabel: away ? this.cutLabel : $localize`:@@Delete:Delete`,
       danger: true,
@@ -546,7 +547,7 @@ export class TlsPageComponent {
   }
 
   private cutMessage(name: string): string {
-    return $localize`:@@Cuts_this_page:You are on the console over HTTPS, through ${name}:name:: without it, this address stops answering. The console stays open over plain HTTP: this page goes there, where you sign in again.`;
+    return $localize`:@@Cuts_this_page:You reach this console over HTTPS through ${name}:name:: without it, this address stops working. The page reopens over HTTP, where you sign in again.`;
   }
 
   protected readonly cutLabel = $localize`:@@Continue_over_http:Continue over HTTP`;
@@ -620,7 +621,7 @@ export class TlsPageComponent {
           .map((x) => {
             const other = this.certificates().find((o) => o.id === x.id);
             const label = other ? `${this.namesOf(other).join(', ')} (${this.sourceLabel(other).toLowerCase()}, ${this.says(other).toLowerCase()})` : x.id;
-            return $localize`:@@Conflict_line:${this.planeLabel(x.plane)}:plane: already serves ${label}:other:, which answers for ${x.names.join(', ')}:names:`;
+            return $localize`:@@Conflict_line:${this.planeLabel(x.plane)}:plane: already serves ${label}:other: for ${x.names.join(', ')}:names:`;
           })
           .join('; ');
         // What the replaced one answered for and this one does not: those
@@ -636,7 +637,7 @@ export class TlsPageComponent {
         const ok = await this.dialogs.confirm({
           title: $localize`:@@Replace_the_certificate:Replace the certificate?`,
           message:
-            $localize`:@@Replace_conflict_message2:${who}:who:. Replacing takes it off that plane; on no other plane, it is listed under Unassigned certificates.` +
+            $localize`:@@Replace_conflict_message2:${who}:who:. Replacing takes it off that plane; if no other plane serves it, it moves to Unassigned certificates.` +
             (lost.length
               ? ' ' + $localize`:@@Replace_loses_names:${lost.join(', ')}:names: will no longer be served over HTTPS there.`
               : ''),
@@ -837,18 +838,18 @@ export class TlsPageComponent {
     const ok = await this.dialogs.confirm(
       mode === 'gateway'
         ? {
-            title: $localize`:@@Mode_to_meerkat_title:Meerkat serves ${this.planeLabel(plane)}:plane:?`,
+            title: $localize`:@@Mode_to_meerkat_title:Let Meerkat serve HTTPS for ${this.planeLabel(plane)}:plane:?`,
             message:
-              $localize`:@@Mode_to_meerkat_message:Meerkat presents ${names}:names: itself, with the certificates of this plane, and no longer believes the headers of a proxy in front.` +
+              $localize`:@@Mode_to_meerkat_message:Meerkat presents ${names}:names: itself with this plane's certificates, and stops trusting the X-Forwarded headers of a proxy.` +
               (plane === 'console'
-                ? ' ' + $localize`:@@Mode_to_meerkat_console:If you reach this console through a proxy, this session ends: Meerkat refuses the switch then.`
+                ? ' ' + $localize`:@@Mode_to_meerkat_console:Refused while you reach this console through a proxy: it would end your session.`
                 : ''),
             confirmLabel: $localize`:@@Apply:Apply`,
             danger: true,
           }
         : {
-            title: $localize`:@@Mode_to_proxy_title:A proxy serves ${this.planeLabel(plane)}:plane:?`,
-            message: $localize`:@@Mode_to_proxy_message:A proxy in front presents ${names}:names: over HTTPS and Meerkat believes its X-Forwarded headers. A certificate here then only secures the link from the proxy to Meerkat.`,
+            title: $localize`:@@Mode_to_proxy_title:Let a proxy serve HTTPS for ${this.planeLabel(plane)}:plane:?`,
+            message: $localize`:@@Mode_to_proxy_message:A proxy in front presents ${names}:names: over HTTPS, and Meerkat trusts its X-Forwarded headers. A certificate here then only secures the link from the proxy to Meerkat.`,
             confirmLabel: $localize`:@@Apply:Apply`,
           },
     );
@@ -957,10 +958,10 @@ export class TlsPageComponent {
 
   protected serveOnTip(plane: Plane, c?: Certificate): string {
     if (plane === 'internal' && c && !this.fits(c, plane)) {
-      return $localize`:@@Internal_needs_names:The services call it ${this.internalNames().join(' or ')}:names:, and this certificate carries none of them`;
+      return $localize`:@@Internal_needs_names:It covers none of the internal names: ${this.internalNames().join(', ')}:names:`;
     }
     if (c && !this.fits(c, plane)) {
-      return $localize`:@@Only_internal_names:It carries only the internal plane's names: nobody reaches ${this.planeLabel(plane)}:plane: by them`;
+      return $localize`:@@Only_internal_names:It covers only internal names, which do not reach ${this.planeLabel(plane)}:plane:`;
     }
     return $localize`:@@Serve_on_plane:Serve on ${this.planeLabel(plane)}:plane:`;
   }
@@ -990,7 +991,7 @@ export class TlsPageComponent {
   }
 
   protected day(ts: number): string {
-    return DateTime.fromSeconds(ts).setLocale(this.locale).toLocaleString(DateTime.DATE_MED);
+    return zoned(ts, this.zone(), 'day');
   }
 
   // What one certificate says about itself, in a line. The wording answers
@@ -1011,7 +1012,7 @@ export class TlsPageComponent {
       }
       return c.console || c.app || c.internal
         ? $localize`:@@Waiting_for_the_authority:Waiting for the authority`
-        : $localize`:@@Asked_once_placed:Asked as soon as it is placed on a door`;
+        : $localize`:@@Asked_once_placed:Requested once placed on a plane`;
     }
     const days = Math.floor(DateTime.fromSeconds(c.info.notAfter).diffNow('days').days);
     if (days < 0) return $localize`:@@Expired_on:Expired on ${this.day(c.info.notAfter)}`;
@@ -1170,8 +1171,8 @@ export class TlsPageComponent {
     <h2 mat-dialog-title i18n="@@Adopt_the_signed_certificate">Adopt the signed certificate</h2>
     <mat-dialog-content class="adopt" appFileDrop dropClass="over" accept=".pem,.crt,.cer,.txt" (filesDropped)="read($event[0])">
       <p i18n="@@Adopt_note2">
-        The certificate the authority signed for this request: paste it, choose its file, or drop
-        it here. It must match the private key this request was made with, which never left.
+        Paste, choose or drop the certificate the authority signed for this request. It must
+        match this request's private key.
       </p>
       <div class="file">
         <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.txt" (picked)="read($event[0])">

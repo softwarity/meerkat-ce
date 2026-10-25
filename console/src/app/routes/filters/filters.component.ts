@@ -84,18 +84,18 @@ export class FiltersComponent implements FormValueControl<Spec[]> {
       case 'request':
         return $localize`:@@Incoming_modifiers_intro:Applied in order to the request before it reaches the service.`;
       case 'response':
-        return $localize`:@@Outgoing_modifiers_intro:Applied in order to the response before it reaches the client.`;
+        return $localize`:@@Outgoing_modifiers_intro:Applied in order to the response before it reaches the caller.`;
       default:
-        return $localize`:@@Terminal_modifiers_intro:Answers instead of proxying (redirect, maintenance): at most one, not combined with other modifiers.`;
+        return $localize`:@@Terminal_modifiers_intro:Answers instead of calling the service (redirect, maintenance): at most one, not combined with other modifiers.`;
     }
   });
 
   protected readonly empty = computed(() => {
     switch (this.phase()) {
       case 'terminal':
-        return $localize`:@@No_terminal_the_route_proxies:None: the route proxies to its upstream.`;
+        return $localize`:@@No_terminal_the_route_proxies:None: the route calls its service.`;
       case 'gate':
-        return $localize`:@@No_gates_yet:No gates yet: this route carries whatever it is sent.`;
+        return $localize`:@@No_gates_yet:No gates yet: this route refuses nothing.`;
       default:
         return $localize`:@@No_modifiers_yet:No modifiers yet.`;
     }

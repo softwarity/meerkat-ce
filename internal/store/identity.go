@@ -181,7 +181,7 @@ type UserTenant struct {
 // SaveTenant inserts or replaces a tenant by ID.
 func (s *Store) SaveTenant(ctx context.Context, t Tenant) error {
 	// See rev.go: a write built on a version somebody has replaced is refused.
-	if err := s.checkRev(ctx, "tenants", "organisation", t.ID, t.Rev); err != nil {
+	if err := s.checkRev(ctx, "tenants", "tenant", t.ID, t.Rev); err != nil {
 		return err
 	}
 	// Same trap one level up: an organisation created without opening hours
@@ -662,7 +662,7 @@ func (s *Store) PrimaryTenant(ctx context.Context) (Tenant, error) {
 		return Tenant{}, err
 	}
 	if len(list) == 0 {
-		return Tenant{}, fmt.Errorf("store: no organisation at all, which cannot happen: one is seeded at first boot")
+		return Tenant{}, fmt.Errorf("store: no tenant at all, which cannot happen: one is seeded at first boot")
 	}
 	return list[0], nil
 }

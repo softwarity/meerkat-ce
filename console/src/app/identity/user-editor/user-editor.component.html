@@ -51,12 +51,12 @@
             <app-ee-lock
               feature="business-hours"
               i18n-why="@@Working_hours_ee_why"
-              why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+              why="Allow access only during set hours, for everyone or per person."
             />
           </h3>
           <p class="hint" i18n="@@User_hours_hint">
-            Set here, they replace the gateway's and the organisation's hours for this person, unless a
-            membership sets its own.
+            Override the gateway's and the tenant's hours for this person, unless a membership
+            sets its own.
           </p>
           <app-business-access-form
             ee-feature="business-hours"

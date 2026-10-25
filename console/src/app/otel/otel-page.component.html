@@ -10,27 +10,28 @@
   </div>
   <div class="drawer-body">
     <p class="hint" i18n="@@Tracing_collector_hint">
-      Two tiers of Collector, then set the agent's address here. Put their UIs behind a
-      <b>route on this gateway</b>.
+      Deploy two tiers of collector, then enter the agent's address on this page. Expose their
+      UIs through a <b>route on this gateway</b>.
     </p>
     <!-- The shape, said before the files: a reader who deploys one collector
          per node finds out the day they want tail sampling that it cannot be
          done there, a trace's spans being made on several nodes. -->
     <ol class="tiers">
       <li i18n="@@Tracing_tier_agent">
-        <b>An agent on every node</b> (DaemonSet, Swarm global): the one address every service
-        sends to, and the reader of the containers' stdout (OpenTelemetry JSON). It writes the
-        <b>metrics to Prometheus</b> and the <b>logs and audit to Loki</b>.
+        <b>An agent on every node</b> (DaemonSet, Swarm global): the address every service sends
+        to. It also reads the containers' standard output (OpenTelemetry JSON). It sends
+        <b>metrics to Prometheus</b> and <b>logs and audit to Loki</b>.
       </li>
       <li i18n="@@Tracing_tier_gateway">
-        <b>A gateway</b>: the agents send it the <b>traces only</b>, every span of a trace to the
-        same replica. Once a trace is complete it keeps it or not (<b>tail sampling</b>: every
-        error, every slow one, a share of the rest) and writes it into <b>Tempo</b>.
+        <b>A gateway collector</b>: the agents send it <b>traces only</b>, all spans of a trace to
+        the same replica. When a trace is complete, it decides whether to keep it (<b>tail
+        sampling</b>: all errors, all slow traces, a share of the rest) and writes it to
+        <b>Tempo</b>.
       </li>
     </ol>
     <p class="hint" i18n="@@Tracing_tier_why">
-      Why two: a trace's spans are made on several nodes, and an agent sees only its own, so it
-      cannot decide which traces to keep. With the gateway deciding, record 100% here.
+      A trace's spans come from several nodes and an agent sees only its own, so only the gateway
+      collector can decide which traces to keep. Record 100% on this page.
     </p>
     <p class="hint" i18n="@@Tracing_collector_backend_hint">
       Set your Tempo, Prometheus and Loki addresses in the files. Includes Grafana sources and a
@@ -95,8 +96,8 @@
 
 @if (!enterprise()) {
   <p class="hint" i18n="@@Tracing_ce_nothing_leaves">
-    Nothing leaves this community image: traces, metrics, audit and pushed logs are sent from the
-    Enterprise image only. Logs written for an agent work here.
+    Sending traces, metrics, audit and logs to a collector requires the Enterprise edition. Logs
+    written for a node agent work in the Community edition.
   </p>
   <!-- Said HERE only: on the image that sends nothing it is the good news,
        on the one that exports it read as a doubt about the switch above. -->
@@ -104,7 +105,7 @@
     Your services still receive a <code>traceparent</code>, so their own traces join up.
   </p>
 } @else if (!enabled() && !endpoint().trim()) {
-  <p class="hint" i18n="@@Tracing_address_first">Give the collector's address below to turn the export on.</p>
+  <p class="hint" i18n="@@Tracing_address_first">Enter the collector address below to turn on the export.</p>
 }
 
 @if (enterprise()) {
@@ -116,7 +117,7 @@
     i18n-label="@@Tracing_endpoint"
     label="Collector address"
     i18n-info="@@Tracing_endpoint_info"
-    info="Any OTLP endpoint. Base address only: the signal path is added."
+    info="Any OTLP endpoint. Base address only: the path of each signal is added."
   >
     <input
       matInput
@@ -150,7 +151,7 @@
          offers to put a pasted key in the vault (VAULT-05). -->
     <app-secret-field
       i18n-label="@@Tracing_header_value"
-      label="Its value"
+      label="Header value"
       i18n-info="@@Tracing_header_value_info"
       info="Stored in the vault; the configuration keeps only the reference."
       [(value)]="headerValue"
@@ -195,7 +196,7 @@
            for somebody to discover in an empty Jaeger three days later. -->
       <span class="warn" i18n="@@Tracing_not_exporting">
         <mat-icon inline>warning</mat-icon>
-        Saved, but nothing is leaving. Check the address and the gateway's log.
+        Saved, but nothing is being sent. Check the address and the gateway log.
       </span>
     }
   </div>
@@ -230,10 +231,10 @@
           <app-form-field
             icon="percent"
             i18n-label="@@Tracing_sample"
-            label="Journeys recorded (%)"
+            label="Traces recorded (%)"
             [clearable]="false"
             i18n-info="@@Tracing_sample_info"
-            info="Share of the traces started here. A caller's own sampling decision is kept."
+            info="Share of the traces started by this gateway. A sampling decision sent by the caller is kept."
           >
             <input
               matInput
@@ -247,10 +248,10 @@
           <app-form-field
             icon="speed"
             i18n-label="@@Tracing_ceiling"
-            label="Ceiling (per second)"
+            label="Max traces per second"
             [clearable]="false"
             i18n-info="@@Tracing_ceiling_info"
-            info="At most this many traces recorded per second, whoever decided. 0 for no limit."
+            info="Includes traces sampled by the caller. 0 for no limit."
           >
             <input
               matInput
@@ -263,7 +264,7 @@
         </div>
       }
       <p class="hint" i18n="@@Tracing_sampling_note">
-        With a Collector doing tail sampling, record <b>100%</b> here and let it pick.
+        If your collector does tail sampling, record <b>100%</b> here.
       </p>
       <!-- The gateway's own detail. After the pipe and before the routes: it is
            about this gateway, not about what it serves, and it is off unless
@@ -274,22 +275,22 @@
           [disabled]="!enabled() || saving()"
           (change)="toggleDetail($event.checked)"
         >
-          <ng-container i18n="@@Tracing_gateway_detail">Detail the gateway's own work</ng-container>
+          <ng-container i18n="@@Tracing_gateway_detail">Detailed gateway spans</ng-container>
         </mat-slide-toggle>
       </div>
       <p class="hint" i18n="@@Tracing_gateway_detail_note">
-        Adds Meerkat's internal steps to traces. Heavier: leave off unless investigating.
+        Adds Meerkat's internal steps to traces. More data: turn on only to investigate.
       </p>
 
       <!-- Who made the call. Off by default: a person in a trace is personal
            data leaving for a collector somebody else may run. -->
       <div class="row">
         <mat-slide-toggle [checked]="caller() && enterprise()" [disabled]="!enabled() || saving()" (change)="toggleCaller($event.checked)">
-          <ng-container i18n="@@Tracing_caller">Name the caller on the spans</ng-container>
+          <ng-container i18n="@@Tracing_caller">Identify the caller in traces</ng-container>
         </mat-slide-toggle>
       </div>
       <p class="hint" i18n="@@Tracing_caller_note">
-        Adds the user, organisation, group and roles to traces: personal data in your collector.
+        Adds the user, tenant, group and roles: personal data sent to your collector.
       </p>
       <p class="hint" i18n="@@Tracing_per_route_note">
         Which routes are traced is set <b>on each route</b>, in its OpenTelemetry section.
@@ -309,8 +310,8 @@
       </div>
       <!-- The one way the counters leave this gateway: pushed, never scraped. -->
       <p class="hint" i18n="@@Tracing_signal_metrics_note">
-        The gateway's counters, pushed every 30 seconds per node. The collector must
-        <b>receive metrics</b>.
+        Gateway metrics, sent every 30 seconds by each gateway instance. The collector must
+        <b>accept metrics</b>.
       </p>
     </div>
   </mat-tab>
@@ -335,11 +336,11 @@
           [disabled]="!enabled() || saving()"
           (change)="toggleAuditConsole($event.checked)"
         >
-          <ng-container i18n="@@Tracing_signal_audit_console">Send Meerkat's console audit too</ng-container>
+          <ng-container i18n="@@Tracing_signal_audit_console">Also send the console audit</ng-container>
         </mat-slide-toggle>
       </div>
       <p class="hint" i18n="@@Tracing_signal_audit_console_note">
-        Changes and sign-ins in this console. They are still kept here.
+        Changes and sign-ins in this console. They are also kept here.
       </p>
       <p class="hint" i18n="@@Tracing_audit_stream_note">
         Sent as logs marked <b>meerkat.stream=audit</b>.
@@ -361,17 +362,17 @@
           <ng-container i18n="@@Tracing_logs_off">Not sent</ng-container>
         </mat-radio-button>
         <mat-radio-button value="agent">
-          <ng-container i18n="@@Tracing_logs_agent">Written for an agent</ng-container>
+          <ng-container i18n="@@Tracing_logs_agent">Written for a node agent</ng-container>
         </mat-radio-button>
         <p class="hint" i18n="@@Tracing_logs_agent_note">
-          Logs written as OpenTelemetry JSON, for a Collector on every node to read. Works with the
-          export off.
+          Written to standard output as OpenTelemetry JSON, for a collector agent on each node.
+          Works with the export off.
         </p>
         <mat-radio-button value="push" [disabled]="!enabled()">
           <ng-container i18n="@@Tracing_logs_push">Pushed to the collector</ng-container>
         </mat-radio-button>
         <p class="hint" i18n="@@Tracing_logs_push_note">
-          Sent to the collector above, for nodes with no agent.
+          Sent to the collector above, when there is no agent on the node.
         </p>
       </mat-radio-group>
       <!-- Its own switch: which lines are written, where the radio above says
@@ -380,8 +381,8 @@
         <ng-container i18n="@@Tracing_access_log">Access log</ng-container>
       </mat-slide-toggle>
       <p class="hint" i18n="@@Tracing_access_log_note">
-        One line per request crossing the front door, refusals included, on standard output and
-        typed <b>access</b>. Off by default: it grows with the traffic.
+        One line per incoming request, refusals included, written to standard output with type
+        <b>access</b>. Off by default: its volume grows with traffic.
       </p>
       @if (logsLost() > 0) {
         <p class="warn" i18n="@@Tracing_logs_lost">

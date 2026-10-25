@@ -25,6 +25,13 @@
           <mat-icon>rule</mat-icon>
           <span i18n="@@Section_group_rules">Group rules</span>
         </a>
+        <!-- The tenant level of the notifications (NOTIF-05, Enterprise). -->
+        @if (me.enterprise()) {
+          <a routerLink="notifications" routerLinkActive="active" class="section-link">
+            <mat-icon>notifications</mat-icon>
+            <span i18n="@@Notifications">Notifications</span>
+          </a>
+        }
         <a routerLink="danger" routerLinkActive="active" class="section-link danger">
           <mat-icon>warning</mat-icon>
           <span i18n="@@Danger_zone">Danger zone</span>
@@ -48,7 +55,7 @@
                 <mat-select-trigger>{{ modeLabel(t.groupMode) }}</mat-select-trigger>
                 <mat-option value="MULTIPLE">
                   <span i18n="@@Cumulative">Cumulative</span>
-                  <small class="what" i18n="@@Cumulative_what">merges the roles of every group</small>
+                  <small class="what" i18n="@@Cumulative_what">members get the roles of all their groups</small>
                 </mat-option>
                 <mat-option value="SINGLE">
                   <span i18n="@@Exclusive">Exclusive</span>

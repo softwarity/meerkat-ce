@@ -125,7 +125,7 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if n, err := a.st.CountTenants(ctx); err == nil && info.Tenancy == store.TenancySingle && n > 1 {
 		info.HiddenTenants = n - 1
 	}
-	if err := edition.Require("more than one organisation"); err != nil {
+	if err := edition.Require("more than one tenant"); err != nil {
 		info.TenancyLocked = true
 		info.TenancyLockWhy = err.Error()
 	}
@@ -151,7 +151,7 @@ func (a *API) putTenancy(w http.ResponseWriter, r *http.Request, actor store.Use
 		return
 	}
 	if body.Tenancy == store.TenancyMulti {
-		if err := edition.Require("more than one organisation"); err != nil {
+		if err := edition.Require("more than one tenant"); err != nil {
 			writeErr(w, http.StatusForbidden, err.Error())
 			return
 		}

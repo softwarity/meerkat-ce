@@ -79,6 +79,10 @@ func TestSystemRoleProtected(t *testing.T) {
 	if err := s.SaveRole(ctx, Role{Name: "authenticated", System: true}); err != nil {
 		t.Fatalf("SaveRole: %v", err)
 	}
+	// A later save cannot take the mark off: that made it deletable.
+	if err := s.SaveRole(ctx, Role{Name: "authenticated", Description: "edited"}); err != nil {
+		t.Fatalf("SaveRole: %v", err)
+	}
 	if _, err := s.DeleteRole(ctx, "authenticated"); err == nil {
 		t.Fatal("expected system role deletion to be refused")
 	}

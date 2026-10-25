@@ -574,7 +574,7 @@ func (a *API) exportAudit(w http.ResponseWriter, r *http.Request, actor store.Us
 	w.Header().Set("Content-Disposition", `attachment; filename="meerkat-audit.csv"`)
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"at", "action", "actor", "token", "target", "targetId", "targetName",
-		"organisation", "ip", "detail", "changes", "call"})
+		"tenant", "ip", "detail", "changes", "call"})
 	for _, e := range events {
 		changes := ""
 		if len(e.Changes) > 0 {

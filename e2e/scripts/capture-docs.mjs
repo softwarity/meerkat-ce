@@ -314,6 +314,9 @@ async function seedEverythingElse(api) {
     await soft(`password ${name}`, () => plane.post('/update-password', {
       form: { password: 'Capture-User-Password-1', confirm: 'Capture-User-Password-1' }, maxRedirects: 0 })
       .then((r) => (r.status() === 303 ? null : r)));
+    // Kept: the notifications shots act as these two readers, and show the
+    // page one of them reads.
+    await plane.storageState({ path: `${tmp}/data-${name}.json` });
     await plane.dispose();
   }
 
@@ -565,6 +568,207 @@ async function seedPicker(page) {
   await page.request.put(`${ADMIN}/api/routes/orders-api`, { data: { ...orders, upstream: 'http://orders.acme.svc:9000' } });
 }
 
+// The notifications (NOTIF-05, Enterprise), laid down once before their
+// shots, which come last: a second tenant, published messages and reader
+// marks would otherwise change the tenants, audit and access-tokens screens
+// the other captions describe. Turned on by root; a second tenant, Acme
+// Retail, holding alice too, so her page has a tenant filter and a message
+// sent to both tenants on one row; two services publishing with their own
+// token, as a service does; one sent from the console; one withdrawn; bob
+// closing an alarm asked of one reader and acknowledging his part of an
+// instruction asked of all, so alice still owes hers.
+let RETAIL = '';
+let notified = null;
+const NOTE = {
+  alarm: 'Cold room 3 is too warm',
+  floor: 'Forklifts now use aisle 4',
+  invoice: 'Invoice INV-2026-0142 is overdue',
+};
+function seedNotifications(page) {
+  notified ??= layNotifications(page.request).catch((e) => log('! notifications:', e.message.split('\n')[0]));
+  return notified;
+}
+async function layNotifications(api) {
+  const soft = async (what, call) => {
+    try {
+      const r = await call();
+      if (r.status() >= 300) {
+        log(`! ${what}: ${r.status()} ${(await r.text()).slice(0, 200)}`);
+        return null;
+      }
+      return r;
+    } catch (e) {
+      log(`! ${what}: ${e.message}`);
+      return null;
+    }
+  };
+  const json = async (r) => (r ? r.json() : null);
+  await soft('notifications on', () => api.put(`${ADMIN}/api/notifications/settings`, { data: { enabled: true } }));
+
+  const people = Object.fromEntries(((await json(await soft('users', () => api.get(`${ADMIN}/api/users`)))) ?? [])
+    .map((u) => [u.username, u.id]));
+  RETAIL = (await json(await soft('tenant Acme Retail', () =>
+    api.post(`${ADMIN}/api/tenants`, { data: { name: 'Acme Retail' } }))))?.id ?? '';
+  for (const [name, type] of [['alice', 'USER'], ['erin', 'ADMIN']]) {
+    if (!RETAIL || !people[name]) continue;
+    await soft(`retail member ${name}`, () => api.put(`${ADMIN}/api/tenants/${RETAIL}/members/${people[name]}`, {
+      data: { userId: people[name], tenantId: RETAIL, type, enabled: true, businessAccess: { inherited: true }, sessionTTL: '' },
+    }));
+  }
+
+  // The portal bar gets its Notifications entry, wearing the bell the
+  // console's Add notifications gives it.
+  const bell = ((await json(await soft('bell', () => api.get(`${ADMIN}/api/portal/icons?q=notifications&limit=20`)))) ?? [])
+    .find((i) => i.name === 'notifications')?.svg ?? '';
+  const settings = await json(await soft('settings', () => api.get(`${ADMIN}/api/settings`)));
+  if (settings) {
+    await soft('portal notifications entry', () => api.put(`${ADMIN}/api/settings`, {
+      data: { ...settings, portal: { ...PORTAL, entries: [...PORTAL.entries, { special: 'notifications', icon: bell }] } },
+    }));
+  }
+
+  // Two services, each with its token on the internal plane.
+  const services = {};
+  for (const name of ['invoicing', 'warehouse']) {
+    const minted = await json(await soft(`token ${name}`, () =>
+      api.post(`${ADMIN}/api/admin-tokens`, { data: { name, scope: 'notifications' } })));
+    if (minted) {
+      services[name] = await request.newContext({ baseURL: INTERNAL,
+        extraHTTPHeaders: { Authorization: `Bearer ${minted.token}` } });
+    }
+  }
+  const sent = {};
+  const publish = async (from, key, message) => {
+    if (!services[from]) return;
+    const r = await soft(`notification ${key}`, () => services[from].post('/api/notifications', { data: message }));
+    if (r) sent[key] = (await r.json()).id;
+    // One second apart: the lists sort by the second they were sent in.
+    await new Promise((res) => setTimeout(res, 1100));
+  };
+  const logistics = 'Acme Logistics';
+  await publish('invoicing', 'draft', {
+    tenant: logistics, title: 'October price list draft', body: 'A first draft, to be replaced by the final list.',
+    meta: { pricelist: '2026-10' },
+  });
+  await publish('warehouse', 'returns', {
+    tenant: 'Acme Retail', title: 'Returns are now accepted for 60 days',
+    body: 'From November, customers may bring an item back within 60 days with its receipt.',
+  });
+  await publish('warehouse', 'floor', {
+    tenant: logistics, level: 'info', title: NOTE.floor,
+    body: 'From Monday the forklift lane moves to aisle 4. Read the new floor plan before your next shift.',
+    detail: { service: 'docs', path: '/floor-plan' }, ack: 'all', meta: { site: 'rotterdam' },
+  });
+  await publish('warehouse', 'alarm', {
+    tenant: logistics, level: 'error', title: NOTE.alarm,
+    body: 'Sensor CR3 reads 9.4 C since 06:12. Check the door seal and the compressor.',
+    ack: 'single', onAck: { service: 'orders', path: '/orders/alerts/acked' }, key: 'cr3-temperature',
+  });
+  await publish('invoicing', 'saturday', {
+    tenant: '*', title: 'Billing is read-only on Saturday night',
+    body: 'Invoices can be read but not changed on 2026-11-07 from 22:00 to 24:00 UTC.', meta: { change: 'CHG-2291' },
+  });
+  await publish('invoicing', 'invoice', {
+    tenant: logistics, level: 'warning', title: NOTE.invoice,
+    body: 'Northwind Traders has not paid the 4820.00 EUR due on 2026-10-20.',
+    detail: { service: 'billing', path: '/invoices/INV-2026-0142' },
+    actions: [{ label: 'Send a reminder', service: 'billing', path: '/invoices/INV-2026-0142/remind',
+      method: 'POST', body: { channel: 'email' } }],
+    key: 'overdue-INV-2026-0142', meta: { invoice: 'INV-2026-0142' },
+  });
+  // From the console, as the tenant page's drawer sends it.
+  if (TENANT) {
+    await soft('notification from the console', () => api.post(`${ADMIN}/api/tenants/${TENANT}/notifications`, {
+      data: { level: 'success', title: 'Stock count closed',
+        body: 'The stock count of 2026-10-24 is closed. 3 differences are left to review.' },
+    }));
+  }
+  if (sent.draft && services.invoicing) {
+    await soft('withdraw the draft', () => services.invoicing.delete(`/api/notifications/${sent.draft}`));
+  }
+  for (const s of Object.values(services)) await s.dispose();
+
+  // The readers: bob closes the alarm for everybody and gives his part of the
+  // floor plan; alice has read the alarm and the stock count.
+  const reader = async (name) => existsSync(`${tmp}/data-${name}.json`)
+    ? request.newContext({ baseURL: DATA, storageState: `${tmp}/data-${name}.json` }) : null;
+  const bob = await reader('bob');
+  if (bob) {
+    for (const key of ['alarm', 'floor']) {
+      if (sent[key]) await soft(`bob acknowledges ${key}`, () => bob.post(`/meerkat/notifications/${sent[key]}/ack`));
+    }
+    await bob.dispose();
+  }
+  const alice = await reader('alice');
+  if (alice) {
+    const list = await json(await soft('alice reads her list', () => alice.get('/meerkat/notifications.json')));
+    for (const it of list?.items ?? []) {
+      if (it.title === NOTE.alarm || it.title === 'Stock count closed') {
+        await soft(`alice reads ${it.title}`, () => alice.post(`/meerkat/notifications/${it.id}/read`));
+      }
+    }
+    await alice.dispose();
+  }
+  log('notifications laid down');
+}
+
+// A data-plane page, as one of the seeded readers: what a user of the
+// applications sees, in the light scheme most of them use. In the zone of
+// the warehouse rather than the machine's, so the times in the image say
+// nothing of where it was taken. And as a reader who has not answered the
+// desktop question yet: a headless browser answers it "denied" for them, and
+// the page would show the line for a blocked browser instead of its button.
+const readers = {};
+async function readerPage(browser, who) {
+  if (!readers[who]) {
+    const ctx = await browser.newContext({
+      viewport: VIEW, colorScheme: 'light', deviceScaleFactor: 1, timezoneId: 'Europe/Amsterdam',
+      storageState: `${tmp}/data-${who}.json`,
+    });
+    await ctx.addInitScript(() => {
+      if (window.Notification) Object.defineProperty(Notification, 'permission', { get: () => 'default' });
+    });
+    readers[who] = await ctx.newPage();
+  }
+  return readers[who];
+}
+
+// The New notification drawer filled in the way the captions describe: the
+// overdue invoice, its detail on Billing, and a reminder sent with POST and a
+// JSON body.
+async function composeInvoice(page) {
+  await page.getByRole('button', { name: /New notification/ }).first().click();
+  await page.waitForTimeout(1200);
+  const drawer = page.locator('app-tenant-notification-compose');
+  await drawer.locator('mat-button-toggle', { hasText: 'Warning' }).locator('button').click();
+  await drawer.getByLabel('Title').fill(NOTE.invoice);
+  await drawer.getByLabel('Text').fill('Northwind Traders has not paid the 4820.00 EUR due on 2026-10-20.');
+  const detail = drawer.locator('section', { has: page.getByRole('heading', { name: 'Detail' }) });
+  await detail.locator('mat-button-toggle', { hasText: 'Route' }).locator('button').click();
+  await detail.locator('mat-select').first().click();
+  await page.getByRole('option', { name: /Billing/ }).first().click();
+  await detail.getByLabel('Path').fill('invoices/INV-2026-0142');
+  const actions = drawer.locator('section', { has: page.getByRole('heading', { name: 'Actions' }) });
+  await actions.getByRole('button', { name: /Add action/ }).click();
+  await actions.getByLabel('Label').first().fill('Send a reminder');
+  // The method first, beside the route: POST, which opens the body editor.
+  await actions.locator('mat-form-field.method mat-select').first().click();
+  await page.getByRole('option', { name: 'POST', exact: true }).click();
+  await actions.locator('mat-form-field', { has: page.locator('mat-label', { hasText: /^Route$/ }) })
+    .locator('mat-select').first().click();
+  await page.getByRole('option', { name: /Billing/ }).first().click();
+  await actions.getByLabel('Path').first().fill('invoices/INV-2026-0142/remind');
+  await page.waitForTimeout(400);
+  // The body is a code editor: the text goes in whole, so its own bracket
+  // closing adds nothing.
+  await actions.locator('app-json-editor .cm-content').first().click();
+  await page.keyboard.insertText('{\n  "channel": "email"\n}');
+  // Back up to the Detail heading: the link it opens, then the action and
+  // its body, in one frame.
+  await detail.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(600);
+}
+
 const SHOTS = [
   // ── Infra ──
   { file: 'routes-list', path: '/infra/routes' },
@@ -789,6 +993,61 @@ const SHOTS = [
   { file: 'api-reference', path: '/system/api', settle: 2500 },
   { file: 'release-notes', path: '/system/release-notes' },
   { file: 'license', path: '/system/license' },
+  // ── Notifications (Enterprise) - last, see seedNotifications ──
+  { file: 'notifications', path: '/data-plane/notifications', prepare: seedNotifications, settle: 1600 },
+  {
+    // Root's drawer: the gateway's switch, a checkbox per tenant, the cap.
+    file: 'notifications-settings', path: '/data-plane/notifications', prepare: seedNotifications, settle: 1600,
+    act: click('Settings'),
+  },
+  {
+    // The API panel beside Settings and Access, for a service's developer.
+    file: 'notifications-api', path: '/data-plane/notifications', prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await page.getByRole('button', { name: 'API', exact: true }).first().click();
+      await page.waitForTimeout(1200);
+    },
+  },
+  {
+    file: 'tenant-notifications', path: () => TENANT && `/tenants/${TENANT}/notifications`,
+    prepare: seedNotifications, settle: 1600,
+  },
+  {
+    // The instruction asked of every reader: bob gave his, alice and carla
+    // still owe theirs.
+    file: 'tenant-notification-detail', path: () => TENANT && `/tenants/${TENANT}/notifications`,
+    prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await page.getByText(NOTE.floor).first().click();
+      await page.waitForTimeout(1200);
+    },
+  },
+  {
+    file: 'notification-compose', path: () => TENANT && `/tenants/${TENANT}/notifications`,
+    prepare: seedNotifications, settle: 1600, act: composeInvoice,
+  },
+  {
+    // The same message, as a service would send it.
+    file: 'notification-compose-json', path: () => TENANT && `/tenants/${TENANT}/notifications`,
+    prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await composeInvoice(page);
+      await page.getByRole('tab', { name: 'JSON' }).or(page.getByRole('link', { name: 'JSON' })).first().click();
+      await page.waitForTimeout(1000);
+    },
+  },
+  // The Notifications page card, and the bar's Notifications entry with its
+  // sample count.
+  { file: 'portal-notifications', path: '/application/portal', prepare: seedNotifications, settle: 3500 },
+  {
+    // alice's own page, on the data plane: two tenants, the message sent to
+    // both on one row, the floor plan she still owes, the invoice unfolded.
+    file: 'notifications-page', as: 'alice', path: '/meerkat/notifications', prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await page.getByText(NOTE.invoice).first().click();
+      await page.waitForTimeout(900);
+    },
+  },
 ];
 
 async function shoot(storageState) {
@@ -814,14 +1073,21 @@ async function shoot(storageState) {
       log('! skipped', s.file, '- the seed did not create what it shows');
       continue;
     }
-    await page.goto(ADMIN + '#' + path).catch(() => {});
-    await page.goto(ADMIN + path);
+    // A shot `as` a reader is a page of the applications' side, on the data
+    // plane, in that reader's session; the others are the console's.
+    const shotPage = s.as ? await readerPage(browser, s.as) : page;
+    if (s.as) {
+      await shotPage.goto(DATA + path);
+    } else {
+      await page.goto(ADMIN + '#' + path).catch(() => {});
+      await page.goto(ADMIN + path);
+    }
     // The console animates drawers in; a frame taken mid-slide is a blurred
     // panel nobody can read.
-    await page.waitForTimeout(s.settle ?? 1200);
+    await shotPage.waitForTimeout(s.settle ?? 1200);
     if (s.act) {
       try {
-        await s.act(page);
+        await s.act(shotPage);
       } catch (e) {
         log('! could not open what', s.file, 'shows:', e.message.split('\n')[0]);
       }
@@ -830,8 +1096,10 @@ async function shoot(storageState) {
     // says which node answered) and the path of the disposable data
     // directory (the database screen prints it) are a stranger's details in
     // a public image. Replaced in the page, in the text people would read.
-    await page.evaluate(([host, data]) => {
-      const clean = (v) => v.split(data).join('/data').split(host).join('gateway-1');
+    // So is the internal plane's port, moved here out of the way of a dev
+    // gateway: the pages say 7070, the address a service really calls.
+    await shotPage.evaluate(([host, data]) => {
+      const clean = (v) => v.split(data).join('/data').split(host).join('gateway-1').split(':17074').join(':7070');
       // Shadow roots too: a code snippet draws its text inside one.
       const roots = [document.body];
       while (roots.length) {
@@ -839,7 +1107,7 @@ async function shoot(storageState) {
         const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
         for (let n = walk.nextNode(); n; n = walk.nextNode()) {
           if (n.nodeType === Node.TEXT_NODE) {
-            if (n.nodeValue.includes(host) || n.nodeValue.includes(data)) n.nodeValue = clean(n.nodeValue);
+            if (n.nodeValue !== clean(n.nodeValue)) n.nodeValue = clean(n.nodeValue);
           } else {
             if (n.shadowRoot) roots.push(n.shadowRoot);
             if ((n.tagName === 'TEXTAREA' || n.tagName === 'INPUT') && n.value) n.value = clean(n.value);
@@ -849,10 +1117,10 @@ async function shoot(storageState) {
     }, [hostname(), DATA_DIR]).catch(() => {});
     // And nothing is left FOCUSED: a stray focus ring in a published image
     // reads as a state the reader is meant to notice, and it is not one.
-    await page.evaluate(() => document.activeElement?.blur?.());
-    await page.waitForTimeout(150);
+    await shotPage.evaluate(() => document.activeElement?.blur?.());
+    await shotPage.waitForTimeout(150);
     const png = `${tmp}/png/${s.file}.png`;
-    await page.screenshot({ path: png });
+    await shotPage.screenshot({ path: png });
     const conv = spawnSync('cwebp', ['-quiet', '-q', '82', png, '-o', `${out}/${s.file}.webp`]);
     if (conv.status !== 0) throw new Error(`cwebp failed for ${s.file}`);
     log('captured', s.file);
@@ -885,7 +1153,7 @@ killStale(18084);
 killStale(19094);
 const gw = startGateway();
 try {
-  await waitFor(ADMIN + '/api/health');
+  await waitFor(ADMIN + '/healthz');
   const state = await seed();
   await shoot(state);
   log('done ->', out);

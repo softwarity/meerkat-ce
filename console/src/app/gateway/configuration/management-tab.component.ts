@@ -1,5 +1,4 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -35,6 +34,8 @@ import {
 } from './pick-location-dialog.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { FileButtonComponent } from '../../shared/file-pick';
+import { ZonedDatePipe, zoned } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // One row per configuration, and the CURRENT one is the first of them.
 //
@@ -55,7 +56,7 @@ type Row = SavedConfiguration & { current?: boolean };
   selector: 'app-configuration-management',
   imports: [
     FileButtonComponent,
-    DatePipe,
+    ZonedDatePipe,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
@@ -228,8 +229,8 @@ type Row = SavedConfiguration & { current?: boolean };
       <mat-drawer-content>
         <div class="top">
           <p class="hint grow" style="margin: 0" i18n="@@Management_hint">
-            The first row is what this gateway serves; the others are saved copies that serve
-            nothing. Click a row to read its file.
+            The first row is the configuration in use; the others are saved copies, not in use.
+            Click a row to open it.
           </p>
           <!-- The size of the shelf, said before it is reached: a cap found by
                being refused is a trap, a cap announced is a price.
@@ -240,7 +241,7 @@ type Row = SavedConfiguration & { current?: boolean };
           @if (cap(); as n) {
             <span class="shelf" [class.full]="saved().length >= n">
               <ng-container i18n="@@Configurations_shelf">{{ saved().length }} of {{ n }} saved</ng-container>
-              <span class="ee" i18n="@@Configurations_shelf_ee">- no limit in Enterprise</span>
+              <span class="ee" i18n="@@Configurations_shelf_ee">- unlimited in Enterprise edition</span>
             </span>
           }
           <!-- No lock: a file exported here must be able to come back in on
@@ -346,7 +347,7 @@ type Row = SavedConfiguration & { current?: boolean };
             <mat-header-cell *matHeaderCellDef i18n="@@Updated">Updated</mat-header-cell>
             <mat-cell *matCellDef="let c">
               @if (!c.current) {
-                <span class="when">{{ c.updatedAt * 1000 | date: 'short' }}</span>
+                <span class="when nowrap">{{ c.updatedAt | zoned: zone() }}</span>
               }
               <span rowActions="tonal">
                 @if (c.current) {
@@ -416,9 +417,9 @@ type Row = SavedConfiguration & { current?: boolean };
                     matIconButton
                     (click)="$event.stopPropagation(); compare(c)"
                     i18n-matTooltip="@@Compare_with_running"
-                    matTooltip="Compare with what runs, or another saved configuration"
+                    matTooltip="Compare with the current or another saved configuration"
                     i18n-aria-label="@@Compare_with_running"
-                    aria-label="Compare with what runs, or another saved configuration"
+                    aria-label="Compare with the current or another saved configuration"
                   >
                     <mat-icon>compare_arrows</mat-icon>
                   </button>
@@ -504,6 +505,7 @@ type Row = SavedConfiguration & { current?: boolean };
 })
 export class ConfigurationManagementComponent {
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   private readonly snack = inject(MatSnackBar);
   private readonly dialogs = inject(DialogsService);
   private readonly dialog = inject(MatDialog);
@@ -566,8 +568,8 @@ export class ConfigurationManagementComponent {
   // the icon above, so the two can never disagree.
   protected readonly markTip = computed(() =>
     this.state() === 'saved'
-      ? $localize`:@@Mark_matches:This is what the gateway serves.`
-      : $localize`:@@Mark_stale:The gateway has changed since it was set from this one. Save the current state again to match.`,
+      ? $localize`:@@Mark_matches:This configuration is in use.`
+      : $localize`:@@Mark_stale:Changed since this configuration was activated. Save the current configuration again to keep the changes.`,
   );
 
   protected readonly stateTip = computed(() => {
@@ -596,9 +598,9 @@ export class ConfigurationManagementComponent {
 
   protected readonly currentLabel = () => $localize`:@@Current_configuration:Current configuration`;
   protected readonly currentSubtitle = () =>
-    $localize`:@@Current_subtitle:What this gateway serves. Saving applies your edits.`;
+    $localize`:@@Current_subtitle:In use. Saving applies your changes.`;
   protected readonly savedSubtitle = () =>
-    $localize`:@@Saved_subtitle:A saved copy. Editing it does not change what is served.`;
+    $localize`:@@Saved_subtitle:A saved copy. Editing it does not change the configuration in use.`;
   protected readonly mediaNote = () =>
     $localize`:@@Media_not_edited_here:Images are left out here and kept as they are. Set them in Built-in pages, Branding.`;
   protected readonly saveLabel = () => $localize`:@@Save:Save`;
@@ -780,7 +782,7 @@ export class ConfigurationManagementComponent {
     if (existing) {
       const ok = await this.dialogs.confirm({
         title: $localize`:@@Replace_configuration:Replace ${name}:name:?`,
-        message: $localize`:@@Replace_configuration_message:Its content is replaced by what this gateway serves now.`,
+        message: $localize`:@@Replace_configuration_message:Its content is replaced by the current configuration.`,
         confirmLabel: $localize`:@@Replace:Replace`,
         danger: true,
       });
@@ -890,11 +892,11 @@ export class ConfigurationManagementComponent {
   private async nothingToLose(): Promise<boolean> {
     if (this.state() === 'saved') return true;
     return this.dialogs.confirm({
-      title: $localize`:@@Nothing_saved_first:What is running is not saved`,
+      title: $localize`:@@Nothing_saved_first:The current configuration is not saved`,
       message:
         this.state() === 'drifted'
-          ? $localize`:@@Drifted_first_message:This gateway has changed since ${this.current()?.active?.name}:name: was saved. Switching loses those changes.`
-          : $localize`:@@Nothing_saved_first_message:No saved configuration matches what this gateway serves. Save it under a name first if you may want it again.`,
+          ? $localize`:@@Drifted_first_message:The configuration has changed since ${this.current()?.active?.name}:name: was saved. Switching loses those changes.`
+          : $localize`:@@Nothing_saved_first_message:No saved configuration matches the current one. Save it under a name first if you may need it again.`,
       confirmLabel: $localize`:@@Continue:Continue`,
       danger: true,
     });
@@ -910,7 +912,7 @@ export class ConfigurationManagementComponent {
       next: async (plan) => {
         this.busy.set(false);
         const keep = await this.pickPlan(
-          $localize`:@@Set_as_current_WHAT:Serve ${c.name}:name:?`,
+          $localize`:@@Set_as_current_WHAT:Activate ${c.name}:name:?`,
           // Not "Set as current": with lines unticked, it is part of it.
           $localize`:@@Apply_to_current:Apply to current`,
           plan,
@@ -962,8 +964,8 @@ export class ConfigurationManagementComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_configuration:Delete ${c.name}:name:?`,
       message: c.active
-        ? $localize`:@@Delete_active_configuration_message:This is the current one. What the gateway serves does not change, it just loses its name.`
-        : $localize`:@@Delete_configuration_message:The saved copy is gone. What the gateway serves does not change.`,
+        ? $localize`:@@Delete_active_configuration_message:It is the current one. The configuration in use does not change; it just loses its name.`
+        : $localize`:@@Delete_configuration_message:The saved copy is deleted. The configuration in use does not change.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });
@@ -1156,7 +1158,7 @@ export class ConfigurationManagementComponent {
   }
 
   private when(ts: number): string {
-    return ts ? new Date(ts * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
+    return zoned(ts, this.zone());
   }
 
   private remoteName(id: string): string {

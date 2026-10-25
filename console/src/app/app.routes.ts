@@ -396,6 +396,15 @@ export const routes: Routes = [
           import('./identity/tenant-sections/tenant-rules.component').then((m) => m.TenantRulesComponent),
       },
       {
+        // The tenant level of the notifications (NOTIF-05): the section is
+        // offered on the Enterprise image only; the API answers 404 elsewhere.
+        path: 'notifications',
+        loadComponent: () =>
+          import('./identity/tenant-sections/tenant-notifications.component').then(
+            (m) => m.TenantNotificationsComponent,
+          ),
+      },
+      {
         path: 'danger',
         loadComponent: () =>
           import('./identity/tenant-sections/tenant-danger.component').then((m) => m.TenantDangerComponent),
@@ -444,6 +453,14 @@ export const routes: Routes = [
         canActivate: [schedulerAccess],
         loadComponent: () =>
           import('./scheduler/scheduler-page.component').then((m) => m.SchedulerPageComponent),
+      },
+      {
+        // What the services told their users (NOTIF-05): readers of the
+        // scheduler read this too, it is the same kind of question.
+        path: 'notifications',
+        canActivate: [schedulerAccess],
+        loadComponent: () =>
+          import('./notifications/notifications-page.component').then((m) => m.NotificationsPageComponent),
       },
       {
         // Not at /metrics: a child path, so nothing the control plane serves

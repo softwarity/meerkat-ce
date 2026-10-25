@@ -302,7 +302,7 @@ export class BuiltInPagesScope {
     this.api.activateTheme(t.id).subscribe({
       next: () => {
         this.snack.open(
-          $localize`:@@Theme_is_now_live:This theme is now live on the flow pages`,
+          $localize`:@@Theme_is_now_live:This theme now applies to the built-in pages`,
           undefined,
           { duration: 3000 },
         );

@@ -1,0 +1,83 @@
+@if (view(); as v) {
+  <div class="switch">
+    <span [matTooltip]="reason()" [matTooltipDisabled]="!reason()">
+      <mat-slide-toggle
+        [checked]="v.state === 'on'"
+        [disabled]="v.state === 'offAbove' || saving()"
+        (change)="set($event)"
+        i18n="@@Notifications_on_for_this_tenant"
+        >Notifications on for this tenant</mat-slide-toggle
+      >
+    </span>
+    @if (reason()) {
+      <span class="muted">{{ reason() }}</span>
+    }
+    <span class="grow"></span>
+    <!-- Trying one out: only where this tenant receives them. -->
+    @if (v.effective) {
+      <button matButton="tonal" (click)="drawer.openCompose()">
+        <mat-icon>add</mat-icon>
+        <ng-container i18n="@@New_notification">New notification</ng-container>
+      </button>
+    }
+  </div>
+  <p class="hint" i18n="@@Tenant_notifications_hint">
+    Members see what the services send them on their notifications page. Turned
+    off, publishing to this tenant is refused.
+  </p>
+}
+
+@if (list().length === 0) {
+  <div class="empty" i18n="@@No_notifications_sent_to_tenant">No notifications sent to this tenant yet.</div>
+} @else {
+  <div class="table-wrap">
+    <mat-table [dataSource]="list()">
+      <ng-container matColumnDef="title">
+        <mat-header-cell *matHeaderCellDef i18n="@@Notification">Notification</mat-header-cell>
+        <mat-cell *matCellDef="let n">
+          <span class="lines">
+            <span class="name"><span class="level" [class]="n.level"></span>{{ title(n) }}</span>
+            @if (state(n) !== 'live') {
+              <span class="muted">
+                @if (state(n) === 'withdrawn') {
+                  <ng-container i18n="@@Withdrawn">Withdrawn</ng-container>
+                } @else {
+                  <ng-container i18n="@@Expired">Expired</ng-container>
+                }
+              </span>
+            }
+          </span>
+        </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="sender">
+        <mat-header-cell *matHeaderCellDef i18n="@@Sender">Sender</mat-header-cell>
+        <mat-cell *matCellDef="let n"><span class="mono">{{ n.sender }}</span></mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="reads">
+        <mat-header-cell *matHeaderCellDef i18n="@@Read_by">Read by</mat-header-cell>
+        <mat-cell *matCellDef="let n">{{ n.reads }} / {{ n.recipients }}</mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="ack">
+        <mat-header-cell *matHeaderCellDef i18n="@@Notify_acknowledged">Acknowledged</mat-header-cell>
+        <mat-cell *matCellDef="let n">
+          @if (ack(n); as a) {
+            <span class="ack" [class.done]="a.done">
+              <mat-icon>{{ a.done ? 'task_alt' : 'schedule' }}</mat-icon>{{ a.text }}
+            </span>
+          }
+        </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="sent">
+        <mat-header-cell *matHeaderCellDef i18n="@@Sent">Sent</mat-header-cell>
+        <mat-cell *matCellDef="let n">{{ n.createdAt | zoned: zone() }}</mat-cell>
+      </ng-container>
+      <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
+      <mat-row
+        *matRowDef="let n; columns: columns"
+        (click)="drawer.openNotification(n)"
+        [class.off]="state(n) !== 'live'"
+        [class.selected]="drawer.notification()?.id === n.id"
+      ></mat-row>
+    </mat-table>
+  </div>
+}

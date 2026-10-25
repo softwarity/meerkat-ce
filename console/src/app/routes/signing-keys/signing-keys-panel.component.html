@@ -10,8 +10,8 @@
 }
 <div class="panel-body">
   <p class="workflow" i18n="@@Signing_keys_workflow">
-    What Meerkat signs with and where it publishes it: the identity a route passes to its service, as a
-    JWT on each request or by OIDC sign-in.
+    The keys Meerkat signs identity tokens with, and where services find them: a JWT sent on each
+    request, or an OIDC sign-in.
   </p>
   @if (data(); as d) {
     <!-- Both labels sit ON the border, the way an outlined field carries its
@@ -74,10 +74,10 @@
          reader has to leave with is that one path costs nothing forever and
          the other is theirs to maintain forever. -->
     <p class="fallback" i18n="@@Static_fallback5">
-      Services verify Meerkat's tokens from these addresses: the internal ones from inside the cluster
-      (port {{ d.internalPort }}), the public OIDC discovery for applications that sign their users in. A
-      service reading them follows key rotations on its own; one holding a PEM from below must be
-      updated at every rotation.
+      Services verify tokens from these addresses: the internal ones from inside the cluster (port
+      {{ d.internalPort }}), the public discovery for applications that sign their users in. A service
+      reading them follows key rotations by itself; one holding a copied PEM must be updated at each
+      rotation.
     </p>
     <!-- The "iss" of every token, chosen among the application plane's public
          addresses: never typed, since a library reads
@@ -147,7 +147,7 @@
             <span
               class="kid"
               i18n-matTooltip="@@Key_id_tooltip"
-              matTooltip="Set in each token's header: the backend uses it to pick the matching key in the JWKS."
+              matTooltip="Key id, in each token's header: the service uses it to find the key in the JWKS."
             >{{ k.kid }}</span>
           </mat-panel-description>
         </mat-expansion-panel-header>
@@ -194,7 +194,7 @@
          the OIDC clients, and read as something done to them. -->
     <div class="renew">
       @if (confirming()) {
-        <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys stay valid for a short grace window.</span>
+        <span class="warn" i18n="@@Rotate_confirm">Rotate now? The old keys stay valid for a short while.</span>
         <button matButton (click)="confirming.set(false)" i18n="@@Cancel">Cancel</button>
         <button matButton="filled" [disabled]="renewing()" (click)="renew()" i18n="@@Rotate">Rotate</button>
       } @else {
@@ -230,7 +230,7 @@
     @if (noPublicName()) {
       <p class="warn-line">
         <mat-icon>warning</mat-icon>
-        <span i18n="@@Oidc_needs_public_name">The provider answers once this gateway has a public address.</span>
+        <span i18n="@@Oidc_needs_public_name">OIDC sign-in works once this gateway has a public address.</span>
         <a routerLink="/infra/tls" [queryParams]="{ plane: 'app' }" i18n="@@Declare_public_name_link"
           >Declare a public name in Domains &amp; TLS, Application tab</a
         >
@@ -258,7 +258,7 @@
               } @else if (c.confidential) {
                 <!-- Imported from a configuration that did not carry its
                      secret: the application cannot sign in until one is drawn. -->
-                <span class="no-secret" i18n="@@Oidc_no_secret_yet">no secret yet: draw one with Regenerate</span>
+                <span class="no-secret" i18n="@@Oidc_no_secret_yet">no secret yet: use Regenerate</span>
               } @else {
                 <ng-container i18n="@@No_secret_PKCE">no secret, PKCE</ng-container>
               }
@@ -282,7 +282,7 @@
                 <mat-icon
                   class="whole-host"
                   i18n-matTooltip="@@Oidc_whole_host_warning"
-                  matTooltip="{{ c.wholeHostRoutes.join(', ') }} covers a whole host: any address on it may receive a code."
+                  matTooltip="{{ c.wholeHostRoutes.join(', ') }} covers a whole host: any address on that host may receive a sign-in code."
                   >warning</mat-icon
                 >
               }

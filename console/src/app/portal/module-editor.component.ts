@@ -33,6 +33,9 @@ export interface ModuleFormData {
   module: ModuleDraft;
   routes: Route[];
   kind: EntryKind;
+  // The notifications entry (NOTIF-05): no route, it opens the notifications
+  // page. It moves and turns off like a module.
+  special: boolean;
   // Whether a BAR is being drawn. An icon is a thing a bar has; a flat menu
   // has a name and an order, so offering it there would be offering a setting
   // nothing reads.
@@ -102,8 +105,8 @@ export class ModuleEditorComponent implements OnInit {
 
   private readonly q$ = new Subject<string>();
 
-  protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: a module opens one.`;
-  protected readonly offHint = $localize`:@@Portal_route_off_hint:The route is turned off: the bar greys the entry until it is back on.`;
+  protected readonly noRoutes = $localize`:@@Portal_no_ui_routes:No UI route yet: create one first.`;
+  protected readonly offHint = $localize`:@@Portal_route_off_hint:This route is turned off: the entry stays greyed until it is back on.`;
 
   ngOnInit(): void {
     // input() is not bound in field initializers - seed here.
@@ -162,13 +165,14 @@ export class ModuleEditorComponent implements OnInit {
   // A module needs its route, a container its label: neither has anything
   // else to be found by.
   protected canSave(): boolean {
+    if (this.data().special) return true;
     return this.data().kind === 'container' ? !!this.label().trim() : !!this.routeId();
   }
 
   protected save(): void {
     if (!this.canSave()) return;
     this.saved.emit({
-      routeId: this.data().kind === 'container' ? '' : this.routeId(),
+      routeId: this.data().kind === 'container' || this.data().special ? '' : this.routeId(),
       icon: this.icon().trim(),
       label: this.label().trim(),
       description: this.description().trim(),
@@ -181,8 +185,10 @@ export class ModuleEditorComponent implements OnInit {
   protected readonly moveLeft = $localize`:@@Move_left:Move left`;
   protected readonly moveRight = $localize`:@@Move_right:Move right`;
   protected readonly noContainer = $localize`:@@Portal_no_container:No container yet: add one first`;
-  protected readonly labelHint = $localize`:@@Portal_module_label_hint:Empty uses the route's name.`;
-  protected readonly containerLabelHint = $localize`:@@Portal_container_label_hint:Required: a container has no route to name it.`;
+  protected readonly labelHint = $localize`:@@Portal_module_label_hint:Leave empty to use the route's name.`;
+  protected readonly containerLabelHint = $localize`:@@Portal_container_label_hint:Required for a container.`;
+  protected readonly notificationsLabelHint = $localize`:@@Portal_notifications_label_hint:Leave empty for Notifications, in each user's language.`;
+  protected readonly notificationsName = $localize`:@@Portal_notifications:Notifications`;
 
 
 

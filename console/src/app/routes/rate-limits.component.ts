@@ -51,8 +51,8 @@ const KEYS: { value: string; label: string; hint: string }[] = [
   },
   {
     value: 'tenant',
-    label: $localize`:@@Per_tenant:Each organisation`,
-    hint: $localize`:@@Per_tenant_hint:One budget per organisation.`,
+    label: $localize`:@@Per_tenant:Each tenant`,
+    hint: $localize`:@@Per_tenant_hint:One budget per tenant.`,
   },
   {
     value: 'ip',
@@ -107,7 +107,7 @@ export function limitScopeTip(l: RateLimit): string {
     bits.push($localize`:@@With_roles:holding ${a.roles.join(', ')}:roles:`);
   }
   if (a.tenants.length) {
-    bits.push($localize`:@@In_orgs:in ${a.tenants.length}:count: organisation(s)`);
+    bits.push($localize`:@@In_orgs:in ${a.tenants.length}:count: tenant(s)`);
   }
   if (a.users.length) {
     bits.push($localize`:@@And_users:and ${a.users.join(', ')}:users:`);
@@ -228,7 +228,7 @@ function toState(a: RateLimit['applies']): AccessState {
     } @empty {
       @if (scope() === 'route') {
         <p class="hint" i18n="@@No_limit_hint">
-          No limit yet. Limits add up: the first one exceeded answers 429.
+          No limit yet. Limits apply together: the first one reached answers 429.
         </p>
       } @else {
         <p class="hint" i18n="@@No_op_limit_hint">
@@ -260,7 +260,7 @@ function toState(a: RateLimit['applies']): AccessState {
          the mistake, and it is invisible until the day it matters. -->
     @if (value().length) {
       <p class="hint" i18n="@@Bound_is_per_node">
-        Counted per node: a cluster of N gateways allows up to N times this.
+        Counted by each gateway: with N gateways, up to N times this gets through.
       </p>
     }
 

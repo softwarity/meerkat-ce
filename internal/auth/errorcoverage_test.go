@@ -79,7 +79,7 @@ func TestEveryRefusalHasAScreen(t *testing.T) {
 
 	var loose []string
 	for key, where := range found {
-		if claimed[key] || errorsWithNoPage[key] {
+		if claimed[key] {
 			continue
 		}
 		loose = append(loose, key+" ("+strings.Join(uniq(where), ", ")+")")
@@ -87,8 +87,8 @@ func TestEveryRefusalHasAScreen(t *testing.T) {
 	sort.Strings(loose)
 	if len(loose) > 0 {
 		t.Errorf("%d refusals belong to no preview, so nothing can show them:\n  %s\n"+
-			"Add each to previewErrors under the page its handler re-renders, or to "+
-			"errorsWithNoPage when it is answered as plain text.",
+			"Add each to previewErrors under the page its handler renders it on: "+
+			"a refusal answered as plain text is the bug, not an exception.",
 			len(loose), strings.Join(loose, "\n  "))
 	}
 

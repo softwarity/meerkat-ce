@@ -40,7 +40,7 @@ export class TrustDialogComponent {
       const v = value();
       if (!v.trim()) return [{ kind: 'pem', message: $localize`:@@Trust_pem_required:Paste a PEM, or choose or drop its file.` }];
       if (v.includes('PRIVATE KEY')) {
-        return [{ kind: 'pem', message: $localize`:@@Trust_pem_key:This holds a private key: a trusted authority is a public certificate only.` }];
+        return [{ kind: 'pem', message: $localize`:@@Trust_pem_key:This contains a private key: give the authority's public certificate only.` }];
       }
       if (!v.includes('-----BEGIN CERTIFICATE-----')) {
         return [{ kind: 'pem', message: $localize`:@@Trust_pem_shape:Expected blocks starting with -----BEGIN CERTIFICATE-----.` }];

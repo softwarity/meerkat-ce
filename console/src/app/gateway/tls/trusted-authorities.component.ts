@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -9,6 +8,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, PlatformAuthorities, TrustedAuthority } from '../../api.service';
 import { LiveChangesService } from '../../shared/live-changes.service';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // The authorities the gateway trusts when IT calls (SSL-09): an upstream in
 // HTTPS signed by a cluster's or a company's own CA. Its own section, and its
@@ -20,12 +21,13 @@ import { LiveChangesService } from '../../shared/live-changes.service';
 // or, on a cluster, picked among the authorities it publishes.
 @Component({
   selector: 'app-trusted-authorities',
-  imports: [DatePipe, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule],
+  imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, ZonedDatePipe],
   templateUrl: './trusted-authorities.component.html',
   styleUrl: './trusted-authorities.component.scss',
 })
 export class TrustedAuthoritiesComponent {
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
@@ -93,9 +95,5 @@ export class TrustedAuthoritiesComponent {
       next: () => this.load(),
       error: () => this.snack.open($localize`:@@Request_failed:Request failed`, undefined, { duration: 3000 }),
     });
-  }
-
-  protected expiry(t: number): number {
-    return t * 1000;
   }
 }

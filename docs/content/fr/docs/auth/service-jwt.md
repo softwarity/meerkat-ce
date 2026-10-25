@@ -198,6 +198,8 @@ désormais un chemin ordinaire, qu'une route peut prendre.
   sépare.
 - [Cluster Kubernetes](/docs/deploy/kubernetes) - le Service interne, et une
   NetworkPolicy qui tient la console à l'écart des backends.
-- [Appels planifiés](/docs/operations/scheduler) - l'autre API du plan interne.
+- [Appels planifiés](/docs/operations/scheduler) et
+  [notifications](/docs/operations/notifications) - les autres API du plan
+  interne.
 - [Meerkat fournisseur OpenID](/docs/auth/oidc-provider) - quand l'application
   connecte elle-même ses utilisateurs, avec les mêmes clés.

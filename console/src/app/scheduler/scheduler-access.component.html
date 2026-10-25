@@ -1,6 +1,6 @@
 <p class="lead" i18n="@@Access_lead">
-  How the services calling this API on the internal plane are recognised, and
-  which of them get in.
+  How services calling this API on the internal plane are identified, and
+  which ones are allowed.
 </p>
 
 <h3 i18n="@@Mode">Mode</h3>
@@ -13,23 +13,23 @@
         @case ("token") {
           <span class="choice" i18n="@@Access_mode_token">Meerkat token</span>
           <span class="muted" i18n="@@Access_mode_token_hint"
-            >A token minted under Access tokens, Internal: named, traced,
+            >An internal token created under Access tokens. Named and
             revocable.</span
           >
         }
         @case ("cluster") {
           <span class="choice" i18n="@@Access_mode_cluster">Cluster token</span>
           <span class="muted" i18n="@@Access_mode_cluster_hint"
-            >The pod's own ServiceAccount token, checked by Kubernetes. Nothing
-            to mint or hand out.</span
+            >The pod's Kubernetes ServiceAccount token. Nothing to create or
+            distribute.</span
           >
         }
         @default {
           <span class="choice" i18n="@@Access_mode_none">None</span>
           <span class="muted" i18n="@@Access_mode_none_hint"
-            >Nothing asked. A caller is named by its token or ServiceAccount if
-            it sends one, otherwise by the workload at its address: a guess,
-            not a proof.</span
+            >No credential required. A caller is identified by its token if it
+            sends one, otherwise by its network address, which proves
+            nothing.</span
           >
         }
       }
@@ -44,7 +44,7 @@
 @if (draft().mode === "token") {
   <p class="go">
     <a matButton="tonal" routerLink="/infra/access-tokens" [queryParams]="{ view: 'internal' }" any-role="root">
-      <ng-container i18n="@@Mint_a_token">Mint a token</ng-container>
+      <ng-container i18n="@@Mint_a_token">Create a token</ng-container>
     </a>
   </p>
 }
@@ -97,18 +97,32 @@
   </p>
 }
 
-<p class="note" i18n="@@Access_out_of_scope">
-  A task calls with the roles it asks for, and may call any route: neither is
-  bounded by who created it.
-</p>
+@if (target() === "notifications") {
+  <p class="note" i18n="@@Access_notifications_out_of_scope">
+    A sender chooses the recipients and the links, but a person only receives
+    a notification they are allowed to open.
+  </p>
+} @else {
+  <p class="note" i18n="@@Access_out_of_scope">
+    A scheduled call uses the roles it requests and may call any route,
+    whoever created it.
+  </p>
+}
 
 @if (wideOpen()) {
   <p class="warning">
     <mat-icon>warning</mat-icon>
-    <span i18n="@@Access_wide_open"
-      >Any pod or container that reaches the internal plane can schedule a call
-      with any role, ROLE_ADMIN included, on any route.</span
-    >
+    @if (target() === "notifications") {
+      <span i18n="@@Access_notifications_wide_open"
+        >Any pod or container that reaches the internal plane can notify the
+        people of every tenant where notifications are on.</span
+      >
+    } @else {
+      <span i18n="@@Access_wide_open"
+        >Any pod or container that reaches the internal plane can schedule a call
+        with any role, ROLE_ADMIN included, on any route.</span
+      >
+    }
   </p>
 }
 
@@ -118,7 +132,7 @@
 
 @if (stored() && !editable()) {
   <p class="muted" i18n="@@Access_read_only">
-    Only an infrastructure administrator changes this.
+    Only an infrastructure administrator can change this.
   </p>
 } @else if (stored()) {
   <div class="actions">

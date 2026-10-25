@@ -5,7 +5,7 @@
 
 const DOCS: Record<string, string> = {
   // predicates
-  path: $localize`:@@doc_Match_the_request_path:Match the request path; several patterns act as a logical OR`,
+  path: $localize`:@@doc_Match_the_request_path:Match the request path; any of several patterns matches`,
   host: $localize`:@@doc_Match_the_Host_header:Match the Host header (*.suffix wildcards)`,
   method: $localize`:@@doc_Match_the_HTTP_method:Match the HTTP method`,
   header: $localize`:@@doc_A_header_is_present:A header is present, optionally matching a regexp`,
@@ -13,26 +13,26 @@ const DOCS: Record<string, string> = {
   query: $localize`:@@doc_A_query_parameter_is_present:A query parameter is present, optionally matching a regexp`,
   'remote-addr': $localize`:@@doc_The_client_address_is_in_CIDR:The client address is in CIDR ranges`,
   'x-forwarded-remote-addr': $localize`:@@doc_The_last_XFF_address_is_in_CIDR:The last X-Forwarded-For address is in CIDR ranges`,
-  after: $localize`:@@doc_Requests_made_after:Requests made after a datetime`,
-  before: $localize`:@@doc_Requests_made_before:Requests made before a datetime`,
-  between: $localize`:@@doc_Requests_made_between:Requests made between two datetimes`,
+  after: $localize`:@@doc_Requests_made_after:Requests made after a date and time`,
+  before: $localize`:@@doc_Requests_made_before:Requests made before a date and time`,
+  between: $localize`:@@doc_Requests_made_between:Requests made between two dates and times`,
   weight: $localize`:@@doc_Split_traffic_canary:Split traffic between the routes of a group (canary)`,
   // modifiers
   'strip-prefix': $localize`:@@doc_Remove_first_path_segments:Remove the first N path segments`,
   'prefix-path': $localize`:@@doc_Prepend_a_prefix:Prepend a prefix to the path`,
   'rewrite-path': $localize`:@@doc_Rewrite_the_path_regexp:Rewrite the path with a regexp`,
-  'set-request-header': $localize`:@@doc_Set_a_request_header:Set a request header, replacing the client value`,
+  'set-request-header': $localize`:@@doc_Set_a_request_header:Set a request header, replacing the caller's value`,
   'add-request-header': $localize`:@@doc_Add_a_request_header:Add a request header value`,
   'remove-request-header': $localize`:@@doc_Remove_a_request_header:Remove a request header`,
   'set-query-param': $localize`:@@doc_Set_a_query_parameter:Set a query parameter`,
   'remove-query-param': $localize`:@@doc_Remove_a_query_parameter:Remove a query parameter`,
-  'set-response-header': $localize`:@@doc_Set_a_response_header:Set a response header, replacing the upstream value`,
+  'set-response-header': $localize`:@@doc_Set_a_response_header:Set a response header, replacing the service's value`,
   'add-response-header': $localize`:@@doc_Add_a_response_header:Add a response header value`,
   'remove-response-header': $localize`:@@doc_Remove_a_response_header:Remove a response header`,
   'set-status': $localize`:@@doc_Force_the_response_status:Force the response status code`,
-  redirect: $localize`:@@doc_Answer_with_a_redirect:Answer with a redirect instead of proxying`,
+  redirect: $localize`:@@doc_Answer_with_a_redirect:Answer with a redirect instead of calling the service`,
   maintenance: $localize`:@@doc_Answer_503_unavailable:Answer 503 with the gateway's unavailable page`,
-  files: $localize`:@@doc_Serve_uploaded_files:Serve files uploaded on the route instead of proxying`,
+  files: $localize`:@@doc_Serve_uploaded_files:Serve files uploaded on the route instead of calling the service`,
 };
 
 export function brickDoc(type: string): string {
@@ -69,7 +69,7 @@ export const PLANNED_MODIFIERS: Record<string, PlannedBrick[]> = {
   gate: [
     { type: 'rate-limiter', doc: $localize`:@@planned_rate_limiter:Throttle callers by key` },
     { type: 'circuit-breaker', doc: $localize`:@@planned_circuit_breaker:Stop calling a failing service, with a fallback` },
-    { type: 'retry', doc: $localize`:@@planned_retry:Retry idempotent requests on upstream errors` },
+    { type: 'retry', doc: $localize`:@@planned_retry:Retry idempotent requests when the service fails` },
   ],
   request: [
     {

@@ -1,7 +1,7 @@
 <mat-drawer-container>
   <mat-drawer-content>
 <p class="intro text-muted" i18n="@@Group_rules_intro">
-  Whoever signs in with this upstream group becomes a member here, with this group.
+  People who sign in with a given upstream group become members here, in the group you choose.
 </p>
 
 <!-- One worked example, because the abstract wording above never makes the
@@ -24,12 +24,12 @@
   </div>
 } @else if (blocker() === 'group') {
   <div class="empty" i18n="@@Rules_need_a_group">
-    This organization has no group yet: create one first.
+    This tenant has no group yet: create one first.
   </div>
 } @else {
   @if (rules().length === 0) {
     <div class="empty" i18n="@@No_rule_yet">
-      No rule yet: people arriving through an authority wait for an administrator.
+      No rule yet: people who sign in through an authority wait for an administrator to add them.
     </div>
   } @else {
     <div class="table-wrap">

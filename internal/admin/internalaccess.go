@@ -106,43 +106,97 @@ func callerOf(r *http.Request) internalCaller {
 	return internalCaller{Via: store.CallerUnidentified, Addr: filters.PeerIP(r)}
 }
 
-// internalSchedules is the funnel of the scheduler API on the internal plane:
-// the mode decides what a caller must present, the list who gets through.
+// door is one API of the internal plane and what guards it: the token
+// perimeter that opens it, the setting that says who may call it, and the
+// screen an operator changes that setting on. The scheduler was the first;
+// the notifications (NOTIF-05) are the second, with their own setting - the
+// services that notify are not the ones that schedule.
+type door struct {
+	scope  string
+	where  string
+	access func(context.Context) store.InternalAccess
+}
+
+// schedulesDoor is the scheduled calls API (SCHED-01).
+func (a *API) schedulesDoor() door {
+	return door{scope: store.ScopeSchedules, where: "Scheduler, Access", access: a.st.InternalAccess}
+}
+
+// notificationsDoor is the notifications API (NOTIF-05).
+func (a *API) notificationsDoor() door {
+	return door{scope: store.ScopeNotifications, where: "Notifications, Access",
+		access: func(ctx context.Context) store.InternalAccess { return a.st.NotifySettings(ctx).Access }}
+}
+
+// internalSchedules is the funnel of the scheduler API on the internal plane.
 func (a *API) internalSchedules(next userHandler) http.Handler {
-	byToken := a.schedules(a.tokenCaller(next))
+	return a.internalDoor(a.schedulesDoor(), next)
+}
+
+type doorKey struct{}
+
+// throughDoor says which door of the internal plane a request came in by, ""
+// on the control plane: what lets a notifications token through authed here
+// and nowhere else.
+func throughDoor(ctx context.Context) string {
+	s, _ := ctx.Value(doorKey{}).(string)
+	return s
+}
+
+// internalDoor is the funnel of one API on the internal plane: the mode
+// decides what a caller must present, the list who gets through.
+func (a *API) internalDoor(d door, next userHandler) http.Handler {
+	byToken := a.perimeter(d.scope, a.tokenCaller(d, next))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// A browser has no business here in any mode: its cookie is dropped,
 		// so no console session ever reaches the scheduler through a side
 		// door - it would be an unidentified caller at best.
 		r.Header.Del("Cookie")
-		access := a.st.InternalAccess(r.Context())
-		r = r.WithContext(context.WithValue(r.Context(), accessKey{}, access))
+		access := d.access(r.Context())
+		ctx := context.WithValue(r.Context(), accessKey{}, access)
+		r = r.WithContext(context.WithValue(ctx, doorKey{}, d.scope))
 		bearer := bearerOf(r)
 		meerkat := strings.HasPrefix(bearer, "mk_")
 		switch {
 		case access.Mode == store.InternalAccessCluster:
-			a.clusterCaller(w, r, access, bearer, next)
+			a.clusterCaller(w, r, d, access, bearer, next)
 		case meerkat:
 			byToken.ServeHTTP(w, r)
 		case access.Mode == store.InternalAccessToken:
 			writeErr(w, http.StatusUnauthorized,
-				"the internal plane asks for a Meerkat token: send one of perimeter "+store.ScopeSchedules+
+				"the internal plane asks for a Meerkat token: send one of perimeter "+d.scope+
 					" (Authorization: Bearer mk_...), minted on the console under Infra, Access tokens, Internal")
 		default:
-			a.noneCaller(w, r, access, bearer, next)
+			a.noneCaller(w, r, d, access, bearer, next)
 		}
 	})
 }
 
-// tokenCaller follows the schedules guard when a Meerkat token was sent: the
+// perimeter admits an application administrator, and a token whose perimeter
+// is exactly this door's.
+func (a *API) perimeter(scope string, next userHandler) http.Handler {
+	if scope == store.ScopeSchedules {
+		return a.schedules(next)
+	}
+	return a.authed(func(w http.ResponseWriter, r *http.Request, actor store.User) {
+		if actor.Root || actor.AppAdmin || tokenScope(r.Context()) == scope {
+			next(w, r, actor)
+			return
+		}
+		writeErr(w, http.StatusForbidden,
+			"this API answers an application administrator, or a token whose perimeter is "+scope)
+	})
+}
+
+// tokenCaller follows the door's guard when a Meerkat token was sent: the
 // token is the identity, and its name is what the list names - or, in None
 // mode where the list names services, the workload at its address.
-func (a *API) tokenCaller(next userHandler) userHandler {
+func (a *API) tokenCaller(d door, next userHandler) userHandler {
 	return func(w http.ResponseWriter, r *http.Request, actor store.User) {
 		access, _ := r.Context().Value(accessKey{}).(store.InternalAccess)
 		c := internalCaller{Identity: actorToken(r.Context()), Via: store.CallerToken, Addr: filters.PeerIP(r)}
 		if !access.Admits(c.Identity) && !a.admittedByAddress(r.Context(), access, c.Addr) {
-			refuseCaller(w, access, c)
+			refuseCaller(w, d, access, c)
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, c)), actor)
@@ -151,12 +205,12 @@ func (a *API) tokenCaller(next userHandler) userHandler {
 
 // clusterCaller admits a ServiceAccount token the API server vouches for, and
 // nothing else.
-func (a *API) clusterCaller(w http.ResponseWriter, r *http.Request, access store.InternalAccess, bearer string, next userHandler) {
+func (a *API) clusterCaller(w http.ResponseWriter, r *http.Request, d door, access store.InternalAccess, bearer string, next userHandler) {
 	if a.Callers == nil || !a.Callers.Kubernetes() {
 		writeErr(w, http.StatusServiceUnavailable,
 			"the internal plane asks for a cluster token, which the Kubernetes API checks, and this gateway "+
 				"does not run on Kubernetes: an infrastructure administrator chooses none or token "+
-				"(Scheduler, Access)")
+				"("+d.where+")")
 		return
 	}
 	if bearer == "" || strings.HasPrefix(bearer, "mk_") {
@@ -171,7 +225,7 @@ func (a *API) clusterCaller(w http.ResponseWriter, r *http.Request, access store
 		return
 	}
 	if !access.Admits(c.Identity) {
-		refuseCaller(w, access, c)
+		refuseCaller(w, d, access, c)
 		return
 	}
 	next(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, c)), c.actor())
@@ -179,7 +233,7 @@ func (a *API) clusterCaller(w http.ResponseWriter, r *http.Request, access store
 
 // noneCaller asks nothing and works out who is calling: a ServiceAccount
 // token when one is sent, the address otherwise.
-func (a *API) noneCaller(w http.ResponseWriter, r *http.Request, access store.InternalAccess, bearer string, next userHandler) {
+func (a *API) noneCaller(w http.ResponseWriter, r *http.Request, d door, access store.InternalAccess, bearer string, next userHandler) {
 	addr := filters.PeerIP(r)
 	var c internalCaller
 	if bearer != "" {
@@ -206,7 +260,7 @@ func (a *API) noneCaller(w http.ResponseWriter, r *http.Request, access store.In
 		admitted = a.admittedByAddress(r.Context(), access, addr)
 	}
 	if !admitted {
-		refuseCaller(w, access, c)
+		refuseCaller(w, d, access, c)
 		return
 	}
 	next(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, c)), c.actor())
@@ -240,7 +294,7 @@ func (a *API) admittedByAddress(ctx context.Context, access store.InternalAccess
 }
 
 // refuseCaller says who was refused, and who would not be.
-func refuseCaller(w http.ResponseWriter, access store.InternalAccess, c internalCaller) {
+func refuseCaller(w http.ResponseWriter, d door, access store.InternalAccess, c internalCaller) {
 	allowed := strings.Join(access.Callers, ", ")
 	if c.Identity == "" {
 		writeErr(w, http.StatusForbidden,
@@ -250,7 +304,7 @@ func refuseCaller(w http.ResponseWriter, access store.InternalAccess, c internal
 	}
 	writeErr(w, http.StatusForbidden,
 		c.words()+" is not among the callers the internal plane admits ("+allowed+
-			"); an infrastructure administrator adds it on the Scheduler, Access")
+			"); an infrastructure administrator adds it on the "+d.where)
 }
 
 // bearerOf is the bearer sent, "" when none.
@@ -347,7 +401,11 @@ func (a *API) internalAccessCandidates(w http.ResponseWriter, r *http.Request, _
 	var err error
 	switch mode {
 	case store.InternalAccessToken:
-		list, err = a.st.ScheduleTokenNames(r.Context())
+		scope := store.ScopeSchedules
+		if r.URL.Query().Get("for") == "notifications" {
+			scope = store.ScopeNotifications
+		}
+		list, err = a.st.TokenNamesOfScope(r.Context(), scope)
 	case store.InternalAccessNone, store.InternalAccessCluster:
 		if a.Callers == nil {
 			out.Unavailable = "no runtime to ask on this gateway: type the names"

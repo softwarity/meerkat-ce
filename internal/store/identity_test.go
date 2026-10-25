@@ -31,7 +31,7 @@ func TestUserLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserByUsername: %v", err)
 	}
-	if got.Fullname != "Alice A" || !got.Dev || got.TenantCreator || got.Timezone != "UTC" || got.CreatedAt == 0 {
+	if got.Fullname != "Alice A" || !got.Dev || got.TenantCreator || got.Timezone != "" || got.CreatedAt == 0 {
 		t.Fatalf("round trip mismatch: %+v", got)
 	}
 

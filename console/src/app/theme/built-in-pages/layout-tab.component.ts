@@ -57,7 +57,7 @@ export class LayoutTabComponent {
     {
       name: 'banner',
       label: $localize`:@@Layout_banner:Banner`,
-      what: $localize`:@@Layout_banner_what:A brand band on top, the card under it. Works without a picture.`,
+      what: $localize`:@@Layout_banner_what:Brand band on top, card below. Works without a picture.`,
       sided: false,
       ownLogoSize: true,
     },

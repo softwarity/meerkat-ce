@@ -20,9 +20,8 @@
   </div>
   <div class="drawer-body">
     <p class="lead" i18n="@@Tls_local_lead">
-      A laptop or a lab has no public name and no public authority. Give the names an address,
-      make an authority this machine's browsers trust, have it sign one certificate for
-      them all, import it here and place it.
+      For a machine with no public name: point the names at the gateway, create a local
+      authority this machine trusts, sign one certificate with it, and import it here.
     </p>
     <mat-button-toggle-group
       class="os"
@@ -38,9 +37,9 @@
     <ol class="steps">
       <li>
         <p i18n="@@Tls_local_step_hosts">
-          <b>Point the names at the gateway</b> in the hosts file. 127.0.0.1 when it runs on this
-          machine (Docker, a local Kubernetes); its address otherwise - a VM, minikube, another
-          machine. localhost needs no line.
+          <b>Point the names at the gateway</b> in the hosts file: 127.0.0.1 if it runs on this
+          machine, otherwise its address (a VM, minikube, another machine). localhost needs no
+          entry.
         </p>
         <div class="local-fields">
           <app-form-field
@@ -49,7 +48,7 @@
             i18n-label="@@Tls_local_names"
             label="Names"
             i18n-info="@@Tls_local_names_info"
-            info="The names the console and the applications will be reached by. Only changes the commands on this page; nothing is saved."
+            info="The names of the console and the applications. Used only in the commands below; nothing is saved."
             i18n-hint="@@Separated_by_commas"
             hint="Separated by commas"
           >
@@ -61,7 +60,7 @@
             i18n-label="@@Tls_local_address"
             label="Gateway address"
             i18n-info="@@Tls_local_address_info"
-            info="Only changes the commands on this page; nothing is saved."
+            info="Used only in the commands below; nothing is saved."
           >
             <input
               matInput
@@ -77,39 +76,38 @@
       </li>
       <li>
         <p i18n="@@Tls_local_step_ca">
-          <b>Create a local authority</b> with mkcert, and make this machine trust it: the system
-          store, Chrome, Edge, Safari, and Firefox through nss. Restart the browsers afterwards.
+          <b>Create a local authority</b> with mkcert and make this machine trust it (system,
+          Chrome, Edge, Safari, Firefox). Restart the browsers afterwards.
         </p>
         <app-snippet filename="local-ca.sh" [downloadable]="false" [content]="caCmd()" />
         <p class="hint" i18n="@@Tls_local_ca_key">
-          Its private key stays in the folder <code>mkcert -CAROOT</code> prints: whoever holds it
-          can sign for any name this machine will believe. Never share it; another machine makes
-          its own.
+          Its private key is in the folder <code>mkcert -CAROOT</code> prints. Never share it:
+          whoever holds it can sign certificates this machine trusts.
         </p>
       </li>
       <li>
         <p i18n="@@Tls_local_step_cert">
-          <b>Sign one certificate for every name</b> of step 1: a <code>meerkat.pem</code>
-          and its <code>meerkat-key.pem</code>, in the current folder.
+          <b>Sign one certificate for all the names</b> of step 1: <code>meerkat.pem</code>
+          and <code>meerkat-key.pem</code>, in the current folder.
         </p>
         <app-snippet filename="certificate.sh" [downloadable]="false" [content]="certCmd()" />
       </li>
       <li>
         <p i18n="@@Tls_local_step_import">
-          <b>Import it here</b>: Add certificate on Console, Import a PEM pair, and drop the two
-          files on the dialog; then the same on Application.
+          <b>Import it here</b>: on the Console tab, Add certificate, Import a PEM pair, and drop
+          the two files; then the same on the Application tab.
         </p>
       </li>
     </ol>
     <p class="hint" i18n="@@Tls_local_ports">
-      Browsers keep the port: the HTTPS address is the one the links on this screen show, not
-      443, unless the gateway is published there.
+      Use the HTTPS port shown on this screen in the address, unless the gateway is published
+      on 443.
     </p>
     <!-- Where the certificate goes, one or the other: the choice each door
          shows at its top, HTTPS presented by. -->
     <p class="hint" i18n="@@Tls_local_present_proxy">
-      With a proxy in front (nginx, an ingress), skip step 4: set the certificate on the proxy,
-      and set the plane to A proxy in front with these names as its public names.
+      Behind a proxy (nginx, an ingress), skip step 4: put the certificate on the proxy, set
+      HTTPS served by to A proxy in front, and enter these names as public names.
     </p>
   </div>
   }
@@ -128,7 +126,7 @@
     <app-ee-lock
       feature="SSL-05"
       i18n-why="@@Acme_ee_why"
-      why="Have Let's Encrypt, ZeroSSL or your own authority issue and renew certificates on their own."
+      why="Get and renew certificates automatically from Let's Encrypt, ZeroSSL or your own authority."
     />
   </span>
   <!-- How a platform issues a certificate for a service's names - cert-manager,
@@ -212,7 +210,7 @@
         <h2 i18n="@@Unassigned_certificates">Unassigned certificates</h2>
       </div>
       <p class="note" i18n="@@Unassigned_note">
-        On no plane: click the plane it belongs on, or delete it.
+        Served on no plane: click the plane to serve it on, or delete it.
       </p>
       <div class="pool">
         @for (c of unplaced(); track c.id) {
@@ -389,7 +387,7 @@
               @if (shownMode(plane) === 'gateway') {
                 <span i18n="@@Https_by_meerkat_note">Meerkat presents these names with the certificates below.</span>
               } @else {
-                <span i18n="@@Https_by_proxy_note4">A proxy in front (an Ingress, nginx, a load balancer) presents them. A certificate below, optional, secures the link from the proxy to Meerkat.</span>
+                <span i18n="@@Https_by_proxy_note4">A proxy in front (an ingress, nginx, a load balancer) presents them. An optional certificate below secures the link from the proxy to Meerkat.</span>
               }
             </p>
             <app-door-names [plane]="plane" [door]="door(plane)" (saved)="apply($event); loadCertificates()" />
@@ -447,8 +445,8 @@
             <p class="problem">
               <mat-icon>warning</mat-icon>
               <span i18n="@@Console_name_uncovered"
-                >This console is reached as {{ here }}, and no certificate on it carries that name:
-                browsers will refuse its HTTPS.</span
+                >No certificate here covers {{ here }}, the name you reach this console by:
+                browsers will refuse HTTPS.</span
               >
             </p>
           }
@@ -467,7 +465,7 @@
           @if (plane === 'internal' && internalUncovered()) {
             <p class="problem">
               <mat-icon>warning</mat-icon>
-              <span i18n="@@Internal_names_uncovered">No certificate here carries one of these names.</span>
+              <span i18n="@@Internal_names_uncovered">No certificate here covers any of these names.</span>
             </p>
           }
           <!-- Not for the internal plane: its names are the cluster's, which a
@@ -494,7 +492,7 @@
                 <span i18n="@@Force_https">Force HTTPS</span>
               </mat-slide-toggle>
               @if (state()?.app && tls()!.redirect && !state()?.redirecting) {
-                <span class="lamp" i18n="@@Standing_down">Standing down</span>
+                <span class="lamp" i18n="@@Standing_down">Not active: no valid certificate</span>
               }
             </div>
             @if (!state()?.app) {
@@ -503,7 +501,7 @@
               </p>
             } @else {
               <p class="note" i18n="@@Force_https_note2">
-                Redirects to HTTPS the names a certificate here carries. Internal names stay in HTTP.
+                Redirects HTTP to HTTPS for the names a certificate here covers. Internal names stay on HTTP.
               </p>
             }
             <!-- HSTS follows the redirect: forcing HTTPS is already the
@@ -555,8 +553,8 @@
 <!-- What called one of the console's doors within the window (SSL-15). -->
 <ng-template #traffic let-scheme>
   @if (heard(scheme); as peer) {
-    <span class="traffic live" i18n="@@Door_receiving">Receiving, from {{ peer }}</span>
+    <span class="traffic live" i18n="@@Door_receiving">In use by {{ peer }}</span>
   } @else {
-    <span class="traffic" i18n="@@Door_idle">Nothing in the last {{ tls()?.trafficWindow }} s</span>
+    <span class="traffic" i18n="@@Door_idle">Unused in the last {{ tls()?.trafficWindow }} s</span>
   }
 </ng-template>

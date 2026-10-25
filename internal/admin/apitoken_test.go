@@ -48,6 +48,64 @@ func TestAdminTokens(t *testing.T) {
 	}
 }
 
+// An edit that says nothing about the expiry keeps it: renaming a 30-day
+// token used to make it a token that never expires. And a field the endpoint
+// does not apply is refused rather than taken and dropped.
+func TestEditingATokenKeepsItsExpiry(t *testing.T) {
+	f := setup(t)
+	code, body := f.call(t, "POST", "/api/admin-tokens", `{"name":"cli","days":30,"scope":"readonly"}`, f.rootC)
+	if code != http.StatusCreated {
+		t.Fatalf("mint: %d %s", code, body)
+	}
+	var created struct {
+		ID        string
+		ExpiresAt int64
+	}
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.ExpiresAt == 0 {
+		t.Fatalf("a 30-day token minted without an expiry: %s", body)
+	}
+	read := func() (out struct {
+		Name      string
+		ExpiresAt int64
+	}) {
+		t.Helper()
+		_, list := f.call(t, "GET", "/api/admin-tokens", "", f.rootC)
+		var all []struct {
+			ID, Name  string
+			ExpiresAt int64
+		}
+		if err := json.Unmarshal([]byte(list), &all); err != nil {
+			t.Fatal(err)
+		}
+		for _, tok := range all {
+			if tok.ID == created.ID {
+				out.Name, out.ExpiresAt = tok.Name, tok.ExpiresAt
+			}
+		}
+		return out
+	}
+
+	if code, out := f.call(t, "PUT", "/api/admin-tokens/"+created.ID, `{"name":"renamed","scope":"readonly"}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("rename: %d %s", code, out)
+	}
+	if got := read(); got.Name != "renamed" || got.ExpiresAt != created.ExpiresAt {
+		t.Fatalf("a rename changed the expiry: %+v, minted with %d", got, created.ExpiresAt)
+	}
+	// Said out loud, 0 still means never.
+	if code, out := f.call(t, "PUT", "/api/admin-tokens/"+created.ID, `{"name":"renamed","days":0,"scope":"readonly"}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("days 0: %d %s", code, out)
+	}
+	if got := read(); got.ExpiresAt != 0 {
+		t.Fatalf("days 0 kept an expiry: %+v", got)
+	}
+	if code, out := f.call(t, "PUT", "/api/admin-tokens/"+created.ID, `{"name":"renamed","scope":"readonly","domain":"app"}`, f.rootC); code != http.StatusBadRequest {
+		t.Fatalf("a domain the endpoint does not apply: %d %s", code, out)
+	}
+}
+
 // bearer calls the admin server with an Authorization: Bearer header and no
 // cookie (the headless path).
 func (f fixture) bearer(t *testing.T, method, path, token string) (int, string) {

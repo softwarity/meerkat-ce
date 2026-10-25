@@ -9,7 +9,7 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Two_factor">Two-factor</h3>
       <p class="hint text-muted" i18n="@@MFA_global_hint">
-        Require a second factor for every user. Organizations and members can override this.
+        Require a second factor for every user. Tenants and members can override this.
       </p>
       <mat-slide-toggle [checked]="mfaRequired()" (change)="mfaRequired.set($event.checked)">
         <ng-container i18n="@@Require_two_factor">Require two-factor for everyone</ng-container>
@@ -26,8 +26,8 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Sign_in_by_email">Sign in by e-mail</h3>
       <p class="hint text-muted" i18n="@@Email_signin_hint">
-        A one-time code by e-mail replaces the password, not the second factor. Needs a mail relay
-        (Infra, Mail relay); never opens the admin console.
+        An e-mailed code replaces the password, not the second factor. Needs a mail relay
+        (Infra, Mail relay). Not accepted for the admin console.
       </p>
       <mat-slide-toggle [checked]="emailSignin()" (change)="emailSignin.set($event.checked)">
         <ng-container i18n="@@Allow_email_signin">Allow signing in with an e-mailed code</ng-container>
@@ -35,12 +35,12 @@
     </mat-card>
 
     <mat-card appearance="outlined">
-      <h3 i18n="@@Session_TTL">Session TTL</h3>
+      <h3 i18n="@@Session_TTL">Session duration</h3>
       <p class="hint text-muted" i18n="@@Session_TTL_hint">
         How long a session lives before the user must sign in again.
       </p>
       <mat-form-field class="field">
-        <mat-label i18n="@@Session_TTL">Session TTL</mat-label>
+        <mat-label i18n="@@Session_TTL">Session duration</mat-label>
         <mat-select [value]="sessionTTL()" (selectionChange)="sessionTTL.set($event.value)">
           @for (c of sessionTtlChoices(); track c) {
             <mat-option [value]="c">{{ human(c) }}</mat-option>
@@ -91,11 +91,11 @@
         </mat-form-field>
       </div>
       <p class="hint text-muted" i18n="@@Password_history_hint">
-        Checked at sign-in: an expired password leads to the change page, an expired temporary one is refused. 0 means no limit.
+        At sign-in, an expired password must be changed and an expired temporary one is refused. 0 means no limit.
       </p>
       @if (pwLength() < pwSum()) {
         <p class="hint text-error" i18n="@@Password_length_raised">
-          The length will be raised to {{ pwSum() }} on save: the kinds above already need that many.
+          Length will be raised to {{ pwSum() }} on save, the total of the counts above.
         </p>
       }
       @if (pwPreview().length) {
@@ -116,7 +116,7 @@
           <ng-container i18n="@@Force_a_change_for_everyone">Force a change for everyone</ng-container>
         </button>
         <span class="hint text-muted" i18n="@@Force_a_change_for_everyone_hint">
-          Every local account but yours, at its next sign-in.
+          All local accounts except yours, at their next sign-in.
         </span>
       </div>
     </mat-card>
@@ -127,7 +127,7 @@
         Attempts allowed within the window. Zero disables a limit, except for reset requests.
       </p>
       <p class="hint text-muted" i18n="@@Rate_limiting_hint_account">
-        Past the failed sign-ins on one account, from any address, its sign-in asks for a picture code and its owner gets a mail. The account is never locked.
+        Past this many failed sign-ins on one account, from any address, signing in to it needs a picture code and its owner is e-mailed. The account is never locked.
       </p>
       <div class="rl-row">
         <mat-form-field class="rl-num">
@@ -180,7 +180,7 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Trusted_browsers">Trusted browsers</h3>
       <p class="hint text-muted" i18n="@@Trusted_browsers_hint">
-        Let users skip the two-factor challenge on a browser they mark as trusted, until it expires.
+        Let users skip the second factor on a browser they mark as trusted, for the duration set here.
       </p>
       <mat-slide-toggle [checked]="trustAllowed()" (change)="trustAllowed.set($event.checked)">
         <ng-container i18n="@@Allow_trusted_browsers">Allow trusted browsers</ng-container>

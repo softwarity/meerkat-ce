@@ -13,7 +13,7 @@
 
   <div class="endpoint">
     <mat-slide-toggle [checked]="enabled()" (change)="setEnabled($event.checked)">
-      <ng-container i18n="@@Answer_agents_on_this_port">Answer agents on this port</ng-container>
+      <ng-container i18n="@@Answer_agents_on_this_port">Accept agents on the control plane</ng-container>
     </mat-slide-toggle>
     <span class="meta">
       @if (enabled()) {
@@ -45,9 +45,8 @@
           <mat-panel-title i18n="@@MCP_private_ca_title">My certificate comes from a private authority</mat-panel-title>
         </mat-expansion-panel-header>
         <p class="hint" i18n="@@MCP_private_ca_hint">
-          The agent checks this console's certificate like any site's. Signed by your own
-          authority (or self-signed), it is refused until the agent trusts that authority: give it
-          the authority's certificate, the file your certificates were issued from.
+          If this console's certificate is signed by your own authority (or self-signed), the agent
+          refuses it until it trusts that authority. Give it the authority's certificate.
         </p>
         <mat-button-toggle-group
           [value]="os()"
@@ -66,22 +65,20 @@
         @switch (client().trust) {
           @case ('node') {
             <p class="hint" i18n="@@MCP_private_ca_node">
-              {{ client().label }} runs on Node.js, which keeps its own list of authorities:
-              NODE_EXTRA_CA_CERTS adds yours to it. Replace the path, then start the agent again
-              from a new terminal - it reads this when it starts.
+              {{ client().label }} runs on Node.js: NODE_EXTRA_CA_CERTS adds your authority.
+              Replace the path, then restart the agent from a new terminal.
             </p>
           }
           @case ('system') {
             <p class="hint" i18n="@@MCP_private_ca_system">
-              {{ client().label }} trusts the authorities of the system: add yours there (an
-              administrator's command). Replace the path, then start the agent again.
+              {{ client().label }} uses the system's authorities: add yours there (needs
+              administrator rights). Replace the path, then restart the agent.
             </p>
           }
           @default {
             <p class="hint" i18n="@@MCP_private_ca_any">
-              A Node.js client reads NODE_EXTRA_CA_CERTS, as above; any other trusts the
-              authorities of the system, where your authority is added the way your system does
-              it. Then start the client again.
+              A Node.js client reads NODE_EXTRA_CA_CERTS, as above; other clients use the system's
+              authorities, so add yours there. Then restart the client.
             </p>
           }
         }

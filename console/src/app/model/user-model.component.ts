@@ -30,8 +30,9 @@ import { FieldDefsComponent } from './field-defs.component';
     <div class="content">
       <h2 i18n="@@Account_fields">Account fields</h2>
       <p class="hint" i18n="@@Model_hint">
-        Your own facts about a person, such as an employee number or a cost centre. Fill them per
-        account under Application, Users; a route can then forward them. None is mandatory.
+        Extra fields on user accounts, such as an employee number or a cost centre. Fill them in
+        per account under Application, Users; routes can forward them to applications. All are
+        optional.
       </p>
       <app-field-defs [(fields)]="userFields" />
 
@@ -41,9 +42,9 @@ import { FieldDefsComponent } from './field-defs.component';
       @if (multiTenant()) {
         <h2 class="second" i18n="@@Tenant_fields">Tenant fields</h2>
         <p class="hint" i18n="@@Tenant_model_hint">
-          Your own facts about a tenant, such as its plan or its region. Root and app-admins fill them
-          on the tenant's General screen; a route forwards them beside the account fields. A name
-          belongs to one list only.
+          Extra fields on tenants, such as their plan or region. Filled in on each
+          tenant's General screen; routes can forward them with the account fields. A field
+          name can be used in only one of the two lists.
         </p>
         <app-field-defs [(fields)]="tenantFields" />
       }

@@ -1,0 +1,310 @@
+<mat-accordion class="how" multi>
+  <mat-expansion-panel expanded>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_where"
+        >Endpoints and token</mat-panel-title
+      >
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="base"><code>{{ origin() }}/api/notifications</code></p>
+      <table class="fields">
+        <tbody>
+          <tr>
+            <th><code>POST /</code></th>
+            <td i18n="@@Notif_ep_post">Publish a notification. Returns its id.</td>
+          </tr>
+          <tr>
+            <th><code>GET /</code></th>
+            <td i18n="@@Notif_ep_list">Your live notifications, filtered by <code>meta.&lt;key&gt;</code>.</td>
+          </tr>
+          <tr>
+            <th><code>DELETE /&#123;id&#125;</code></th>
+            <td i18n="@@Notif_ep_delete">Withdraw one. It leaves every reader's page at once.</td>
+          </tr>
+          <tr>
+            <th><code>DELETE /?meta.&lt;key&gt;=...</code></th>
+            <td i18n="@@Notif_ep_delete_many">Withdraw every one the filter matches.</td>
+          </tr>
+          <tr>
+            <th><code>GET /&#123;id&#125;/acks</code></th>
+            <td i18n="@@Notif_ep_acks">Who acknowledged it, and who has not yet.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="hint" i18n="@@Notif_api_where_2">
+        With the <b>Meerkat token</b> mode, send an internal token with the
+        perimeter <b>Notifications only</b>:
+        <code>Authorization: Bearer mk_...</code>. You list, withdraw and follow
+        only what you sent: publish and withdraw with the same credential.
+      </p>
+      <p class="hint" i18n="@@Notif_api_where_3">
+        This API is on the <b>internal plane</b>: a port inside the cluster,
+        never exposed through an ingress. The credential a service must present
+        is set under <b>Access</b>. Services publish the notifications; this
+        console shows what was sent and who read it, and can withdraw it.
+      </p>
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_publish">Publish</mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_publish_1">
+        A person receives it only if they may open where it leads. The readers
+        see it on their notifications page, with a count on the user button or
+        the portal bar.
+      </p>
+      <app-snippet filename="publish-notification.sh" [content]="publishCmd()" />
+      <app-snippet filename="notification.jsonc" [content]="payload" />
+      <p class="hint" i18n="@@Notif_api_publish_2">
+        64 KiB at most. An unknown field is refused.
+      </p>
+      <table class="fields">
+        <tbody>
+          <tr>
+            <th><code>tenant</code></th>
+            <td i18n="@@Notif_field_tenant">
+              A tenant id or name, optional when there is only one. Its
+              notifications must be on. <code>*</code> sends a copy to every
+              tenant (see below).
+            </td>
+          </tr>
+          <tr>
+            <th><code>roles</code></th>
+            <td i18n="@@Notif_field_roles">
+              Only the members holding one of these roles. An unknown role is
+              refused.
+            </td>
+          </tr>
+          <tr>
+            <th><code>users</code></th>
+            <td i18n="@@Notif_field_users">
+              Only these members, by username. With <code>roles</code>, either
+              is enough. Without both, every member of the tenant. Someone who
+              is not a member is refused.
+            </td>
+          </tr>
+          <tr>
+            <th><code>title</code></th>
+            <td i18n="@@Notif_field_title">
+              Required. Plain text, 200 characters at most, the same for every
+              reader.
+            </td>
+          </tr>
+          <tr>
+            <th><code>body</code></th>
+            <td i18n="@@Notif_field_body">Plain text, 4000 characters at most.</td>
+          </tr>
+          <tr>
+            <th><code>level</code></th>
+            <td i18n="@@Notif_field_level">
+              <code>info</code> by default, or <code>success</code>,
+              <code>warning</code>, <code>error</code>.
+            </td>
+          </tr>
+          <tr>
+            <th><code>detail</code></th>
+            <td i18n="@@Notif_field_detail">
+              Where the notification leads: <code>{{ "{" }}service, path{{ "}" }}</code>,
+              a screen behind this gateway, or an https
+              <code>{{ "{" }}url{{ "}" }}</code>. Name the service as it is called in
+              the cluster and the path as it sees it; Meerkat builds the public
+              address. Only the people allowed to open it receive the
+              notification.
+            </td>
+          </tr>
+          <tr>
+            <th><code>actions</code></th>
+            <td i18n="@@Notif_field_actions">
+              Buttons, five at most: a <code>label</code> of 60 characters and
+              <code>{{ "{" }}service, path{{ "}" }}</code> or an https
+              <code>{{ "{" }}url{{ "}" }}</code>. The reader's browser makes the call,
+              with their session. Without a detail, a person receives it if
+              they may call one of the actions.
+            </td>
+          </tr>
+          <tr>
+            <th><code>actions[].method</code></th>
+            <td i18n="@@Notif_field_action_method">
+              <code>GET</code> by default, or <code>POST</code>,
+              <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>.
+            </td>
+          </tr>
+          <tr>
+            <th><code>actions[].body</code></th>
+            <td i18n="@@Notif_field_action_body">
+              JSON, sent as <code>application/json</code>; not with
+              <code>GET</code>. The reader can see it: put no secret in it.
+            </td>
+          </tr>
+          <tr>
+            <th><code>mail</code></th>
+            <td i18n="@@Notif_field_mail">
+              Also send it by mail. Refused when no mail relay is configured.
+              A mail carries no action.
+            </td>
+          </tr>
+          <tr>
+            <th><code>expires</code></th>
+            <td i18n="@@Notif_field_expires">
+              An ISO 8601 duration (P7D, PT12H) or an RFC 3339 date. 30 days by
+              default, 90 at most. Then it is deleted.
+            </td>
+          </tr>
+          <tr>
+            <th><code>key</code></th>
+            <td i18n="@@Notif_field_key">
+              200 characters at most. Sent again with the same key while it is
+              live, in the same tenant: the answer is that notification, and
+              nobody is told twice. The same key in two tenants gives two
+              notifications.
+            </td>
+          </tr>
+          <tr>
+            <th><code>meta</code></th>
+            <td i18n="@@Notif_field_meta">
+              Your own keys and text values, to find and withdraw your
+              notifications. Never shown to the readers.
+            </td>
+          </tr>
+          <tr>
+            <th><code>ack</code></th>
+            <td i18n="@@Notif_field_ack">
+              <code>none</code> by default. <code>single</code>: the first
+              reader to acknowledge it closes it for everyone.
+              <code>all</code>: every reader acknowledges their own. A reader
+              cannot delete it while they owe it.
+            </td>
+          </tr>
+          <tr>
+            <th><code>onAck</code></th>
+            <td i18n="@@Notif_field_onack">
+              Your service, <code>{{ "{" }}service, path{{ "}" }}</code> only, called
+              at each acknowledgement (see below). Needs <code>ack</code>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_every"
+        >Every tenant at once</mat-panel-title
+      >
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_every_1">
+        With <code>"tenant": "*"</code>, each enabled tenant whose
+        notifications are on gets its own copy, with its own id. A tenant where
+        nobody may receive it is left out, and the answer says which and why.
+        Named users are taken in the tenants they belong to.
+      </p>
+      <app-snippet filename="every-tenant.sh" [content]="everyCmd()" />
+      <p class="hint" i18n="@@Notif_api_every_2">
+        A person in several of these tenants sees one notification and gets
+        one mail. Sent again with the same <code>key</code>, the copies already
+        live are answered and the missing ones published. No tenant received
+        it: <code>422</code>.
+      </p>
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_answers">Responses</mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <table class="fields">
+        <tbody>
+          <tr>
+            <th><code>201</code></th>
+            <td i18n="@@Notif_answer_201">
+              Published: its <code>id</code> and the number of
+              <code>recipients</code>.
+            </td>
+          </tr>
+          <tr>
+            <th><code>200</code></th>
+            <td i18n="@@Notif_answer_200">
+              Its <code>key</code> is already live: the same notification, with
+              <code>"existing": true</code>. Nobody is told again.
+            </td>
+          </tr>
+          <tr>
+            <th><code>400</code></th>
+            <td i18n="@@Notif_answer_400">
+              Malformed JSON, an unknown field, or more than 64 KiB.
+            </td>
+          </tr>
+          <tr>
+            <th><code>422</code></th>
+            <td i18n="@@Notif_answer_422">
+              Refused. <code>error</code> says why and names the field, for example
+              notifications off for the tenant (and who turned them off), an
+              unknown role, a link that is not https, nobody in the audience
+              allowed to open it, or more people than the cap an administrator
+              set.
+            </td>
+          </tr>
+          <tr>
+            <th><code>401</code>, <code>403</code></th>
+            <td i18n="@@Notif_answer_401">
+              The credential is missing or invalid (<code>401</code>), or this
+              caller is not admitted, or its token is for another API
+              (<code>403</code>). See <b>Access</b>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <app-snippet filename="refused.http" [content]="refused" />
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_read"
+        >Find and withdraw</mat-panel-title
+      >
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_read_1">
+        <code>meta.&lt;key&gt;=&lt;value&gt;</code> matches exactly,
+        <code>meta.&lt;key&gt;=~&lt;expression&gt;</code> by regular
+        expression; all conditions must match. Withdrawn, a notification
+        leaves every reader's page and asks nobody for anything.
+      </p>
+      <app-snippet filename="find-notifications.sh" [content]="readCmd()" />
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_acks"
+        >Acknowledgements</mat-panel-title
+      >
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_acks_1">
+        With <code>ack</code>, the reader presses <b>Acknowledge</b>. Your list
+        shows where it stands (<code>ackState</code>,
+        <code>acknowledged</code>, <code>ackBy</code>), and
+        <code>/acks</code> names each person.
+      </p>
+      <app-snippet filename="acknowledgements.sh" [content]="acksCmd()" />
+      <p class="hint" i18n="@@Notif_api_acks_2">
+        With <code>onAck</code>, Meerkat calls your service at each
+        acknowledgement, through its route, on the <b>application</b> port:
+      </p>
+      <app-snippet filename="on-ack-call.http" [content]="incoming" />
+      <p class="hint" i18n="@@Notif_api_acks_3">
+        Answer <code>2xx</code>. Anything else, or no answer, is tried twice
+        more. <code>complete</code> is true on the acknowledgement that closes
+        it: the first with <code>single</code>, the last with <code>all</code>.
+      </p>
+    </ng-template>
+  </mat-expansion-panel>
+</mat-accordion>

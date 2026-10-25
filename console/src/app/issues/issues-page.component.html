@@ -11,7 +11,7 @@
           <div class="grow">
             <div i18n="@@Collect_issue_reports">Collect issue reports</div>
             <p class="hint" i18n="@@Collect_issue_reports_hint">
-              Users get a "Report an issue" entry in their user button, where that button is on the page.
+              Adds "Report an issue" to the user button menu.
             </p>
           </div>
           <mat-slide-toggle [checked]="collecting()" [disabled]="savingCollect()" (change)="setCollecting($event.checked)" />
@@ -53,7 +53,7 @@
                 @if (i.tenantName) {
                   <span class="tenant">{{ i.tenantName }}</span>
                 }
-                <span class="when" [title]="fullWhen(i.createdAt)">{{ relWhen(i.createdAt) }}</span>
+                <span class="when nowrap" [title]="relWhen(i.createdAt)">{{ i.createdAt | zoned: zone() }}</span>
               </div>
             </div>
           } @empty {
@@ -90,7 +90,7 @@
             @if (d.tenantName) {
               <div><span class="k" i18n="@@Tenant">Tenant</span> {{ d.tenantName }}</div>
             }
-            <div><span class="k" i18n="@@When">When</span> <span [title]="fullWhen(d.createdAt)">{{ relWhen(d.createdAt) }}</span></div>
+            <div><span class="k" i18n="@@When">When</span> <span class="nowrap" [title]="relWhen(d.createdAt)">{{ d.createdAt | zoned: zone() }}</span></div>
             @if (d.url) {
               <div class="url"><span class="k">URL</span> <span class="mono">{{ d.url }}</span></div>
             }
@@ -126,7 +126,7 @@
             <div class="comment">
               <div class="c-head">
                 <span class="who">{{ c.author || c.authorId }}</span>
-                <span class="when" [title]="fullWhen(c.at)">{{ relWhen(c.at) }}</span>
+                <span class="when nowrap" [title]="relWhen(c.at)">{{ c.at | zoned: zone() }}</span>
               </div>
               <div class="c-text">{{ c.text }}</div>
             </div>

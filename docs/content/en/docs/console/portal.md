@@ -49,6 +49,18 @@ bar, come back: the entries stay.
    menu - on a phone, or as soon as they do not fit on one line. Only full width
    is editable, and the width is never saved.
 
+## Notifications
+
+Once root has turned [notifications](/docs/console/notifications) on
+(Enterprise), two more things appear:
+
+- a **Notifications page** card: **Built-in**, the page the gateway serves, or
+  **Your page**, a UI route and a path under it. Everything that leads to the
+  notifications leads there; who may not open that route gets the built-in page;
+- in Portal mode, **Add notifications** beside Add a container: a Notifications
+  entry for the bar, which carries the one badge of unread notifications.
+  Without it, the account button carries the entry and the badge.
+
 ## An entry
 
 **Add a module** for an application, **Add a container** to group modules.

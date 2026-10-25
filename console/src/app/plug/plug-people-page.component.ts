@@ -26,7 +26,7 @@ import { PlugSessionsComponent } from './plug-sessions.component';
       @if (people(); as p) {
         @if (!p.enabled) {
           <p class="hint" i18n="@@Plug_people_closed">
-            The developer tunnel is closed. An infrastructure administrator opens it in Infra, Plug.
+            The developer tunnel is closed. An infrastructure administrator can open it in Infra, Plug.
           </p>
         } @else {
           <mat-card appearance="outlined">
@@ -40,7 +40,7 @@ import { PlugSessionsComponent } from './plug-sessions.component';
           <h3 class="group" i18n="@@Plug_group_developers">Developers</h3>
           @if (p.developers.length === 0) {
             <p class="hint" i18n="@@Plug_no_developers_app">
-              Nobody holds the developer capability yet. Grant it in Application, Users.
+              No user has the developer capability yet. Grant it in Application, Users.
             </p>
           } @else {
             <ul class="devs">
@@ -51,7 +51,7 @@ import { PlugSessionsComponent } from './plug-sessions.component';
                   @for (k of d.keys; track k.fingerprint) {
                     <code class="fp" [title]="k.comment ?? ''">{{ k.fingerprint }}</code>
                   } @empty {
-                    <span class="muted" i18n="@@Plug_no_key">no key deposited yet</span>
+                    <span class="muted" i18n="@@Plug_no_key">no key added yet</span>
                   }
                 </li>
               }

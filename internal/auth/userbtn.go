@@ -106,7 +106,9 @@ func containsFold(list []string, v string) bool {
 // userButtonScript is the button's script with the evaluation's menu entry
 // and its rules in place (empty in the other editions).
 func userButtonScript() string {
-	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.MenuCSS, "__MK_EVAL__", evalmark.MenuEntry).Replace(userButtonJS)
+	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.MenuCSS, "__MK_EVAL__", evalmark.MenuEntry,
+		"__MK_SNACKBAR__", snackbarJS,
+		"__MK_NOTIFY_SW_SCOPE__", NotificationsWorkerScope, "__MK_NOTIFY_SW__", NotificationsWorkerPath).Replace(userButtonJS)
 }
 
 func (h *Handler) userButtonJS(w http.ResponseWriter, _ *http.Request) {
@@ -194,6 +196,10 @@ type userButtonPayload struct {
 	// the state - the live channel only keeps it fresh. A page whose socket
 	// never opens still shows the truth it was served with.
 	Served []servedName `json:"served,omitempty"`
+	// Notifications is the reader's unread count and where their page is
+	// (NOTIF-05): the button wears the count, and a menu entry leads to the
+	// page. Absent when the feature is not here or not on for them.
+	Notifications *NotifyBadge `json:"notifications,omitempty"`
 }
 
 // servedName is one overridden name, as a page needs it: what is served, and
@@ -255,6 +261,19 @@ func userButtonMenuLabels(t map[string]string) map[string]string {
 		// The row that OPENS the panel is the menu's, not the panel's - though
 		// the panel wears it as its title too, so both previews carry it.
 		"openIssue": t["openIssue"],
+		// The notifications' entry and snackbar (NOTIF-05): drawn only when
+		// the payload carries a count, which only the Enterprise image sends.
+		"notifications": t["notifications"],
+		"notifNew":      t["notifNew"],
+		"notifOpen":     t["notifOpen"],
+		"notifClose":    t["notifClose"],
+		// The result of an action run from a desktop notification's button.
+		"notifDone":   t["notifDone"],
+		"notifFailed": t["notifFailed"],
+		// A notification that asks to be acknowledged: the button on the
+		// snackbar and the desktop, and the desktop's result.
+		"notifAck":   t["notifAck"],
+		"notifAcked": t["notifAcked"],
 	}
 	return labels
 }
@@ -342,6 +361,9 @@ func (h *Handler) userButtonJSON(w http.ResponseWriter, r *http.Request) {
 	// Same rule as the organisations above: a submenu offering ONE destination
 	// is a click that leads where one already is. It appears when there is a
 	// choice to make, and not before.
+	if b, ok := h.Notifications(r); ok {
+		payload.Notifications = &b
+	}
 	if links := h.reachableLinks(r.Context(), sess); len(links) > 1 {
 		for _, l := range links {
 			payload.Apps = append(payload.Apps, userButtonLink(l))
@@ -503,6 +525,126 @@ const userButtonJS = `(() => {
         .catch(() => {});
     }
 
+    // The notifications (NOTIF-05) move while the page is open: one arrives,
+    // one is read in another tab. The count is read again from the gateway,
+    // which checks access, and a new one is said: on the desktop when the
+    // browser lets this origin, in a snackbar on the page otherwise.
+    watchNotifications() {
+      this.watchingNotifications = true;
+      const recount = () => fetch('/meerkat/notifications/counts', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(b => {
+          if (!b || !this.lastData) return;
+          this.lastData.notifications = b;
+          this.render(this.lastData, this.lastSim);
+        })
+        .catch(() => {});
+      listenToNotifyWorker();
+      page().onEvent('notification-state', recount);
+      page().onEvent('notification', (d) => {
+        recount();
+        if (!d || d.change !== 'new') return;
+        // On the notifications page itself, the list shows it already: news
+        // leading to where you are says nothing. The page may be the
+        // integrator's, routed in its fragment (/app/#/inbox).
+        const where = () => ((this.lastData && this.lastData.notifications) || {}).page || '/meerkat/notifications';
+        try {
+          const at = new URL(where(), location.href);
+          if (at.pathname === location.pathname && at.hash === location.hash) return;
+        } catch (e) {}
+        // The desktop is for a tab or a window the reader is not looking at.
+        // The page says it too, in a snackbar, as soon as it is seen: the
+        // system may hold a desktop notification back (the browser not let in
+        // the system's settings, a focus mode), and news that came while the
+        // tab was hidden - sent from the console in another tab - would
+        // otherwise never show at all.
+        const looking = !document.hidden && document.hasFocus();
+        const desk = !looking && desktopAllowed();
+        // The message in the reader's language: the one this page speaks.
+        const lang = (page() && page().resolvedLanguage && page().resolvedLanguage()) || document.documentElement.lang || '';
+        fetch('/meerkat/notifications.json?unread=1&limit=10' + (lang ? '&lang=' + encodeURIComponent(lang) : ''), { credentials: 'same-origin' })
+          .then(r => (r.ok ? r.json() : null))
+          .then(list => {
+            // A message sent to every tenant is one item, whichever of its
+            // copies the news names, and it is said once on this page.
+            let it = ((list && list.items) || []).find(x => x.id === d.id || (x.ids || []).includes(d.id));
+            if (!it) return;
+            const key = it.group || it.id;
+            if (this.told.has(key)) return;
+            this.told.add(key);
+            // One sent in another tenant than this session's: its title says
+            // which, and on the desktop it carries no Open and no action -
+            // they would act in a tenant this page does not act in. Its click
+            // leads to the notifications page, where it is read. Sent to
+            // several of the reader's tenants, none of them this one: the
+            // first two names, and how many more.
+            if (it.tenant && it.here === false) {
+              const names = ((it.tenants || []).length ? it.tenants : [it.tenant]).map(t => t.name);
+              const short = names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');
+              it = Object.assign({}, it, { title: short + ': ' + it.title, detail: null, actions: [] });
+            }
+            if (desk) showOnDesktop(it, () => { location.href = where(); }, lang, (this.lastData && this.lastData.labels) || {}, where());
+            // One that asks to be acknowledged carries the button, from any
+            // tenant: acknowledging opens nothing.
+            const ack = it.ack && !it.acknowledged
+              ? () => fetch('/meerkat/notifications/' + encodeURIComponent(it.id) + '/ack', { method: 'POST', credentials: 'same-origin' })
+                .then(r => r.ok, () => false)
+              : null;
+            const snack = { id: key, level: it.level, title: it.title, go: () => { location.href = where(); }, ack };
+            if (document.hidden) this.unseen.push(snack);
+            else if (this.shadowRoot) this.snackbar().show(snack);
+          })
+          .catch(() => {});
+      });
+      // Back on the tab: what came while it was hidden, at most the three a
+      // stack holds.
+      this.unseen = [];
+      // What this page said already, by item: a message sent to every tenant
+      // may be news twice (a copy per tenant), it is one item.
+      this.told = new Set();
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden || !this.unseen.length || !this.shadowRoot) return;
+        this.unseen.splice(0).slice(-3).forEach((s) => this.snackbar().show(s));
+      });
+    }
+
+    // The desktop helper lives exactly while it can serve: registered once
+    // this reader has the notifications, on a secure origin, with the
+    // desktop allowed; unregistered when one of those goes - the permission
+    // taken back, the notifications turned off for this reader. A visitor
+    // signed out leaves it as it is, and a plain page load registers nothing.
+    // Settled again on each change of the two, the permission included.
+    syncNotifyWorker(data) {
+      if (!data || !window.isSecureContext || !navigator.serviceWorker) return;
+      const on = !!data.notifications;
+      if (!on && !data.authenticated) return;
+      const allowed = on && desktopAllowed();
+      const state = (on ? 'on' : 'off') + '/' + (allowed ? 'allowed' : 'not');
+      if (this.notifyState === state) return;
+      this.notifyState = state;
+      if (allowed) notifyWorker();
+      else dropNotifyWorker();
+      if (on && !this.watchingPermission && navigator.permissions && navigator.permissions.query) {
+        this.watchingPermission = true;
+        navigator.permissions.query({ name: 'notifications' })
+          .then((st) => st.addEventListener('change', () => this.syncNotifyWorker(this.lastData)))
+          .catch(() => {});
+      }
+    }
+
+    // The stack of snackbars, made once and kept across redraws: render()
+    // rewrites the shadow root, and puts the same nodes back, timers and all.
+    snackbar() {
+      if (!this.snacks) {
+        this.snacks = mkSnackbar({
+          nonce: NONCE,
+          label: (k) => ((this.lastData && this.lastData.labels) || {})[k] || ''
+        });
+      }
+      this.snacks.attach(this.shadowRoot);
+      return this.snacks;
+    }
+
     // The button dresses ITSELF: the shadow's light-dark() theme tokens and
     // system colors follow this color-scheme. The document is the agent's.
     wearScheme(v) {
@@ -547,6 +689,9 @@ const userButtonJS = `(() => {
 
       const L = data.labels || {};
       const auth = !!data.authenticated;
+      // The notifications entry and badge are this button's unless the bar
+      // it rides in carries them (NOTIF-05).
+      const notifHere = !!data.notifications && !(inPortal && data.notifications.inBar);
       // Issue reports (ISSUE-01): start collecting the console tail as soon
       // as we know the tracker is on - a report attaches the recent output.
       if (auth && data.issues) hookConsole();
@@ -627,6 +772,15 @@ const userButtonJS = `(() => {
         // sharing it is how a profile ended up offering "back to /login".
         items.push('<div class="head-row"><a class="head" href="/profile" title="' + esc(L.profile) + '"><strong>' + esc(data.username) + '</strong>' +
           (data.tenantName ? '<span class="sub-line">' + esc(data.tenantName) + '</span>' : '') + '</a>' + schemeBtn + '</div>');
+        // The notifications page (NOTIF-05), when the gateway carries them and
+        // they are on for this tenant. Not when the portal bar this button
+        // rides in carries its own entry (inBar), which leads there with the
+        // same count: one entry, one badge.
+        if (notifHere) {
+          const n = data.notifications.total || 0;
+          items.push('<a class="item" href="' + esc(data.notifications.page) + '"><span>' + esc(L.notifications || 'Notifications') + '</span>' +
+            (n ? '<span class="count">' + n + '</span>' : '') + '</a>');
+        }
         // The fronted applications this session may open; the current one is
         // ticked (matched on its entry path). Suppressed inside the portal bar,
         // whose own navigation IS this list (PORTAL-01).
@@ -717,6 +871,10 @@ const userButtonJS = `(() => {
         ' display: grid; place-items: center; background: var(--mk-primary, color-mix(in srgb, CanvasText 82%, Canvas)); color: var(--mk-on-primary, Canvas);' +
         ' font-weight: 700; font-size: ' + Math.max(9, Math.round(h * 0.34)) + 'px; object-fit: cover; }' +
         '.wrap { position: relative; }' +
+        '.btn { position: relative; }' +
+        '.nb, .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; display: inline-grid; place-items: center;' +
+        ' background: var(--mk-error, #d32f2f); color: var(--mk-on-error, #fff); font-size: 10px; font-weight: 700; line-height: 1; }' +
+        '.nb { position: absolute; top: -5px; ' + (align === 'left' ? 'right' : 'left') + ': -5px; }' +
         '.menu { position: absolute; ' + menuPlace + ' min-width: 210px; padding: 6px;' +
         ' background: var(--mk-surface-container, Canvas); color: var(--mk-on-surface, CanvasText);' +
         ' border: 1px solid var(--mk-outline, color-mix(in srgb, CanvasText 22%, transparent));' +
@@ -878,9 +1036,14 @@ const userButtonJS = `(() => {
           ? '<img class="avatar" src="' + esc(data.avatar) + '" alt="">'
           : '<span class="avatar">' + esc(auth ? (data.initials || '?') : '-') + '</span>') +
         (namePos === 'after' && auth ? '<span class="name">' + esc(data.username) + '</span>' : '') +
+        (notifHere && data.notifications.total
+          ? '<span class="nb">' + (data.notifications.total > 99 ? '99+' : data.notifications.total) + '</span>' : '') +
         '</button>' +
         '<div class="menu" id="menu" role="menu">' + items.join('') + '__MK_EVAL__</div>' +
         '</div>';
+      // The snackbars on screen outlive a redraw: the count that moved with
+      // the same notification redraws the button a moment after one shows.
+      if (this.snacks) this.snacks.attach(this.shadowRoot);
 
       const menu = this.shadowRoot.getElementById('menu');
       const closeSubs = () => {
@@ -932,6 +1095,8 @@ const userButtonJS = `(() => {
         document.addEventListener('click', () => { closeSubs(); menu.classList.remove('open'); });
       }
       menu.addEventListener('click', (e) => e.stopPropagation());
+      if (data.notifications && !this.watchingNotifications && page() && page().onEvent) this.watchNotifications();
+      this.syncNotifyWorker(data);
 
       // Flyout submenus: hover opens them (pure CSS); a click PINS them for
       // touch screens. Opening one - by hover or click - closes every other:
@@ -1033,6 +1198,154 @@ const userButtonJS = `(() => {
       function mark() { return '<span class="mark">✓</span>'; }
     }
   }
+
+  // The desktop, when the browser lets this origin show on it: a secure
+  // context and a permission the reader gave (asked on the notifications
+  // page, from a click - never here, never on load).
+  function desktopAllowed() {
+    try {
+      return window.isSecureContext && typeof Notification === 'function' && Notification.permission === 'granted';
+    } catch (e) { return false; }
+  }
+
+  // One notification on the desktop. Tagged with its id, or with its group
+  // for a message sent to every tenant: every tab of this reader hears the
+  // same news, in whichever tenant, and the system shows it once. A click on it
+  // opens the notifications page; its buttons are the detail (Open) and then
+  // the actions, as many as the system shows - what does not fit stays on the
+  // page. Buttons need the notification shown by a service worker (and a
+  // phone accepts no other kind): the gateway's own, registered here the first
+  // time. When it cannot be - a page whose policy refuses workers, a browser
+  // without them, a private window - the page makes it itself, without
+  // buttons; and the snackbar says it in any case once the tab is seen again.
+  function showOnDesktop(it, go, lang, L, page) {
+    return notifyWorker()
+      .then((reg) => {
+        // A deployment may have changed the worker: looked at once per page,
+        // when it is used - never on load.
+        if (!notifyChecked) { notifyChecked = true; reg.update().catch(() => {}); }
+        const d = desktopData(it, L, page);
+        const max = typeof Notification.maxActions === 'number' ? Notification.maxActions : 2;
+        const buttons = [];
+        // Acknowledge first when it asks: what the reader is asked to do.
+        if (d.ack && L.notifAck) buttons.push({ action: 'ack', title: L.notifAck });
+        if (d.detail && L.notifOpen) buttons.push({ action: 'open', title: L.notifOpen });
+        d.actions.forEach((a, i) => { if (buttons.length < max && a.label) buttons.push({ action: 'act' + i, title: a.label }); });
+        return reg.showNotification(it.title, {
+          body: it.body || '', tag: it.group || it.id, icon: '/meerkat/favicon', lang: lang || '', data: d, actions: buttons
+        });
+      })
+      .then(() => true)
+      .catch(() => pageNotification(it, go, lang));
+  }
+
+  // What the worker needs to answer a click, without reading the list: the
+  // addresses made whole against this page, and the words of a result in the
+  // reader's language.
+  function desktopData(it, L, page) {
+    const abs = (u) => { try { return new URL(u, location.href).href; } catch (e) { return ''; } };
+    return {
+      id: it.id, page: abs(page),
+      done: L.notifDone || 'Done', failed: L.notifFailed || 'Failed', acked: L.notifAcked || 'Done',
+      ack: !!(it.ack && !it.acknowledged),
+      detail: it.detail ? { url: abs(it.detail.url), external: !!it.detail.external } : null,
+      actions: (it.actions || []).map((a) => ({ label: a.label, url: abs(a.url), external: !!a.external, method: a.method || 'GET', body: a.body }))
+    };
+  }
+
+  // The worker (ee/notify/worker.go): one registration for the origin, at a
+  // scope that serves nothing - it controls no page and intercepts no
+  // request. Asked once per page: the answer, refusal included, is kept.
+  const NOTIFY_SW = '__MK_NOTIFY_SW__';
+  const NOTIFY_SW_SCOPE = '__MK_NOTIFY_SW_SCOPE__';
+  let notifyReg = null;
+  let notifyChecked = false;
+  function notifyWorker() {
+    if (notifyReg) return notifyReg;
+    notifyReg = new Promise((resolve, reject) => {
+      const sw = navigator.serviceWorker;
+      if (!sw || typeof sw.register !== 'function') { reject(new Error('no service worker')); return; }
+      const scope = new URL(NOTIFY_SW_SCOPE, location.origin).href;
+      sw.getRegistration(scope)
+        .then((reg) => {
+          // The application's own worker may answer for the scope (one at
+          // "/" covers everything): only ours will do.
+          if (reg && reg.scope === scope && reg.active) return reg;
+          return sw.register(NOTIFY_SW, { scope: NOTIFY_SW_SCOPE });
+        })
+        .then(activeWorker)
+        .then(resolve, reject);
+    });
+    notifyReg.catch(() => {});
+    return notifyReg;
+  }
+
+  // Ours only, found by its scope: an application's own worker stays.
+  function dropNotifyWorker() {
+    notifyReg = null;
+    const sw = navigator.serviceWorker;
+    if (!sw || typeof sw.getRegistration !== 'function') return;
+    const scope = new URL(NOTIFY_SW_SCOPE, location.origin).href;
+    sw.getRegistration(scope)
+      .then((reg) => (reg && reg.scope === scope ? reg.unregister() : false))
+      .catch(() => {});
+  }
+
+  // A worker shows nothing before it is active: the first registration
+  // waits for it to install.
+  function activeWorker(reg) {
+    if (reg.active) return reg;
+    const w = reg.installing || reg.waiting;
+    if (!w) return Promise.reject(new Error('no worker'));
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('worker not active')), 10000);
+      w.addEventListener('statechange', () => {
+        if (w.state === 'activated') { clearTimeout(t); resolve(reg); }
+        else if (w.state === 'redundant') { clearTimeout(t); reject(new Error('worker discarded')); }
+      });
+    });
+  }
+
+  // A click on a notification the worker showed, when no window is on the
+  // notifications page: the worker controls no page and so cannot move one.
+  // It asks which pages carry this button (hello) and tells one to go
+  // (open). Only our worker is heard, and only an address of this origin.
+  function listenToNotifyWorker() {
+    const sw = navigator.serviceWorker;
+    if (!sw || window.__meerkatNotifyWorker) return;
+    window.__meerkatNotifyWorker = true;
+    sw.addEventListener('message', (e) => {
+      const d = e.data || {};
+      let ours = false;
+      try { ours = !!e.source && new URL(e.source.scriptURL).pathname === NOTIFY_SW && e.origin === location.origin; } catch (err) {}
+      if (!ours) return;
+      if (d.meerkatNotify === 'hello' && e.ports && e.ports[0]) e.ports[0].postMessage('here');
+      if (d.meerkatNotify === 'open') {
+        try {
+          const to = new URL(d.url, location.href);
+          if (to.origin === location.origin) location.href = to.href;
+        } catch (err) {}
+      }
+    });
+    if (typeof sw.startMessages === 'function') sw.startMessages();
+  }
+
+  // The notification the page makes itself: no button, refused on a phone.
+  // False when the browser refuses it, and the snackbar says it instead.
+  function pageNotification(it, go, lang) {
+    try {
+      const n = new Notification(it.title, { body: it.body || '', tag: it.group || it.id, icon: '/meerkat/favicon', lang: lang || '' });
+      n.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        try { window.focus(); } catch (err) {}
+        n.close();
+        go();
+      };
+      return true;
+    } catch (e) { return false; }
+  }
+
+  __MK_SNACKBAR__
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1340,7 +1653,7 @@ const userButtonJS = `(() => {
         stream = await navigator.mediaDevices.getDisplayMedia(
           { video: true, audio: false, preferCurrentTab: true, selfBrowserSurface: 'include' });
       } catch (err) {
-        if (!err || err.name !== 'NotAllowedError') msg(lb('issueCaptureFailed', 'Screen capture failed.'));
+        if (!err || err.name !== 'NotAllowedError') msg(lb('issueCaptureFailed', 'Screen capture failed. Try again, or send the report without it.'));
         return;
       }
       try {
@@ -1356,7 +1669,7 @@ const userButtonJS = `(() => {
         c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
         st.full = st.shot = c; st.rect = null;
         renderPreview();
-      } catch { msg(lb('issueCaptureFailed', 'Screen capture failed.')); }
+      } catch { msg(lb('issueCaptureFailed', 'Screen capture failed. Try again, or send the report without it.')); }
       finally {
         p.style.visibility = '';
         for (const t of stream.getTracks()) t.stop();
@@ -1474,7 +1787,7 @@ const userButtonJS = `(() => {
       if (!text) { msg(lb('issueDescriptionRequired', 'A description is required.')); desc.focus(); return; }
       if (st.busy) return;
       const shot = encodeShot();
-      if (shot === null) { msg(lb('issueTooLarge', 'The screenshot is too large to send.')); return; }
+      if (shot === null) { msg(lb('issueTooLarge', 'The screenshot is too large to send. Crop it, or remove it.')); return; }
       const body = {
         description: text,
         url: location.href,
@@ -1491,7 +1804,7 @@ const userButtonJS = `(() => {
         body.console.splice(0, Math.ceil(body.console.length / 2));
         json = JSON.stringify(body);
       }
-      if (json.length > ISSUE_MAX_JSON) { msg(lb('issueTooLarge', 'The screenshot is too large to send.')); return; }
+      if (json.length > ISSUE_MAX_JSON) { msg(lb('issueTooLarge', 'The screenshot is too large to send. Crop it, or remove it.')); return; }
       st.busy = true;
       send.disabled = true;
       send.textContent = lb('issueSending', 'Sending...');
@@ -1548,8 +1861,8 @@ const userButtonJS = `(() => {
       msgEl.hidden = false;
       msgEl.innerHTML = [
         lb('issueDescriptionRequired', 'A description is required.'),
-        lb('issueTooLarge', 'The screenshot is too large to send.'),
-        lb('issueCaptureFailed', 'Screen capture failed.'),
+        lb('issueTooLarge', 'The screenshot is too large to send. Crop it, or remove it.'),
+        lb('issueCaptureFailed', 'Screen capture failed. Try again, or send the report without it.'),
         lb('issueFailed', 'Sending failed. Please try again.')
       ].map(esc).join('<br>');
       return;

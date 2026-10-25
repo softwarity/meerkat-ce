@@ -48,8 +48,10 @@ var Buckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 // inside one, and they are counted identically - which is the point of having
 // the block rather than two near-copies that drift.
 type counters struct {
-	// Requests by status class: index 0 is 1xx, 4 is 5xx. Anything outside
-	// 100..599 lands in 5: a handler that wrote nonsense is not nothing.
+	// Requests by status class: index n is nxx, 1 to 5, and index 0 is never
+	// written (the console and the history read 4 and 5 as the errors).
+	// Anything outside 100..599 lands in 5: a handler that wrote nonsense is
+	// not nothing.
 	byClass [6]atomic.Uint64
 	// The histogram: one counter per bucket, cumulative at read time.
 	buckets [12]atomic.Uint64

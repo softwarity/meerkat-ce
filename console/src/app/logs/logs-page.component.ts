@@ -11,6 +11,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { LiveTopic, LivewireClient } from '@softwarity/livewire';
 import { ApiService, LogEntry, LogLevel, LogsAnswer } from '../api.service';
+import { MeService } from '../me.service';
+import { zoned, zonedClock } from '../shared/zoned-date.pipe';
 
 // How many lines the screen keeps: what the gateway keeps.
 const KEPT = 5000;
@@ -44,6 +46,7 @@ const LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
 })
 export class LogsPageComponent {
   private readonly api = inject(ApiService);
+  private readonly zone = inject(MeService).timezone;
   private readonly snack = inject(MatSnackBar);
 
   protected readonly levels = LEVELS;
@@ -74,7 +77,7 @@ export class LogsPageComponent {
     const until = this.state()?.until;
     if (!until) return '';
     const minutes = Math.max(0, Math.round((Date.parse(until) - this.now()) / 60000));
-    return $localize`:@@Logs_back_in:Back to ${this.state()?.startup}:level: in ${minutes}:minutes: min`;
+    return $localize`:@@Logs_back_in:Resets to ${this.state()?.startup}:level: in ${minutes}:minutes: min`;
   });
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
@@ -162,10 +165,15 @@ export class LogsPageComponent {
     this.open.update((s) => (s === e.seq ? undefined : e.seq));
   }
 
+  // The clock in the reader's zone; the whole moment on hover.
   protected time(e: LogEntry): string {
-    const d = new Date(e.time);
-    const p = (n: number, w = 2) => String(n).padStart(w, '0');
-    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+    const ms = new Date(e.time).getTime();
+    return isNaN(ms) ? '' : zonedClock(ms, this.zone());
+  }
+
+  protected moment(e: LogEntry): string {
+    const ms = new Date(e.time).getTime();
+    return isNaN(ms) ? '' : zoned(ms / 1000, this.zone(), 'long');
   }
 
   protected attrs(e: LogEntry): { key: string; value: string }[] {

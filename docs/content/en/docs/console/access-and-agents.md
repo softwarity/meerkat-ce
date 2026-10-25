@@ -11,7 +11,7 @@ Three screens, one subject: working on this gateway from outside the console.
 
 - **Access tokens** is on both planes. Under **Infra**, it mints console tokens
   for a script or a pipeline, and internal tokens for a service calling the
-  scheduler. Under **Application**, it also lists the application tokens: an
+  scheduler or publishing notifications. Under **Application**, it also lists the application tokens: an
   app admin sees everyone's and can revoke them.
 - **Infra > MCP** (infra admins) connects an assistant, and produces no key at
   all.
@@ -32,13 +32,14 @@ shows. The filters above the list narrow it to **Console**, **Application** (the
 tokens people created on their profile, for an app admin) or **Internal**. A row
 opens its drawer.
 
-**Internal** lists the tokens of perimeter `schedules`: they open the
-[scheduler's API](/docs/operations/scheduler#the-token) on the internal plane
-and nothing on the console's port. Under that filter the button reads **New
+**Internal** lists the tokens of perimeter `schedules` and `notifications`:
+they open the [scheduler's API](/docs/operations/scheduler#the-token), or the
+[notifications'](/docs/operations/notifications#publishing), on the internal
+plane and nothing on the console's port. Under that filter the button reads **New
 internal token**: a name - the service that holds it, offered from the
 services the gateway sees, or `global` for one they share - the addresses and
 the expiry, the perimeter being what makes it internal. Whether a service needs
-one at all is the scheduler's **Access** setting.
+one at all is the **Access** setting of the scheduler, or of the notifications.
 
 Creating one asks four things:
 

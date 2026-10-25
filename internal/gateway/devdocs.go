@@ -38,9 +38,16 @@ var devSpecClient = &http.Client{Timeout: 20 * time.Second, Transport: &http.Tra
 	DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
 }}
 
+// Mux is what the gateway's own data-plane endpoints are mounted on: a
+// *http.ServeMux, or a test recording the patterns.
+type Mux interface {
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+}
+
 // RegisterDevDocs mounts the developer docs on the data-plane mux, ahead of
 // the route fallback.
-func (rt *Router) RegisterDevDocs(mux *http.ServeMux) {
+func (rt *Router) RegisterDevDocs(mux Mux) {
 	mux.Handle("GET /meerkat/apidocs", http.RedirectHandler("/meerkat/apidocs/", http.StatusMovedPermanently))
 	mux.HandleFunc("GET /meerkat/apidocs/{$}", rt.devDocsPage)
 	mux.HandleFunc("GET /meerkat/apidocs/assets/{file}", rt.devDocsAsset)

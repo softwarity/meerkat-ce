@@ -143,7 +143,7 @@
              between them makes the reader work out which is which. -->
         <h3 class="sub" i18n="@@How_it_answers">How it answers</h3>
         <p class="section-hint" i18n="@@Target_hint">
-          Proxy fetches from a service; the others answer here, without calling anything.
+          Proxy calls a service. The other modes answer directly, without calling one.
         </p>
         <mat-form-field>
           <mat-label i18n="@@Mode">Mode</mat-label>
@@ -268,7 +268,7 @@
           <p class="section-hint off-note">
             <mat-icon inline>warning</mat-icon>
             <span i18n="@@Upstream_short_name"
-              >The upstream uses the short name {{ short.host }}, which a name-constrained CA cannot certify.</span
+              >{{ short.host }} is a short name: a name-constrained CA cannot issue a certificate for it.</span
             >
             <button matButton type="button" (click)="useFullName()">
               <ng-container i18n="@@Use_full_name">Use {{ short.full }}</ng-container>
@@ -345,9 +345,9 @@
           <mat-select [value]="draft().specSource" (selectionChange)="setSpecSource($event.value)">
             <mat-option value="" i18n="@@Spec_none">None</mat-option>
             <mat-option value="upstream" i18n="@@Spec_from_service">Published by the service</mat-option>
-            <mat-option value="file" i18n="@@Spec_deposited">Deposited here</mat-option>
+            <mat-option value="file" i18n="@@Spec_deposited">Uploaded here</mat-option>
           </mat-select>
-          <mat-hint align="end" i18n="@@Spec_hint">Feeds endpoint-level security and the developer swagger</mat-hint>
+          <mat-hint align="end" i18n="@@Spec_hint">Used by endpoint security and the API reference</mat-hint>
         </mat-form-field>
 
         @if (draft().specSource === 'upstream') {
@@ -372,7 +372,7 @@
           >
             <mat-icon svgIcon="openapi" />
           </button>
-          <mat-hint align="end" i18n="@@OpenAPI_url_hint">Relative to the upstream, or an absolute url for a third-party service</mat-hint>
+          <mat-hint align="end" i18n="@@OpenAPI_url_hint">Relative to the upstream, or a full URL for a third-party service</mat-hint>
         </mat-form-field>
         } @else if (draft().specSource === 'file') {
         <div class="spec-file">
@@ -380,7 +380,7 @@
             accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
             [disabled]="saving()"
             (picked)="depositSpec($event[0])"
-          ><span i18n="@@Deposit_a_file">Deposit a file</span></app-file-button>
+          ><span i18n="@@Deposit_a_file">Upload a file</span></app-file-button>
           @if (draft().specFilename) {
           <span class="spec-name">{{ draft().specFilename }}</span>
           <button
@@ -417,7 +417,7 @@
         }
         @if (specShadow()) {
         <p class="spec-note warn" i18n="@@Spec_shadows">
-          The service already answers on that path: the deposited file takes its place. Rename it to serve both.
+          The service already answers on this path: the uploaded file replaces it. Rename the file to keep both.
         </p>
         }
         }
@@ -434,7 +434,7 @@
       }
       @case ('security') {
         <p class="section-hint" i18n="@@Route_security_hint">
-          Access to the whole route. Empty leaves security to the upstream; an API route can refine it per operation under Endpoints.
+          Who may use the whole route. Left empty, the service decides. An API route can refine it per operation under Endpoints.
         </p>
         <app-access-editor
           [value]="draft().access"
@@ -446,7 +446,7 @@
       }
       @case ('limits') {
         <p class="section-hint" i18n="@@Route_limits_hint">
-          Every bound applies at once: per route, per user, per address. The first one exceeded answers 429.
+          All limits apply together: per route, per user, per address. The first one reached answers 429.
         </p>
         <app-rate-limits
           [value]="draft().limits"
@@ -473,7 +473,7 @@
       }
       @case ('identity') {
         <p class="section-hint" i18n="@@Identity_section_hint2">
-          What this route knows about the signed-in caller, and under which name. Auth forward sends it to the service, User info puts it on the page.
+          What this route passes on about the signed-in user, and under which name. Auth forward sends it to the service, User info puts it on the page.
         </p>
           <div class="id-attrs">
             @for (field of identityFields(); track field) {
@@ -614,11 +614,11 @@
           </div>
           @if (draft().identityAlgorithm === 'RS256') {
             <p class="section-hint id-hint warn" i18n="@@Signature_algorithm_rs256_warn">
-              RS256 is the slowest. If the backend reads the JWKS, switching to ES256 needs nothing on its side.
+              If the service verifies tokens with the JWKS, switching to ES256 needs no change on its side.
             </p>
           }
           <p class="section-hint id-hint" i18n="@@Signed_jwt_hint">
-            Backends verify each token against the published JWKS. Keys are under "OIDC / JWT" on the Routes page.
+            The service verifies each token with the published JWKS. Keys are under OIDC / JWT on the Routes page.
           </p>
         }
 
@@ -753,7 +753,7 @@
 
           <h3 class="sub" i18n="@@Token_audience">Audience</h3>
           <p class="section-hint id-hint" i18n="@@Token_audience_hint">
-            The token's <code>aud</code>: the route's name unless the application expects a value of its own.
+            The token's <code>aud</code>. Defaults to the route's name; set it if the application expects another value.
           </p>
           <div class="ttl-row">
             <mat-form-field class="position-field" subscriptSizing="dynamic">
@@ -778,17 +778,15 @@
           <h3 class="sub" i18n="@@Shape_of_the_roles">Shape of the roles</h3>
           @if (draft().identityMechanism === 'oidc') {
             <p class="section-hint id-hint" i18n="@@Roles_shape_hint_oidc">
-              A claim built from the roles carries every role of the person, comma-separated, unless shaped
-              here: keep or drop roles by name or by tag, cut or add a prefix, change the case, then write
-              the list separated or as a JSON array, or turn them into the one value it expects - what the
-              application reads, and nothing more.
+              By default, every role of the person, comma-separated. Shape them to send only what the
+              application reads: filter by name or tag, change the prefix or case, write a list, a JSON array
+              or a single value.
             </p>
           } @else {
             <p class="section-hint id-hint" i18n="@@Roles_shape_hint">
-              The roles travel on every request, all of them comma-separated unless shaped here: keep or drop
-              roles by name or by tag, cut or add a prefix, change the case, then write the list separated or
-              as a JSON array, or turn them into the one value it expects - what the service reads, and
-              nothing more.
+              Sent on every request: by default, every role of the person, comma-separated. Shape them to send
+              only what the service reads: filter by name or tag, change the prefix or case, write a list, a
+              JSON array or a single value.
             </p>
           }
           <div class="btn-row">
@@ -803,7 +801,7 @@
             </button>
             @if (!draft().identityAttrs['roles'].selected) {
               <span class="section-hint" i18n="@@Roles_not_included"
-                >Roles are not included in Identity.</span
+                >Select roles in Identity first.</span
               >
             }
           </div>
@@ -824,7 +822,7 @@
           @if (draft().identityAttrs['roles'].selected && rolesExample(); as ex) {
             <div class="roles-example">
               <span class="section-hint" i18n="@@Roles_example_lead"
-                >For someone holding every role of the catalogue ({{ ex.total }}), it sends {{ ex.count }}:</span
+                >For a user with all {{ ex.total }} roles, it sends {{ ex.count }}:</span
               >
               <code class="roles-out">{{ ex.text || '""' }}</code>
             </div>
@@ -834,7 +832,7 @@
       @case ('scheme') {
         <h3 class="sub" i18n="@@Color_scheme">Color scheme</h3>
         <p class="section-hint" i18n="@@Scheme_section_hint">
-          How this application applies light or dark. The CSS color-scheme and a data-meerkat-scheme attribute are always set; add the application's own mechanism if it has one.
+          How this application switches between light and dark. The CSS color-scheme and a data-meerkat-scheme attribute are always set; pick the application's own mechanism if it has one.
         </p>
         <p class="section-hint" i18n="@@Scheme_who_offers">
           The switch is in the portal bar when the portal is on, otherwise in the User button.
@@ -895,7 +893,7 @@
           </div>
           @if (draft().schemeNoAuto) {
             <p class="section-hint" i18n="@@No_system_mode_hint">
-              "Follow my system" is resolved to light or dark before reaching the application, so the switch offers two positions instead of three.
+              "Follow my system" is turned into light or dark before reaching the application, and the switch offers two choices instead of three.
             </p>
           }
         }
@@ -940,7 +938,7 @@
         @if (draft().schemeMechanism !== 'none') {
         <h3 class="sub" i18n="@@Override_localstorage">Override localStorage</h3>
         <p class="section-hint" i18n="@@Override_localstorage_hint">
-          If the application keeps its theme in localStorage, give the key and its value for each mode: Meerkat writes the visitor's choice there before the page's scripts run. An empty value removes the entry.
+          If the application stores its theme in localStorage, give the key and the value for each mode. The visitor's choice is written there before the page's scripts run; an empty value removes the entry.
         </p>
         <div class="flags">
           <mat-checkbox [checked]="draft().schemeStorageOverride" (change)="setStorageOverride($event.checked)">
@@ -969,8 +967,8 @@
       }
       @case ('button') {
         <p class="section-hint" i18n="@@User_button_hint">
-          Injects the meerkat-user-button web component into the pages: profile, tenant switch,
-          languages, color scheme, sign out.
+          Adds the user button to the pages: profile, tenant switch, language, color scheme,
+          sign out.
         </p>
         <mat-checkbox [checked]="draft().btnEnabled" (change)="setFlag('btnEnabled', $event.checked)">
           <ng-container i18n="@@Inject_the_user_button">Inject the user button</ng-container>
@@ -1111,7 +1109,7 @@
 
         @if (!draft().schemeSelect && draft().schemeMechanism !== 'none') {
           <p class="section-hint" i18n="@@Button_scheme_hint">
-            Without a switch, the button wears what the visitor chose elsewhere. Force it light or dark here; the page is not touched.
+            Without a switch, the button follows the visitor's choice. Force it light or dark here; the page itself does not change.
           </p>
           <div class="btn-row">
             <mat-form-field class="position-field">
@@ -1199,7 +1197,7 @@
              what nobody should have to configure. The mechanism below is for
              an application that reads the language somewhere else. -->
         <p class="section-hint" i18n="@@Locales_forwarding_hint2">
-          Accept-Language always carries the person's language first. Pick a mechanism only if the application reads it elsewhere, or to follow a change.
+          Accept-Language always puts the user's language first. Pick a mechanism only if the application reads it elsewhere, or must follow a change.
         </p>
         <div class="btn-row">
           <mat-form-field class="mech-field">
@@ -1347,7 +1345,7 @@
           </div>
           @if (!pageUserFields().length) {
             <p class="section-hint" i18n="@@Identity_declares_nothing">
-              The Identity section declares no fact to put on the page.
+              No fact is selected in Identity.
             </p>
           }
           <div class="field-rows">
@@ -1397,7 +1395,7 @@
           <p class="section-hint off-note">
             <mat-icon inline>info</mat-icon>
             <span i18n="@@Route_tracing_export_off"
-              >OpenTelemetry is off for this installation: these switches wait for it.</span
+              >OpenTelemetry is off for this installation: these settings apply once it is on.</span
             >
             <button matButton type="button" (click)="openTelemetrySettings()">
               <ng-container i18n="@@Open_telemetry_settings">OpenTelemetry settings</ng-container>
@@ -1416,8 +1414,8 @@
           <ng-container i18n="@@Route_tracing_toggle">Include this route in OpenTelemetry</ng-container>
         </mat-slide-toggle>
         <p class="section-hint" i18n="@@Route_tracing_push_hint">
-          Its traces and its metrics. Off, it only counts in the gateway's totals: right for an
-          admin interface or a probe.
+          Sends its traces and metrics. Off, it only counts in the gateway's totals, which suits an
+          admin interface or a health probe.
         </p>
         <!-- The second switch needs the first AND a UI route: it injects a
              script into pages, and a service route has none. Disabled rather
@@ -1441,7 +1439,7 @@
         <h3 class="sub" i18n="@@Section_audit">Audit</h3>
         <p class="section-hint">
           @if (auditUpload(); as up) {
-            <ng-container i18n="@@Audit_uploaded">{{ up.length }} audited operations read from the file, saved with the route.</ng-container>
+            <ng-container i18n="@@Audit_uploaded">{{ up.length }} audited operations from the file, saved with the route.</ng-container>
           } @else {
             <ng-container i18n="@@Audit_count">{{ auditCount() }} audited operations, set in
               <a routerLink="/infra/endpoint-audit">Endpoint audit</a>.</ng-container>
@@ -1464,7 +1462,7 @@
       }
       @case ('custom') {
         <p class="section-hint" i18n="@@Custom_hint3">
-          Your own CSS and JavaScript, injected into this application's pages in the list's order within each place.
+          Your own CSS and JavaScript, added to this application's pages in list order.
         </p>
         <app-injections [formField]="f.injections" [routeId]="route()?.id" [ensureSaved]="ensureSaved" [persist]="persist" />
       }

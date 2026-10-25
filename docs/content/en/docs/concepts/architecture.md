@@ -88,6 +88,7 @@ on the internal plane.
 - `/.well-known/jwks.json` - the public keys the [identity JWT](/docs/auth/service-jwt) verifies against. No token needed.
 - `/.well-known/openid-configuration` - the discovery document: the issuer, and where those keys are. No token needed.
 - `/api/schedules/...` - the [scheduled calls](/docs/operations/scheduler), written by the service that needs them, presenting what the scheduler's access asks: nothing, a token whose perimeter is `schedules`, or its pod's ServiceAccount token.
+- `/api/notifications/...` - the [notifications](/docs/operations/notifications) a service sends its users (Enterprise), behind an access of its own, set like the scheduler's: nothing, a token whose perimeter is `notifications`, or its pod's ServiceAccount token.
 - `/healthz`.
 
 Plain HTTP by default, since a service reaches it by a name inside the cluster

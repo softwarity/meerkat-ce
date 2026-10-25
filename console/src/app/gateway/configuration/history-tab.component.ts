@@ -1,5 +1,4 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
@@ -16,6 +15,8 @@ import { ApiService, ConfigPlan, RestorePoint } from '../../api.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { ConfigurationYamlComponent } from './configuration-yaml.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
+import { ZonedDatePipe, zoned } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // The tape (CFG-06): one restore point per change, newest first.
 //
@@ -31,7 +32,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
 @Component({
   selector: 'app-configuration-history',
   imports: [
-    DatePipe,
+    ZonedDatePipe,
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
@@ -133,8 +134,8 @@ import { LiveChangesService } from '../../shared/live-changes.service';
       <mat-drawer-content>
         <div class="intro">
           <p class="hint" style="margin: 0" i18n="@@History_hint">
-            A restore point is recorded at each configuration change; one person's changes within
-            a couple of minutes count as one. Accounts, sessions and the vault are not included.
+            A restore point is recorded at each configuration change (one person's changes within two
+            minutes count as one). Accounts, sessions and the vault are not included.
           </p>
         </div>
 
@@ -146,7 +147,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
           <mat-table [dataSource]="rows()">
             <ng-container matColumnDef="when">
               <mat-header-cell *matHeaderCellDef i18n="@@Time">Time</mat-header-cell>
-              <mat-cell *matCellDef="let p">{{ p.at * 1000 | date: 'HH:mm' }}</mat-cell>
+              <mat-cell *matCellDef="let p" class="nowrap">{{ p.at | zoned: zone() : "time" }}</mat-cell>
             </ng-container>
 
             <ng-container matColumnDef="who">
@@ -170,7 +171,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
                 @if (p.sameAs; as at) {
                   <mat-chip disableRipple [matTooltip]="sameTip()">
                     <mat-icon matChipAvatar>history</mat-icon>
-                    {{ at * 1000 | date: 'HH:mm' }}
+                    {{ at | zoned: zone() }}
                   </mat-chip>
                 }
                 <span rowActions="tonal">
@@ -255,6 +256,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
 })
 export class ConfigurationHistoryComponent {
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   private readonly snack = inject(MatSnackBar);
   private readonly dialogs = inject(DialogsService);
   private readonly router = inject(Router);
@@ -283,7 +285,7 @@ export class ConfigurationHistoryComponent {
     const out: (RestorePoint | { day: string })[] = [];
     let current = '';
     for (const p of this.points()) {
-      const day = new Date(p.at * 1000).toLocaleDateString();
+      const day = zoned(p.at, this.zone(), 'day');
       if (day !== current) {
         current = day;
         out.push({ day });
@@ -297,12 +299,12 @@ export class ConfigurationHistoryComponent {
 
   protected readonly started = () => $localize`:@@The_gateway:the gateway`;
   protected readonly savedTip = () =>
-    $localize`:@@Saved_here:A saved configuration holds exactly this state.`;
+    $localize`:@@Saved_here:Identical to this saved configuration.`;
   protected readonly restoreTip = () => $localize`:@@Restore:Restore`;
   protected readonly alreadyTip = () =>
-    $localize`:@@Already_this_state:This gateway is already in this state.`;
+    $localize`:@@Already_this_state:This is already the current configuration.`;
   protected readonly sameTip = () =>
-    $localize`:@@Same_as_earlier:Back to the same configuration as that earlier moment.`;
+    $localize`:@@Same_as_earlier:Same configuration as at this earlier time.`;
   protected readonly note = () =>
     $localize`:@@Point_note:Images are not in restore points: restoring leaves them in place.`;
 
@@ -341,7 +343,7 @@ export class ConfigurationHistoryComponent {
   }
 
   protected title(p: RestorePoint): string {
-    return new Date(p.at * 1000).toLocaleString();
+    return zoned(p.at, this.zone(), 'long');
   }
 
   private reload(): void {
@@ -379,7 +381,7 @@ export class ConfigurationHistoryComponent {
         // give.
         const done = plan.changes.some((c) => c.action !== 'same')
           ? $localize`:@@Restored:Restored`
-          : $localize`:@@Nothing_to_change:Nothing to change: the gateway already matched that moment`;
+          : $localize`:@@Nothing_to_change:Nothing to change: the configuration already matches that time`;
         this.run(this.api.restoreConfigPoint(p.id), done);
       },
       error: (err: unknown) => {
@@ -420,14 +422,14 @@ export class ConfigurationHistoryComponent {
     const count = (action: string) => plan.changes.filter((c) => c.action === action).length;
     const removed = this.removes(plan);
     if (!count('add') && !count('update') && !removed) {
-      return $localize`:@@Restore_no_change:This gateway already matches that moment. Nothing changes.`;
+      return $localize`:@@Restore_no_change:The configuration already matches that time. Nothing changes.`;
     }
     const gone = plan.changes
       .filter((c) => c.action === 'remove')
       .map((c) => c.label)
       .join(', ');
     const head = $localize`:@@Activate_counts:${count('add')}:added: added, ${count('update')}:updated: updated, ${removed}:removed: removed.`;
-    return removed ? head + ' ' + $localize`:@@Activate_removed_list:What goes: ${gone}:gone:.` : head;
+    return removed ? head + ' ' + $localize`:@@Activate_removed_list:Removed: ${gone}:gone:.` : head;
   }
 
   private removes(plan: ConfigPlan): number {

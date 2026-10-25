@@ -23,6 +23,8 @@ import {
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { PauseService } from '../../shared/pause.service';
 import { SnippetComponent } from '../../shared/snippet.component';
+import { zoned } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 import {
   Snippet,
   createDatabase,
@@ -81,8 +83,8 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
   <mat-card appearance="outlined">
     <h2 i18n="@@Pause">Pause</h2>
     <p class="hint" i18n="@@Pause_hint">
-      Every application answers the maintenance page and the gateway writes nothing, on every node.
-      Pause before a migration: what is written after the copy would be lost at the switch.
+      All applications show the maintenance page and nothing is written, on every gateway. Pause
+      before a migration, or what is written after the copy is lost.
     </p>
     <mat-slide-toggle [checked]="pause.paused()" (change)="pause.set($event.checked)">
       <ng-container i18n="@@Pause_the_gateway">Pause the gateway</ng-container>
@@ -90,8 +92,8 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
     <div class="note">
       <mat-icon>restart_alt</mat-icon>
       <p i18n="@@Pause_not_stored">
-        Never stored: a restart ends it, and a gateway started on the new database starts working
-        at once.
+        Not saved: a restart ends the pause, so a gateway started on the new database works at
+        once.
       </p>
     </div>
   </mat-card>
@@ -99,8 +101,8 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
   <mat-card appearance="outlined">
     <h2 i18n="@@Database_title">Database</h2>
     <p class="hint" i18n="@@Database_hint_kinds">
-      The whole database, users, sessions, vault and audit trail included. Of the same kind as this
-      gateway's, a copy is your backup; of the other kind, it moves the gateway.
+      The whole database, including users, sessions, vault and audit trail. A copy of the same type
+      is a backup; to the other type, it migrates the gateway.
     </p>
     @if (backup(); as b) {
       <div class="actions">
@@ -183,8 +185,8 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
           </mat-form-field>
         </div>
         <p class="hint" i18n="@@Target_fields_hint_v2">
-          An empty database. The password is used for the test and the copy and kept nowhere; the
-          gateway remembers where the copy went, and the trail records the host.
+          An empty database. The password is used for the test and the copy, and never stored. The
+          audit trail records the host.
         </p>
       }
 
@@ -192,8 +194,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
         <div class="note warn">
           <mat-icon>pause_circle</mat-icon>
           <p i18n="@@Pause_before_migrating">
-            This is a migration: pause the gateway first, or what is written after the copy is lost
-            at the switch.
+            This is a migration: pause the gateway first, or what is written after the copy is lost.
           </p>
         </div>
       }
@@ -225,7 +226,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                 @switch (s) {
                   @case ('create') {
                     <p class="hint" i18n="@@Step_create_hint">
-                      What a database administrator runs, with the names and the password typed above.
+                      For a database administrator to run, with the names and password entered above.
                     </p>
                     <app-snippet [filename]="sql().name" [downloadable]="false" [content]="sql().content" />
                   }
@@ -248,7 +249,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                             <ng-container i18n="@@Probe_plain">without TLS (sslmode {{ pr.sslmode }}).</ng-container>
                           }
                           @if (!pr.empty) {
-                            <ng-container i18n="@@Probe_in_use">This database already holds a gateway: copy into an empty one.</ng-container>
+                            <ng-container i18n="@@Probe_in_use">This database is already used by a gateway: use an empty one.</ng-container>
                           } @else if (!pr.canCreate) {
                             <ng-container i18n="@@Probe_cannot_create">This user may not create tables here: grant it, or make it the database's owner.</ng-container>
                           } @else {
@@ -260,7 +261,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                   }
                   @case ('pause') {
                     <p class="hint" i18n="@@Step_pause_hint">
-                      With the switch at the top of this tab: nothing is written from now on, on any node.
+                      With the switch at the top of this tab: nothing is written from then on.
                     </p>
                   }
                   @case ('copy') {
@@ -274,7 +275,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                       <div class="note">
                         <mat-icon>check_circle</mat-icon>
                         <p>
-                          <ng-container i18n="@@Copied_remembered">{{ c.rows }} rows in {{ c.tables }} tables copied to {{ c.host }}:{{ c.port }}/{{ c.database }} on {{ when(c.at) }}, every table counted on both sides.</ng-container>
+                          <ng-container i18n="@@Copied_remembered">{{ c.rows }} rows in {{ c.tables }} tables copied to {{ c.host }}:{{ c.port }}/{{ c.database }} on {{ when(c.at) }}, row counts checked on both sides.</ng-container>
                           <button matButton class="inline" (click)="forget()" i18n="@@Dismiss">Dismiss</button>
                         </p>
                       </div>
@@ -297,8 +298,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                   }
                   @case ('switch') {
                     <p class="hint" i18n="@@Step_switch_hint">
-                      The gateway picks its database when it starts: the change is the deployment's, and
-                      its files stay the truth about it.
+                      The gateway chooses its database at startup: make the change in the deployment.
                     </p>
                     @for (sn of switchSnippets(b); track sn.name) {
                       <app-snippet [filename]="sn.name" [downloadable]="false" [content]="sn.content" />
@@ -315,8 +315,8 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
                       <app-snippet [filename]="wayBack(b).name" [downloadable]="false" [content]="wayBack(b).content" />
                     } @else {
                       <p class="hint" i18n="@@Step_back_embedded_hint">
-                        The PostgreSQL database is untouched: pointing the deployment back at it is the
-                        way back.
+                        The PostgreSQL database is untouched: to go back, point the deployment at it
+                        again.
                       </p>
                     }
                   }
@@ -448,6 +448,7 @@ type Step = 'create' | 'test' | 'pause' | 'copy' | 'download' | 'load' | 'switch
 })
 export class ConfigurationDatabaseComponent {
   private readonly api = inject(ApiService);
+  private readonly zone = inject(MeService).timezone;
   private readonly snack = inject(MatSnackBar);
   protected readonly pause = inject(PauseService);
   protected readonly platformNames = platformNames;
@@ -692,7 +693,7 @@ export class ConfigurationDatabaseComponent {
   }
 
   protected when(at: number): string {
-    return new Date(at * 1000).toLocaleString();
+    return zoned(at, this.zone());
   }
 
   // A file is fetched as a Blob and handed to the browser: reading it as text
@@ -762,7 +763,7 @@ function postgresIn(services: DiscoveredService[]): { name: string; host: string
     if (!port) continue;
     const name = s.name;
     let refused: string | undefined;
-    if (/bouncer|pooler/i.test(name)) refused = $localize`:@@Pg_pooler:a pooler, not for a gateway`;
+    if (/bouncer|pooler/i.test(name)) refused = $localize`:@@Pg_pooler:a connection pooler, not supported`;
     else if (/replica|-ro$|-r$|repl/i.test(name)) refused = $localize`:@@Pg_replica:a replica, read only`;
     const rank = refused ? 2 : /primary|-rw$/i.test(name) ? 0 : 1;
     out.push({ name, host: s.names?.[0] ?? name, port, refused, rank });

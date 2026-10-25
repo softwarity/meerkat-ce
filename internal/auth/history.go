@@ -124,7 +124,7 @@ type loginEventView struct {
 	Label   string
 	Method  string
 	Meta    string // "IP - country", possibly empty
-	When    string
+	When    moment
 	Current bool
 }
 
@@ -166,7 +166,7 @@ const profileHistoryBody = `    <style>
           {{if .Meta}}<span class="lh-meta">{{.Meta}}</span>{{end}}
         </div>
         <span class="lh-method">{{.Method}}</span>
-        <span class="lh-when">{{.When}}</span>
+        <span class="lh-when">{{.When.HTML}}</span>
       </div>
       {{else}}
       <p class="hint-line">{{.T.historyEmpty}}</p>
@@ -188,13 +188,8 @@ func (h *Handler) showProfileHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := profileHistoryData{flowChrome: listChrome(h.flowData(r, "titleHistory"))}
-	// Timestamps land in the user's own timezone when it resolves.
-	loc := time.Local
-	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil && u.Timezone != "" {
-		if l, err := time.LoadLocation(u.Timezone); err == nil {
-			loc = l
-		}
-	}
+	// Times in the zone the person chose, else their browser's (when.go).
+	loc := h.readerZone(r.Context(), sess.UserID)
 	currentHash := ""
 	if token := browserTokenOf(r); token != "" {
 		currentHash = hashTrust(token)
@@ -207,7 +202,7 @@ func (h *Handler) showProfileHistory(w http.ResponseWriter, r *http.Request) {
 		current := e.BrowserHash != "" && e.BrowserHash == currentHash
 		v := loginEventView{
 			Method:  h.tr(r, methodKey(e.Method)),
-			When:    time.Unix(e.At, 0).In(loc).Format("2006-01-02 15:04"),
+			When:    momentOf(e.At, loc),
 			Current: current,
 		}
 		if current {

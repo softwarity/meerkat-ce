@@ -6,12 +6,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
-import { ApiService, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
+import { ApiService, NotifyPage, PortalEntry, PortalSubEntry, PortalConfig, Route, Settings } from '../api.service';
 import { EntryKind, ModuleEditorComponent, ModuleDraft, ModuleFormData } from './module-editor.component';
 import { LiveChangesService } from '../shared/live-changes.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
@@ -31,7 +34,10 @@ import { EeLockComponent } from '../shared/ee-lock.component';
     MatButtonToggleModule,
     MatCardModule,
     MatCheckboxModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
+    MatSelectModule,
     MatSliderModule,
     MatSidenavModule,
     MatSlideToggleModule,
@@ -82,6 +88,23 @@ export class PortalPageComponent {
   protected readonly brandLogo = signal('');
   protected readonly entries = signal<PortalEntry[]>([]);
 
+  // The notifications (NOTIF-05), when root turned them on: where users read
+  // them - the built-in page, or a page of the integrator's on one of its UI
+  // routes - and, in portal mode, the bar's entry that leads there.
+  protected readonly notifyOn = signal(false);
+  // The integrator's page is being chosen: shown before a route is picked,
+  // and saved once it is.
+  protected readonly notifyCustom = signal(false);
+  protected readonly notifyRoute = signal('');
+  protected readonly notifyPath = signal('');
+  // The catalogue holds the notifications entry, at either level.
+  protected readonly hasNotifyEntry = computed(() =>
+    this.entries().some((e) => e.special === 'notifications' || (e.children ?? []).some((c) => c.special === 'notifications')),
+  );
+  // The bell, from the icon bank: the entry wears it from the moment it is
+  // added, as the gateway stores it.
+  private bell = '';
+
   // Only UI routes can wear the bar; those are what a module binds to. A
   // route turned off stays bindable: the bar greys its entry until it is back.
   protected readonly uiRoutes = signal<Route[]>([]);
@@ -116,7 +139,7 @@ export class PortalPageComponent {
     const out: { name: string; href: string; group?: string; head?: boolean }[] = [];
     let last = 0;
     const push = (m: PortalEntry | PortalSubEntry, group: string, run: number) => {
-      if (m.disabled || this.routeOff(m.routeId) || this.routeGone(m.routeId)) return;
+      if (m.special || m.disabled || this.routeOff(m.routeId) || this.routeGone(m.routeId)) return;
       out.push({ name: this.label(m), href: '#', ...(group ? { group } : {}), ...(run !== last ? { head: true } : {}) });
       last = run;
     };
@@ -213,9 +236,10 @@ export class PortalPageComponent {
           label: this.label(c),
           icon: c.icon ?? '',
           description: c.description ?? '',
-          badge: c.badge ?? '',
           disabled: !!c.disabled,
-          off: this.routeOff(c.routeId),
+          off: !c.special && this.routeOff(c.routeId),
+          // The notifications entry wears a sample count, to see where it lands.
+          ...(c.special ? { badge: '3' } : {}),
         }));
         // A container is greyed out when every module it shows is.
         const shown = children.filter((c) => !c.disabled);
@@ -224,9 +248,9 @@ export class PortalPageComponent {
           label: this.label(p),
           icon: p.icon ?? '',
           description: p.description ?? '',
-          badge: p.badge ?? '',
           disabled: !!p.disabled,
-          off: this.isContainer(p) ? shown.length > 0 && shown.every((c) => c.off) : this.routeOff(p.routeId),
+          off: this.isContainer(p) ? shown.length > 0 && shown.every((c) => c.off) : !p.special && this.routeOff(p.routeId),
+          ...(p.special || children.some((c) => c.badge) ? { badge: '3' } : {}),
           children,
         };
       }),
@@ -256,6 +280,13 @@ export class PortalPageComponent {
 
   private load(): void {
     this.loadRoutes();
+    // Root's switch for the whole feature; refused (an image without it, a
+    // reader who may not see it) is off.
+    this.api.notifySettings().subscribe({
+      next: (n) => this.notifyOn.set(n.enabled),
+      error: () => this.notifyOn.set(false),
+    });
+    this.api.searchIcons('notifications').subscribe((r) => (this.bell = r.find((i) => i.name === 'notifications')?.svg ?? ''));
     this.api.branding().subscribe({
       next: (b) => this.brandLogo.set(b.logo || ''),
       error: () => this.brandLogo.set(''),
@@ -280,6 +311,10 @@ export class PortalPageComponent {
     this.showLogo.set(!c.hideLogo);
     this.logoRadius.set(c.logoRadius ?? 0);
     this.entries.set((c.entries ?? []).map(clone));
+    const np = c.notifyPage ?? {};
+    this.notifyRoute.set(np.routeId ?? '');
+    this.notifyPath.set(np.path ?? '');
+    this.notifyCustom.set(!!np.routeId);
   }
 
   // Every change persists at once: a toggle IS the setting, and a module edit is
@@ -317,7 +352,14 @@ export class PortalPageComponent {
       hideLogo: !this.showLogo(),
       logoRadius: this.logoRadius(),
       entries: this.entries(),
+      notifyPage: this.notifyPage(),
     };
+  }
+
+  // One or the other: the built-in page (nothing), or a route and its path.
+  private notifyPage(): NotifyPage {
+    const routeId = this.notifyCustom() ? this.notifyRoute() : '';
+    return routeId ? { routeId, path: this.notifyPath().trim() || '/' } : {};
   }
 
   // ── display helpers ─────────────────────────────────────────────────────
@@ -338,12 +380,15 @@ export class PortalPageComponent {
   }
 
   protected label(m: PortalEntry | PortalSubEntry): string {
-    return (m.label || '').trim() || this.routeName(m.routeId ?? '');
+    return (m.label || '').trim() || (m.special ? this.notificationsName : this.routeName(m.routeId ?? ''));
   }
 
   protected isContainer(e: PortalEntry): boolean {
-    return !e.routeId;
+    return !e.routeId && !e.special;
   }
+
+  protected readonly notificationsName = $localize`:@@Portal_notifications:Notifications`;
+  protected readonly savedOnceChosen = $localize`:@@Portal_notify_route_hint:Saved once a route is chosen.`;
 
   // ── layout controls ─────────────────────────────────────────────────────
 
@@ -378,6 +423,27 @@ export class PortalPageComponent {
     this.logoRadius.set(v);
     this.persist();
   }
+  // The notifications page: the built-in one is saved at once; the
+  // integrator's once a route is picked.
+  protected setNotifyCustom(v: boolean): void {
+    this.notifyCustom.set(v);
+    if (!v || this.notifyRoute()) this.persist();
+  }
+  protected setNotifyRoute(v: string): void {
+    this.notifyRoute.set(v);
+    this.persist();
+  }
+  protected setNotifyPath(v: string): void {
+    if (v.trim() === this.notifyPath().trim()) return;
+    this.notifyPath.set(v);
+    if (this.notifyRoute()) this.persist();
+  }
+  // The route's address, before the path the integrator types.
+  protected notifyBase(): string {
+    const rt = this.uiRoutes().find((r) => r.id === this.notifyRoute());
+    return rt ? entryPath(rt) : '';
+  }
+
   protected setPreviewWidth(v: number): void {
     this.previewWidth.set(v);
     // Leaving full width leaves the editor: close any open drawer so it cannot
@@ -412,6 +478,14 @@ export class PortalPageComponent {
       this.entries.update((ps) => [...ps, entryFromDraft(m)]);
       this.selected.set(String(this.entries().length - 1)); // keep the new one selected
     });
+  }
+
+  // The notifications entry: no route, at the end of the top level, where it
+  // can be moved like any other.
+  protected addNotifications(): void {
+    this.entries.update((ps) => [...ps, { special: 'notifications', icon: this.bell }]);
+    this.persist();
+    this.editParent(this.entries().length - 1);
   }
 
   // A container is a label, an icon and the modules put in it: no route.
@@ -569,8 +643,9 @@ export class PortalPageComponent {
       .filter((p) => p.container && (!path || p.index !== path.pi))
       .map(({ index, name }) => ({ index, name }));
     this.editing.set({
-      title,
+      title: m?.special ? this.notificationsName : title,
       kind,
+      special: !!m?.special,
       bar: this.isBar(),
       existing: path !== null,
       canUp,
@@ -630,6 +705,24 @@ function entryFromDraft(m: ModuleDraft): PortalEntry {
     description: m.description,
     disabled: m.disabled,
   };
+}
+
+// Where a link to a UI route lands, as the gateway derives it: its first
+// path pattern, cut at the first wildcard.
+function entryPath(rt: Route): string {
+  for (const p of rt.predicates ?? []) {
+    if (p.type !== 'path') continue;
+    const patterns = (p.args?.['patterns'] as string[] | undefined) ?? [];
+    for (let s of patterns) {
+      const i = s.search(/[*{]/);
+      if (i >= 0) s = s.slice(0, i);
+      s = s.replace(/\/$/, '');
+      // The root route: the path the integrator types is the whole address.
+      if (s === '') return '';
+      if (s.startsWith('/')) return s;
+    }
+  }
+  return '';
 }
 
 function clone(p: PortalEntry): PortalEntry {

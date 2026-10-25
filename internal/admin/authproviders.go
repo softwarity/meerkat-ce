@@ -128,9 +128,16 @@ func (a *API) listAuthProviders(w http.ResponseWriter, r *http.Request, _ store.
 		a.internal(w, err)
 		return
 	}
+	linked, err := a.st.LinkedPeople(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
 	out := make([]providerView, 0, len(all))
 	for _, p := range all {
-		out = append(out, a.providerView(r, p))
+		v := a.providerView(r, p)
+		v.Linked = linked[p.ID]
+		out = append(out, v)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -163,7 +170,7 @@ func (a *API) putAuthProvider(w http.ResponseWriter, r *http.Request, actor stor
 	}
 	if !store.ValidProviderKind(p.Kind) {
 		writeErr(w, http.StatusUnprocessableEntity, "unknown provider kind "+p.Kind+
-			" (allowed: "+store.ProviderOIDC+", "+store.ProviderLDAP+", "+store.ProviderSAML+")")
+			" (allowed: "+strings.Join(store.ProviderKinds, ", ")+")")
 		return
 	}
 	// A directory or a SAML federation is what the licence covers. OIDC and
@@ -239,6 +246,11 @@ func (a *API) putAuthProvider(w http.ResponseWriter, r *http.Request, actor stor
 	beforeView, beforeHeld := publicProvider(before)
 	a.auditUpdate(r.Context(), actor, "authprovider.update", "authprovider", saved.ID, saved.Name, "",
 		providerView{AuthProvider: beforeView, SecretsSet: beforeHeld}, view)
+	// Counted after the audit: who is linked is not what this write changed,
+	// and in the diff it would read as if it had.
+	if linked, err := a.st.LinkedPeople(r.Context()); err == nil {
+		view.Linked = linked[saved.ID]
+	}
 	writeJSON(w, http.StatusOK, view)
 }
 

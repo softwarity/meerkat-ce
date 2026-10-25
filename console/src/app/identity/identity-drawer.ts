@@ -1,10 +1,16 @@
 import { computed, Injectable, signal } from '@angular/core';
+import { SentNotification } from '../api.service';
 
 // Which page of the member drawer is on screen.
 export type MemberEditorView = 'member' | 'history';
 
-// What the drawer holds: a member of the organisation, or one of its groups.
-type DrawerItem = { kind: 'member'; userId: string } | { kind: 'group'; groupId: string };
+// What the drawer holds: a member of the organisation, one of its groups, or
+// a notification sent to it.
+type DrawerItem =
+  | { kind: 'member'; userId: string }
+  | { kind: 'group'; groupId: string }
+  | { kind: 'notification'; notification: SentNotification }
+  | { kind: 'compose' };
 
 // The identity drawer's state, provided by the PAGE that hosts the members or
 // groups matrix: the drawer is drawn at the page's level, over its whole
@@ -24,7 +30,15 @@ export class IdentityDrawer {
     const i = this.item();
     return i?.kind === 'group' ? i.groupId : null;
   });
+  readonly notification = computed(() => {
+    const i = this.item();
+    return i?.kind === 'notification' ? i.notification : null;
+  });
+  // The notification builder.
+  readonly composing = computed(() => this.item()?.kind === 'compose');
   readonly opened = computed(() => this.item() !== null);
+  // Bumped when the drawer withdrew or sent a notification: the list re-reads.
+  readonly withdrawn = signal(0);
 
   openMember(userId: string, view: MemberEditorView = 'member'): void {
     this.view.set(view);
@@ -33,6 +47,14 @@ export class IdentityDrawer {
 
   openGroup(groupId: string): void {
     this.item.set({ kind: 'group', groupId });
+  }
+
+  openNotification(notification: SentNotification): void {
+    this.item.set({ kind: 'notification', notification });
+  }
+
+  openCompose(): void {
+    this.item.set({ kind: 'compose' });
   }
 
   close(): void {
@@ -47,7 +69,9 @@ export class IdentityDrawer {
 
   // An open overlay - a dialog, a select's panel - owns the key first.
   escape(): void {
-    if (document.querySelector('.cdk-overlay-container .cdk-overlay-pane')) return;
+    // Anywhere in the page: a select's panel is drawn as a popover beside
+    // its field, not in the overlay container.
+    if (document.querySelector('.cdk-overlay-pane')) return;
     if (!this.opened()) return;
     this.back();
   }

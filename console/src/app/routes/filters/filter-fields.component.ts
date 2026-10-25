@@ -405,7 +405,7 @@ const CONTENT_TYPES: { value: string; what: string }[] = [
         <div class="vars">
           <p class="lead">
             Sent as typed, except what is between
-            <code>&#123;&#123;</code> and <code>&#125;&#125;</code>, replaced by something about the caller.
+            <code>&#123;&#123;</code> and <code>&#125;&#125;</code>, replaced by a value about the caller.
           </p>
           <dl>
             <dt><code>{{ GOOD }}</code></dt>
@@ -418,7 +418,7 @@ const CONTENT_TYPES: { value: string; what: string }[] = [
             <dt><code>{{ JOIN }}</code></dt>
             <dd>the roles as one string: <code>ROLE_A,ROLE_B</code>.</dd>
             <dt><code>{{ IFELSE }}</code></dt>
-            <dd>two answers in one route. Nobody is signed in when the route has no gateway rule.</dd>
+            <dd>two answers in one route. Nobody is signed in when the route has no access rule.</dd>
           </dl>
           <p class="also">
             Also available: <code>.UserID</code> <code>.Fullname</code> <code>.Email</code> <code>.Tenant</code>

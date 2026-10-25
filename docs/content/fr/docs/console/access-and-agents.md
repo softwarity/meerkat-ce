@@ -12,7 +12,7 @@ console.
 
 - **Access tokens** figure sur les deux plans. Sous **Infra**, l'écran émet des jetons
   de console destinés à un script ou à un pipeline, et des jetons internes pour un
-  service qui appelle le scheduler. Sous **Application**, il liste en plus les jetons
+  service qui appelle le scheduler ou publie des notifications. Sous **Application**, il liste en plus les jetons
   d'application : un administrateur d'application voit ceux de tous les comptes et
   peut les révoquer.
 - **Infra > MCP** (administrateurs infra) connecte un assistant, sans produire la
@@ -35,13 +35,14 @@ Scheduler. Les filtres au-dessus de la liste la restreignent à **Console**,
 administrateur d'application) ou **Internal**. Un clic sur une ligne ouvre son
 tiroir.
 
-**Internal** liste les jetons de périmètre `schedules` : ils ouvrent
-l'[API du scheduler](/docs/operations/scheduler#le-jeton) sur le plan interne, et
+**Internal** liste les jetons de périmètre `schedules` et `notifications` : ils
+ouvrent l'[API du scheduler](/docs/operations/scheduler#le-jeton), ou celle des
+[notifications](/docs/operations/notifications#publier), sur le plan interne, et
 rien sur le port de la console. Sous ce filtre, le bouton devient **New internal
 token** : un nom - le service qui le détient, proposé parmi les services que voit
 la gateway, ou `global` pour un jeton qu'ils partagent -, les adresses et
 l'expiration, le périmètre étant ce qui le rend interne. Qu'un service en ait besoin
-ou non dépend du réglage **Access** du scheduler.
+ou non dépend du réglage **Access** du scheduler, ou de celui des notifications.
 
 La création d'un jeton demande quatre informations :
 

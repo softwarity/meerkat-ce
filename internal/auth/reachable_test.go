@@ -71,10 +71,10 @@ func TestProfileHubAndUserButtonListReachableApps(t *testing.T) {
 
 	hub := do(t, mux, "GET", "/profile", nil, sc)
 	body := bodyString(hub)
-	if !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
+	if !strings.Contains(body, `value="/shop"`) || !strings.Contains(body, `value="/intranet"`) {
 		t.Fatalf("profile hub must link the reachable apps:\n%.600s", body)
 	}
-	if strings.Contains(body, `href="/ops"`) {
+	if strings.Contains(body, `"/ops"`) {
 		t.Fatalf("profile hub must not link a role-gated app the user does not hold")
 	}
 
@@ -155,19 +155,21 @@ func TestTheModeDecidesWhatTheMenuOffers(t *testing.T) {
 	// no submenu at all - the bar is the navigation by then.
 	hub := func() string { return bodyString(do(t, mux, "GET", "/profile", nil, sc)) }
 
+	// Mode none: no catalogue to read, so the profile lists the UI routes the
+	// session may open - the way back in has to exist in every mode.
 	seedCatalogue(t, st, store.PortalModeNone, "shop", "intranet")
-	if body := hub(); strings.Contains(body, `href="/shop"`) || strings.Contains(body, `href="/intranet"`) {
-		t.Errorf("mode none must offer no application at all:\n%.600s", body)
+	if body := hub(); !strings.Contains(body, `value="/shop"`) || !strings.Contains(body, `value="/intranet"`) {
+		t.Errorf("mode none must list the UI routes the session may open:\n%.600s", body)
 	}
 
 	seedCatalogue(t, st, store.PortalModeLinks, "shop", "intranet")
-	if body := hub(); !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
+	if body := hub(); !strings.Contains(body, `value="/shop"`) || !strings.Contains(body, `value="/intranet"`) {
 		t.Errorf("mode links must offer the catalogue:\n%.600s", body)
 	}
 
 	// Without the bar (the community image), portal mode reads as links.
 	seedCatalogue(t, st, store.PortalModePortal, "shop", "intranet")
-	if body := hub(); !strings.Contains(body, `href="/shop"`) || !strings.Contains(body, `href="/intranet"`) {
+	if body := hub(); !strings.Contains(body, `value="/shop"`) || !strings.Contains(body, `value="/intranet"`) {
 		t.Errorf("mode portal without the bar must offer the catalogue as links:\n%.600s", body)
 	}
 
@@ -175,10 +177,10 @@ func TestTheModeDecidesWhatTheMenuOffers(t *testing.T) {
 	RegisterPortalBar(&PortalBar{})
 	t.Cleanup(func() { RegisterPortalBar(nil) })
 	body := hub()
-	if !strings.Contains(body, `href="/shop"`) {
+	if !strings.Contains(body, `class="apps-btn" href="/shop"`) {
 		t.Errorf("mode portal must still offer the way back in:\n%.600s", body)
 	}
-	if strings.Contains(body, `href="/intranet"`) {
+	if strings.Contains(body, `"/intranet"`) {
 		t.Errorf("mode portal must offer ONE link, not the whole catalogue:\n%.600s", body)
 	}
 }
@@ -260,8 +262,8 @@ func TestTheCatalogueKeepsItsContainers(t *testing.T) {
 	}
 
 	hub := bodyString(do(t, mux, "GET", "/profile", nil, sc))
-	if !strings.Contains(hub, `<span class="group">Tools</span><a href="/intranet">`) ||
-		!strings.Contains(hub, `<a href="/wiki">wiki</a><span class="group"></span><a href="/docs">`) {
+	if !strings.Contains(hub, `<optgroup label="Tools"><option value="/intranet">intranet</option><option value="/wiki">wiki</option></optgroup>`) ||
+		!strings.Contains(hub, `</optgroup><option value="/docs">docs</option>`) {
 		t.Errorf("the profile hub must head the container's modules and break back out:\n%s", hub)
 	}
 }

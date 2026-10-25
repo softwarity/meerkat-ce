@@ -121,7 +121,7 @@ func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User
 			Description: e.Description, Tags: e.Tags,
 			CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt, ExpiresAt: e.ExpiresAt,
 			ReadOnly:   !slices.Contains(writable, e.Scope),
-			UsedBy:     usage[e.Name],
+			UsedBy:     usage[vaultKey(e.Scope, e.Name)],
 			Unreadable: unreadable[e.Scope+"/"+e.Name],
 		})
 	}
@@ -170,12 +170,22 @@ func (a *API) putVaultEntry(w http.ResponseWriter, r *http.Request, actor store.
 
 func (a *API) deleteVaultEntry(w http.ResponseWriter, r *http.Request, actor store.User) {
 	name, scope := r.PathValue("name"), r.PathValue("scope")
-	if _, err := a.st.GetVaultEntry(r.Context(), scope, name); err != nil {
-		writeErr(w, http.StatusNotFound, "vault entry not found")
-		return
-	}
+	// The right FIRST: a 404 or a 409 answered before it would tell anybody
+	// signed in whether a name exists in a scope they do not administer.
 	if !slices.Contains(a.vaultScopes(r.Context(), actor), scope) {
 		writeErr(w, http.StatusForbidden, "you do not administer the "+scope+" scope")
+		return
+	}
+	// Listed rather than read: reading opens a secret, and one this gateway's
+	// key cannot open (a database moved under another key) is exactly the
+	// kind somebody comes here to delete.
+	entries, err := a.st.ListVaultEntries(r.Context(), []string{scope})
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	if !slices.ContainsFunc(entries, func(e vault.Entry) bool { return e.Name == name }) {
+		writeErr(w, http.StatusNotFound, "vault entry not found")
 		return
 	}
 	// Refuse to delete something the configuration still points at: the routes
@@ -185,7 +195,7 @@ func (a *API) deleteVaultEntry(w http.ResponseWriter, r *http.Request, actor sto
 		a.internal(w, err)
 		return
 	}
-	if used := usage[name]; len(used) > 0 {
+	if used := usage[vaultKey(scope, name)]; len(used) > 0 {
 		writeErr(w, http.StatusConflict, "still referenced by "+strings.Join(used, ", "))
 		return
 	}
@@ -197,9 +207,18 @@ func (a *API) deleteVaultEntry(w http.ResponseWriter, r *http.Request, actor sto
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// vaultUsage maps an entry name to the objects referencing it. Each holder is
-// scanned as JSON, so a reference counts wherever it sits (an upstream, a
-// filter argument, a client secret) without enumerating fields.
+// vaultKey is how vaultUsage files an entry: a name means nothing without
+// its scope.
+func vaultKey(scope, name string) string { return scope + "/" + name }
+
+// vaultUsage maps an entry, by vaultKey, to the objects referencing it. Each
+// holder is scanned as JSON, so a reference counts wherever it sits (an
+// upstream, a filter argument, a client secret) without enumerating fields.
+//
+// A reference is to a name IN THE SCOPE ITS HOLDER RESOLVES IN, never to the
+// name alone: a route reads the infra entries only, so the application entry
+// of the same name is not its to hold - matching by name refused that
+// deletion, and named the route as its user on the vault screen.
 //
 // Completeness is the point: this is what refuses the deletion of a live entry,
 // and a holder missing from here is a holder whose secret can be deleted from
@@ -207,13 +226,15 @@ func (a *API) deleteVaultEntry(w http.ResponseWriter, r *http.Request, actor sto
 // unresolved $name.
 func (a *API) vaultUsage(ctx context.Context) (map[string][]string, error) {
 	usage := map[string][]string{}
-	add := func(label string, holder any) error {
+	add := func(label string, holder any, scopes ...string) error {
 		raw, err := json.Marshal(holder)
 		if err != nil {
 			return err
 		}
 		for _, name := range vault.Refs(string(raw)) {
-			usage[name] = append(usage[name], label)
+			for _, scope := range scopes {
+				usage[vaultKey(scope, name)] = append(usage[vaultKey(scope, name)], label)
+			}
 		}
 		return nil
 	}
@@ -222,7 +243,7 @@ func (a *API) vaultUsage(ctx context.Context) (map[string][]string, error) {
 		return nil, err
 	}
 	for _, r := range routes {
-		if err := add("route: "+r.Name, r); err != nil {
+		if err := add("route: "+r.Name, r, vault.ScopeInfra); err != nil {
 			return nil, err
 		}
 	}
@@ -231,12 +252,44 @@ func (a *API) vaultUsage(ctx context.Context) (map[string][]string, error) {
 		return nil, err
 	}
 	for _, p := range providers {
-		if err := add("authority: "+p.Name, p.Config); err != nil {
+		if err := add("authority: "+p.Name, p.Config, vault.ScopeInfra); err != nil {
 			return nil, err
 		}
 	}
-	if err := add("mail relay", a.st.RawSMTP(ctx)); err != nil {
+	// The relay is infrastructure; only the display name in front of the
+	// address is the application's (store.GetSMTP).
+	relay := a.st.RawSMTP(ctx)
+	fromName := relay.FromName
+	relay.FromName = ""
+	if err := add("mail relay", relay, vault.ScopeInfra); err != nil {
 		return nil, err
+	}
+	if err := add("mail relay", fromName, vault.ScopeApp); err != nil {
+		return nil, err
+	}
+	if err := add("telemetry", a.st.RawTelemetry(ctx).Headers, vault.ScopeInfra); err != nil {
+		return nil, err
+	}
+	for _, auth := range a.st.RawTLS(ctx).ACME.Authorities {
+		if err := add("ACME authority: "+auth.Name, auth.EABHMACKey, vault.ScopeInfra); err != nil {
+			return nil, err
+		}
+	}
+	// A schedule's headers resolve in its organisation, falling back to the
+	// application entries - which one answers is decided at the call, by what
+	// the organisation holds then, so both are held.
+	schedules, err := a.st.ListSchedules(ctx, store.ScheduleFilter{})
+	if err != nil {
+		return nil, err
+	}
+	for _, sc := range schedules {
+		scopes := []string{vault.ScopeApp}
+		if sc.TenantID != "" {
+			scopes = vault.ResolutionOrder(vault.TenantScope(sc.TenantID))
+		}
+		if err := add("schedule: "+sc.Name, sc.Headers, scopes...); err != nil {
+			return nil, err
+		}
 	}
 	return usage, nil
 }

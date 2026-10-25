@@ -80,6 +80,14 @@ const (
 	// hold open (internal/events). The argument is the hub topic, a space, and
 	// the encoded message.
 	TopicEvent = "event"
+	// TopicNotification says that a notification arrived, was withdrawn or
+	// changed state (NOTIF-05), so every node pushes it to the recipients
+	// whose pages it holds. The argument is the kind ("new" or "gone"), a
+	// space and the notification's id: ONE message whatever the audience,
+	// where an event per recipient would put five thousand on the bus for an
+	// organisation of five thousand. The rows are the truth; each node reads
+	// who to tell from them.
+	TopicNotification = "notification"
 	// TopicServed carries the names a node's developer tunnel is answering
 	// for (DEV-11), so a page says "served from a developer's machine"
 	// whichever gateway the load balancer handed it. The TRAFFIC already

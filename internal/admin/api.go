@@ -26,6 +26,7 @@ import (
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
+	"github.com/softwarity/meerkat/internal/notifier"
 	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/session"
@@ -40,6 +41,10 @@ type API struct {
 	// server-to-server endpoints, and their place in the discovery document.
 	// Nil, or the community image's absent one, adds nothing.
 	OIDC oidcprovider.Provider
+	// Notify is the notifications (NOTIF-05): their internal plane API, and
+	// what the console reads of them. Nil, or the community image's absent
+	// one, adds nothing.
+	Notify notifier.Notifier
 	// Served is what the developer tunnel serves and who is plugged in
 	// (DEV-11, DEV-13), merged over the nodes; nil in tests that do not care.
 	Served *devtunnel.Registry
@@ -118,6 +123,11 @@ type API struct {
 	// rules and identity forwarding as any client's request. Wired by main;
 	// nil and the tool says the plane is not reachable from here.
 	DataPlane http.Handler
+	// InternalPlane is the internal plane's whole handler, which the API
+	// reference's Try it out hands its request to in process: the page runs in
+	// a browser, and the internal plane is not reachable from one. Wired by
+	// main; nil and that plane is read only on the page.
+	InternalPlane http.Handler
 
 	st     *store.Store
 	sm     *session.Manager
@@ -438,13 +448,19 @@ func (a *API) reorderRoutes(w http.ResponseWriter, r *http.Request, actor store.
 // exact same code path the engine uses - so an invalid route is refused with
 // the engine's precise error and never persisted.
 func (a *API) putRoute(w http.ResponseWriter, r *http.Request, actor store.User) {
-	var route store.Route
+	// The READ shape, problem included: a route is changed by reading it,
+	// changing one thing and sending it back (the console's enable toggle does
+	// exactly that), and refusing a field the server itself wrote would make a
+	// broken route the one route nobody can touch. The problem is read and
+	// dropped: the gateway says it, a client never does.
+	var in routeOut
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&route); err != nil {
+	if err := dec.Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed route: "+err.Error())
 		return
 	}
+	route := in.Route
 	route.ID = r.PathValue("id")
 	saved, err := a.saveRoute(r.Context(), actor, route)
 	if err != nil {
@@ -458,7 +474,9 @@ func (a *API) putRoute(w http.ResponseWriter, r *http.Request, actor store.User)
 		a.internal(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, saved)
+	// The GET shape: a saved route that names an empty vault entry is stored
+	// and not served, and the one answer the caller reads should say so.
+	writeJSON(w, http.StatusOK, a.withProblems([]store.Route{saved})[0])
 }
 
 // saveRoute creates or updates one route and applies it: validate, store,
@@ -523,6 +541,15 @@ func (a *API) saveRoute(ctx context.Context, actor store.User, route store.Route
 	if err := a.st.SaveRoute(ctx, route); err != nil {
 		return route, err
 	}
+	// What the store HOLDS from here on, not what was sent: the revision moved
+	// on and the store cleaned the access rules, and a caller that builds its
+	// next save on this answer - the console's editor does - was refused as
+	// stale with the route it had just written.
+	stored, err := a.st.GetRoute(ctx, route.ID)
+	if err != nil {
+		return route, fmt.Errorf("saved, but reading it back failed: %w", err)
+	}
+	route = stored
 	// Same rule for uploaded files: a route that does not serve them (the
 	// files mode) keeps only those its custom code names. A block removed
 	// takes its file with it, rather than leaving bytes nobody sees.

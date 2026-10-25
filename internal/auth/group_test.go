@@ -169,7 +169,7 @@ func TestCumulativeModeUnchanged(t *testing.T) {
 		t.Fatalf("cumulative mode must not stamp a group")
 	}
 	hub := do(t, mux, "GET", "/profile", nil, cookie)
-	if body := bodyString(hub); !strings.Contains(body, `href="/opsapp"`) || !strings.Contains(body, `href="/salesapp"`) {
+	if body := bodyString(hub); !strings.Contains(body, `value="/opsapp"`) || !strings.Contains(body, `value="/salesapp"`) {
 		t.Fatalf("cumulative roles must open both apps:\n%.400s", body)
 	}
 }

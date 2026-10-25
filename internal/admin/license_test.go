@@ -42,7 +42,7 @@ func TestLicenseIsRefusedOnTheCommunityImage(t *testing.T) {
 	}
 	f := setupBare(t)
 	if code, out := f.call(t, "PUT", "/api/license", `{"license": "x"}`, f.rootC); code != http.StatusForbidden ||
-		!strings.Contains(out, "community image") {
+		!strings.Contains(out, "Community edition") {
 		t.Fatalf("license on the community image: %d %s", code, out)
 	}
 }

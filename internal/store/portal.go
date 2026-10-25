@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/softwarity/meerkat/internal/icons"
 )
@@ -69,6 +71,48 @@ type PortalConfig struct {
 	// every mode but "none"; the icons and children below them are read only
 	// when a bar is drawn.
 	Entries []PortalEntry `json:"entries,omitempty"`
+	// NotifyPage is where the users read their notifications (NOTIF-05), in
+	// every mode: the bar's entry, the user button's, the toast and the mails
+	// all lead there. Kept here because it is a place in the catalogue's
+	// world - a route and a path under it - and the built-in page when empty.
+	NotifyPage NotifyPage `json:"notifyPage,omitzero"`
+}
+
+// NotifyPage is the notifications page: the built-in one when RouteID is
+// empty, or a page of the integrator's - a UI route and a path under it,
+// built on the data plane's notifications API. One or the other, never both:
+// the built-in page stays reachable at its address whatever is chosen here.
+type NotifyPage struct {
+	RouteID string `json:"routeId,omitempty"`
+	// Path is under the route's address: "/inbox" on a route at /app is
+	// /app/inbox. It may carry a query and a fragment, for an application
+	// that routes in its fragment (/#/inbox).
+	Path string `json:"path,omitempty"`
+}
+
+// PortalSpecialNotifications is the notifications entry (NOTIF-05): an entry
+// of the catalogue that opens no route but the notifications page, and wears
+// the unread badge. Placed, moved and removed like the others; its presence
+// is what puts it in the bar.
+const PortalSpecialNotifications = "notifications"
+
+// NotificationsEntry says the catalogue places the notifications entry where
+// the bar shows it: not turned off, nor inside a container turned off.
+func (c PortalConfig) NotificationsEntry() bool {
+	for _, e := range c.Entries {
+		if e.Disabled {
+			continue
+		}
+		if e.Special == PortalSpecialNotifications {
+			return true
+		}
+		for _, ch := range e.Children {
+			if !ch.Disabled && ch.Special == PortalSpecialNotifications {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // PortalEntry is one entry of the catalogue, and it is one of two things.
@@ -99,19 +143,19 @@ type PortalEntry struct {
 	Label string `json:"label,omitempty"`
 	// Description is the entry's tooltip.
 	Description string `json:"description,omitempty"`
-	// Badge is the channel key a future notifier writes a count onto (the
-	// mechanism is deferred; the slot is reserved so the shape does not move
-	// under it later).
-	Badge string `json:"badge,omitempty"`
 	// Disabled turns the module off for everyone without removing it: kept in
 	// the config but never served. Zero value (false) means enabled.
 	Disabled bool `json:"disabled,omitempty"`
 	// Children are a container's modules, its sub-modules. Empty on a module.
 	Children []PortalSubEntry `json:"children,omitempty"`
+	// Special makes the entry one the gateway provides rather than a route:
+	// "notifications" (PortalSpecialNotifications) is the only one. It has no
+	// route and no children.
+	Special string `json:"special,omitempty"`
 }
 
 // IsContainer says the entry is a container rather than a module.
-func (e PortalEntry) IsContainer() bool { return e.RouteID == "" }
+func (e PortalEntry) IsContainer() bool { return e.RouteID == "" && e.Special == "" }
 
 // PortalSubEntry is a module inside a container, shown in the secondary
 // surface.
@@ -121,9 +165,11 @@ type PortalSubEntry struct {
 	Icon        string `json:"icon,omitempty"`
 	Label       string `json:"label,omitempty"`
 	Description string `json:"description,omitempty"`
-	Badge       string `json:"badge,omitempty"`
 	// Disabled turns the sub-module off for everyone (see PortalEntry.Disabled).
 	Disabled bool `json:"disabled,omitempty"`
+	// Special: see PortalEntry.Special. The notifications entry may sit in a
+	// container too.
+	Special string `json:"special,omitempty"`
 }
 
 // Portal modes: what the catalogue is drawn as.
@@ -293,12 +339,57 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfi
 		return nil
 	}
 
+	if err := sanitizeNotifyPage(&cfg.NotifyPage, known, stored); err != nil {
+		return err
+	}
+
+	// The notifications entry is offered once: a second one is dropped, the
+	// first wins, like a route listed twice.
+	seenSpecial := false
+	special := func(kind, name, routeID string, children int) (keep bool, err error) {
+		if name != PortalSpecialNotifications {
+			return false, fmt.Errorf("portal %s special %q: allowed is %s", kind, name, PortalSpecialNotifications)
+		}
+		if routeID != "" {
+			return false, fmt.Errorf("portal %s %q: it opens the notifications page, not a route - leave its route empty", kind, name)
+		}
+		if children > 0 {
+			return false, fmt.Errorf("portal %s %q: it holds no modules - add a container and move it in", kind, name)
+		}
+		if seenSpecial {
+			return false, nil
+		}
+		seenSpecial = true
+		return true, nil
+	}
+	// The bell when no icon was chosen: the entry is drawn like any other,
+	// and an entry without an icon is drawn with the label's initial.
+	specialIcon := func(icon string) string {
+		if icon = icons.Resolve(icon); icon != "" {
+			return icon
+		}
+		return icons.Resolve("notifications")
+	}
+
 	seenEntries := map[string]bool{}
 	entries := cfg.Entries[:0]
 	for i := range cfg.Entries {
 		p := cfg.Entries[i]
 		p.RouteID = strings.TrimSpace(p.RouteID)
 		p.Label = strings.TrimSpace(p.Label)
+		p.Special = strings.TrimSpace(p.Special)
+		if p.Special != "" {
+			keep, err := special("entry", p.Special, p.RouteID, len(p.Children))
+			if err != nil {
+				return err
+			}
+			if keep {
+				p.Icon = specialIcon(p.Icon)
+				p.Description = strings.TrimSpace(p.Description)
+				entries = append(entries, p)
+			}
+			continue
+		}
 		if p.IsContainer() {
 			// A container has no route to name it, so it needs a label of its
 			// own: an untitled heading is one nobody can find again.
@@ -325,12 +416,25 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfi
 		// else is dropped (icons.Resolve).
 		p.Icon = icons.Resolve(p.Icon)
 		p.Description = strings.TrimSpace(p.Description)
-		p.Badge = strings.TrimSpace(p.Badge)
 
 		seenChildren := map[string]bool{}
 		children := p.Children[:0]
 		for j := range p.Children {
 			c := p.Children[j]
+			c.RouteID = strings.TrimSpace(c.RouteID)
+			if c.Special = strings.TrimSpace(c.Special); c.Special != "" {
+				keep, err := special("sub-entry", c.Special, c.RouteID, 0)
+				if err != nil {
+					return err
+				}
+				if keep {
+					c.Icon = specialIcon(c.Icon)
+					c.Label = strings.TrimSpace(c.Label)
+					c.Description = strings.TrimSpace(c.Description)
+					children = append(children, c)
+				}
+				continue
+			}
 			if err := checkRoute("sub-entry", c.RouteID); err != nil {
 				return err
 			}
@@ -341,12 +445,67 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfi
 			c.Icon = icons.Resolve(c.Icon)
 			c.Label = strings.TrimSpace(c.Label)
 			c.Description = strings.TrimSpace(c.Description)
-			c.Badge = strings.TrimSpace(c.Badge)
 			children = append(children, c)
 		}
 		p.Children = children
 		entries = append(entries, p)
 	}
 	cfg.Entries = entries
+	return nil
+}
+
+// sanitizeNotifyPage checks the notifications page: the built-in one (both
+// fields empty), or a UI route and a path under it. A route the stored portal
+// already names passes even when it was deleted or stopped being a UI route
+// since, as for the entries: the built-in page takes over at read time.
+func sanitizeNotifyPage(n *NotifyPage, known map[string]Route, stored *PortalConfig) error {
+	n.RouteID, n.Path = strings.TrimSpace(n.RouteID), strings.TrimSpace(n.Path)
+	if n.RouteID == "" {
+		if n.Path != "" {
+			return fmt.Errorf("notifications page path %q: pick the UI route it is under, or leave both empty for the built-in page", n.Path)
+		}
+		return nil
+	}
+	rt, ok := known[n.RouteID]
+	held := stored != nil && stored.NotifyPage.RouteID == n.RouteID
+	switch {
+	case held && (!ok || !rt.IsUI):
+	case !ok:
+		return fmt.Errorf("notifications page route %q: no such route", n.RouteID)
+	case !rt.IsUI:
+		return fmt.Errorf("notifications page route %q (%s): not a UI route - turn UI on in the route, or pick another", n.RouteID, rt.Name)
+	}
+	if n.Path == "" {
+		n.Path = "/"
+	}
+	return checkNotifyPath(n.Path)
+}
+
+// checkNotifyPath refuses what is not a path under a route: another host, a
+// way out of the route (..), a backslash or a space a browser reads its own
+// way.
+func checkNotifyPath(p string) error {
+	bad := func(why string) error {
+		return fmt.Errorf("notifications page path %q: %s; give a path under the route, like /inbox or /#/inbox", p, why)
+	}
+	switch {
+	case len(p) > 512:
+		return bad("longer than 512 characters")
+	case !strings.HasPrefix(p, "/"):
+		return bad("it must start with /")
+	case strings.HasPrefix(p, "//"):
+		return bad("// names another host")
+	case strings.ContainsAny(p, "\\<>\"'"):
+		return bad("no backslash, quote or angle bracket")
+	case strings.IndexFunc(p, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0:
+		return bad("no space or control character")
+	}
+	u, err := url.Parse(p)
+	if err != nil || u.Scheme != "" || u.Host != "" {
+		return bad("not a path")
+	}
+	if slices.Contains(strings.Split(u.Path, "/"), "..") {
+		return bad(".. leaves the route")
+	}
 	return nil
 }

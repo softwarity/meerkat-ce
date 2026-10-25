@@ -32,12 +32,12 @@
           <app-ee-lock
             feature="business-hours"
             i18n-why="@@Working_hours_ee_why"
-            why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+            why="Allow access only during set hours, for everyone or per person."
           />
         </h3>
         <p class="hint" i18n="@@Group_hours_hint">
-          The organisation picks one group per session: set here, these hours replace the account's and
-          the organisation's for whoever signs in with this group, unless a member has its own.
+          For whoever signs in with this group. They override the account's and the tenant's
+          hours, but not a member's own.
         </p>
         <app-business-access-form
           ee-feature="business-hours"
@@ -61,7 +61,7 @@
     <section class="danger-zone">
       <h3 i18n="@@Danger_zone">Danger zone</h3>
       <p class="hint" i18n="@@Delete_group_hint">
-        Removes the group and its assignments: its members stay, the roles it gave them do not.
+        Deletes the group. Its members stay but lose the roles it gave them.
       </p>
       <button matButton (click)="remove()">
         <mat-icon>delete</mat-icon>

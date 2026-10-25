@@ -273,7 +273,7 @@ func (h *Handler) showReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.st.PeekEmailToken(r.Context(), hashTrust(token), resetPurpose, time.Now().Unix()); err != nil {
-		http.Error(w, h.tr(r, "errResetExpired"), http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
 		return
 	}
 	writeFlow(w, resetPage, resetData{
@@ -306,7 +306,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := h.st.TakeEmailToken(r.Context(), hashTrust(token), resetPurpose, time.Now().Unix())
 	if err != nil {
-		http.Error(w, h.tr(r, "errResetExpired"), http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
 		return
 	}
 	// The reuse rule applies here too - a reset is where someone reaches for
@@ -325,7 +325,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.st.SetUserPassword(r.Context(), userID, string(hash), false); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, h.tr(r, "errResetExpired"), http.StatusUnprocessableEntity)
+			h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
 			return
 		}
 		http.Error(w, "internal error", http.StatusInternalServerError)

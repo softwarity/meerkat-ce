@@ -16,7 +16,7 @@
       <span class="theme-name">
         <b>{{ name() }}</b>
         @if (readOnly()) {
-          <mat-icon class="lock" matTooltip="Built-in palette: duplicate it to make it yours"
+          <mat-icon class="lock" matTooltip="Built-in theme: duplicate it to edit it"
             i18n-matTooltip="@@Theme_builtin_hint">lock</mat-icon>
         } @else {
           <button matIconButton (click)="startRename()"
@@ -29,7 +29,7 @@
           <mat-icon>more_vert</mat-icon>
         </button>
         @if (dirty()) {
-          <span class="dirty" matTooltip="Unsaved changes - moving to another theme discards them"
+          <span class="dirty" matTooltip="Unsaved changes are lost if you switch theme"
             i18n-matTooltip="@@Theme_dirty_hint" i18n="@@Unsaved">unsaved</span>
         }
       </span>
@@ -44,11 +44,11 @@
         </button>
         @if (active()) {
           <div class="menu-why" i18n="@@Theme_active_undeletable">
-            The live theme cannot be deleted. Activate another one first.
+            The active theme cannot be deleted. Activate another one first.
           </div>
         } @else if (readOnly()) {
           <div class="menu-why" i18n="@@Theme_builtin_undeletable">
-            Built-in: duplicate it to make it yours.
+            Built-in themes cannot be deleted.
           </div>
         }
       </mat-menu>
@@ -135,7 +135,7 @@
       [disabled]="readOnly()"
       (change)="colorMatch.set($event.checked)"
       i18n-matTooltip="@@Theme_color_match_hint"
-      matTooltip="Stay true to the colours given: containers keep their tone instead of the spec's"
+      matTooltip="Keep the exact colours you set instead of the tones Material derives"
     ><ng-container i18n="@@Theme_color_match">Color match</ng-container></mat-checkbox>
     <!-- The flow pages' decorative effects, on or off at once. -->
     <mat-checkbox
@@ -145,7 +145,7 @@
       (mouseenter)="hoverToken.emit('night')"
       (mouseleave)="hoverToken.emit('')"
       i18n-matTooltip="@@Glow_hint"
-      matTooltip="Halo, glows and app-name gradient on the flow pages. Uncheck for a flat design."
+      matTooltip="Halo, glow and gradient on the application name. Uncheck for a flat design."
     ><ng-container i18n="@@Glow">Glow</ng-container></mat-checkbox>
   </div>
 
@@ -215,7 +215,7 @@
     </button>
     <app-file-button appearance="text" icon="upload" accept="application/json,.json" [disabled]="readOnly()"
       (picked)="importTheme($event[0])"
-      matTooltip="Load a Material Theme Builder export (review, then save)" i18n-matTooltip="@@Theme_import_hint2">
+      matTooltip="Load a Material Theme Builder export, then save" i18n-matTooltip="@@Theme_import_hint2">
       <span i18n="@@Import">Import</span>
     </app-file-button>
     <span class="grow"></span>

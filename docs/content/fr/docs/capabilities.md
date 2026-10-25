@@ -80,6 +80,7 @@ Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 20 langu
 |---|---|---|---|
 | [Bouton utilisateur et portail](/docs/concepts/data-plane-chrome) | Profil, déconnexion, organisation, langue, clair ou sombre, et la navigation entre vos applications, ajoutés aux pages que sert la gateway. | À construire dans chaque application. Aucun produit ne le fait. | Community, barre de navigation Enterprise |
 | [CSS par rôle, votre CSS et votre JavaScript](/docs/customise/injections) | Les rôles posés sur la page côté serveur, et votre propre code par route. | Du code front dans chaque application. | Community |
+| [Notifier vos utilisateurs](/docs/operations/notifications) | Un service envoie une requête ; ses utilisateurs l'apprennent dans l'application qu'ils ont ouverte, avec un compteur, un snackbar, une notification du bureau, un mail si demandé, et un acquittement quand il compte. | Un service de notifications et sa boîte de réception dans chaque application, ou Novu, Knock, Courier. | Enterprise, *en partie* |
 | Signalement d'anomalies | Une capture d'écran et son contexte technique, suivis dans la console. | Sentry auto-hébergé, ou Marker.io, Jam, Userback. | Community |
 | [Thème et marque](/docs/customise/theme) | Thèmes Material 3, clair et sombre, votre logo et votre fond ; plus de mises en page et sans la marque Meerkat avec Enterprise. | Un thème par outil. | Community, mises en page Enterprise |
 
@@ -125,5 +126,5 @@ Prévu, et pas encore construit (le détail est dans la [feuille de route](/proj
 - **HTTP/3**, dès que le gain se mesure.
 - **Un coffre externe** : HashiCorp Vault, secrets Kubernetes, secrets Docker.
 - **Les signalements poussés vers GitHub, GitLab ou Jira.**
-- **Les notifications Web Push.**
+- **Le Web Push** : une notification du bureau qui atteint une personne même quand aucune application n'est ouverte.
 - **Kerberos et SPNEGO**, Enterprise.

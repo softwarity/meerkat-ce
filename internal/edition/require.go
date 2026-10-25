@@ -10,5 +10,5 @@ func Require(what string) error {
 	if Enterprise {
 		return nil
 	}
-	return fmt.Errorf("%s is part of the Enterprise edition, and this is the community image", what)
+	return fmt.Errorf("%s is part of the Enterprise edition, and this is the Community edition", what)
 }

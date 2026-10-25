@@ -12,13 +12,14 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// Several configurations, one active (CFG-01/02) - root only, Enterprise only.
+// Several configurations, one active (CFG-01/02) - root only, on both
+// editions, the community one holding FreeConfigurations at a time.
 //
 // Root for the same reason import and export are (a document crosses both
-// planes at once), and Enterprise because keeping several is what a test
-// instance juggling one shape per customer buys. The COLLECTION is what is
-// sold, not the format: a community installation exports, imports and versions
-// its configuration exactly as before, it just holds one at a time.
+// planes at once). What Enterprise buys is the SIZE of the shelf, which is
+// what a test instance juggling one shape per customer needs: every act works
+// on both images, and a community installation only meets the cap when it
+// would grow past it (see roomForAnother).
 //
 // The rule the whole screen rests on: a saved configuration is a COPY, never
 // the running state. Saving one changes nothing, deleting one changes nothing,
@@ -73,7 +74,7 @@ func (a *API) roomForAnother(ctx context.Context) error {
 		return nil
 	}
 	return fmt.Errorf(
-		"this image keeps %d configurations at a time and holds %d: delete one, or the Enterprise edition keeps as many as you like",
+		"the Community edition keeps %d configurations at a time and holds %d: delete one, or the Enterprise edition keeps as many as you like",
 		FreeConfigurations, len(list))
 }
 
@@ -436,14 +437,17 @@ func (a *API) configurationPlan(w http.ResponseWriter, r *http.Request, _ store.
 // by object, without looking at what runs (CFG-04). The answer has the shape
 // of a plan, so the console reads it with the same table as an import.
 func (a *API) compareConfigurations(w http.ResponseWriter, r *http.Request, _ store.User) {
-	from, err := a.st.GetConfiguration(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeErr(w, http.StatusNotFound, "configuration not found")
+	from, ok := a.configuration(w, r)
+	if !ok {
 		return
 	}
 	to, err := a.st.GetConfiguration(r.Context(), r.PathValue("other"))
-	if err != nil {
+	if errors.Is(err, store.ErrConfigurationNotFound) {
 		writeErr(w, http.StatusNotFound, "the configuration to compare with was not found")
+		return
+	}
+	if err != nil {
+		a.internal(w, err)
 		return
 	}
 	a1, err := config.Unmarshal([]byte(from.Document))

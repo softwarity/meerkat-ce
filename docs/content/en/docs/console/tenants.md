@@ -28,6 +28,7 @@ Each is a route of its own, so deep links work.
 | **Groups** | The roles-to-groups matrix, and the group mode |
 | **Members** | Who is in this organisation and in which groups |
 | **Group rules** | What an authority says, turned into membership here |
+| **Notifications** | Whether this tenant receives notifications, what was sent to it and who read it, and a drawer to send one. Enterprise: see [Notifications](/docs/console/notifications#a-tenants-notifications-section) |
 | **Danger zone** | Transfer of ownership, and deletion |
 
 **Groups**, **Members** and **Group rules** are the same screens documented under

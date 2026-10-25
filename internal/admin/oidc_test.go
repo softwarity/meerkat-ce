@@ -359,7 +359,7 @@ func TestATrialSaysWhoItCannotTry(t *testing.T) {
 	for _, c := range []struct{ path, body, says string }{
 		{"/api/oidc/clients/app/try", `{}`, "whom to try it for"},
 		{"/api/oidc/clients/app/try", `{"user": "nobody"}`, `no account \"nobody\"`},
-		{"/api/oidc/clients/app/try", `{"user": "bob", "tenant": "nowhere"}`, `no organisation \"nowhere\"`},
+		{"/api/oidc/clients/app/try", `{"user": "bob", "tenant": "nowhere"}`, `no tenant \"nowhere\"`},
 	} {
 		if code, out := f.call(t, "POST", c.path, c.body, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, c.says) {
 			t.Fatalf("%s: %d %s", c.body, code, out)

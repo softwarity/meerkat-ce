@@ -360,6 +360,24 @@ func TestAnAliasCompetesAcrossEverythingTheGatewayJoins(t *testing.T) {
 	}
 }
 
+// With no runtime to ask, the services are still a list: the console and the
+// agents read it as one, and a gateway with no runtime is the ordinary case.
+func TestNoRuntimeStillAnswersAList(t *testing.T) {
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("DOCKER_HOST", "unix://"+t.TempDir()+"/no.sock")
+	r := DiscoverIn(t.Context(), "")
+	if r.Unavailable == "" {
+		t.Fatalf("a runtime answered on a socket that does not exist: %+v", r)
+	}
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"services":[]`) {
+		t.Fatalf("no runtime answered %s, want an empty services list", b)
+	}
+}
+
 // A namespace is checked before it reaches a URL path (SVC-02).
 func TestANamespaceIsALabel(t *testing.T) {
 	for _, ok := range []string{"canopy", "monitoring", "a", "kube-system", "ns1"} {

@@ -13,6 +13,7 @@ import (
 	_ "github.com/softwarity/meerkat/ee/directories"
 	_ "github.com/softwarity/meerkat/ee/gitdriver"
 	_ "github.com/softwarity/meerkat/ee/layouts"
+	_ "github.com/softwarity/meerkat/ee/notify"
 	_ "github.com/softwarity/meerkat/ee/oidc"
 	_ "github.com/softwarity/meerkat/ee/portal"
 	_ "github.com/softwarity/meerkat/ee/saml"

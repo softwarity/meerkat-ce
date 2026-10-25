@@ -26,6 +26,7 @@ import { AdminToken, ApiService, DataToken, TokenScope } from '../api.service';
 import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { zoned } from '../shared/zoned-date.pipe';
 
 // One row of the common table: a control-plane token of the caller's, an
 // internal one (perimeter schedules, which a service presents on the internal
@@ -92,7 +93,8 @@ export class AccessTokensPageComponent {
     // what a service presents on the internal plane, never on the console's.
     const mine: TokenRow[] = this.tokens().map((t) => ({
       ...t,
-      plane: t.scope === 'schedules' ? ('internal' as const) : ('admin' as const),
+      plane:
+        t.scope === 'schedules' || t.scope === 'notifications' ? ('internal' as const) : ('admin' as const),
     }));
     const theirs: TokenRow[] = this.dataTokens().map((t) => ({ ...t, plane: 'data' as const }));
     return [...mine, ...theirs].filter(
@@ -166,7 +168,7 @@ export class AccessTokensPageComponent {
         .open<
           TokenCreateDialogComponent,
           TokenDialogData,
-          { name: string; days: number; scope: TokenScope; from: string } | undefined
+          { name: string; days: number | null; scope: TokenScope; from: string } | undefined
         >(TokenCreateDialogComponent, { width: '520px', restoreFocus: true, data: { token: t } })
         .afterClosed(),
     );
@@ -227,7 +229,7 @@ export class AccessTokensPageComponent {
   protected async revokeData(t: TokenRow): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Revoke_token_NAME:Revoke token "${t.name}:NAME:"?`,
-      message: $localize`:@@Revoke_data_token_warning:It belongs to ${t.ownerName}:OWNER:. It is refused from its next call.`,
+      message: $localize`:@@Revoke_data_token_warning:It belongs to ${t.ownerName}:OWNER:. It is refused at its next call.`,
       confirmLabel: $localize`:@@Revoke:Revoke`,
       danger: true,
     });
@@ -261,6 +263,8 @@ export class AccessTokensPageComponent {
     switch (t.scope) {
       case 'schedules':
         return $localize`:@@Scheduled_calls_only:Scheduled calls only`;
+      case 'notifications':
+        return $localize`:@@Notifications_only:Notifications only`;
       case 'readonly':
         return $localize`:@@Read_only:Read only`;
       default:
@@ -275,7 +279,7 @@ export class AccessTokensPageComponent {
   }
 
   protected day(ts: number): string {
-    return DateTime.fromSeconds(ts).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATE_MED);
+    return zoned(ts, this.me.timezone(), 'day');
   }
 
   protected expiryLabel(ts: number): string {
@@ -357,19 +361,41 @@ interface TokenDialogData {
         <mat-hint>
           @if (internal) {
             <ng-container i18n="@@Internal_token_name_hint">
-              The service that holds it, or global for one every service shares.
+              The service that uses it, or global for a token all services share.
             </ng-container>
           }
         </mat-hint>
       </mat-form-field></p>
       @if (internal) {
         <p class="plane" i18n="@@Token_for_the_internal_plane">
-          For the internal plane: a service presents it to call the scheduler, and it opens nothing else.
+          For the internal plane: a backend service uses it, within its perimeter only.
         </p>
       } @else {
         <p class="plane" i18n="@@Token_for_the_control_plane">
-          For the control plane, on this port.
+          For the control plane API.
         </p>
+      }
+      @if (internal) {
+      <!-- An internal token opens ONE door of the internal plane: the
+           scheduler's, or the notifications' (NOTIF-05). -->
+      <p><mat-form-field>
+        <mat-label i18n="@@Perimeter">Perimeter</mat-label>
+        <mat-select [value]="scope()" (selectionChange)="scope.set($event.value)">
+          <mat-option value="schedules" i18n="@@Scheduled_calls_only">Scheduled calls only</mat-option>
+          <mat-option value="notifications" i18n="@@Notifications_only">Notifications only</mat-option>
+        </mat-select>
+        <mat-hint>
+          @if (scope() === 'notifications') {
+            <ng-container i18n="@@Perimeter_notifications_hint">
+              Publishes on /api/notifications on the internal plane, nothing else. For a backend service.
+            </ng-container>
+          } @else {
+            <ng-container i18n="@@Perimeter_schedules_hint">
+              Calls /api/schedules on the internal plane, nothing else. For a backend service.
+            </ng-container>
+          }
+        </mat-hint>
+      </mat-form-field></p>
       }
       @if (!internal) {
       <p><mat-form-field>
@@ -383,7 +409,7 @@ interface TokenDialogData {
           @switch (scope()) {
             @case ('schedules') {
               <ng-container i18n="@@Perimeter_schedules_hint">
-                Opens /api/schedules and nothing else, on the internal plane. A backend service's credential.
+                Calls /api/schedules on the internal plane, nothing else. For a backend service.
               </ng-container>
             }
             @case ('readonly') {
@@ -393,7 +419,7 @@ interface TokenDialogData {
             }
             @default {
               <ng-container i18n="@@Perimeter_full_hint">
-                Everything you can do, without a browser.
+                Everything you can do in the console.
               </ng-container>
             }
           }
@@ -409,12 +435,15 @@ interface TokenDialogData {
           placeholder="10.0.0.0/24, 192.168.1.7"
         />
         <mat-hint i18n="@@Used_from_hint">
-          The connecting address, never a forwarded header.
+          Allowed addresses or ranges, as seen on the connection (forwarded headers are ignored).
         </mat-hint>
       </mat-form-field></p>
       <p><mat-form-field>
         <mat-label i18n="@@Expiry">Expiry</mat-label>
         <mat-select [value]="days()" (selectionChange)="days.set($event.value)">
+          @if (editing) {
+            <mat-option [value]="keep" i18n="@@Unchanged">Unchanged</mat-option>
+          }
           <mat-option [value]="0" i18n="@@never_expires">never expires</mat-option>
           <mat-option [value]="30" i18n="@@in_30_days">30 days</mat-option>
           <mat-option [value]="90" i18n="@@in_90_days">90 days</mat-option>
@@ -445,7 +474,11 @@ export class TokenCreateDialogComponent {
   protected readonly internal = !this.editing && !!this.data?.internal;
 
   protected readonly name = signal(this.editing?.name ?? '');
-  protected readonly days = signal(0);
+  // Editing starts on the expiry the token has: a fresh "never expires" here
+  // turned every rename of a 30-day token into one that never expires. A
+  // number rather than null, which mat-select reads as no selection.
+  protected readonly keep = -1;
+  protected readonly days = signal(this.editing ? this.keep : 0);
   // Read-only by default when minting: a token handed to an agent is the
   // common case, and the safe answer should be the one nobody has to think
   // about. When editing, what the token already is.
@@ -470,7 +503,7 @@ export class TokenCreateDialogComponent {
     if (name) {
       this.ref.close({
         name,
-        days: this.days(),
+        days: this.days() === this.keep ? null : this.days(),
         scope: this.scope(),
         from: this.from().trim(),
       });

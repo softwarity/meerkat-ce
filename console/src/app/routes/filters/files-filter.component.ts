@@ -92,13 +92,13 @@ import { argStr, patchSpec } from '../predicates/args';
               <!-- Always there, shown only for a type that was a guess: a suffix
                    inside an @if is not projected into the suffix slot. -->
               <mat-icon matSuffix class="warn" [class.off]="!guessed(f)" [matTooltipDisabled]="!guessed(f)"
-                matTooltip="Not recognised from the name or the content - say what it is"
+                matTooltip="Type not recognised: enter it"
                 i18n-matTooltip="@@Files_type_unknown2">warning</mat-icon>
             </mat-form-field>
             <span class="meta">{{ size(f.size) }}</span>
             <a matIconButton [href]="link(f.name)" target="_blank" rel="noopener"
-              matTooltip="Open it on the data plane" i18n-matTooltip="@@Files_open"
-              aria-label="Open it on the data plane" i18n-aria-label="@@Files_open">
+              matTooltip="Open in the data plane" i18n-matTooltip="@@Files_open"
+              aria-label="Open in the data plane" i18n-aria-label="@@Files_open">
               <mat-icon>open_in_new</mat-icon>
             </a>
             <button matIconButton type="button" [disabled]="busy()" (click)="remove(f)"
@@ -118,7 +118,7 @@ import { argStr, patchSpec } from '../predicates/args';
       <mat-form-field subscriptSizing="dynamic">
         <mat-label><ng-container i18n="@@Files_index_at">Answered at</ng-container> {{ base() || '/' }}</mat-label>
         <mat-select [value]="index()" (selectionChange)="set('index', $event.value)"
-          matTooltip="The file served at the route's own path, with no name after it - the index.html of a small site. None: that path answers 404, only the files' own addresses answer"
+          matTooltip="The file served at the route's own path, such as index.html. None: that path answers 404"
           i18n-matTooltip="@@Files_index_hint2">
           <mat-option value="" i18n="@@Files_index_none2">None - 404</mat-option>
           @for (f of files(); track f.name) {
@@ -131,7 +131,7 @@ import { argStr, patchSpec } from '../predicates/args';
         <input matInput type="number" min="0" [value]="maxAge()" (change)="setMaxAge($any($event.target).value)" />
       </mat-form-field>
       <mat-checkbox [checked]="cors()" (change)="set('cors', $event.checked)"
-        matTooltip="A font or a module loaded by a page of another origin is refused without it"
+        matTooltip="Needed for fonts or modules loaded by a page on another domain"
         i18n-matTooltip="@@Files_cors_hint"><ng-container i18n="@@Files_cors">Readable from any origin (CORS)</ng-container></mat-checkbox>
     </div>
   `,

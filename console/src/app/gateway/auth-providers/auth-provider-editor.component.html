@@ -25,17 +25,17 @@
   <p class="hint text-muted">
     @if (kind() === 'oidc') {
       <ng-container i18n="@@Kind_oidc_hint">
-        An identity provider the browser is sent to; its token is verified against its keys.
+        Users sign in on an OpenID Connect identity provider, which sends them back here.
       </ng-container>
     } @else if (kind() === 'ldap') {
       <app-ee-lock
         feature="directories"
         i18n-why="@@Directories_ee_why"
-        why="Plug an LDAP directory or an Active Directory in straight, instead of going through an identity provider."
+        why="Sign users in directly against an LDAP directory or Active Directory."
       />
       <ng-container i18n="@@Kind_ldap_hint">
-        A directory checked with what the person typed in the sign-in form. No button on the
-        login page.
+        Checks the login and password typed in the sign-in form against the directory. No button
+        on the sign-in page.
       </ng-container>
     } @else if (kind() === 'github') {
       <ng-container i18n="@@Kind_github_hint">
@@ -49,8 +49,7 @@
         why="Federate with a SAML identity provider: ADFS, Entra ID, Okta, Shibboleth."
       />
       <ng-container i18n="@@Kind_saml_hint">
-        A SAML 2.0 identity provider the browser is sent to; its signed answer is verified against
-        the certificate in its metadata.
+        Users sign in on a SAML 2.0 identity provider, which sends them back here.
       </ng-container>
     }
   </p>
@@ -107,7 +106,7 @@
        it is shown only to whoever asks for it. Frozen after creation - changing
        it would break the callback already registered with the vendor. -->
   @if (identityShown()) {
-    <app-form-field i18n-label="@@Identifier" label="Identifier" i18n-hint="@@Provider_id_hint" hint="The segment of the sign-in URL, derived from the authority">
+    <app-form-field i18n-label="@@Identifier" label="Identifier" i18n-hint="@@Provider_id_hint" hint="Part of the sign-in URL. Cannot be changed after creation">
       <textarea
         matInput
         rows="1"
@@ -130,7 +129,7 @@
   }
 
   @if (kind() === 'oidc') {
-    <app-form-field i18n-label="@@Issuer" label="Issuer" i18n-hint="@@Issuer_hint" hint="Its discovery document is read from there" allowVault="values" vaultScope="infra">
+    <app-form-field i18n-label="@@Issuer" label="Issuer" i18n-hint="@@Issuer_hint" hint="The URL before /.well-known/openid-configuration" allowVault="values" vaultScope="infra">
       <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('issuer')" (input)="setCfg('issuer', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="https://sso.acme.io/realms/main"></textarea>
@@ -146,7 +145,7 @@
       [value]="cfg('clientSecret')" (valueChange)="setCfg('clientSecret', $event)"
       [held]="secretHeld('clientSecret')" [at]="secretAt('clientSecret')" />
 
-    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Comma separated, empty accepts every address the authority knows">
+    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Separated by commas. Empty: any address.">
       <textarea matInput rows="1" class="oneline" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('allowedDomains')" (input)="setCfgList('allowedDomains', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="acme.io"></textarea>
@@ -177,7 +176,7 @@
     </app-form-field>
 
     <p class="hint text-muted" i18n="@@Allowed_orgs_groups_hint">
-      They also come back as groups ("org", "org/team"), which a tenant's group rule can map to roles.
+      Organisations and teams arrive as groups ("org", "org/team"), which a tenant's group rules can map to roles.
     </p>
 
   }
@@ -203,7 +202,7 @@
         <mat-option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">emailAddress</mat-option>
         <mat-option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">unspecified</mat-option>
       </mat-select>
-      <mat-hint i18n="@@Saml_nameid_format_hint">How the identity provider names the person; a transient one changes at every sign-in</mat-hint>
+      <mat-hint i18n="@@Saml_nameid_format_hint">How the identity provider identifies the user. A transient NameID changes at every sign-in</mat-hint>
     </mat-form-field>
 
     <p class="hint text-muted" i18n="@@Saml_attributes_hint">
@@ -220,7 +219,7 @@
         [value]="cfg('nameAttribute')" (input)="setCfg('nameAttribute', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="displayName"></textarea>
     </app-form-field>
-    <app-form-field i18n-label="@@Saml_groups_attribute" label="Groups attribute" i18n-hint="@@Saml_groups_attribute_hint" hint="A tenant's group rule maps these to roles">
+    <app-form-field i18n-label="@@Saml_groups_attribute" label="Groups attribute" i18n-hint="@@Saml_groups_attribute_hint" hint="A tenant's group rules map these to roles">
       <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('groupsAttribute')" (input)="setCfg('groupsAttribute', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="groups"></textarea>
@@ -231,7 +230,7 @@
         (keydown.enter)="$event.preventDefault()" placeholder="objectGUID"></textarea>
     </app-form-field>
 
-    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Comma separated, empty accepts every address the authority knows">
+    <app-form-field i18n-label="@@Allowed_domains" label="Allowed e-mail domains" i18n-hint="@@Allowed_domains_hint" hint="Separated by commas. Empty: any address.">
       <textarea matInput rows="1" class="oneline" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('allowedDomains')" (input)="setCfgList('allowedDomains', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="acme.io"></textarea>
@@ -256,9 +255,9 @@
 
   @if (kind() === 'ldap') {
     <mat-form-field>
-      <mat-label i18n="@@Dialect">Dialect</mat-label>
+      <mat-label i18n="@@Dialect">Directory type</mat-label>
       <mat-select [value]="cfg('dialect') || 'directory'" (selectionChange)="setCfg('dialect', $event.value)">
-        <mat-option value="directory" i18n="@@Dialect_directory">Directory (OpenLDAP and friends)</mat-option>
+        <mat-option value="directory" i18n="@@Dialect_directory">LDAP (OpenLDAP and others)</mat-option>
         <mat-option value="ad">Active Directory</mat-option>
       </mat-select>
     </mat-form-field>
@@ -277,7 +276,7 @@
         (keydown.enter)="$event.preventDefault()" placeholder="dc=acme,dc=io"></textarea>
     </app-form-field>
 
-    <app-form-field i18n-label="@@Service_account" label="Service account" i18n-hint="@@Service_account_hint" hint="Used to SEARCH, never to sign anyone in" allowVault="values" vaultScope="infra">
+    <app-form-field i18n-label="@@Service_account" label="Service account" i18n-hint="@@Service_account_hint" hint="Used to search the directory, never to sign users in" allowVault="values" vaultScope="infra">
       <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('bindDn')" (input)="setCfg('bindDn', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()" placeholder="cn=meerkat,ou=services,dc=acme,dc=io"></textarea>
@@ -287,7 +286,7 @@
       [value]="cfg('bindPassword')" (valueChange)="setCfg('bindPassword', $event)"
       [held]="secretHeld('bindPassword')" [at]="secretAt('bindPassword')" />
 
-    <app-form-field i18n-label="@@User_filter" label="User filter" i18n-hint="@@User_filter_hint" hint="%s is what the person typed; empty uses the dialect's default">
+    <app-form-field i18n-label="@@User_filter" label="User filter" i18n-hint="@@User_filter_hint" hint="%s is the login typed; empty uses the dialect's default">
       <textarea matInput rows="1" class="oneline mono" spellcheck="false" autocapitalize="off" autocorrect="off"
         [value]="cfg('userFilter')" (input)="setCfg('userFilter', $any($event.target).value)"
         (keydown.enter)="$event.preventDefault()"></textarea>
@@ -314,7 +313,7 @@
       </mat-select>
     </mat-form-field>
     <p class="hint text-muted" i18n="@@Auto_create_hint">
-      A first sign-in creates the account. Refused, only accounts already linked get in.
+      Allowed: a first sign-in creates the account. Refused: only accounts already linked can sign in.
     </p>
 
     <mat-form-field>
@@ -335,8 +334,8 @@
       <h3 i18n="@@Authority_test">Test</h3>
       @if (kind() === 'ldap') {
         <p class="hint text-muted" i18n="@@Authority_lookup_hint">
-          Ask the directory about someone, with the service account and no password: whoever has never
-          signed in here too.
+          Look someone up in the directory with the service account, even if they never signed in
+          here.
         </p>
         <div class="lookup">
           <mat-form-field subscriptSizing="dynamic">
@@ -368,7 +367,7 @@
         <div class="person">
           <div>
             <strong>{{ person.username }}</strong> {{ person.fullname }}
-            <span class="text-muted">{{ seen(person.lastSeenAt || person.createdAt) }}</span>
+            <span class="text-muted nowrap">{{ seen(person.lastSeenAt || person.createdAt) }}</span>
           </div>
           <div class="chips">
             @for (g of person.groups ?? []; track g) {

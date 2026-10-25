@@ -65,11 +65,11 @@
     }
   } @else if (intent() === 'limits') {
     <p class="intro" i18n="@@Endpoint_limits_intro">
-      Bound an operation of the route's OpenAPI spec. One left untouched only has the route's limits.
+      Limit an operation of the route's OpenAPI spec. Operations left untouched only have the route's limits.
     </p>
   } @else {
     <p class="intro" i18n="@@Endpoint_security_intro">
-      Who may call each operation of the route's OpenAPI spec. One left untouched follows the route's rule.
+      Who may call each operation of the route's OpenAPI spec. Operations left untouched follow the route's rule.
     </p>
   }
 </header>
@@ -82,7 +82,7 @@
   <div class="notice">
     <mat-icon>info</mat-icon>
     <span i18n="@@No_api_routes_with_spec">
-      No route exposes an OpenAPI spec yet. Add a Swagger URL to an API route.
+      No route has an OpenAPI spec yet. Add one in a route's Target section.
     </span>
     <a matButton [routerLink]="['/infra/routes']" i18n="@@Go_to_routes">Go to routes</a>
   </div>
@@ -247,7 +247,7 @@
       </span>
     } @else if (intent() === 'limits') {
       <span class="count" i18n="@@endpoints_bounded_summary">
-        {{ (data()?.operations)?.length || 0 }} operations, {{ boundCount() }} bounded
+        {{ (data()?.operations)?.length || 0 }} operations, {{ boundCount() }} limited
       </span>
     } @else {
       <span class="count" i18n="@@endpoints_secured_summary">
@@ -271,7 +271,7 @@
     @if (strayCount(); as n) {
       <span class="count stray"
         i18n-matTooltip="@@Stray_rules_tooltip"
-        matTooltip="Saved rules matching no operation of this spec, probably left behind by a spec change. They are kept."
+        matTooltip="Saved rules that match no operation of the current spec, usually after a spec change. They are kept."
       >{{ n }} rule(s) matching no operation</span>
     }
     <span class="spacer"></span>
@@ -430,7 +430,7 @@
         } @else if (intent() === 'limits') {
 <section id="sec-limits">
           <h3 i18n="@@Rate_limits">Rate limits</h3>
-          <p class="sub" i18n="@@What_this_operation_may_carry">What this operation may carry</p>
+          <p class="sub" i18n="@@What_this_operation_may_carry">How often this operation may be called</p>
           <p class="hint" i18n="@@Op_limits_hint">
             On top of the route's own limits, which still apply.
           </p>
@@ -448,7 +448,7 @@
           <h3 i18n="@@Security">Security</h3>
           <p class="sub" i18n="@@Who_may_call_this">Who may call this operation</p>
           <mat-slide-toggle [checked]="stateOf(o).override" (change)="setOverride(o, $event.checked)">
-            <span i18n="@@Override_route_default">Override the route config</span>
+            <span i18n="@@Override_route_default">Override the route's rule</span>
           </mat-slide-toggle>
           @if (stateOf(o).override) {
             <app-access-editor
@@ -465,7 +465,7 @@
                  whose subject drifts. But an operation that inherits has to be
                  able to say what FROM, so the sentence is the way there. -->
             <a class="inherits" [routerLink]="['/infra/routes', selectedId(), 'security']"
-               i18n="@@Inherits_route_default">Inherits the route config</a>
+               i18n="@@Inherits_route_default">Follows the route's rule</a>
           }
         </section>
         @if (o.upstream) {

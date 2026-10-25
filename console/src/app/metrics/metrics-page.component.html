@@ -9,7 +9,7 @@
    note below say both. -->
 @if (samples().length === 0) {
   <p class="empty" i18n="@@Metrics_empty">
-    Nothing measured yet: the first figures arrive a few seconds after start.
+    No data yet: figures appear a few seconds after startup.
   </p>
 }
 <h2 class="over" i18n="@@Metrics_last_minute">Over the last minute</h2>
@@ -24,15 +24,15 @@
   </div>
   <div class="figure">
     <div class="value">{{ meanMs() | number: '1.0-1' }} ms</div>
-    <div class="what" i18n="@@Metrics_mean">mean answer</div>
+    <div class="what" i18n="@@Metrics_mean">mean response</div>
   </div>
   <div class="figure">
     <div class="value">{{ p95Ms() | number: '1.0-0' }} ms</div>
-    <div class="what" i18n="@@Metrics_p95">p95: 95% answered faster</div>
+    <div class="what" i18n="@@Metrics_p95">p95: 95% of responses are faster</div>
   </div>
   <div class="figure">
     <div class="value">{{ latest()?.inFlight ?? 0 }}</div>
-    <div class="what" i18n="@@Metrics_in_flight">in flight</div>
+    <div class="what" i18n="@@Metrics_in_flight">in progress</div>
   </div>
 </div>
 
@@ -42,7 +42,7 @@
 </section>
 
 <section>
-  <h2 i18n="@@Metrics_latency">How long an answer takes</h2>
+  <h2 i18n="@@Metrics_latency">Response time</h2>
   <app-chart class="chart" [option]="latencyOption()" />
 </section>
 
@@ -83,7 +83,7 @@
         <th class="n" [class.sorted]="axis() === 'failing'" i18n="@@Metrics_errors">
           Refused or failed
         </th>
-        <th class="n" [class.sorted]="axis() === 'slow'" i18n="@@Metrics_mean">Mean answer</th>
+        <th class="n" [class.sorted]="axis() === 'slow'" i18n="@@Metrics_mean">Mean response</th>
         <th class="n" [class.sorted]="axis() === 'costly'" i18n="@@Metrics_spent">
           Time spent
         </th>

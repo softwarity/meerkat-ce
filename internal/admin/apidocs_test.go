@@ -83,16 +83,27 @@ func TestAPIDocsAssets(t *testing.T) {
 	}
 }
 
-// The console documents the CONTROL plane only: Meerkat's own API, always -
-// the routes' specs are the data plane's developer docs business.
+// The console documents Meerkat's own three planes, and nothing else - the
+// routes' specs are the data plane's developer docs business. All three are
+// tried from it.
 func TestAPIDocsConsoleIsMeerkatOnly(t *testing.T) {
 	f := setup(t)
 	var specs []specRef
 	if err := json.Unmarshal([]byte(readAll(t, f.get(t, "/apidocs/specs.json", f.plainC))), &specs); err != nil {
 		t.Fatal(err)
 	}
-	if len(specs) != 1 || specs[0].Name != "Meerkat Admin API" {
-		t.Fatalf("console specs = %+v, want the Meerkat spec alone", specs)
+	if len(specs) != 3 || !specs[0].TryIt || !specs[1].TryIt || !specs[2].TryIt {
+		t.Fatalf("console specs = %+v, want the three planes, each tried", specs)
+	}
+	for _, s := range specs {
+		res := f.get(t, "/apidocs/"+s.URL, f.plainC)
+		var doc struct {
+			OpenAPI string `json:"openapi"`
+		}
+		if err := json.Unmarshal([]byte(readAll(t, res)), &doc); res.StatusCode != http.StatusOK || err != nil ||
+			!strings.HasPrefix(doc.OpenAPI, "3.") {
+			t.Fatalf("%s: %d %v", s.URL, res.StatusCode, err)
+		}
 	}
 	// The retired surfaces stay retired.
 	if res := f.get(t, "/apidocs/specs/route/anything", f.rootC); res.StatusCode != http.StatusNotFound {
@@ -148,5 +159,49 @@ func TestAPIDocsMintTestToken(t *testing.T) {
 	if code, _ := f.call(t, "POST", "/api/apidocs/token",
 		`{"username":"","roles":[],"minutes":5}`, f.rootC); code != http.StatusUnprocessableEntity {
 		t.Fatalf("empty username: %d, want 422", code)
+	}
+}
+
+// Try it out on the internal and data planes goes through this page: the
+// call reaches the plane's own handler, without the console's cookies, and
+// with the Authorization the reader filled in. Only a person signed in to the
+// console may use it, and the internal plane only root or an infra admin.
+func TestAPIDocsTryItOutReachesTheOtherPlanes(t *testing.T) {
+	f := setup(t)
+	var got *http.Request
+	plane := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r
+		w.WriteHeader(http.StatusTeapot)
+	})
+	f.api.InternalPlane, f.api.DataPlane = plane, plane
+
+	req, _ := http.NewRequest(http.MethodGet, f.adminSrv.URL+"/apidocs/call/internal/api/schedules?route=x", nil)
+	req.AddCookie(f.rootC)
+	req.Header.Set("Authorization", "Bearer mk_internal")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusTeapot || got == nil {
+		t.Fatalf("root's call did not reach the internal plane: %d", res.StatusCode)
+	}
+	if got.URL.Path != "/api/schedules" || got.URL.Query().Get("route") != "x" {
+		t.Errorf("the plane was asked %s, want /api/schedules?route=x", got.URL)
+	}
+	if got.Header.Get("Cookie") != "" || got.Header.Get("Authorization") != "Bearer mk_internal" {
+		t.Errorf("cookie %q crossed, or the reader's Authorization %q did not",
+			got.Header.Get("Cookie"), got.Header.Get("Authorization"))
+	}
+
+	got = nil
+	if res := f.get(t, "/apidocs/call/internal/api/schedules", f.plainC); res.StatusCode != http.StatusForbidden || got != nil {
+		t.Errorf("a plain account reached the internal plane: %d", res.StatusCode)
+	}
+	if res := f.get(t, "/apidocs/call/data/meerkat/user-button.json", f.plainC); res.StatusCode != http.StatusTeapot {
+		t.Errorf("a signed-in account did not reach the data plane: %d", res.StatusCode)
+	}
+	if res := f.get(t, "/apidocs/call/data/healthz", nil); res.StatusCode != http.StatusUnauthorized {
+		t.Errorf("an anonymous caller used the console's Try it out: %d", res.StatusCode)
 	}
 }

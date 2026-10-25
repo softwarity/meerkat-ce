@@ -108,6 +108,17 @@ seul réglage pour toute la barre. Le nom de l'application défini dans la marqu
 peut figurer à côté du logo ; il est désactivé par défaut, car le logo seul
 suffit à faire la marque.
 
+## L'entrée Notifications
+
+Avec les [notifications](/docs/console/notifications) activées (Enterprise), le
+catalogue peut contenir une entrée spéciale, **Notifications** : sans route,
+elle ouvre la page des notifications de la personne, et porte l'**unique badge**
+de ses non lues, en direct. Elle s'ajoute avec **Add notifications** en mode
+Portal, puis se place, se déplace et se retire comme n'importe quelle entrée ;
+laissée sans libellé, elle se lit Notifications dans la langue de chacun. Sans
+elle, l'entrée et le badge sont sur le bouton de compte. Les entrées des
+applications ne portent pas de badge.
+
 ## Ce que la barre remplace
 
 En mode **Portal**, elle prend la place du bouton utilisateur propre à chaque
@@ -135,9 +146,6 @@ champs.
 
 ## Ce qui n'est pas réalisé
 
-- **Le canal des badges.** Une entrée possède une clé de badge et l'emplacement
- est réservé, mais rien n'y envoie encore de compteur - c'est prévu sur le
- canal temps réel.
 - **L'arrivée sur la première application accessible.** Un visiteur qui ne peut
  pas ouvrir l'application sur laquelle il arrive n'est pas redirigé vers une
  application qu'il peut ouvrir.

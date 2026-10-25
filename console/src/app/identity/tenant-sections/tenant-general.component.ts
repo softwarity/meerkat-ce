@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { EeLockComponent } from '../../shared/ee-lock.component';
@@ -14,6 +13,7 @@ import { UserFieldsFormComponent } from '../user-fields-form.component';
 import { MeService } from '../../me.service';
 import { TenantScope } from '../tenant-scope';
 import { TenantsService } from '../../shared/tenants.service';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
 
 // The tenant's General section (a child route of the tenant layout): identity,
 // the organisation's own fields (MODEL-03) and working hours, committed
@@ -23,7 +23,7 @@ import { TenantsService } from '../../shared/tenants.service';
   selector: 'app-tenant-general',
   imports: [
     EeLockComponent,
-    DatePipe,
+    ZonedDatePipe,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -44,6 +44,7 @@ export class TenantGeneralComponent {
   // Root and the app-admins write an organisation's fields; its own
   // administrators read them - the services behind the gateway trust them.
   private readonly me = inject(MeService);
+  protected readonly zone = this.me.timezone;
   protected readonly fieldsReadonly = computed(() => !this.me.isAppAdmin());
 
   protected readonly saving = signal(false);

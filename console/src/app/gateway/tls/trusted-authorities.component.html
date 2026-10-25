@@ -16,7 +16,7 @@
     </button>
   </div>
   <p class="note" i18n="@@Trusted_authorities_note2">
-    Accepted when the gateway calls an upstream in HTTPS, on top of the public authorities.
+    Accepted, besides the public authorities, when the gateway calls a service over HTTPS.
   </p>
 
   @for (a of list(); track a.id) {
@@ -30,9 +30,9 @@
         @for (c of a.certificates; track c.fingerprint) {
           <span class="cert">
             {{ c.subject }}
-            <span class="until" i18n="@@Trust_until">until {{ expiry(c.notAfter) | date: 'mediumDate' }}</span>
+            <span class="until nowrap" i18n="@@Trust_until">until {{ c.notAfter | zoned: zone() : "day" }}</span>
             @if (!c.isCa) {
-              <span class="leaf" i18n-matTooltip="@@Trust_leaf_tip" matTooltip="Not an authority: this certificate is trusted as it stands, for the upstream that presents it." i18n="@@Trust_leaf">certificate</span>
+              <span class="leaf" i18n-matTooltip="@@Trust_leaf_tip" matTooltip="Not an authority: only this exact certificate is trusted, for the service that presents it." i18n="@@Trust_leaf">certificate</span>
             }
           </span>
         }

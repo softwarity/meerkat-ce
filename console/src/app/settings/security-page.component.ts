@@ -164,7 +164,7 @@ export class SecurityPageComponent {
   protected async forceChangeForAll(): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Force_a_password_change_for_everyone:Force a password change for everyone?`,
-      message: $localize`:@@Force_change_everyone_message:Every local account, yours excepted, must choose a new password at its next sign-in.`,
+      message: $localize`:@@Force_change_everyone_message:All local accounts except yours must choose a new password at their next sign-in.`,
       confirmLabel: $localize`:@@Force_the_change:Force the change`,
       danger: true,
     });

@@ -105,7 +105,7 @@ export type PickLocationOutcome = { remoteId: string; name: string };
                push side had a note explaining that the choice is remembered -
                UI behaviour, told to somebody who will find out by using it. -->
           <p class="note" i18n="@@Pull_applies_nothing">
-            Nothing is applied: it is saved beside what is running.
+            Nothing is applied: it is saved next to the current configuration.
           </p>
         }
       }
@@ -231,7 +231,7 @@ export class PickLocationDialogComponent {
         </div>
       } @else if (data.result.plan; as plan) {
         <p class="from" i18n="@@What_activating_would_change">
-          What serving it would change:
+          What activating it would change:
         </p>
         <!-- Each line tickable: serving it straight from here keeps the
              unticked ones as the gateway holds them (keep.go). -->
@@ -240,21 +240,21 @@ export class PickLocationDialogComponent {
           selectable
           [(kept)]="kept"
           i18n-nothing="@@Pull_no_change"
-          nothing="This gateway already matches what the repository holds."
+          nothing="The current configuration already matches the repository."
         />
       } @else {
         <!-- No plan sent back: nothing would change, said rather than left
              as a heading over an empty list. -->
         <div class="note">
           <mat-icon>check_circle</mat-icon>
-          <p i18n="@@Pull_no_change">This gateway already matches what the repository holds.</p>
+          <p i18n="@@Pull_no_change">The current configuration already matches the repository.</p>
         </div>
       }
       <div class="note">
         <mat-icon>info</mat-icon>
         <p i18n="@@Pull_applied_nothing_yet">
-          Nothing is applied yet. Apply to current serves the lines ticked above now; Close keeps
-          it saved, to serve later.
+          Nothing is applied yet. Apply to current applies the ticked lines now; Close keeps it
+          saved for later.
         </p>
       </div>
     </mat-dialog-content>

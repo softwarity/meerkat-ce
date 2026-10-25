@@ -198,12 +198,12 @@ export class UserCreateComponent {
   protected readonly accessHint = computed(() => {
     if (this.access() === 'password') {
       return this.mailReady() || !this.edition()
-        ? $localize`:@@Access_password_hint:A password is generated and shown once, to hand over; it must be changed at the first sign-in.`
+        ? $localize`:@@Access_password_hint:A password is generated and shown once, for you to give to the person. They must change it at first sign-in.`
         : $localize`:@@Access_no_invite_WHY:An invitation cannot be sent: ${this.edition()?.mailWhy}:WHY:.`;
     }
     return this.email().trim()
-      ? $localize`:@@Access_invite_hint:A link to choose a password is mailed to the address above, valid 48 hours.`
-      : $localize`:@@Access_invite_needs_email:The invitation goes to the e-mail address above: give one.`;
+      ? $localize`:@@Access_invite_hint:A link to choose a password is mailed to the address above. It is valid for 48 hours.`
+      : $localize`:@@Access_invite_needs_email:Enter an e-mail address above to send the invitation.`;
   });
 
   // A login and nothing else - and an address when it is to be mailed:

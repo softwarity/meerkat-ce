@@ -31,25 +31,25 @@ import (
 func (a *API) grantTools() []mcp.Tool {
 	return []mcp.Tool{
 		{
-			Name: "list_groups", Allow: administersIdentity, Title: "List an organisation's groups", ReadOnly: true,
-			Description: "The groups of one organisation and the roles each one grants, by name. A " +
-				"group is how a role becomes somebody's: the catalogue holds roles, an organisation " +
+			Name: "list_groups", Allow: administersIdentity, Title: "List a tenant's groups", ReadOnly: true,
+			Description: "The groups of one tenant and the roles each one grants, by name. A " +
+				"group is how a role becomes somebody's: the catalogue holds roles, a tenant " +
 				"holds groups, a member holds groups.",
 			Schema: object(map[string]any{
-				"tenant": str("The organisation, by name (or its id). Omit it in a single-organisation installation."),
+				"tenant": str("The tenant, by name (or its id). Omit it in a single-tenant installation."),
 			}),
 			Call: a.toolListGroups,
 		},
 		{
 			Name: "save_group", Allow: administersIdentity, Title: "Add a group, or change what it grants",
-			Description: "Add a group to an organisation, or change its description and the roles it " +
-				"grants. It works BY NAME inside that organisation: a name it does not hold is a new " +
+			Description: "Add a group to a tenant, or change its description and the roles it " +
+				"grants. It works BY NAME inside that tenant: a name it does not hold is a new " +
 				"group, a name it holds is that group. Roles are named as list_roles spells them - a " +
 				"name nobody holds is refused rather than saved as a grant of nothing. What you pass " +
 				"is what changes: a field left out keeps its value.",
 			Schema: object(map[string]any{
-				"tenant":      str("The organisation, by name or id."),
-				"name":        str("The group's name inside that organisation."),
+				"tenant":      str("The tenant, by name or id."),
+				"name":        str("The group's name inside that tenant."),
 				"newName":     str("Rename it to this. Nothing else points at a group by name, so this moves nothing else."),
 				"description": str("What it is for."),
 				"roles": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
@@ -59,39 +59,39 @@ func (a *API) grantTools() []mcp.Tool {
 		},
 		{
 			Name: "delete_group", Allow: administersIdentity, Title: "Remove a group",
-			Description: "Remove a group from an organisation. Refused while members still hold it - " +
+			Description: "Remove a group from a tenant. Refused while members still hold it - " +
 				"deleting it would take their roles away without saying whose. The refusal counts them; " +
 				"list_members says who.",
 			Schema: object(map[string]any{
-				"tenant": str("The organisation, by name or id."),
+				"tenant": str("The tenant, by name or id."),
 				"name":   str("The group's name."),
 			}, "name"),
 			Call: a.toolDeleteGroup,
 		},
 		{
-			Name: "list_members", Allow: administersIdentity, Title: "List who is in an organisation", ReadOnly: true,
-			Description: "The people in one organisation: their username, whether the membership is " +
+			Name: "list_members", Allow: administersIdentity, Title: "List who is in a tenant", ReadOnly: true,
+			Description: "The people in one tenant: their username, whether the membership is " +
 				"enabled, whether they administer it, and the groups they hold there - which is what " +
-				"decides the roles they carry INSIDE that organisation and nowhere else.",
+				"decides the roles they carry INSIDE that tenant and nowhere else.",
 			Schema: object(map[string]any{
-				"tenant": str("The organisation, by name or id."),
+				"tenant": str("The tenant, by name or id."),
 			}),
 			Call: a.toolListMembers,
 		},
 		{
-			Name: "save_member", Allow: administersIdentity, Title: "Put somebody in an organisation, with what they hold",
-			Description: "Join somebody to an organisation and set the groups they hold there, in one " +
+			Name: "save_member", Allow: administersIdentity, Title: "Put somebody in a tenant, with what they hold",
+			Description: "Join somebody to a tenant and set the groups they hold there, in one " +
 				"call: the account must exist, the membership is created if it is missing, and the " +
 				"groups REPLACE what they held. This is one decision - who holds what, where - and it " +
 				"took two endpoints in a fixed order, which is how a half-done grant happens. Roles " +
 				"are not set here: a group grants them, so that a second person gets the same thing by " +
 				"holding the same group.",
 			Schema: object(map[string]any{
-				"tenant":   str("The organisation, by name or id."),
+				"tenant":   str("The tenant, by name or id."),
 				"username": str("The account, by username."),
 				"groups": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
 					"description": "The groups they hold there, by name. Replaces what they held; an empty list takes them all away and keeps the membership."},
-				"admin":   map[string]any{"type": "boolean", "description": "They administer this organisation. Left out, an existing membership keeps what it had and a new one is an ordinary member."},
+				"admin":   map[string]any{"type": "boolean", "description": "They administer this tenant. Left out, an existing membership keeps what it had and a new one is an ordinary member."},
 				"enabled": map[string]any{"type": "boolean", "description": "The membership itself. Left out, a new one is enabled."},
 			}, "username"),
 			Call: a.toolSaveMember,
@@ -115,7 +115,7 @@ func (a *API) tenantByName(ctx context.Context, given string) (store.Tenant, err
 		for _, t := range tenants {
 			names = append(names, t.Name)
 		}
-		return store.Tenant{}, fmt.Errorf("which organisation: this installation has %d (%s)",
+		return store.Tenant{}, fmt.Errorf("which tenant: this installation has %d (%s)",
 			len(tenants), strings.Join(names, ", "))
 	}
 	for _, t := range tenants {
@@ -127,7 +127,7 @@ func (a *API) tenantByName(ctx context.Context, given string) (store.Tenant, err
 	for _, t := range tenants {
 		names = append(names, t.Name)
 	}
-	return store.Tenant{}, fmt.Errorf("no organisation is called %q: this installation has %s",
+	return store.Tenant{}, fmt.Errorf("no tenant is called %q: this installation has %s",
 		given, strings.Join(names, ", "))
 }
 
@@ -479,7 +479,7 @@ func (a *API) accountTools() []mcp.Tool {
 				"is why it only works until the person changes it. Pass password: \"temporary\" on " +
 				"an existing account to issue a new one the same way. An agent never chooses a " +
 				"password.\n\nAdministrative capabilities are not set here, and neither is what the " +
-				"account holds in an organisation - that is save_member.",
+				"account holds in a tenant - that is save_member.",
 			Schema: object(map[string]any{
 				"username": str("The account name, as the person will type it."),
 				"fullname": str("Their name, for the pages that greet them."),

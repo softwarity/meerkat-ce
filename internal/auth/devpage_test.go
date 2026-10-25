@@ -301,28 +301,30 @@ func TestTheProfileReturnsWhereYouWere(t *testing.T) {
 
 	deep := "/embed/ZmxpZ2h0LWZvbGRlci1mcm9udGVuZA"
 	body := bodyString(do(t, mux, "GET", "/profile?from="+url.QueryEscape(deep), nil, c))
-	if !strings.Contains(body, `href="`+deep+`"`) {
+	if !strings.Contains(body, `<a class="apps-btn" href="`+deep+`">Back</a>`) {
 		t.Fatalf("the profile does not return to the page that sent us: %s", deep)
 	}
 
-	// A path is inside an entry by SEGMENTS, not by characters: /embedded is
-	// not inside /embed, and a plain prefix test said it was.
-	for _, in := range []string{"/embed", "/embed/x", "/embed?a=1"} {
-		if !underEntry(in, "/embed") {
-			t.Fatalf("%s should be inside /embed", in)
+	// A page is the route's by SEGMENTS, not by characters: /embedded is not
+	// a page of /embed/**, and a plain prefix test said it was.
+	for _, in := range []string{"/embed", "/embed/x", "/embed/x?a=1"} {
+		body := bodyString(do(t, mux, "GET", "/profile?from="+url.QueryEscape(in), nil, c))
+		if !strings.Contains(body, `href="`+html.EscapeString(in)+`">Back</a>`) {
+			t.Fatalf("%s is a page of /embed/**: no way back to it", in)
 		}
 	}
 	for _, out := range []string{"/embedded", "/embedding/x", "/other"} {
-		if underEntry(out, "/embed") {
-			t.Fatalf("%s is not inside /embed", out)
+		body := bodyString(do(t, mux, "GET", "/profile?from="+url.QueryEscape(out), nil, c))
+		if strings.Contains(body, `>Back</a>`) {
+			t.Fatalf("%s is not a page of /embed/**, and Back was offered", out)
 		}
 	}
 
-	// Nobody said: the application is still listed, at its entry, and nothing
-	// pretends to know where the person was.
+	// Nobody said: the application is offered at its entry, under its name,
+	// and nothing pretends to know where the person was.
 	plain := bodyString(do(t, mux, "GET", "/profile", nil, c))
-	if !strings.Contains(plain, `href="/embed"`) {
-		t.Fatalf("the application is no longer listed at its entry: %s", plain)
+	if !strings.Contains(plain, `<a class="apps-btn" href="/embed">NEO</a>`) {
+		t.Fatalf("the application is no longer offered at its entry: %s", plain)
 	}
 	if strings.Contains(plain, deep) {
 		t.Fatal("a deep return appeared with nothing to return to")

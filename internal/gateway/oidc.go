@@ -124,7 +124,7 @@ func (rt *Router) PersonFor(ctx context.Context, userID, tenantID string) (Perso
 		return Person{}, fmt.Errorf("account %q is disabled or outside its validity window: it signs nobody in", e.data.Username)
 	}
 	if tenantID != "" && !slices.Contains(e.data.Memberships, tenantID) {
-		return Person{}, fmt.Errorf("%s is not an enabled member of organisation %q", e.data.Username, tenantID)
+		return Person{}, fmt.Errorf("%s is not an enabled member of tenant %q", e.data.Username, tenantID)
 	}
 	return Person{d: e.data}, nil
 }

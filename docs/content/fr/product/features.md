@@ -67,6 +67,19 @@ Pour en savoir plus : [Appels planifiés](/docs/operations/scheduler).
 - **Rien à installer** : ni serveur de messages, ni verrou ; en cluster, les appels se répartissent entre les nœuds.
 - **Un écran en direct dans la console** : suspendre, lancer tout de suite, supprimer, et l'historique de chaque exécution - quand, comment elle s'est terminée, ce qui a répondu - avec une exécution en échec relancée en un clic.
 
+## Notifier vos utilisateurs
+
+Un service prévient ses utilisateurs, qui l'apprennent dans l'application qu'ils ont ouverte. **Enterprise** *en partie*
+
+En savoir plus : [Notifier vos utilisateurs](/docs/operations/notifications).
+
+- **Une requête du service** : un titre, un texte, un lien vers le détail et jusqu'à cinq actions, désignés par le service et le chemin qu'il connaît déjà ; la gateway trouve l'adresse publique.
+- **Vue là où l'on travaille** : un compteur sur le bouton de compte ou la barre de portail, un snackbar sur la page ouverte, une notification du bureau quand l'onglet est en arrière-plan, un mail si demandé, et une page qui les liste toutes.
+- **Seulement à qui peut agir** : l'audience, ce sont les membres du tenant, réduits à des rôles ou à des noms, et aux personnes qui peuvent ouvrir ce vers quoi elle mène.
+- **Acquittée quand il le faut** : par un lecteur pour tous, ou par chacun ; le service est rappelé à chaque acquittement, et la piste d'audit garde qui et quand.
+- **Tous les tenants d'un coup** : un message, un exemplaire par tenant, et une personne membre de plusieurs ne le voit qu'une fois.
+- **Activées à trois endroits** : root, l'administrateur de l'application et l'administrateur de chaque tenant, chacun pouvant les couper pour sa part.
+
 ## Routage et protection du trafic
 
 Une API gateway complète, pilotée depuis la console.

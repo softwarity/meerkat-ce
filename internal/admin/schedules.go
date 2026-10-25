@@ -1,11 +1,14 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -83,6 +86,7 @@ func (a *API) registerSchedules(mux Mux) {
 	mux.Handle("PUT /api/settings/schedules", a.rootOnly(a.putScheduleSettings))
 	// Who may call the API on the internal plane, and how they are known.
 	a.registerInternalAccess(mux)
+	a.registerNotifications(mux)
 }
 
 // scheduleSettings is the housekeeping the scheduler has, and what may be
@@ -206,7 +210,7 @@ func (a *API) createSchedule(w http.ResponseWriter, r *http.Request, actor store
 	a.auditEvent(r.Context(), actor, "schedule.create", "schedule", in.ID, in.Name, "",
 		rolesWords(in.Roles)+"; written by "+c.words())
 	a.schedulesMoved(r.Context())
-	writeJSON(w, http.StatusCreated, in)
+	a.answerSchedule(w, r, http.StatusCreated, in.ID)
 }
 
 // putSchedule replaces one that exists. An unknown id is a 404 rather than a
@@ -242,22 +246,46 @@ func (a *API) putSchedule(w http.ResponseWriter, r *http.Request, actor store.Us
 	}
 	a.auditEvent(r.Context(), actor, "schedule.update", "schedule", in.ID, in.Name, "", rolesWords(in.Roles))
 	a.schedulesMoved(r.Context())
-	writeJSON(w, http.StatusOK, in)
+	a.answerSchedule(w, r, http.StatusOK, in.ID)
 }
 
 // readSchedule decodes what was sent and refuses what cannot work - the half
 // the two writers have in common.
 func (a *API) readSchedule(w http.ResponseWriter, r *http.Request, actor store.User, stored store.Schedule) (store.Schedule, bool) {
 	var in store.Schedule
-	if err := decodeStrict(r, &in); err != nil {
+	raw, err := io.ReadAll(r.Body)
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields()
+		err = dec.Decode(&in)
+	}
+	if err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
 		return in, false
 	}
 	in.CreatedBy = actor.Username
-	// The run belongs to whoever is running it, never to the writer.
+	// The run belongs to whoever is running it, never to the writer: on a
+	// creation that is nothing at all, whatever the body carries - a service
+	// that sent a cause, a try count or a failing date would otherwise have
+	// written the gateway's account of its own runs.
 	in.RunID, in.ClaimedBy, in.ClaimedAt, in.Progress = stored.RunID, stored.ClaimedBy, stored.ClaimedAt, stored.Progress
 	in.RunStarted, in.RunState, in.Attempts = stored.RunStarted, stored.RunState, stored.Attempts
+	in.RunCause, in.RunOf, in.TurnTry, in.RunDetail = stored.RunCause, stored.RunOf, stored.TurnTry, stored.RunDetail
 	in.LastState, in.LastDetail, in.LastAt = stored.LastState, stored.LastDetail, stored.LastAt
+	in.FailingSince, in.UpdatedAt, in.Route = stored.FailingSince, stored.UpdatedAt, ""
+	// PAUSED IS THE OPERATOR'S unless the service says otherwise. A service
+	// that rewrites its schedule at every start sends the call and when, and
+	// a pause put on it from the console is not among what it knows: leaving
+	// the field out keeps the one in place, as for the description. Sent, it
+	// is obeyed - a service may create a schedule paused, or resume its own.
+	if stored.ID != "" {
+		var said struct {
+			Paused *bool `json:"paused"`
+		}
+		if json.Unmarshal(raw, &said) == nil && said.Paused == nil {
+			in.Paused = stored.Paused
+		}
+	}
 	// Who created it stays who created it: a later writer is in the audit.
 	in.Caller, in.CallerVia, in.CallerAddr = stored.Caller, stored.CallerVia, stored.CallerAddr
 	if err := store.SanitizeSchedule(&in, a.routeExists(r)); err != nil {
@@ -577,8 +605,7 @@ func (a *API) setSchedulePaused(w http.ResponseWriter, r *http.Request, actor st
 	a.auditEvent(r.Context(), actor, verb, "schedule", sc.ID, sc.Name, "", "")
 	// Resuming one whose turn came round while it was paused fires it now.
 	a.schedulesMoved(r.Context())
-	sc.Paused = paused
-	writeJSON(w, http.StatusOK, sc)
+	a.answerSchedule(w, r, http.StatusOK, sc.ID)
 }
 
 // listScheduleRuns is the history of one schedule, newest first (SCHED-03).
@@ -631,9 +658,13 @@ func (a *API) runSchedule(w http.ResponseWriter, r *http.Request, actor store.Us
 	cause, of := store.CauseManual, ""
 	if in.ReplayOf != "" {
 		past, err := a.st.GetScheduleRun(r.Context(), sc.ID, in.ReplayOf)
-		if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeErr(w, http.StatusNotFound,
 				"no run "+in.ReplayOf+" in this schedule's history: replay names one of its own runs")
+			return
+		}
+		if err != nil {
+			a.internal(w, err)
 			return
 		}
 		cause, of = store.CauseReplay, past.ID
@@ -654,8 +685,7 @@ func (a *API) runSchedule(w http.ResponseWriter, r *http.Request, actor store.Us
 	a.auditEvent(r.Context(), actor, "schedule.run", "schedule", sc.ID, sc.Name, "", what)
 	// "Now" means now: this node wakes, and the others hear it.
 	a.schedulesMoved(r.Context())
-	sc.NextAt = time.Now().Unix()
-	writeJSON(w, http.StatusAccepted, sc)
+	a.answerSchedule(w, r, http.StatusAccepted, sc.ID)
 }
 
 func (a *API) deleteSchedule(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -712,6 +742,19 @@ func (a *API) schedule(w http.ResponseWriter, r *http.Request) (store.Schedule, 
 		return store.Schedule{}, false
 	}
 	return sc, true
+}
+
+// answerSchedule answers a write with the row as it now stands, route named:
+// what the gateway stored, never what the body sent, and the same shape as a
+// get - a pause's answer that lost the route was a row that changed under the
+// screen reading it.
+func (a *API) answerSchedule(w http.ResponseWriter, r *http.Request, code int, id string) {
+	sc, err := a.st.GetSchedule(r.Context(), id)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, code, a.nameSchedules(r, []store.Schedule{sc})[0])
 }
 
 // nameSchedules fills the route's NAME, which a row carries as an id and a

@@ -42,6 +42,9 @@ The caller is available as `{{.Username}}`, `{{.UserID}}`, `{{.Fullname}}`,
 `{{.SignedIn}}`, which is `false` when nobody is signed in. Nothing else is
 reachable: no store, no filesystem, no other account.
 
+`{{.Timezone}}` is the zone the person chose on their profile, and empty when they
+chose none: their browser's zone then applies, and only the browser knows it.
+
 Three functions come with it:
 
 - `json` renders a value as JSON, quotes and escaping included.

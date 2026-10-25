@@ -84,7 +84,7 @@ func (a *API) saveRule(w http.ResponseWriter, r *http.Request, actor store.User,
 	if rule.GroupID != "" {
 		g, err := a.st.GetGroup(r.Context(), rule.GroupID)
 		if err != nil || g.TenantID != rule.TenantID {
-			writeErr(w, http.StatusUnprocessableEntity, "unknown group in this organization")
+			writeErr(w, http.StatusUnprocessableEntity, "unknown group in this tenant")
 			return
 		}
 	}
@@ -166,7 +166,7 @@ func (a *API) updateGroupRule(w http.ResponseWriter, r *http.Request, actor stor
 		}
 	}
 	if !found {
-		writeErr(w, http.StatusNotFound, "rule not found in this organization")
+		writeErr(w, http.StatusNotFound, "rule not found in this tenant")
 		return
 	}
 	a.saveRule(w, r, actor, rule, "grouprule.update")
@@ -180,7 +180,7 @@ func (a *API) deleteGroupRule(w http.ResponseWriter, r *http.Request, actor stor
 		return
 	}
 	if !ok {
-		writeErr(w, http.StatusNotFound, "rule not found in this organization")
+		writeErr(w, http.StatusNotFound, "rule not found in this tenant")
 		return
 	}
 	a.auditEvent(r.Context(), actor, "grouprule.delete", "grouprule", id, id, tenantID, "")

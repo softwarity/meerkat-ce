@@ -155,6 +155,7 @@ var (
 	registerCodePage = flowPage("register-code", registerCodeBody)
 	confirmedPage    = flowPage("confirmed", confirmedBody)
 	pendingPage      = flowPage("account-pending", pendingBody)
+	linkDeadPage     = flowPage("link-dead", linkDeadBody)
 )
 
 type registerData struct {
@@ -276,6 +277,32 @@ const confirmedBody = `    <form onsubmit="return false">
       <a class="choice" style="text-decoration:none" href="/login">{{.T.signIn}}</a>
     </form>
 `
+
+// The page a mailed link lands on when it cannot do its job: expired, spent,
+// or - for an address change - the address taken meanwhile. It used to be
+// http.Error, a naked line of text in a browser that had just left a themed
+// mail, for someone who only clicked late. The sentence already says what to
+// do next; the link under it goes there.
+type linkDeadData struct {
+	flowChrome
+	Error string
+	Back  string
+	// BackLabel is the link's text, already translated.
+	BackLabel string
+}
+
+const linkDeadBody = `    <form onsubmit="return false">
+      <p class="error">{{.Error}}</p>
+    </form>
+    <p class="back"><a href="{{.Back}}">{{.BackLabel}}</a></p>
+`
+
+// renderLinkDead answers a mailed link that is no use any more, under the
+// title of the journey it belonged to, with the status it always had.
+func (h *Handler) renderLinkDead(w http.ResponseWriter, r *http.Request, title, errKey, back, backKey string, status int) {
+	c := h.flowData(r, title)
+	writeFlow(w, linkDeadPage, linkDeadData{flowChrome: c, Error: c.T[errKey], Back: back, BackLabel: c.T[backKey]}, status)
+}
 
 type pendingData struct {
 	flowChrome
@@ -512,7 +539,7 @@ func (h *Handler) doConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := h.st.TakeEmailToken(r.Context(), hashTrust(token), confirmPurpose, time.Now().Unix())
 	if err != nil {
-		http.Error(w, h.tr(r, "errConfirmExpired"), http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleRegister", "errConfirmExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
 		return
 	}
 	h.confirmed(w, r, userID)

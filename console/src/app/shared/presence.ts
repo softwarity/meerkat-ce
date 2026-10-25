@@ -4,6 +4,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LiveTopic, LivewireClient } from '@softwarity/livewire';
 import { ApiService, LiveSession } from '../api.service';
+import { MeService } from '../me.service';
+import { zoned } from './zoned-date.pipe';
 
 // Who is signed in, live (CONSOLE-07). The sessions themselves are read
 // through GET /api/sessions, which decides what this administrator may see;
@@ -53,8 +55,6 @@ export class PresenceService {
   }
 }
 
-const time = (unix: number) => new Date(unix * 1000).toLocaleString();
-
 // The person icon at the head of a row: coloured while the account has a
 // session open, and its sessions in the tooltip. `tenantId` narrows it to the
 // sessions open IN that organisation - on a Members screen, connected means
@@ -89,6 +89,7 @@ export class PresenceComponent {
   readonly tenantId = input<string>('');
 
   private readonly presence = inject(PresenceService);
+  private readonly zone = inject(MeService).timezone;
 
   protected readonly sessions = computed(() => {
     const all = this.presence.byUser().get(this.userId()) ?? [];
@@ -100,13 +101,13 @@ export class PresenceComponent {
     const list = this.sessions();
     if (list.length === 0) {
       return this.tenantId()
-        ? $localize`:@@Presence_offline_here:Not signed in to this organisation`
+        ? $localize`:@@Presence_offline_here:Not signed in to this tenant`
         : $localize`:@@Presence_offline:Not signed in`;
     }
     const lines = list.map((s) => {
       const where = s.plane === 'admin' ? $localize`:@@Presence_console:console` : (s.tenantName ?? '');
       const parts = [s.label || $localize`:@@Presence_unknown_browser:browser`, s.ip ?? '', where];
-      return `${parts.filter(Boolean).join(' - ')}\n${$localize`:@@Presence_since:since`} ${time(s.createdAt)}`;
+      return `${parts.filter(Boolean).join(' - ')}\n${$localize`:@@Presence_since:since`} ${zoned(s.createdAt, this.zone())}`;
     });
     const head =
       list.length === 1

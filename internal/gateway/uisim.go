@@ -113,14 +113,36 @@ func setUISimCookie(w http.ResponseWriter, r *http.Request, route, value string,
 // RegisterUISim mounts the developer-bar endpoints on the data-plane mux,
 // next to the developer docs. Same gate as those: the dev capability, and
 // nothing else.
-func (rt *Router) RegisterUISim(mux *http.ServeMux) {
+//
+// The two writes sit behind the cross-site guard the sign-in pages wear
+// (internal/auth/guard.go): they ride the session cookie, and a page on a
+// neighbouring port or subdomain is same-site, so SameSite=Lax attaches it.
+// Without the guard such a page could start a test on a developer's session -
+// the route then serves them as someone else - with a text/plain form whose
+// body the JSON decoder does not refuse. DELETE cannot leave a form, but it is
+// a write all the same: guarded by being one, not by today's browsers.
+func (rt *Router) RegisterUISim(mux Mux) {
 	mux.HandleFunc("GET /meerkat/dev-sim", rt.uiSimState)
-	mux.HandleFunc("POST /meerkat/dev-sim", rt.uiSimSet)
-	mux.HandleFunc("DELETE /meerkat/dev-sim", rt.uiSimClear)
+	mux.HandleFunc("POST /meerkat/dev-sim", sameSiteWrite(rt.uiSimSet))
+	mux.HandleFunc("DELETE /meerkat/dev-sim", sameSiteWrite(rt.uiSimClear))
 }
 
-// uiSimGate resolves the calling developer, or answers the refusal: a non-dev
-// session gets an explicit 401.
+// sameSiteWrite refuses a write another site's page sent, before the handler
+// reads the cookie it carried.
+func sameSiteWrite(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if filtering.CrossSiteWrite(r) {
+			uiSimErr(w, http.StatusForbidden, "refused: this request was sent by another site's page")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// uiSimGate resolves the calling developer, or answers the refusal: 401 when
+// nobody is signed in, 403 when an account is but lacks the dev capability -
+// the same split as the developer docs, so the bar can tell "sign in" from
+// "ask for the right".
 func (rt *Router) uiSimGate(w http.ResponseWriter, r *http.Request) (sessionKey string, dev store.User, ok bool) {
 	sess, err := rt.sm.Resolve(r.Context(), r)
 	if err != nil || sess.Pending != "" {
@@ -129,7 +151,7 @@ func (rt *Router) uiSimGate(w http.ResponseWriter, r *http.Request) (sessionKey 
 	}
 	u, err := rt.st.GetUserByID(r.Context(), sess.UserID)
 	if err != nil || !rt.st.DevAllowed(r.Context(), u) {
-		uiSimErr(w, http.StatusUnauthorized, "the UI test mode requires the dev capability: ask an application administrator to grant it on Users")
+		uiSimErr(w, http.StatusForbidden, "the UI test mode requires the dev capability: ask an application administrator to grant it on Users")
 		return "", store.User{}, false
 	}
 	return sess.TokenHash, u, true

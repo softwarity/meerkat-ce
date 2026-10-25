@@ -188,7 +188,8 @@ port the path is now an ordinary one, which a route may claim.
   separates them.
 - [Kubernetes cluster](/docs/deploy/kubernetes) - the internal Service, and a
   NetworkPolicy that keeps the console away from the backends.
-- [Scheduled calls](/docs/operations/scheduler) - the other API of the
+- [Scheduled calls](/docs/operations/scheduler) and
+  [notifications](/docs/operations/notifications) - the other APIs of the
   internal plane.
 - [Meerkat as an OpenID provider](/docs/auth/oidc-provider) - when the
   application signs its users in itself, with the same keys.

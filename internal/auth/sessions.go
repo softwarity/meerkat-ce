@@ -26,7 +26,7 @@ type sessionView struct {
 	ID      string
 	Label   string
 	Meta    string
-	Since   string
+	Since   moment
 	Current bool
 }
 
@@ -59,7 +59,7 @@ const profileSessionsBody = `    <style>
       <div class="row">
         <div class="ss-lines">
           <span class="ss-label{{if .Current}} here{{end}}">{{if .Current}}{{$.T.sessionsThisBrowser}}{{else}}{{.Label}}{{end}}</span>
-          <span class="ss-meta">{{.Since}}{{if .Meta}} - {{.Meta}}{{end}}</span>
+          <span class="ss-meta">{{.Since.HTML}}{{if .Meta}} - {{.Meta}}{{end}}</span>
         </div>
         {{if not .Current}}
         <form method="post" action="/profile/sessions" class="ss-form">
@@ -90,12 +90,7 @@ func (h *Handler) showProfileSessions(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/"+sess.Pending, http.StatusSeeOther)
 		return
 	}
-	loc := time.Local
-	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil && u.Timezone != "" {
-		if l, err := time.LoadLocation(u.Timezone); err == nil {
-			loc = l
-		}
-	}
+	loc := h.readerZone(r.Context(), sess.UserID)
 	list, _, err := h.st.ListSessions(r.Context(), store.SessionFilter{UserID: sess.UserID, Plane: store.PlaneData, Limit: 100}, time.Now().Unix())
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -109,7 +104,7 @@ func (h *Handler) showProfileSessions(w http.ResponseWriter, r *http.Request) {
 			v.Label = useragent.Label(s.Agent)
 		}
 		if s.CreatedAt > 0 {
-			v.Since = time.Unix(s.CreatedAt, 0).In(loc).Format("2006-01-02 15:04")
+			v.Since = momentOf(s.CreatedAt, loc)
 		}
 		if !v.Current {
 			data.Others = true

@@ -4,9 +4,8 @@
   @switch (door) {
     @case ('pem') {
       <p class="note" i18n="@@Import_pem_note">
-        The certificate, then any intermediates, and its private key: paste them, choose the files,
-        or drop them here - each file goes where it belongs. The key is stored sealed and never
-        shown again.
+        Paste, choose or drop the certificate (then any intermediates) and its private key. The
+        key is stored encrypted and never shown again.
       </p>
       <div class="file">
         <app-file-button appearance="outlined" icon="folder_open" accept=".pem,.crt,.cer,.key,.txt" multiple (picked)="take($event)">
@@ -40,12 +39,12 @@
         <p class="carries" [class.fits]="fitsInternal()">
           <mat-icon>{{ fitsInternal() ? 'check_circle' : 'info' }}</mat-icon>
           <span>
-            <ng-container i18n="@@Carries_names">Carries {{ carried().join(', ') }}.</ng-container>
+            <ng-container i18n="@@Carries_names">Covers {{ carried().join(', ') }}.</ng-container>
             @if (internalNames.length) {
               @if (fitsInternal()) {
                 <ng-container i18n="@@Fits_internal"> Fits the internal plane.</ng-container>
               } @else {
-                <ng-container i18n="@@Not_internal_names"> None of the internal plane's names.</ng-container>
+                <ng-container i18n="@@Not_internal_names"> Covers no internal name.</ng-container>
               }
             }
           </span>
@@ -64,8 +63,7 @@
     }
     @case ('keystore') {
       <p class="note" i18n="@@Import_keystore_note">
-        A PKCS#12 keystore (.p12, .pfx) holding the certificate and its key: choose it, or drop it
-        here.
+        A PKCS#12 keystore (.p12, .pfx) with the certificate and its key: choose or drop it.
       </p>
       <div class="drop" [class.held]="keystore()">
         <mat-icon>{{ keystore() ? 'inventory_2' : 'upload_file' }}</mat-icon>
@@ -89,13 +87,13 @@
         </p>
       } @else if (door === 'acme') {
         <p class="note" i18n="@@Acme_order_note2">
-          It is asked as soon as it is placed on a door, and renewed before it ends. Host names
-          only: the authority connects to each one on port 443 to check it reaches this gateway.
+          Requested once placed on a plane, and renewed before it expires. Host names only: the
+          authority must reach each one on port 443 of this gateway.
         </p>
       } @else {
         <p class="note" i18n="@@Signing_request_note">
           Send the request to your authority, then adopt the signed certificate here. The private
-          key never leaves.
+          key stays here.
         </p>
       }
       <app-form-field
@@ -104,7 +102,7 @@
         i18n-hint="@@Certificate_names_hint"
         hint="Separated by spaces or commas"
         i18n-info="@@Certificate_names_info"
-        info="Host names, *.example.com for a wildcard, IP addresses. The certificate answers for every one of them."
+        info="Host names, *.example.com for a wildcard, or IP addresses."
       >
         <input
           matInput
@@ -120,7 +118,7 @@
           i18n-label="@@Organization"
           label="Organization (optional)"
           i18n-info="@@Organization_info"
-          info="Written in the certificate's subject and shown in its details. It changes nothing to what the certificate serves; some authorities ask for it on a signing request."
+          info="Shown in the certificate's details; changes nothing to what it serves. Some authorities require it on a signing request."
         >
           <input matInput [value]="organization()" (input)="organization.set($any($event.target).value)" />
         </app-form-field>
@@ -155,8 +153,8 @@
   }
   @if (unreachable().length) {
     <p class="error" i18n="@@Not_reachable_names">
-      A public authority cannot reach {{ unreachable().join(', ') }}: it only exists on this
-      network. Use an internal authority, or another way in.
+      A public authority cannot reach {{ unreachable().join(', ') }}, which exists only on this
+      network. Use an internal authority or another option.
     </p>
   }
   @if (dropError()) {

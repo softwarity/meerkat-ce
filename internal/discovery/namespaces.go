@@ -32,7 +32,19 @@ func ValidNamespace(ns string) error {
 // DiscoverIn is Discover for namespace ns ("" or the gateway's own: the
 // default list), with the cluster's namespaces when this gateway may list
 // them. Outside Kubernetes it is Discover: namespaces mean nothing there.
+//
+// Its services are a list even when no runtime answered: this is what the
+// console and the agents read, and a null where a list is expected is what
+// they trip on - an installation without a runtime is the ordinary case.
 func DiscoverIn(ctx context.Context, ns string) Result {
+	r := discoverIn(ctx, ns)
+	if r.Services == nil {
+		r.Services = []Service{}
+	}
+	return r
+}
+
+func discoverIn(ctx context.Context, ns string) Result {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
 		return Discover(ctx)
 	}

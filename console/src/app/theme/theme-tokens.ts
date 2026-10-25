@@ -19,7 +19,7 @@ export interface CoreRow {
 }
 
 export const CORE_ROWS: CoreRow[] = [
-  { key: 'primary', label: $localize`:@@Theme_core_primary:Primary`, hint: $localize`:@@Theme_core_primary_hint:Acts as the source colour` },
+  { key: 'primary', label: $localize`:@@Theme_core_primary:Primary`, hint: $localize`:@@Theme_core_primary_hint:The other colours derive from it` },
   { key: 'secondary', label: $localize`:@@Theme_core_secondary:Secondary` },
   { key: 'tertiary', label: $localize`:@@Theme_core_tertiary:Tertiary` },
   { key: 'error', label: $localize`:@@Theme_core_error:Error` },
@@ -83,7 +83,7 @@ export const ROLE_GROUPS: RoleGroup[] = [
       'tertiaryFixed', 'tertiaryFixedDim', 'onTertiaryFixed', 'onTertiaryFixedVariant',
     ],
   },
-  { label: $localize`:@@Theme_roles_meerkat:Flow pages`, roles: [GLOW] },
+  { label: $localize`:@@Theme_roles_meerkat:Built-in pages`, roles: [GLOW] },
 ];
 
 // A role's name as a reader says it: "surfaceContainerHigh" -> "Surface

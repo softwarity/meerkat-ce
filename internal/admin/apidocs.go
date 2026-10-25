@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,7 +24,10 @@ func (a *API) registerAPIDocs(mux Mux) {
 	mux.HandleFunc("GET /apidocs/assets/{file}", apidocsAsset)
 	mux.Handle("GET /apidocs/specs.json", a.authed(a.apidocsSpecs))
 	mux.Handle("GET /apidocs/specs/meerkat-admin.json", a.authed(a.apidocsAdminSpec))
+	mux.Handle("GET /apidocs/specs/meerkat-internal.json", a.authed(a.apidocsInternalSpec))
+	mux.Handle("GET /apidocs/specs/meerkat-data.json", a.authed(a.apidocsDataSpec))
 	mux.Handle("POST /api/apidocs/token", a.devOrInfra(a.mintTestToken))
+	mux.Handle("/apidocs/call/{plane}/{rest...}", a.authed(a.apidocsCall))
 }
 
 // apidocsPage serves the shell. A browser without a live session is sent to
@@ -64,26 +66,102 @@ func apidocsAsset(w http.ResponseWriter, r *http.Request) {
 
 // specRef is one entry of the spec picker.
 type specRef struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+	TryIt bool   `json:"tryIt"`
 }
 
-// apidocsSpecs: the console documents the CONTROL plane - Meerkat's own API,
-// nothing else. The routes' specs live on the data plane, for developers.
+// apidocsSpecs: Meerkat's own three planes, the one this page is served on
+// first. The routes' specs live on the data plane, for developers.
 func (a *API) apidocsSpecs(w http.ResponseWriter, _ *http.Request, _ store.User) {
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, []specRef{{Name: "Meerkat Admin API", URL: "specs/meerkat-admin.json"}})
+	writeJSON(w, http.StatusOK, []specRef{
+		{Name: "Control plane - Meerkat Admin API", URL: "specs/meerkat-admin.json", TryIt: true},
+		{Name: "Internal plane - for the services of the cluster", URL: "specs/meerkat-internal.json", TryIt: true},
+		{Name: "Data plane - what Meerkat answers beside the routes", URL: "specs/meerkat-data.json", TryIt: true},
+	})
 }
 
 // apidocsAdminSpec serves the embedded admin spec, stamped with the build
 // version so the page shows what this binary actually answers. Its servers
 // are this origin: Try it out hits /api directly, no tunnel involved.
 func (a *API) apidocsAdminSpec(w http.ResponseWriter, _ *http.Request, _ store.User) {
-	spec := bytes.Replace(apidocs.AdminSpec,
-		[]byte(`"version": "dev"`), []byte(`"version": "`+version.Version+`"`), 1)
+	a.serveSpec(w, apidocs.AdminSpec)
+}
+
+// apidocsInternalSpec offers two addresses: this page, which Try it out goes
+// through, and the one the services are told (internalOriginOf). When the
+// runtime cannot name the latter, the page says what the scheduler's how-to
+// says: this gateway, on the internal port.
+func (a *API) apidocsInternalSpec(w http.ResponseWriter, r *http.Request, _ store.User) {
+	origin := a.internalOriginOf(r.Context())
+	if origin == "" {
+		origin = "http://<gateway>:" + portOf(a.InternalAddr)
+	}
+	a.serveSpec(w, apidocs.InternalSpec,
+		apidocs.Server{URL: "/apidocs/call/internal", Description: "Through this console (Try it out)"},
+		apidocs.Server{URL: origin, Description: "From inside the cluster"})
+}
+
+// apidocsDataSpec likewise: this page, then the address the console opens a
+// route at (dataOrigin).
+func (a *API) apidocsDataSpec(w http.ResponseWriter, r *http.Request, _ store.User) {
+	a.serveSpec(w, apidocs.DataSpec,
+		apidocs.Server{URL: "/apidocs/call/data", Description: "Through this console (Try it out)"},
+		apidocs.Server{URL: a.dataOrigin(r), Description: "Direct"})
+}
+
+// apidocsCall runs a Try it out of the internal or the data plane's
+// reference. A browser reaches neither from this page - the internal plane is
+// inside the cluster, the data plane another origin with its own session - so
+// the call is handed to that plane's handler in process, as the scheduler and
+// the agent's call_route do.
+//
+// What crosses is what the page sent minus this plane's cookies: the plane
+// called authenticates the request by its own means, the Authorization header
+// the reader filled in. The console session only decides who may use this
+// door: a person signed in here (never a token, which can call the plane
+// itself), and for the internal plane root or an infra admin, whose plane it
+// is.
+func (a *API) apidocsCall(w http.ResponseWriter, r *http.Request, actor store.User) {
+	var plane http.Handler
+	switch r.PathValue("plane") {
+	case "internal":
+		if !actor.Root && !actor.InfraAdmin {
+			writeErr(w, http.StatusForbidden, "calling the internal plane from here requires root or the infra-admin capability")
+			return
+		}
+		plane = a.InternalPlane
+	case "data":
+		plane = a.DataPlane
+	}
+	if plane == nil {
+		writeErr(w, http.StatusNotFound, "unknown plane: internal or data")
+		return
+	}
+	if sess, err := a.sm.Resolve(r.Context(), r); err != nil || sess.TokenID != "" {
+		writeErr(w, http.StatusForbidden, "Try it out is for a person signed in to the console: a token calls the plane itself")
+		return
+	}
+	out := r.Clone(r.Context())
+	out.URL.Path = "/" + r.PathValue("rest")
+	out.URL.RawPath = ""
+	out.RequestURI = ""
+	out.Header.Del("Cookie")
+	out.Header.Del("Origin")
+	out.Header.Del("Sec-Fetch-Site")
+	plane.ServeHTTP(w, out)
+}
+
+func (a *API) serveSpec(w http.ResponseWriter, spec []byte, servers ...apidocs.Server) {
+	out, err := apidocs.Served(spec, version.Version, servers...)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write(spec)
+	_, _ = w.Write(out)
 }
 
 // testTokenRequest is the API screen's mint form: an identity to impersonate

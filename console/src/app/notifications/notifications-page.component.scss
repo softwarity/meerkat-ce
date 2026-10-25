@@ -1,0 +1,231 @@
+@use "../../styles/table";
+
+// The scheduler's shape: the banner stays put, the table fills what is left
+// and scrolls under its own sticky header.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  flex: none;
+
+  h1 {
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin: 0;
+  }
+}
+
+.grow {
+  flex: 1;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0 24px 24px;
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  padding: 24px 0;
+}
+
+.table-wrap {
+  @include table.frame;
+
+  .mat-column-title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .mat-column-sender {
+    flex: 0 0 220px;
+  }
+  .mat-column-tenant {
+    flex: 0 0 160px;
+  }
+  .mat-column-reads {
+    flex: 0 0 90px;
+  }
+  .mat-column-sent {
+    flex: 0 0 170px;
+    white-space: nowrap;
+  }
+  mat-row {
+    cursor: pointer;
+  }
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// The level as a dot before the title: the colour the reader's page shows.
+.level {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-inline-end: 8px;
+  vertical-align: middle;
+  background: var(--mat-sys-primary);
+
+  &.success {
+    background: var(--mat-sys-tertiary);
+  }
+  &.warning {
+    background: var(--mat-sys-secondary);
+  }
+  &.error {
+    background: var(--mat-sys-error);
+  }
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+
+.mono {
+  font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.off {
+  opacity: 0.55;
+}
+
+mat-drawer-container {
+  height: 100%;
+  background: transparent;
+}
+
+mat-drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+mat-drawer {
+  width: min(460px, 90vw);
+
+  // How a service publishes: command lines and a JSON payload, which wrap in
+  // 460px - as wide as the scheduler's.
+  &.wide {
+    width: min(760px, 96vw);
+  }
+}
+
+.drawer {
+  padding: 20px 24px 24px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+
+  h3 {
+    margin: 24px 0 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    margin: 16px 0 0;
+  }
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+  }
+  dd {
+    margin: 0;
+    min-width: 0;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.text {
+  white-space: pre-wrap;
+}
+
+.master {
+  display: block;
+  margin-top: 16px;
+}
+
+.toggles {
+  display: grid;
+  gap: 4px;
+  margin: 16px 0 24px;
+}
+
+// The tooltip's anchor: a disabled checkbox swallows the pointer itself.
+.box {
+  justify-self: start;
+}
+
+.cap {
+  width: 100%;
+}
+
+.readers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+}
+
+.error {
+  color: var(--mat-sys-error);
+}
+
+.drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.danger {
+  color: var(--mat-sys-error);
+}
+
+// The console's table look, and a sticky header that rows pass under.
+@include table.banded-rows;

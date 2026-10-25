@@ -1,14 +1,15 @@
-import { Component, LOCALE_ID, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RowActionsDirective } from '@softwarity/row-actions';
-import { DateTime } from 'luxon';
 import { ApiService, PlugSession } from '../api.service';
+import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { zoned } from '../shared/zoned-date.pipe';
 
 // Who is plugged into the cluster, now (DEV-13): one row per plug run, merged
 // over the gateway's replicas, with what it serves - or nothing, for a client
@@ -46,7 +47,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                     i18n-matTooltip="@@Plug_session_parked"
-                    matTooltip="The cluster's {{ n.name }} is parked: this run answers in its place"
+                    matTooltip="Replaces the deployed {{ n.name }} while plugged in"
                   >
                     <rect x="4" y="4" width="6" height="6" />
                     <rect class="mine" x="14" y="4" width="6" height="6" />
@@ -59,7 +60,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                     i18n-matTooltip="@@Plug_session_added"
-                    matTooltip="The cluster had no {{ n.name }}: this run adds the name"
+                    matTooltip="New name: no {{ n.name }} is deployed in the cluster"
                   >
                     <rect x="4" y="4" width="6" height="6" />
                     <rect class="mine" x="14.5" y="4.5" width="5" height="5" transform="rotate(45 17 7)" />
@@ -108,7 +109,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
         <ng-container matColumnDef="since">
           <th mat-header-cell *matHeaderCellDef i18n="@@Plug_session_plugged_at">Plugged in at</th>
           <td mat-cell *matCellDef="let s">
-            <span class="sub" [title]="full(s.since)">{{ at(s.since) }}</span>
+            <span class="sub nowrap">{{ at(s.since) }}</span>
             <span rowActions="tonal">
               <button
                 matIconButton
@@ -133,7 +134,7 @@ export class PlugSessionsComponent {
   private readonly api = inject(ApiService);
   private readonly dialogs = inject(DialogsService);
   private readonly snack = inject(MatSnackBar);
-  private readonly locale = inject(LOCALE_ID);
+  private readonly zone = inject(MeService).timezone;
 
   protected readonly columns = ['who', 'serves', 'from', 'since'];
   protected readonly rows = signal<PlugSession[]>([]);
@@ -151,7 +152,7 @@ export class PlugSessionsComponent {
     const who = s.fullname || s.who || s.key || s.id;
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Plug_session_close_title:End this session?`,
-      message: $localize`:@@Plug_session_close_message:The command ${who}:who: runs stops as on a Ctrl-C, and what it serves goes back to the cluster at once. A new run is still let in: to keep somebody out, remove their key.`,
+      message: $localize`:@@Plug_session_close_message:The plug command of ${who}:who: stops as with Ctrl-C, and the deployed services take over at once. They can still reconnect: to block them, remove their key.`,
       confirmLabel: $localize`:@@Plug_session_close_confirm:End`,
       danger: true,
     });
@@ -163,16 +164,9 @@ export class PlugSessionsComponent {
     });
   }
 
-  // The time alone for a run plugged in today, the date with it otherwise.
+  // The moment it was plugged in, in the reader's zone (the wire says RFC 3339).
   protected at(at: string): string {
-    if (!at) return '-';
-    const t = DateTime.fromISO(at).reconfigure({ locale: this.locale });
-    return t.hasSame(DateTime.now(), 'day')
-      ? t.toLocaleString(DateTime.TIME_SIMPLE)
-      : t.toLocaleString({ month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  }
-
-  protected full(at: string): string {
-    return at ? DateTime.fromISO(at).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED) : '';
+    const ms = at ? Date.parse(at) : NaN;
+    return isNaN(ms) ? '-' : zoned(ms / 1000, this.zone());
   }
 }

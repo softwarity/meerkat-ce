@@ -273,7 +273,20 @@ type flowChrome struct {
 	// List widens the page: a sign-in form is two fields and deserves to be
 	// narrow, a list of browsers is not and does not.
 	List bool
-	T    map[string]string // the locale's message catalogue
+	// BodyStart is written at the top of <body>, where a route page gets what
+	// the gateway injects: the portal bar on a page standing behind it
+	// (BehindPortal), nothing anywhere else.
+	BodyStart template.HTML
+	// App makes the page a screen of the product rather than a step of the
+	// sign-in: no brand block, no arrangement - the page draws its own frame.
+	// The background picture, colours, fonts, scheme and language stay those
+	// of every other page, so the built-in pages preview shows it as served.
+	App bool
+	// Timezone is the zone the person reading chose on their profile, stamped
+	// on <html data-tz> for the page's scripts (mkWhen); empty when none is
+	// chosen or the page does not know who reads it: the browser's is used.
+	Timezone string
+	T        map[string]string // the locale's message catalogue
 }
 
 // withPasswordRules adds the checklist to a page's chrome. Called by the pages

@@ -16,9 +16,9 @@
     </div>
 
     <p class="hint" i18n="@@Access_tokens_both_planes">
-      Console tokens call this console's API with your powers, narrowed by a perimeter. Internal
-      tokens let a service call the scheduler on the internal plane. Application tokens are created by
-      each person on their profile; you can see and revoke them here.
+      Console tokens call the control plane API with your rights, limited to a perimeter. Internal
+      tokens let a backend service call the internal plane. Application tokens are created by each
+      user on their profile; you can see and revoke them here.
     </p>
 
     <div class="toolbar">
@@ -130,18 +130,18 @@
           <dt i18n="@@Plane">Plane</dt>
           <dd>
             @if (t.plane === 'admin') {
-              <ng-container i18n="@@Console_api">This console's API</ng-container>
+              <ng-container i18n="@@Console_api">Control plane API</ng-container>
             } @else if (t.plane === 'internal') {
-              <ng-container i18n="@@Internal_scheduler_api">The scheduler's API, on the internal plane</ng-container>
+              <ng-container i18n="@@Internal_scheduler_api">Internal plane API</ng-container>
             } @else {
-              <ng-container i18n="@@Applications_apis">The applications' APIs</ng-container>
+              <ng-container i18n="@@Applications_apis">Application APIs (data plane)</ng-container>
             }
           </dd>
           @if (t.plane === 'data') {
             <dt i18n="@@Owner">Owner</dt>
             <dd>{{ t.ownerName }}</dd>
             @if (t.tenantName) {
-              <dt i18n="@@Organisation">Organisation</dt>
+              <dt i18n="@@Organisation">Tenant</dt>
               <dd>{{ t.tenantName }}{{ t.groupName ? ' - ' + t.groupName : '' }}</dd>
             }
           }
@@ -181,7 +181,7 @@
           </div>
         } @else {
           <p class="note" i18n="@@Data_token_note">
-            Created by its owner on their profile. Revoked, it is refused from its next call.
+            Created by its owner on their profile. Once revoked, it is refused at its next call.
           </p>
           <div class="actions">
             <button matButton="outlined" class="danger" (click)="revokeData(t)">

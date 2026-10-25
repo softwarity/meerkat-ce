@@ -112,6 +112,12 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
       { path: 'audit', label: $localize`:@@Audit:Audit`, icon: 'history_edu', roles: 'root app-admin tenant-admin' },
       { path: 'sessions', label: $localize`:@@Sessions:Sessions`, icon: 'devices', roles: 'root app-admin tenant-admin' },
       { path: 'scheduler', label: $localize`:@@Scheduler:Scheduler`, icon: 'schedule', roles: 'root app-admin' },
+      {
+        path: 'notifications',
+        label: $localize`:@@Notifications:Notifications`,
+        icon: 'notifications',
+        roles: 'root app-admin',
+      },
       { path: 'metrics', label: $localize`:@@Metrics:Metrics`, icon: 'monitoring', roles: 'root infra-admin' },
       {
         path: 'issues',

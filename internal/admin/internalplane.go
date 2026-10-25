@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/notifier"
 	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/signing"
 	"github.com/softwarity/meerkat/internal/store"
@@ -79,6 +80,16 @@ func (a *API) RegisterInternal(mux Mux) {
 		mux.Handle(e.pattern, a.internalSchedules(e.h))
 	}
 	mux.Handle("PATCH /api/schedules/{id}/run", a.runReport(a.reportRun))
+	// The notifications (NOTIF-05), when this binary carries them: the
+	// services publish here, behind the access chosen for them.
+	if a.Notify != nil {
+		for _, e := range a.Notify.Internal() {
+			mux.Handle(e.Pattern, a.internalDoor(a.notificationsDoor(), func(w http.ResponseWriter, r *http.Request, _ store.User) {
+				c := callerOf(r)
+				e.Handle(w, r, notifier.Sender{Identity: c.Identity, Via: c.Via, Addr: c.Addr})
+			}))
+		}
+	}
 }
 
 // runReport lets a service report on the run it was handed, whatever the

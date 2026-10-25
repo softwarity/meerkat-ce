@@ -37,7 +37,7 @@ var (
 	pusher      func(PushConfig, *Registry) (stop func(), err error)
 	pushMu      sync.Mutex
 	pushStop    func()
-	errNoPusher = errors.New("pushing metrics over OTLP is part of the Enterprise edition, and this is the community image: " +
+	errNoPusher = errors.New("pushing metrics over OTLP is part of the Enterprise edition, and this is the Community edition: " +
 		"the built-in metrics screen works here with nothing to install")
 )
 

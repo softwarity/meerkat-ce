@@ -36,7 +36,7 @@ export function upstreamProblem(raw: string): string {
   try {
     u = new URL(v);
   } catch {
-    return $localize`:@@Gap_upstream_unreadable:the upstream is not a url: scheme and host are both needed`;
+    return $localize`:@@Gap_upstream_unreadable:the upstream is not a URL: it needs a scheme and a host`;
   }
   if (!u.hostname) {
     return $localize`:@@Gap_upstream_no_host:the upstream has no host`;

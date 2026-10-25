@@ -41,11 +41,15 @@ const (
 	// opens is /api/schedules - not the gateway's configuration, not the
 	// accounts, not the applications in front of it.
 	ScopeSchedules = "schedules"
+	// ScopeNotifications: publishing notifications (NOTIF-05) and NOTHING
+	// else - a backend's credential like the one above, for the internal
+	// plane's /api/notifications.
+	ScopeNotifications = "notifications"
 )
 
 // TokenScopes are the allowed perimeters, in the order a form should offer
 // them (the narrowest first).
-var TokenScopes = []string{ScopeSchedules, ScopeReadOnly, ScopeFull}
+var TokenScopes = []string{ScopeSchedules, ScopeNotifications, ScopeReadOnly, ScopeFull}
 
 // SanitizeTokenCIDRs normalizes the addresses a token may be used from
 // (MCP-02), and refuses what does not parse - a typo here would silently allow
@@ -116,11 +120,11 @@ func SanitizeTokenScope(scope string) (string, error) {
 	switch s := strings.ToLower(strings.TrimSpace(scope)); s {
 	case "":
 		return ScopeReadOnly, nil
-	case ScopeFull, ScopeReadOnly, ScopeSchedules:
+	case ScopeFull, ScopeReadOnly, ScopeSchedules, ScopeNotifications:
 		return s, nil
 	default:
-		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s and %s",
-			scope, ScopeSchedules, ScopeReadOnly, ScopeFull)
+		return "", fmt.Errorf("token perimeter %q: allowed are %s, %s, %s and %s",
+			scope, ScopeSchedules, ScopeNotifications, ScopeReadOnly, ScopeFull)
 	}
 }
 

@@ -783,38 +783,48 @@ func (s *Scheduler) call(sc store.Schedule) {
 // is a request like any other: so the route's own first host is used when it
 // declares one, and the gateway's otherwise.
 func (s *Scheduler) host(ctx context.Context, sc store.Schedule) string {
-	rt, err := s.d.Store.GetRoute(ctx, sc.RouteID)
-	if err == nil {
-		for _, p := range rt.Predicates {
-			if p.Type != "host" {
-				continue
-			}
-			switch v := p.Args["hosts"].(type) {
-			case string:
-				if h := firstHost(v); h != "" {
-					return h
-				}
-			case []any:
-				for _, one := range v {
-					if str, ok := one.(string); ok {
-						if h := firstHost(str); h != "" {
-							return h
-						}
-					}
-				}
-			case []string:
-				for _, one := range v {
-					if h := firstHost(one); h != "" {
-						return h
-					}
-				}
-			}
+	if rt, err := s.d.Store.GetRoute(ctx, sc.RouteID); err == nil {
+		if h := RouteHost(rt); h != "" {
+			return h
 		}
 	}
 	if s.d.Host != "" {
 		return s.d.Host
 	}
 	return "localhost"
+}
+
+// RouteHost is the first name a route is chosen by, "" when it is chosen by
+// path alone: what an in-process call through the data plane presents to
+// meet that route. The notifications call a sender's service the same way
+// when a reader acknowledges.
+func RouteHost(rt store.Route) string {
+	for _, p := range rt.Predicates {
+		if p.Type != "host" {
+			continue
+		}
+		switch v := p.Args["hosts"].(type) {
+		case string:
+			if h := firstHost(v); h != "" {
+				return h
+			}
+		case []any:
+			for _, one := range v {
+				if str, ok := one.(string); ok {
+					if h := firstHost(str); h != "" {
+						return h
+					}
+				}
+			}
+		case []string:
+			for _, one := range v {
+				if h := firstHost(one); h != "" {
+					return h
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // firstHost takes one name out of a list, skipping the wildcards: "*.acme.io"

@@ -2463,17 +2463,17 @@ func refusalReason(a store.Access, c store.Caller) string {
 	case needsTenant(a) && c.TenantID == "" && len(c.Memberships) == 0:
 		if rolesOnly(a) {
 			return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ") +
-				", held in an organisation - and your account belongs to no organisation yet"
+				", held in a tenant - and your account belongs to no tenant yet"
 		}
-		return "forbidden: your account belongs to no organisation yet"
+		return "forbidden: your account belongs to no tenant yet"
 	case needsTenant(a) && c.TenantID == "":
 		if rolesOnly(a) {
 			return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ") +
-				" in the active organisation - and no organisation is active on this session, choose one first"
+				" in the active tenant - and no tenant is active on this session, choose one first"
 		}
-		return "forbidden: no organisation is active on this session - choose one first"
+		return "forbidden: no tenant is active on this session - choose one first"
 	case a.Level == store.AccessTenants && !slices.Contains(a.Tenants, c.TenantID):
-		return "forbidden: this endpoint is reserved to another organisation"
+		return "forbidden: this endpoint is reserved to another tenant"
 	case len(a.Roles) > 0:
 		return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ")
 	}
@@ -2886,9 +2886,18 @@ func orDefault(v, fallback string) string {
 // off got nothing at all. It carries the session watch too, which is why no
 // route opts out - a page with no agent is a page that goes on looking signed
 // in for hours after the session ended.
+//
+// A UI route with no ui block at all (the API takes ui: null, an imported
+// configuration may leave it out) is a UI route with no options set, not a
+// lesser one: it gets the agent all the same - the portal bar is drawn on it,
+// and without the agent the bar's badges never move.
 func pageAgentFragment(r store.Route, localeCodes []string) string {
-	if !r.IsUI || r.UI == nil {
+	if !r.IsUI {
 		return ""
+	}
+	var scheme *store.SchemeConfig
+	if r.UI != nil {
+		scheme = r.UI.Scheme
 	}
 	attrs := ""
 	// Two different things, and they used to ride together (see SchemeConfig):
@@ -2905,10 +2914,10 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 	// and everything that inherits it - the portal bar first, whose colours are
 	// the document's - matches the application instead of the visitor's choice,
 	// which this application does not take anyway.
-	if s := r.UI.Scheme; s != nil && s.Mechanism == store.SchemeNone && (s.Button == "light" || s.Button == "dark") {
+	if s := scheme; s != nil && s.Mechanism == store.SchemeNone && (s.Button == "light" || s.Button == "dark") {
 		attrs += fmt.Sprintf(` data-scheme-wear="%s"`, s.Button)
 	}
-	if s := r.UI.Scheme; s != nil && s.Mechanism != store.SchemeNone {
+	if s := scheme; s != nil && s.Mechanism != store.SchemeNone {
 		if s.Select {
 			attrs += ` data-scheme="select"`
 		}
@@ -2965,7 +2974,7 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 	// The route's own scheme script, before the agent so it is defined by the
 	// time the agent's catch-up calls it. The body's hash is in the URL: the
 	// answer is cacheable, and an edit reaches a browser holding the last one.
-	if s := r.UI.Scheme; s != nil && s.Mechanism == store.SchemeScript && s.Script != "" {
+	if s := scheme; s != nil && s.Mechanism == store.SchemeScript && s.Script != "" {
 		sum := sha256.Sum256([]byte(s.Script))
 		agent = fmt.Sprintf(`<script defer src="/meerkat/scheme.js?r=%s&amp;v=%x"></script>`,
 			url.QueryEscape(r.ID), sum[:4]) + agent
@@ -2984,7 +2993,7 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 	// Inline and not deferred, so it lands before the app's own boot script. Only
 	// when a scheme was actually chosen; with none, the app keeps its own memory
 	// and follows the system, which is what "auto" means.
-	if s := r.UI.Scheme; s != nil && s.StorageOverride && s.Storage != "" && s.Mechanism != store.SchemeNone {
+	if s := scheme; s != nil && s.StorageOverride && s.Storage != "" && s.Mechanism != store.SchemeNone {
 		light, dark := orDefault(s.StorageLight, "light"), orDefault(s.StorageDark, "dark")
 		// An empty value is a choice of its own: remove the entry and let the
 		// application fall back to whatever it does with nothing stored.

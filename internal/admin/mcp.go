@@ -203,10 +203,10 @@ func (a *API) tools() []mcp.Tool {
 		{
 			Name: "describe_gateway", Title: "Describe the gateway", ReadOnly: true,
 			Description: "What this Meerkat installation is: edition (community or Enterprise), version, " +
-				"organisation mode, and how many routes, users and organisations it holds. " +
+				"tenant mode, and how many routes, users and tenants it holds. " +
 				"Call this FIRST: it says which edition you are talking to, and what your own perimeter " +
 				"is. Both matter for the same reason - an Enterprise capability is absent from the " +
-				"community image, and a tool outside your perimeter is not in your list - so knowing them " +
+				"Community edition, and a tool outside your perimeter is not in your list - so knowing them " +
 				"is how you say 'that needs the Enterprise edition' or 'this token may not change " +
 				"anything' instead of failing at it.",
 			Schema: noArgs(),
@@ -260,10 +260,10 @@ func (a *API) tools() []mcp.Tool {
 						"person land somewhere else'.",
 					"properties": map[string]any{
 						"username":    str("The account, for a rule that names people."),
-						"tenantId":    str("The organisation ACTIVE on the session, which is what a rule reads. Not the ones they belong to."),
-						"roles":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "The effective roles IN that organisation."},
-						"memberships": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "The organisations they could switch to. These grant nothing; they tell a final refusal from one a switch would fix."},
-						"signedIn":    map[string]any{"type": "boolean", "description": "There is a session, with no organisation chosen - what a fresh account looks like."},
+						"tenantId":    str("The tenant ACTIVE on the session, which is what a rule reads. Not the ones they belong to."),
+						"roles":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "The effective roles IN that tenant."},
+						"memberships": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "The tenants they could switch to. These grant nothing; they tell a final refusal from one a switch would fix."},
+						"signedIn":    map[string]any{"type": "boolean", "description": "There is a session, with no tenant chosen - what a fresh account looks like."},
 					},
 				},
 			}),
@@ -277,8 +277,8 @@ func (a *API) tools() []mcp.Tool {
 			Call:   a.toolListUsers,
 		},
 		{
-			Name: "list_tenants", Allow: administersIdentity, Title: "List the organisations", ReadOnly: true,
-			Description: "The organisations (tenants) and their owner. In single-organisation mode there " +
+			Name: "list_tenants", Allow: administersIdentity, Title: "List the tenants", ReadOnly: true,
+			Description: "The tenants and their owner. In single-tenant mode there " +
 				"is one, and the others are held back rather than deleted.",
 			Schema: noArgs(),
 			Call:   a.toolListTenants,
@@ -344,7 +344,7 @@ func (a *API) tools() []mcp.Tool {
 		},
 		{
 			Name: "export_configuration", Allow: isRoot, Title: "Export the whole configuration", ReadOnly: true,
-			Description: "The entire infrastructure as one YAML document: routes, roles, organisations, " +
+			Description: "The entire infrastructure as one YAML document: routes, roles, tenants, " +
 				"authorities, OIDC clients, settings and the vault entries it REFERENCES (never their values). " +
 				"An OIDC client's secret is carried as its sha256 (secretHash) only, never in clear. " +
 				"The cheapest way to get the whole picture in one call before answering a broad question. " +
@@ -357,6 +357,7 @@ func (a *API) tools() []mcp.Tool {
 	read = append(read, a.lookTools()...)
 	read = append(read, a.writeTools()...)
 	read = append(read, a.scheduleTools()...)
+	read = append(read, a.notificationTools()...)
 	read = append(read, a.roleTools()...)
 	read = append(read, a.oidcTools()...)
 	read = append(read, a.identityTools()...)
@@ -411,7 +412,7 @@ func (a *API) toolDescribe(ctx context.Context, _ json.RawMessage) (any, error) 
 		// So the agent can SAY why, instead of stopping at a tool it cannot
 		// find. The community image simply does not carry that code.
 		out["enterpriseWouldAdd"] = []string{
-			"more than one organisation",
+			"more than one tenant",
 			"arranging the built-in pages (layouts)",
 			"the orchestrator directories",
 			"removing the Meerkat mark",
@@ -594,9 +595,9 @@ func accessSummary(a store.Access) string {
 	case store.AccessAuth:
 		parts = append(parts, "signed in")
 	case store.AccessTenant:
-		parts = append(parts, "signed in with an organisation chosen")
+		parts = append(parts, "signed in with a tenant chosen")
 	case store.AccessTenants:
-		parts = append(parts, "organisation in "+strings.Join(a.Tenants, ", "))
+		parts = append(parts, "tenant in "+strings.Join(a.Tenants, ", "))
 	case store.AccessDeny:
 		parts = append(parts, "nobody")
 	default:

@@ -1610,6 +1610,12 @@ func TestPageAgentRunsWithoutTheButton(t *testing.T) {
 	if got := pageAgentFragment(plain, nil); !strings.Contains(got, "/meerkat/page.js") {
 		t.Errorf("a plain UI route got no agent:\n%s", got)
 	}
+	// Nor does one saved with no ui block at all (ui: null over the API): the
+	// portal bar is drawn on it, and the agent is what moves its badges.
+	plain.UI = nil
+	if got := pageAgentFragment(plain, nil); !strings.Contains(got, "/meerkat/page.js") {
+		t.Errorf("a UI route without a ui block got no agent:\n%s", got)
+	}
 }
 
 // Both scripts are deferred, so they run in document order, and the button's

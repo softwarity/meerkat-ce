@@ -8,7 +8,7 @@
 </div>
 @if (scope.tenant(); as t) {
   <p class="meta">
-    <span i18n="@@Created_on">Created on</span> {{ t.createdAt * 1000 | date: 'yyyy-MM-dd' }}
+    <span i18n="@@Created_on">Created on</span> <span class="nowrap">{{ t.createdAt | zoned: zone() : "day" }}</span>
     @if (t.createdByName) {
       <span i18n="@@by">by</span> <span class="who">{{ t.createdByName }}</span>
     }
@@ -44,7 +44,7 @@
   <app-ee-lock
     feature="business-hours"
     i18n-why="@@Working_hours_ee_why"
-    why="Refuse access outside declared hours, gateway-wide or per person: an audit requirement rather than a defence."
+    why="Allow access only during set hours, for everyone or per person."
   />
 </h3>
 <app-business-access-form

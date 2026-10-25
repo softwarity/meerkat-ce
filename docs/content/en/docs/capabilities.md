@@ -79,6 +79,7 @@ The ways in, all served by the gateway in your colours, in 20 languages.
 |---|---|---|---|
 | [User button and portal](/docs/concepts/data-plane-chrome) | Profile, sign-out, organisation, language, light or dark, and the navigation across your applications, added to the pages the gateway serves. | To build in each application. No product does it. | Community, navigation bar Enterprise |
 | [Per-role CSS, your CSS and JavaScript](/docs/customise/injections) | Roles stamped on the page server-side, and your own code per route. | Front-end code in each application. | Community |
+| [Notifying your users](/docs/operations/notifications) | A service sends one request; its users see it in whichever application they have open, with a count, a snackbar, a desktop notification, a mail if asked, and an acknowledgement when it matters. | A notification service and its inbox widget in every application, or Novu, Knock, Courier. | Enterprise, *partly* |
 | Issue reporting | A screenshot and its technical context, tracked in the console. | Sentry self-hosted, or Marker.io, Jam, Userback. | Community |
 | [Theme and branding](/docs/customise/theme) | Material 3 themes, light and dark, your logo and background; more page layouts and no Meerkat mark with Enterprise. | A theme per tool. | Community, layouts Enterprise |
 
@@ -124,5 +125,5 @@ Planned, and not built yet (the detail is on the [roadmap](/project/roadmap)):
 - **HTTP/3**, once the gain can be measured.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets, Docker secrets.
 - **Issues pushed to GitHub, GitLab or Jira.**
-- **Web Push notifications.**
+- **Web Push**: a desktop notification that reaches a person even when no application is open.
 - **Kerberos and SPNEGO**, Enterprise.

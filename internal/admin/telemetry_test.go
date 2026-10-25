@@ -208,3 +208,25 @@ func TestAnExportThatSendsNothingIsRefused(t *testing.T) {
 		t.Fatalf("an export sending nothing answered %d: %s", code, out)
 	}
 }
+
+// The settings every console account reads carry the telemetry setting, and
+// they carry it the way its own screen does: a header typed as a literal is
+// most often the collector's credential, and it never comes back.
+func TestTheSettingsHoldBackALiteralCollectorHeader(t *testing.T) {
+	f := setup(t)
+	cfg := store.DefaultTelemetry()
+	cfg.Headers = map[string]string{"Authorization": "Bearer plain-token", "X-Tenant": "$otlp-tenant"}
+	if err := f.api.st.SetSetting(context.Background(), store.SettingTelemetry, cfg); err != nil {
+		t.Fatal(err)
+	}
+	code, out := f.call(t, "GET", "/api/settings", "", f.plainC)
+	if code != http.StatusOK {
+		t.Fatalf("GET /api/settings: %d %s", code, out)
+	}
+	if strings.Contains(out, "plain-token") {
+		t.Errorf("a plain account read a literal collector header: %s", out)
+	}
+	if !strings.Contains(out, "$otlp-tenant") {
+		t.Errorf("a reference is public and should still be shown: %s", out)
+	}
+}

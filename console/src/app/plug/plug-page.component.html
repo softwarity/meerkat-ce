@@ -25,8 +25,8 @@
   <ol class="steps">
     <li>
       <p i18n="@@Plug_step_profile">
-        <b>Name the profile</b>: plug keeps one per gateway, and every command below passes it
-        with <code>-p</code>.
+        <b>Name the profile</b>: one per gateway, passed to every command below with
+        <code>-p</code>.
       </p>
       <app-form-field
         class="profile"
@@ -66,15 +66,15 @@
     </li>
     <li>
       <p i18n="@@Plug_step_deposit">
-        <b>Deposit the public key</b> on your profile, signed in to the applications:
+        <b>Add the public key</b> to your profile at
         <a [href]="keyPage()" target="_blank" rel="noopener">{{ keyPage() }}</a>, or from the user
         menu, Developer, plug key. Removing it blocks the next connection.
       </p>
     </li>
     <li>
       <p i18n="@@Plug_step_run">
-        <b>Plug a service in</b>: prefix the command that runs it. The cluster reaches it as
-        my-service:8080, forwarded to your local 3000.
+        <b>Plug a service in</b>: put plug before the command that runs it. The cluster reaches it
+        as my-service:8080, forwarded to your local port 3000.
       </p>
       <app-snippet filename="run.sh" [downloadable]="false" [content]="runCmd()" />
     </li>
@@ -94,9 +94,9 @@
 
 <div class="content">
 <p class="lead" i18n="@@Plug_lead">
-  <b>plug</b> runs a developer's local service as a member of the cluster, under its real name,
-  through a tunnel this gateway opens. A deployed service of the same name is parked meanwhile.
-  More in
+  <b>plug</b> runs a developer's local service in the cluster, under its real name, through a
+  tunnel opened by this gateway. A deployed service with the same name is replaced in the
+  meantime. See
   <a href="https://softwarity.github.io/plug/" target="_blank" rel="noopener">plug's documentation</a>.
 </p>
 
@@ -130,7 +130,7 @@
         }
       }
       @case ('unavailable') {
-        <ng-container i18n="@@Plug_status_unavailable">Switched on, but not running here:</ng-container>
+        <ng-container i18n="@@Plug_status_unavailable">On, but not running on this gateway:</ng-container>
         {{ s.status.why }}
       }
       @default {
@@ -175,11 +175,11 @@
           <ng-container i18n="@@Plug_exposed_published">{{ x.source === 'swarm' ? 'Swarm' : 'Docker' }} publishes it on port {{ x.port }} of the host.</ng-container>
         }
         @default {
-          <ng-container i18n="@@Plug_exposed_none">The runtime could not say how it is published.</ng-container> {{ x.why }}
+          <ng-container i18n="@@Plug_exposed_none">Could not detect how the tunnel is published.</ng-container> {{ x.why }}
         }
       }
       @if (x.kind !== 'clusterip') {
-        <ng-container i18n="@@Plug_exposed_front"> A mapping in front of it (k3d, Docker Desktop, a firewall) is not seen: what developers type is what to record.</ng-container>
+        <ng-container i18n="@@Plug_exposed_front"> A port mapping in front of it (k3d, Docker Desktop, a firewall) cannot be detected: enter the address developers actually use.</ng-container>
       }
     </span>
   </p>
@@ -204,7 +204,7 @@
       label="Port"
       [clearable]="false"
       i18n-info="@@Plug_port_info"
-      info="The published port, empty if nothing sits in between (the container listens on 22222). The Helm chart publishes it as plug.service (ClusterIP by default; use a NodePort or LoadBalancer for laptops outside the cluster)."
+      info="The published port. Leave empty if it is the container port (22222). For machines outside the cluster, set plug.service to NodePort or LoadBalancer in the Helm chart."
     >
       <input
         matInput
@@ -242,7 +242,7 @@
        entry that exists while the tunnel is open. -->
   @if (s.enterprise && s.enabled) {
     <p class="hint people" i18n="@@Plug_people_moved">
-      Who may plug in, who is plugged in now and ending a session are on
+      Who may plug in and the active sessions are under
       <a routerLink="/application/plug">Application, Plug</a>.
     </p>
   }

@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"database/sql"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -99,6 +101,10 @@ func (a *API) scopedIssue(w http.ResponseWriter, r *http.Request, actor store.Us
 		return store.Issue{}, false
 	}
 	is, err := a.st.GetIssue(r.Context(), r.PathValue("id"))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		a.internal(w, err)
+		return store.Issue{}, false
+	}
 	if err != nil || !issueInScope(is, scope) {
 		writeErr(w, http.StatusNotFound, "unknown issue")
 		return store.Issue{}, false

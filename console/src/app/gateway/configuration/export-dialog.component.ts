@@ -105,7 +105,7 @@ export interface ExportChoice {
       @if (report(); as r) {
         @if (r.contents.length) {
           <dl>
-            <dt i18n="@@It_carries">It carries</dt>
+            <dt i18n="@@It_carries">Contains</dt>
             <dd>{{ carried(r.contents) }}</dd>
           </dl>
         }
@@ -118,7 +118,7 @@ export interface ExportChoice {
           <mat-icon>info</mat-icon>
           <div>
             <p i18n="@@Not_carried_list2">
-              Not a backup: no users, organisations, sessions, vault, audit trail, personal tokens
+              Not a backup: no users, memberships, sessions, vault, audit trail, personal tokens
               or signing keys.
             </p>
             <p class="aside" i18n="@@Backup_is_the_database_tab">
@@ -131,7 +131,7 @@ export interface ExportChoice {
             <mat-icon>key_off</mat-icon>
             <div>
               <p i18n="@@Export_literals_note">
-                These secrets are stored as values, not vault references: they are NOT in the
+                These secrets are typed in directly, not vault references: they are NOT in the
                 file and arrive empty.
               </p>
               <ul>
@@ -148,7 +148,7 @@ export interface ExportChoice {
                 }
               </ul>
               <p class="aside" i18n="@@Literals_remedy">
-                Move each one to the vault and reference it by $name: the file then carries only
+                Move each one to the vault and reference it by $name: the file then holds only
                 the name.
               </p>
             </div>
@@ -174,7 +174,7 @@ export interface ExportChoice {
           <div class="note">
             <mat-icon>image</mat-icon>
             <p i18n="@@Export_image_note">
-              This configuration has images. Plain YAML leaves them out; the package carries
+              This configuration has images. Plain YAML leaves them out; the package includes
               them.
             </p>
           </div>
@@ -287,7 +287,7 @@ export class ExportDialogComponent {
       // "1 setting" through the fallback: an inventory that miscounts what it
       // carries is worse than no inventory.
       case 'tenant':
-        return one ? $localize`:@@Organisation:Organisation` : $localize`:@@Organisations:Organisations`;
+        return one ? $localize`:@@Organisation:Tenant` : $localize`:@@Organisations:Tenants`;
       case 'group':
         return one ? $localize`:@@Group:Group` : $localize`:@@Groups:Groups`;
       default:

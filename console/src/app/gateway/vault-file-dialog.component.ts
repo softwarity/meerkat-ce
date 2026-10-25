@@ -91,8 +91,8 @@ export interface VaultFileDialogData {
     <mat-dialog-content>
       @if (data.mode === 'export') {
         <p class="hint" i18n="@@Vault_export_hint">
-          Every entry you administer, values included, encrypted under this passphrase. Do not
-          version the file; without the passphrase nobody can read it.
+          All the entries you manage, values included, encrypted with this passphrase. Nobody can
+          read the file without it. Do not commit it to git.
         </p>
       } @else {
         <p class="hint" i18n="@@Vault_import_hint">
@@ -187,7 +187,7 @@ export interface VaultFileDialogData {
           @if (r.skipped.length) {
             <div class="warn">
               <ng-container i18n="@@N_skipped">
-                {{ r.skipped.length }} skipped: not yours, or unknown organisation
+                {{ r.skipped.length }} skipped: not yours, or unknown tenant
               </ng-container>
               <span class="names">: {{ r.skipped.join(', ') }}</span>
             </div>

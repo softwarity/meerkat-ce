@@ -473,7 +473,7 @@ func importTenants(ctx context.Context, st *store.Store, doc *Document, plan *Pl
 		})
 		if commit && action != ActionSame {
 			if err := st.SaveTenant(ctx, t); err != nil {
-				return fmt.Errorf("config: organisation %q: %w", t.Name, err)
+				return fmt.Errorf("config: tenant %q: %w", t.Name, err)
 			}
 		}
 	}

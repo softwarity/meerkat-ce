@@ -6,8 +6,8 @@
 
     <div class="content">
       <p class="intro text-muted" i18n="@@Authentication_intro">
-        The ways to sign in to the data plane. An authority proves who someone is; roles, granted by
-        an administrator, decide what they may do.
+        How users sign in to the applications. An authority checks who they are; the roles an
+        administrator grants decide what they can do.
       </p>
 
       <div class="master">
@@ -15,8 +15,8 @@
           <ng-container i18n="@@Self_registration">Self-registration</ng-container>
         </mat-slide-toggle>
         <span class="hint text-muted" i18n="@@Self_registration_master_hint">
-          Let people create their own account; it reaches nothing until an administrator grants
-          roles. Off here, no authority may.
+          Let users create their own account, with no access until an administrator grants roles.
+          Off, no authority allows it.
         </span>
       </div>
       <!-- The mailed links that prove an address: the one finishing a sign-up
@@ -62,7 +62,7 @@
                   <!-- No server to reach: what this row needs to say is what
                        turning it off does, and what it never touches. -->
                   <span class="truncate text-muted" i18n="@@Local_accounts_target">
-                    The passwords held here. Off, this console still keeps its password sign-in.
+                    Passwords stored in Meerkat. When off, the console keeps its password sign-in.
                   </span>
                 } @else {
                   <span class="mono truncate">{{ target(p) }}</span>

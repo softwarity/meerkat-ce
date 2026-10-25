@@ -45,8 +45,8 @@ interface MapDraft {
   imports: [FormField, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule],
   template: `
     <p class="hint" i18n="@@Role_map_intro">
-      The application's spec names these roles. Map each onto a catalogue role: Auth forward then sends the
-      ones the person holds, under the application's own names. A role not mapped is never sent.
+      Roles named in the application's spec. Map each to a role of the catalogue: Auth forward then sends
+      the ones the person holds, under the application's names. A role left unmapped is never sent.
     </p>
 
     <div class="applied">

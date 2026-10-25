@@ -499,3 +499,11 @@
   flex-wrap: wrap;
   min-height: 48px;
 }
+
+// The notifications page's route and path, under the card's head, aligned on
+// its text (past the icon).
+.notify-custom {
+  margin-top: 12px;
+  padding-left: 40px;
+  align-items: flex-start;
+}

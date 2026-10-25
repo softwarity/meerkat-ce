@@ -1,0 +1,2928 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Meerkat Internal API",
+    "description": "The API your cluster's services call: Meerkat's public keys, scheduled calls, notifications and the OpenID provider's back end. Port 7070 (7443 over HTTPS). Keep it inside the cluster: never expose it.\n\nKeys, discovery and the probe are open. The scheduler and the notifications each have an access setting in the console (Scheduler > Access, Notifications > Access):\n\n- **None**: no credential.\n- **Meerkat token**: `Authorization: Bearer mk_...`, an internal token with the perimeter `schedules` or `notifications`.\n- **Cluster token**: the calling pod's ServiceAccount token (Kubernetes only).\n\nAn access can also be limited to a list of callers. A credential that is sent is always checked. Changes are recorded in the audit trail. Writes answer 503 with Retry-After while the database is being moved.",
+    "version": "dev"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "meerkatToken": []
+    },
+    {
+      "clusterToken": []
+    },
+    {}
+  ],
+  "tags": [
+    {
+      "name": "Keys",
+      "description": "Public keys and OpenID discovery. Open to every caller."
+    },
+    {
+      "name": "OpenID provider",
+      "description": "Token and userinfo endpoints for applications that sign users in through Meerkat (Enterprise edition)."
+    },
+    {
+      "name": "Scheduler",
+      "description": "Calls Meerkat makes to your services on a schedule."
+    },
+    {
+      "name": "Notifications",
+      "description": "Notifications to users (Enterprise edition)."
+    },
+    {
+      "name": "Probes",
+      "description": "Liveness probe."
+    }
+  ],
+  "paths": {
+    "/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Keys"
+        ],
+        "summary": "Read the gateway's public keys",
+        "operationId": "getJwks",
+        "description": "Verify the identity token Meerkat sends with each request. Retired keys stay listed during their grace period. Cached 5 minutes.",
+        "responses": {
+          "200": {
+            "description": "The key set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Keys unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Keys"
+        ],
+        "summary": "Read the OpenID discovery document",
+        "operationId": "getOpenIdConfiguration",
+        "description": "Issuer and key set, at the address the caller used. With the OpenID provider active (Enterprise edition), also its endpoints. Cached 5 minutes, except while the provider is active.",
+        "responses": {
+          "200": {
+            "description": "The discovery document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenIdConfiguration"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/notifications": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Publish a notification",
+        "operationId": "publishNotification",
+        "description": "Sent to the tenant's enabled members, narrowed to the roles and users named, and to those allowed to open its link. The audience is fixed at publication. With `\"tenant\": \"*\"`, each enabled tenant whose notifications are on gets its own copy, with its own id; a tenant where nobody may receive it is skipped, and the answer says which and why. A person in several of these tenants sees one notification naming them, and gets one mail. With `ack`, readers are asked to acknowledge it, and `onAck` names your service, called at each acknowledgement (a `NotificationAckCall`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPublished"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already published under this key; nobody notified again (sent to every tenant: every copy was)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPublished"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, unknown field, or over 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused, with the reason (for example notifications off for the tenant, nobody in the audience, or above the cap; sent to every tenant: no tenant received it)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise",
+        "callbacks": {
+          "onAck": {
+            "{$request.body#/onAck}": {
+              "post": {
+                "summary": "An acknowledgement, told to your service",
+                "description": "Called once per acknowledgement, through the route of `onAck`. Sent to every tenant, each copy is called with its own id and tenant.",
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/NotificationAckCall"
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "2XX": {
+                    "description": "Taken"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List your notifications",
+        "operationId": "listMyNotifications",
+        "description": "Your live notifications, newest first. Filter with `meta.<key>=<value>` or `meta.<key>=~<RE2 regex>`; all must match. One that asks to be acknowledged says where that stands: `ackState`, `acknowledged`, `ackBy`.",
+        "responses": {
+          "200": {
+            "description": "Your notifications, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed meta condition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Withdraw notifications by filter",
+        "operationId": "withdrawMatchingNotifications",
+        "description": "Withdraws your live notifications that match; at least one meta condition. Filter with `meta.<key>=<value>` or `meta.<key>=~<RE2 regex>`; all must match.",
+        "responses": {
+          "200": {
+            "description": "Withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "withdrawn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Ids withdrawn."
+                    }
+                  },
+                  "required": [
+                    "withdrawn"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No meta condition, or a malformed one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Withdraw a notification",
+        "operationId": "withdrawMyNotification",
+        "description": "It disappears from users' pages at once.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Withdrawn"
+          },
+          "404": {
+            "description": "No live notification of yours with this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/api/notifications/{id}/acks": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Who acknowledged a notification",
+        "operationId": "listMyNotificationAcks",
+        "description": "For one of yours that asks to be acknowledged: who did, when, and who has not yet.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where it stands",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationAcks"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No notification of yours with this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It does not ask for an acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/api/schedules": {
+      "get": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "List the schedules",
+        "operationId": "internalListSchedules",
+        "description": "Sorted by name. Filter with `meta.<key>=<value>` or `meta.<key>=~<RE2 regex>`; all must match.",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant id."
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Route id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schedule"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed meta condition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Create a schedule",
+        "operationId": "internalCreateSchedule",
+        "description": "The id is chosen by Meerkat; find your schedules again by their metadata. Each run calls the service through its route, as the account `meerkat` with the schedule's roles.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The schedule, with its id and next run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or unknown field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "callbacks": {
+          "scheduledCall": {
+            "$ref": "#/components/callbacks/scheduledCall"
+          }
+        }
+      }
+    },
+    "/api/schedules/pause": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Pause schedules by filter",
+        "operationId": "internalPauseMatching",
+        "description": "A filter is required: tenant, route or a meta condition. Filter with `meta.<key>=<value>` or `meta.<key>=~<RE2 regex>`; all must match. A run in progress stops at its next report.",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant id."
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Route id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules, paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schedule"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No filter, or a malformed meta condition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/api/schedules/resume": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Resume schedules by filter",
+        "operationId": "internalResumeMatching",
+        "description": "A filter is required: tenant, route or a meta condition. Filter with `meta.<key>=<value>` or `meta.<key>=~<RE2 regex>`; all must match.",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant id."
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Route id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules, resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schedule"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No filter, or a malformed meta condition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/api/schedules/{id}": {
+      "get": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Read a schedule",
+        "operationId": "internalGetSchedule",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Replace a schedule",
+        "operationId": "internalPutSchedule",
+        "description": "Never creates one. An empty description keeps the current one. Changing when it runs recomputes the next run.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or unknown field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "callbacks": {
+          "scheduledCall": {
+            "$ref": "#/components/callbacks/scheduledCall"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Delete a schedule",
+        "operationId": "internalDeleteSchedule",
+        "description": "Deletes its history too. A run in progress stops at its next report.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/api/schedules/{id}/pause": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Pause a schedule",
+        "operationId": "internalPauseSchedule",
+        "description": "A run in progress stops at its next report.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule, paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/api/schedules/{id}/resume": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Resume a schedule",
+        "operationId": "internalResumeSchedule",
+        "description": "A run missed while paused goes out now.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule, resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/api/schedules/{id}/run": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Run now, or replay a past run",
+        "operationId": "internalRunSchedule",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRunRequest"
+              }
+            }
+          },
+          "description": "Optional: empty runs the schedule now."
+        },
+        "responses": {
+          "202": {
+            "description": "Due now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or unknown field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown schedule or history entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Paused, or a run in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Cancel the run in progress",
+        "operationId": "internalCancelScheduleRun",
+        "description": "Ends it as cancelled and schedules the next run. The service learns it at its next report.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "No run in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Report on a run",
+        "operationId": "internalReportScheduleRun",
+        "description": "For a service that answered 202. No credential: the run identifier the call carried is the proof.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "name": "Meerkat-Job-Run",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run identifier, when the body does not name it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRunReport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded: carry on"
+          },
+          "400": {
+            "description": "Malformed body, or unknown field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a run of this schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Stop: the run is over (the body says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleRunStop"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid report (no run, progress, state or retryIn)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/schedules/{id}/runs": {
+      "get": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "List a schedule's runs",
+        "operationId": "internalListScheduleRuns",
+        "description": "Newest first, including runs that were due but never sent.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "1 to 500, default 100."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The runs, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleRun"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Probes"
+        ],
+        "summary": "Check liveness",
+        "operationId": "internalHealthz",
+        "description": "Answers UP while the process serves. No readiness probe on this plane.",
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "UP"
+                      ]
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": "Meerkat version."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "version"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/meerkat/oidc/jwks": {
+      "get": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Read the OpenID provider's keys",
+        "operationId": "oidcJwks",
+        "description": "Readable from any origin.",
+        "responses": {
+          "200": {
+            "description": "The key set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: no issuer configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/token": {
+      "post": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Exchange a code or refresh token",
+        "operationId": "oidcToken",
+        "description": "For an application's server inside the cluster. A code or refresh token works only while the user's Meerkat session lasts and a route of the client still admits the user.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OidcTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcTokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_client: unknown client or wrong secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "server_error: tokens not issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: no issuer configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oidcClient": []
+          },
+          {}
+        ],
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/userinfo": {
+      "get": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Read the token's user",
+        "operationId": "oidcUserinfo",
+        "responses": {
+          "200": {
+            "description": "The user's claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcUserinfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token missing, invalid or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: no issuer configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oidcAccessToken": []
+          }
+        ],
+        "x-meerkat-edition": "enterprise"
+      },
+      "post": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Read the token's user (form)",
+        "operationId": "oidcUserinfoPost",
+        "description": "The token in the Authorization header or as access_token in the form.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "access_token": {
+                    "type": "string",
+                    "description": "When not sent as a bearer."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcUserinfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token missing, invalid or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: no issuer configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oidcAccessToken": []
+          },
+          {}
+        ],
+        "x-meerkat-edition": "enterprise"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "meerkatToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Meerkat token (`mk_...`) with the perimeter `schedules` or `notifications`, or an application administrator's token. Required when the access is Meerkat token; refused when it is Cluster token."
+      },
+      "clusterToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "The calling pod's ServiceAccount token (/var/run/secrets/kubernetes.io/serviceaccount/token). Required when the access is Cluster token. Kubernetes only."
+      },
+      "oidcClient": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Client id and secret (client_secret_basic), or in the form. A public client sends no secret."
+      },
+      "oidcAccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "An access token from the OpenID provider."
+      }
+    },
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Unknown id",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Invalid": {
+        "description": "Refused, with the reason",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "CallerUnauthorized": {
+        "description": "Credential missing or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "CallerRefused": {
+        "description": "Caller not admitted, or token perimeter does not cover this API",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ClusterUnavailable": {
+        "description": "Cluster token unavailable: not on Kubernetes, or the Kubernetes API did not answer",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Schedule": {
+        "type": "object",
+        "description": "A scheduled call: a route and path, when, and with which roles.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Set by Meerkat (`sch_...`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Shown in the console and the log."
+          },
+          "description": {
+            "type": "string",
+            "description": "What it is for, 500 characters at most."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Roles the call carries, 10 at most. Rules treat them like a person's."
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Account that last wrote it (a token's owner); empty when only the access mode identified the caller."
+          },
+          "caller": {
+            "type": "string",
+            "description": "Who created it, as the access check identified them."
+          },
+          "callerVia": {
+            "type": "string",
+            "description": "How the creator was identified.",
+            "enum": [
+              "token",
+              "serviceaccount",
+              "workload",
+              "container",
+              "unidentified"
+            ]
+          },
+          "callerAddr": {
+            "type": "string",
+            "description": "Creator's address."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant the call is made in; also where `$name` vault references resolve. Empty for none."
+          },
+          "routeId": {
+            "type": "string",
+            "description": "Route the call goes through."
+          },
+          "route": {
+            "type": "string",
+            "description": "Route name."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your own labels, for `meta.<key>` filters. 20 keys at most; keys of letters, digits and - _ . : up to 40 characters; values up to 200."
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method. GET and HEAD are refused.",
+            "enum": [
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Path on the route, starting with /."
+          },
+          "body": {
+            "description": "An object or array is sent as JSON; a string is sent as is."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Content-Type, when the body is not JSON."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Extra headers, 10 at most. Values may be vault references (`$name`). Authorization, Host and the Meerkat-Job headers are refused."
+          },
+          "every": {
+            "type": "string",
+            "description": "Cadence: ISO 8601 duration (PT30M, P1D), 1 minute at least, counted from the end of the previous run."
+          },
+          "cron": {
+            "type": "string",
+            "description": "Calendar: five-field cron (0 3 * * MON), in timezone."
+          },
+          "at": {
+            "type": "string",
+            "description": "Single date, RFC 3339 with offset: runs once."
+          },
+          "startAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "First run of a cadence or calendar (Unix seconds). Not with at."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for cron (Europe/Paris); empty is UTC."
+          },
+          "overlap": {
+            "type": "string",
+            "description": "skip: a run due while the previous one is open waits for it.",
+            "enum": [
+              "skip"
+            ]
+          },
+          "catchUp": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How late a missed run may still go out, in seconds; 0 is no limit."
+          },
+          "retryLost": {
+            "type": "string",
+            "description": "Delay before a lost run is sent again, PT1M to P1D. Empty never resends."
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Wait for the answer, ISO 8601, 2 minutes at most. Long work answers 202."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Sends nothing while paused."
+          },
+          "nextAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Next run (Unix seconds); 0 once a single date has run."
+          },
+          "runId": {
+            "type": "string",
+            "description": "Run in progress (its Meerkat-Job-Run); empty if none."
+          },
+          "runStarted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the run in progress (Unix seconds)."
+          },
+          "claimedBy": {
+            "type": "string",
+            "description": "Gateway making the run, when several share the database."
+          },
+          "claimedAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When that gateway took or renewed the run (Unix seconds)."
+          },
+          "progress": {
+            "type": "integer",
+            "description": "Percentage, 0 to 100."
+          },
+          "runDetail": {
+            "type": "string",
+            "description": "Service's last report on the run."
+          },
+          "runState": {
+            "type": "string",
+            "description": "calling: no answer yet; accepted: the service took the work; waiting: lost, to be resent.",
+            "enum": [
+              "calling",
+              "accepted",
+              "waiting"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "description": "Attempts of the current or last run."
+          },
+          "runCause": {
+            "type": "string",
+            "description": "manual: run now; replay: past run again; retry: after a failure; asked: the service asked to be called back.",
+            "enum": [
+              "manual",
+              "replay",
+              "retry",
+              "asked"
+            ]
+          },
+          "runOf": {
+            "type": "string",
+            "description": "Run this one continues."
+          },
+          "turnTry": {
+            "type": "integer",
+            "description": "Attempts the next run already had."
+          },
+          "lastState": {
+            "type": "string",
+            "description": "How the last run ended.",
+            "enum": [
+              "done",
+              "failed",
+              "lost",
+              "dropped",
+              "cancelled"
+            ]
+          },
+          "lastDetail": {
+            "type": "string",
+            "description": "Last run's detail."
+          },
+          "lastAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "End of the last run (Unix seconds)."
+          },
+          "failingSince": {
+            "type": "integer",
+            "format": "int64",
+            "description": "First failure of the current streak (Unix seconds); absent while runs succeed."
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds."
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "routeId",
+          "method",
+          "path",
+          "every",
+          "overlap",
+          "catchUp",
+          "paused",
+          "nextAt",
+          "progress"
+        ]
+      },
+      "ScheduleInput": {
+        "type": "object",
+        "description": "Give exactly one of every, cron or at. Fields Meerkat manages are ignored.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shown in the console and the log."
+          },
+          "description": {
+            "type": "string",
+            "description": "What it is for, 500 characters at most."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Roles the call carries, 10 at most. Rules treat them like a person's."
+          },
+          "role": {
+            "type": "string",
+            "description": "A single role. Not with roles."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant the call is made in; also where `$name` vault references resolve. Empty for none."
+          },
+          "routeId": {
+            "type": "string",
+            "description": "Route the call goes through."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your own labels, for `meta.<key>` filters. 20 keys at most; keys of letters, digits and - _ . : up to 40 characters; values up to 200."
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method, POST by default. GET and HEAD are refused.",
+            "enum": [
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Path on the route, / by default."
+          },
+          "body": {
+            "description": "An object or array is sent as JSON; a string is sent as is."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Content-Type, when the body is not JSON."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Extra headers, 10 at most. Values may be vault references (`$name`). Authorization, Host and the Meerkat-Job headers are refused."
+          },
+          "every": {
+            "type": "string",
+            "description": "Cadence: ISO 8601 duration (PT30M, P1D), 1 minute at least, counted from the end of the previous run."
+          },
+          "cron": {
+            "type": "string",
+            "description": "Calendar: five-field cron (0 3 * * MON), in timezone."
+          },
+          "at": {
+            "type": "string",
+            "description": "Single date, RFC 3339 with offset: runs once."
+          },
+          "startAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "First run of a cadence or calendar (Unix seconds). Not with at."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for cron (Europe/Paris); empty is UTC."
+          },
+          "overlap": {
+            "type": "string",
+            "description": "skip (the only value): a run due while the previous one is open waits for it.",
+            "enum": [
+              "skip"
+            ]
+          },
+          "catchUp": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How late a missed run may still go out, in seconds; 0 is no limit."
+          },
+          "retryLost": {
+            "type": "string",
+            "description": "Delay before a lost run (202, then no report) is sent again, PT1M to P1D. Empty never resends."
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Wait for the answer, ISO 8601, 2 minutes at most. Long work answers 202."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Create paused. Omitted on PUT, keeps the current state."
+          }
+        },
+        "required": [
+          "name",
+          "routeId"
+        ]
+      },
+      "ScheduleRun": {
+        "type": "object",
+        "description": "A finished run.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "History entry id, for a replay."
+          },
+          "scheduleId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string",
+            "description": "Meerkat-Job-Run sent; absent if never sent."
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "Attempt that ended it."
+          },
+          "node": {
+            "type": "string",
+            "description": "Gateway that ended it."
+          },
+          "cause": {
+            "type": "string",
+            "description": "Why it went out, when not a regular run.",
+            "enum": [
+              "manual",
+              "replay",
+              "retry",
+              "asked"
+            ]
+          },
+          "ofRun": {
+            "type": "string",
+            "description": "Run it continues."
+          },
+          "startedAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds."
+          },
+          "endedAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds."
+          },
+          "state": {
+            "type": "string",
+            "description": "dropped: too late, never sent; lost: the service stopped reporting; cancelled: stopped by someone.",
+            "enum": [
+              "done",
+              "failed",
+              "lost",
+              "dropped",
+              "cancelled"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status the service answered."
+          },
+          "detail": {
+            "type": "string",
+            "description": "What happened."
+          }
+        },
+        "required": [
+          "id",
+          "scheduleId",
+          "endedAt",
+          "state"
+        ]
+      },
+      "ScheduleRunReport": {
+        "type": "object",
+        "description": "Report on a run accepted with 202.",
+        "properties": {
+          "run": {
+            "type": "string",
+            "description": "Meerkat-Job-Run of the call, or send that header."
+          },
+          "state": {
+            "type": "string",
+            "description": "Empty or running: progress (renews the lease). done or failed: closes the run.",
+            "enum": [
+              "",
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "progress": {
+            "type": "integer",
+            "description": "Percentage, 0 to 100.",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "detail": {
+            "type": "string",
+            "description": "What to show about the run."
+          },
+          "retryIn": {
+            "type": "string",
+            "description": "With failed: call again after this ISO 8601 duration, 1 minute to 1 day. After 5 in a row the run is abandoned."
+          }
+        }
+      },
+      "ScheduleRunStop": {
+        "type": "object",
+        "description": "Stop: the run is closed.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Why, in a sentence."
+          },
+          "stop": {
+            "type": "string",
+            "description": "Why, in one word.",
+            "enum": [
+              "paused",
+              "cancelled",
+              "deleted",
+              "lost",
+              "closed"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "stop"
+        ]
+      },
+      "ScheduleRunRequest": {
+        "type": "object",
+        "properties": {
+          "replayOf": {
+            "type": "string",
+            "description": "History entry to replay, with a new run identifier and the current payload. Empty runs now."
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "description": "A notification.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "`ntf_...`"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Tenant."
+          },
+          "sender": {
+            "type": "string",
+            "description": "Who published it, as the access identified them, or their address."
+          },
+          "senderVia": {
+            "type": "string",
+            "description": "How the sender was identified.",
+            "enum": [
+              "token",
+              "serviceaccount",
+              "workload",
+              "container",
+              "unidentified"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Deduplication key."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "body": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "detailUrl": {
+            "type": "string",
+            "description": "Public address it leads to."
+          },
+          "detailRoute": {
+            "type": "string",
+            "description": "Route serving it."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationAction"
+            },
+            "description": "Buttons, 5 at most."
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your labels, for `meta.<key>` filters."
+          },
+          "mail": {
+            "type": "boolean",
+            "description": "Also sent by mail."
+          },
+          "recipients": {
+            "type": "integer",
+            "description": "Number of recipients."
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds."
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds; then deleted."
+          },
+          "withdrawnAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds; absent if not withdrawn."
+          },
+          "ack": {
+            "type": "string",
+            "description": "`single`: the first reader to acknowledge closes it for everyone. `all`: every reader acknowledges, complete when the last one did. Absent when it asks for none.",
+            "enum": [
+              "single",
+              "all"
+            ]
+          },
+          "onAck": {
+            "type": "object",
+            "description": "Where your service is called at each acknowledgement.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Public address."
+              },
+              "route": {
+                "type": "string",
+                "description": "Route serving it."
+              }
+            },
+            "required": [
+              "url"
+            ]
+          },
+          "ackCompleteAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds the request was closed: the first acknowledgement (single), the last reader's (all)."
+          },
+          "ackState": {
+            "type": "string",
+            "description": "With `ack`: whether it is still waiting.",
+            "enum": [
+              "pending",
+              "done"
+            ]
+          },
+          "acknowledged": {
+            "type": "integer",
+            "description": "With `ack`: readers who acknowledged it."
+          },
+          "ackBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationPerson"
+              }
+            ],
+            "description": "With `ack` single, once done: who closed it."
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "sender",
+          "senderVia",
+          "level",
+          "title",
+          "body",
+          "recipients",
+          "createdAt",
+          "expiresAt"
+        ]
+      },
+      "NotificationAction": {
+        "type": "object",
+        "description": "A button the reader's browser calls through the data plane, with their session.",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/LocalizedText"
+          },
+          "url": {
+            "type": "string",
+            "description": "Public address."
+          },
+          "route": {
+            "type": "string",
+            "description": "Route serving it; absent for an external link."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "How it is called. GET for one sent without a method."
+          },
+          "body": {
+            "description": "The JSON value sent with it; absent when it sends none."
+          }
+        },
+        "required": [
+          "label",
+          "url",
+          "method"
+        ]
+      },
+      "LocalizedText": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "description": "The text, under the key \"\". A notification sent earlier with one text per language: the reader gets theirs, then English."
+      },
+      "Jwk": {
+        "type": "object",
+        "description": "One public key (RFC 7517).",
+        "properties": {
+          "kty": {
+            "type": "string",
+            "enum": [
+              "EC",
+              "OKP",
+              "RSA"
+            ]
+          },
+          "use": {
+            "type": "string",
+            "enum": [
+              "sig"
+            ]
+          },
+          "alg": {
+            "type": "string",
+            "enum": [
+              "ES256",
+              "EdDSA",
+              "RS256"
+            ]
+          },
+          "kid": {
+            "type": "string",
+            "description": "Key id."
+          },
+          "crv": {
+            "type": "string",
+            "description": "P-256 for EC, Ed25519 for OKP.",
+            "enum": [
+              "P-256",
+              "Ed25519"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "description": "base64url, EC and OKP."
+          },
+          "y": {
+            "type": "string",
+            "description": "base64url, EC."
+          },
+          "n": {
+            "type": "string",
+            "description": "base64url modulus, RSA."
+          },
+          "e": {
+            "type": "string",
+            "description": "base64url exponent, RSA."
+          }
+        },
+        "required": [
+          "kty",
+          "use",
+          "alg",
+          "kid"
+        ]
+      },
+      "Jwks": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Jwk"
+            },
+            "description": "Active key of each algorithm, then retired keys in their grace period."
+          }
+        },
+        "required": [
+          "keys"
+        ]
+      },
+      "OpenIdConfiguration": {
+        "type": "object",
+        "description": "Without the OpenID provider (Enterprise edition): issuer, keys and algorithms only.",
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "Issuer (iss claim)."
+          },
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "Enterprise edition: public authorize endpoint."
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "Enterprise edition: on this plane."
+          },
+          "userinfo_endpoint": {
+            "type": "string",
+            "description": "Enterprise edition, with a client declared: on this plane."
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "Key set on this plane."
+          },
+          "end_session_endpoint": {
+            "type": "string",
+            "description": "Enterprise edition: public sign-out."
+          },
+          "response_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Enterprise edition: code."
+          },
+          "grant_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Enterprise edition: authorization_code, refresh_token."
+          },
+          "code_challenge_methods_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Enterprise edition: S256."
+          },
+          "token_endpoint_auth_methods_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Enterprise edition: client_secret_basic, client_secret_post, none."
+          },
+          "scopes_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Enterprise edition: openid, profile, email."
+          },
+          "id_token_signing_alg_values_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ES256, EdDSA, RS256."
+          },
+          "subject_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "public."
+          }
+        },
+        "required": [
+          "issuer",
+          "jwks_uri",
+          "id_token_signing_alg_values_supported",
+          "subject_types_supported"
+        ]
+      },
+      "OAuthError": {
+        "type": "object",
+        "description": "An OAuth 2.0 error (RFC 6749 5.2).",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "invalid_request, invalid_client, invalid_grant, unsupported_grant_type, invalid_token, server_error, temporarily_unavailable."
+          },
+          "error_description": {
+            "type": "string",
+            "description": "What is wrong."
+          }
+        },
+        "required": [
+          "error",
+          "error_description"
+        ]
+      },
+      "OidcTokenRequest": {
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "refresh_token"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "authorization_code: the code from authorize."
+          },
+          "redirect_uri": {
+            "type": "string",
+            "description": "authorization_code: the code's redirect URI."
+          },
+          "code_verifier": {
+            "type": "string",
+            "description": "authorization_code: PKCE verifier, required without a secret."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "refresh_token: the last one issued; each use returns a new one."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "When not in the Authorization header."
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "client_secret_post: confidential clients only, not with the Authorization header."
+          }
+        },
+        "required": [
+          "grant_type"
+        ]
+      },
+      "OidcTokens": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT, RS256, audience the client's."
+          },
+          "id_token": {
+            "type": "string",
+            "description": "JWT, RS256, audience the client id."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Valid while the user's Meerkat session lasts."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scopes granted, space separated."
+          }
+        },
+        "required": [
+          "access_token",
+          "id_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "scope"
+        ]
+      },
+      "OidcUserinfo": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "sub and the claims the route adds; registered claims (iss, aud, exp...) left out.",
+        "properties": {
+          "sub": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sub"
+        ]
+      },
+      "NotificationTarget": {
+        "type": "object",
+        "description": "`{service, path}` for a service behind Meerkat, or `{url}` outside it. Name the service as called in the cluster (station-ui for station-ui.prod.svc.cluster.local) and the path as it sees it; Meerkat builds the public address from its route. An external url must be https.",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service host name in the cluster."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path as the service sees it."
+          },
+          "url": {
+            "type": "string",
+            "description": "External https address."
+          }
+        }
+      },
+      "NotificationActionInput": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NotificationTarget"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "60 characters at most."
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ],
+                "default": "GET",
+                "description": "Any case; stored in upper case."
+              },
+              "body": {
+                "description": "Any JSON value, sent as is with `Content-Type: application/json`. Not with GET. Counts in the message's 64 KiB. The reader can see it: put nothing secret in it."
+              }
+            },
+            "required": [
+              "label"
+            ]
+          }
+        ],
+        "description": "A button: a label, a link, and how the reader's browser calls it. On an external url, a method other than GET with a body makes the browser ask the site first (CORS preflight): the site must allow it."
+      },
+      "NotificationMessage": {
+        "type": "object",
+        "description": "64 KiB at most. Unknown fields are refused.",
+        "properties": {
+          "tenant": {
+            "type": "string",
+            "description": "Tenant id or name; optional with a single one. Must be enabled, with notifications on. `*` sends a copy to every tenant: named users each tenant has, the others ignored there."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only members holding one of these roles."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only these members, by username. With roles, either matches."
+          },
+          "title": {
+            "type": "string",
+            "description": "Required. Plain text, 200 characters at most."
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain text, 4000 characters at most."
+          },
+          "level": {
+            "type": "string",
+            "description": "Default info.",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "detail": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationTarget"
+              }
+            ],
+            "description": "Where it leads: a service and path, or an https url."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationActionInput"
+            },
+            "description": "Buttons, 5 at most."
+          },
+          "mail": {
+            "type": "boolean",
+            "description": "Also send by mail; needs a mail relay."
+          },
+          "expires": {
+            "type": "string",
+            "description": "ISO 8601 duration (P7D) or RFC 3339 date; default 30 days, 90 at most."
+          },
+          "key": {
+            "type": "string",
+            "description": "Deduplication key, 200 characters: while live, publishing again to the same tenant returns the same notification."
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your labels, for `meta.<key>` filters."
+          },
+          "ack": {
+            "type": "string",
+            "description": "Ask the readers to acknowledge it: `single`, the first one closes it for everyone (on call); `all`, every reader must (a safety instruction). While a reader owes it, they cannot delete it.",
+            "enum": [
+              "none",
+              "single",
+              "all"
+            ],
+            "default": "none"
+          },
+          "onAck": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationTarget"
+              }
+            ],
+            "description": "Your service, `{service, path}` only: Meerkat POSTs a `NotificationAckCall` to it through its route at each acknowledgement, as the user `meerkat` in the notification's tenant with no role, retried twice. Needs `ack`."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "NotificationPublished": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "recipients": {
+            "type": "integer",
+            "description": "Number of recipients; sent to every tenant, the sum of the copies."
+          },
+          "existing": {
+            "type": "boolean",
+            "description": "Key already used: the earlier notification, nobody notified again. Sent to every tenant: true when every copy was."
+          },
+          "tenants": {
+            "type": "array",
+            "description": "Sent to every tenant: one copy per tenant that received it.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tenant": {
+                  "type": "string",
+                  "description": "Tenant id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Tenant name."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "This copy's id, to withdraw it."
+                },
+                "recipients": {
+                  "type": "integer"
+                },
+                "existing": {
+                  "type": "boolean",
+                  "description": "Key already used in this tenant."
+                }
+              },
+              "required": [
+                "tenant",
+                "name",
+                "id",
+                "recipients"
+              ]
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "description": "Sent to every tenant: the tenants left out, and why.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tenant": {
+                  "type": "string",
+                  "description": "Tenant id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Tenant name."
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenant",
+                "name",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "recipients"
+        ],
+        "description": "Sent to every tenant, there is no id: `tenants` lists the copies, `skipped` the tenants left out."
+      },
+      "NotificationPerson": {
+        "type": "object",
+        "description": "A person, as an acknowledgement names them.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Account id."
+          },
+          "username": {
+            "type": "string",
+            "description": "Empty if the account no longer exists."
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name, when the account has one."
+          }
+        },
+        "required": [
+          "id",
+          "username"
+        ]
+      },
+      "NotificationAckGiven": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NotificationPerson"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix seconds."
+              }
+            },
+            "required": [
+              "at"
+            ]
+          }
+        ],
+        "description": "A reader who acknowledged it."
+      },
+      "NotificationAcks": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Notification"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "acks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NotificationAckGiven"
+                },
+                "description": "Who acknowledged it, first first."
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NotificationPerson"
+                },
+                "description": "Who has not yet; empty once a single one is closed."
+              }
+            },
+            "required": [
+              "acks",
+              "missing"
+            ]
+          }
+        ],
+        "description": "Where an acknowledgement stands, person by person."
+      },
+      "NotificationAckCall": {
+        "type": "object",
+        "description": "What your `onAck` service receives at each acknowledgement, as a POST with a JSON body. Headers: `Meerkat-Notification` (its id) and `Meerkat-Attempt`. Answer 2xx; anything else is tried twice more.",
+        "properties": {
+          "notification": {
+            "type": "string",
+            "description": "The notification's id."
+          },
+          "tenant": {
+            "type": "string",
+            "description": "Tenant id."
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Its deduplication key."
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Its labels."
+          },
+          "ack": {
+            "type": "string",
+            "enum": [
+              "single",
+              "all"
+            ]
+          },
+          "by": {
+            "$ref": "#/components/schemas/NotificationPerson"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When, RFC 3339 in UTC."
+          },
+          "acknowledged": {
+            "type": "integer",
+            "description": "Readers who acknowledged it so far."
+          },
+          "recipients": {
+            "type": "integer",
+            "description": "Readers it was given to."
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "This acknowledgement closed it: the first (single), the last (all)."
+          }
+        },
+        "required": [
+          "notification",
+          "tenant",
+          "ack",
+          "by",
+          "at",
+          "acknowledged",
+          "recipients",
+          "complete"
+        ]
+      }
+    },
+    "callbacks": {
+      "scheduledCall": {
+        "{$request.body#/path}": {
+          "post": {
+            "summary": "Scheduled call to your service",
+            "description": "Sent through the schedule's route, with its method (POST by default), body and headers. The same run may arrive twice: ignore a Meerkat-Job-Run already seen.",
+            "parameters": [
+              {
+                "name": "Meerkat-Job",
+                "in": "header",
+                "required": true,
+                "description": "Schedule id.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              {
+                "name": "Meerkat-Job-Run",
+                "in": "header",
+                "required": true,
+                "description": "Run identifier, the same on every attempt of a run.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              {
+                "name": "Meerkat-Job-Attempt",
+                "in": "header",
+                "required": true,
+                "description": "Attempt number, from 1 to 3.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                }
+              }
+            ],
+            "requestBody": {
+              "required": false,
+              "description": "The schedule's body.",
+              "content": {
+                "*/*": {
+                  "schema": {}
+                }
+              }
+            },
+            "responses": {
+              "2XX": {
+                "description": "Done: the run is closed"
+              },
+              "202": {
+                "description": "Accepted: report progress and the outcome with PATCH /api/schedules/{id}/run"
+              },
+              "424": {
+                "description": "Not now: call again after Retry-After. 5 times in a row at most",
+                "headers": {
+                  "Retry-After": {
+                    "required": true,
+                    "description": "Seconds or an HTTP date, kept between 1 minute and 1 day.",
+                    "schema": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "default": {
+                "description": "Failed. No answer, 401, 403, 404, 502, 503 and 504 are tried again, 3 attempts at most"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

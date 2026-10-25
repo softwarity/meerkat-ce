@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -33,8 +34,8 @@ type apiTokenView struct {
 	Context  string // "acme" or "acme - Support", or the "no organisation" label
 	Tenant   string // the organisation's own name, empty when there is none
 	Enabled  bool
-	Expiry   string // "" = never, else localized date, or "expired"
-	LastUsed string // "" = never used
+	Expiry   template.HTML // "" = never, else "until" and its date, or "expired"
+	LastUsed template.HTML // "" = never used
 	Expired  bool
 }
 
@@ -317,6 +318,7 @@ func (h *Handler) renderTokens(w http.ResponseWriter, r *http.Request, sess stor
 	}
 	if tokens, err := h.st.ListAPITokens(r.Context(), sess.UserID, store.PlaneData); err == nil {
 		now := time.Now().Unix()
+		loc := h.readerZone(r.Context(), sess.UserID)
 		for _, tok := range tokens {
 			// Tenant is kept apart from the label so the template can tell a
 			// token that belongs to an organisation from one that belongs to
@@ -332,13 +334,13 @@ func (h *Handler) renderTokens(w http.ResponseWriter, r *http.Request, sess stor
 			}
 			if tok.ExpiresAt != 0 {
 				if now >= tok.ExpiresAt {
-					v.Expiry, v.Expired = t["expired"], true
+					v.Expiry, v.Expired = template.HTML(template.HTMLEscapeString(t["expired"])), true //nolint:gosec // escaped
 				} else {
-					v.Expiry = t["until"] + " " + time.Unix(tok.ExpiresAt, 0).Format("2006-01-02")
+					v.Expiry = dayOf(tok.ExpiresAt, loc).In(t["until"])
 				}
 			}
 			if tok.LastUsedAt != 0 {
-				v.LastUsed = t["lastUsed"] + " " + time.Unix(tok.LastUsedAt, 0).Format("2006-01-02")
+				v.LastUsed = dayOf(tok.LastUsedAt, loc).In(t["lastUsed"])
 			}
 			data.Tokens = append(data.Tokens, v)
 		}

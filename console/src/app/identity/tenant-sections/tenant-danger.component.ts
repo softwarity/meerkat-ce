@@ -83,7 +83,7 @@ import { TenantsService } from '../../shared/tenants.service';
       <mat-card appearance="outlined" class="danger-card danger-zone">
         <h3 i18n="@@Delete_this_tenant">Delete this tenant</h3>
         <p class="hint" i18n="@@Delete_this_tenant_hint">
-          Removes the tenant, its memberships and its groups. There is no undo.
+          Deletes the tenant with its memberships and groups. This cannot be undone.
         </p>
         <div class="danger-row">
           <button matButton="outlined" class="danger" (click)="removeTenant()" i18n="@@Delete_tenant">

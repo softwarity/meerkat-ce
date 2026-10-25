@@ -30,7 +30,7 @@ Le rail de gauche regroupe les deux plans et les écrans transverses.
 | **Application** | `/application/...` | Le produit que voient vos utilisateurs : identité, rôles, pages, portail, politiques |
 | **Tenants** | `/tenants/:id/...` | Une organisation à la fois (en mode multi-organisation uniquement) |
 | **Vault** | `/vault` | Toutes les valeurs et tous les secrets nommés auxquels la configuration fait référence |
-| **Data plane** | `/data-plane/...` | Ce que font les applications : leurs connexions (Audit), qui y est connecté (Sessions), les appels planifiés qui leur sont adressés (Scheduler), ce que la gateway a servi (Metrics), ce que vos utilisateurs ont signalé (Issues) |
+| **Data plane** | `/data-plane/...` | Ce que font les applications : leurs connexions (Audit), qui y est connecté (Sessions), les appels planifiés qui leur sont adressés (Scheduler), ce que leurs services ont dit à leurs utilisateurs (Notifications), ce que la gateway a servi (Metrics), ce que vos utilisateurs ont signalé (Issues) |
 | **Meerkat** | `/system/...` | La gateway elle-même : qui a modifié quoi et qui s'est connecté à la console (Audit), ce qu'elle dit d'elle-même en direct (Logs), qui tient la console (Sessions), l'installation entière comme document ou comme base (Configuration) - et, en bas, la référence REST du plan de contrôle (API reference), ce qu'apporte cette version (Release notes) et l'édition (License) |
 
 Ce découpage n'a rien de cosmétique. **Infra** concerne l'installation : un upstream,
@@ -54,7 +54,7 @@ d'administration applique les mêmes périmètres à chaque appel.
 |---|---|
 | `root` | Tout, y compris Configuration |
 | `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Logs, Audit et Issues, ainsi que le périmètre infra du coffre |
-| `app admin` | Le plan Application (avec Access tokens), Sessions, Scheduler, Audit et Issues, ainsi que le périmètre applicatif du coffre |
+| `app admin` | Le plan Application (avec Access tokens), Sessions, Scheduler, Notifications, Audit et Issues, ainsi que le périmètre applicatif du coffre |
 | `tenant admin` | Les organisations que le compte administre, avec Sessions, Audit et Issues restreints à celles-ci |
 | `tenant creator` | La création d'une organisation depuis le tiroir Tenants |
 | `dev` | L'outillage développeur sur les applications servies ; ce n'est pas un écran de la console |
@@ -119,6 +119,7 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 - **[Vault](/docs/console/vault)** - les secrets et les valeurs, référencés sous la forme `$name`.
 - **[Metrics](/docs/console/traffic)** - le trafic, la latence, le classement des routes.
 - **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.
+- **[Notifications](/docs/console/notifications)** - ce que les services ont dit à leurs utilisateurs, qui peut publier, et où les utilisateurs les lisent (Enterprise).
 - **[Audit et Issues](/docs/console/audit-and-issues)** - l'historique des modifications, et les signalements.
 - **[Logs](/docs/operations/logs#dans-la-console)** - les lignes de journal de la gateway, en direct, et son niveau de journalisation. Un seul nœud à la fois.
 - **[Configuration](/docs/console/configuration)** (sous Meerkat, root uniquement) - les configurations, les points de reprise, les snapshots et la migration : l'installation entière, qui couvre les deux plans.
@@ -142,6 +143,11 @@ pages de profil de la gateway, celles-là mêmes que voient vos utilisateurs,
 avec la photo, le mot de passe, le second facteur, les passkeys et les jetons
 d'API personnels. La déconnexion est juste en dessous ; elle déconnecte d'un coup
 tous les onglets de la console.
+
+Le [fuseau horaire](/docs/auth/flow-pages#le-profil) choisi là est celui dans
+lequel la console écrit ses heures ; sans choix, celui de votre navigateur. Toute
+heure se lit de la même façon, `2026-10-25T17:41` (avec `Z` en UTC), et il y a
+combien de temps s'affiche au survol.
 
 ## Version et notes de version
 

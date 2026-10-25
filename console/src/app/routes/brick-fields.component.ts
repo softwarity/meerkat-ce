@@ -99,7 +99,7 @@ import { StringListComponent } from './predicates/string-list.component';
         }
         }
       } @empty {
-        <p class="list-label" i18n="@@Brick_takes_no_setting">This brick takes no setting.</p>
+        <p class="list-label" i18n="@@Brick_takes_no_setting">Nothing to set.</p>
       }
     </div>
   `,

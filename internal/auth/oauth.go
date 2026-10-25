@@ -113,7 +113,13 @@ func (h *Handler) authorizationServer(w http.ResponseWriter, r *http.Request) {
 		"token_endpoint_auth_methods_supported": []string{"none"},
 		// S256 only. "plain" exists in the specification and protects nothing.
 		"code_challenge_methods_supported": []string{"S256"},
-		"scopes_supported":                 []string{"mcp:read", "mcp:write"},
+		// No scopes_supported: the perimeter is chosen by the approver on the
+		// consent page, read only ticked, and a scope the request names is not
+		// read. Advertising mcp:read and mcp:write told a client it could ask
+		// for one, and asking changed nothing. Pre-ticking what a client asks
+		// for would be the other answer, and the wrong one: the one click
+		// between an agent and the approver's full powers is the one that
+		// must not be made for them.
 	})
 }
 
@@ -139,6 +145,14 @@ func (h *Handler) oauthRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.st.SaveOAuthClient(r.Context(), client); err != nil {
 		oauthError(w, http.StatusBadRequest, "invalid_redirect_uri", err.Error())
+		return
+	}
+	// Answered as STORED: the store trims and cuts the name, names a nameless
+	// client "an agent" and normalises the redirect URIs, and RFC 7591 has the
+	// server answer the metadata it registered, not the metadata it was sent.
+	client, err := h.st.GetOAuthClient(r.Context(), client.ID)
+	if err != nil {
+		oauthError(w, http.StatusInternalServerError, "server_error", "the registration could not be read back")
 		return
 	}
 	writeJSONResponse(w, http.StatusCreated, map[string]any{

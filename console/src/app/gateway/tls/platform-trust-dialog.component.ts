@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +9,8 @@ import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, HttpsSwitch, PlatformAuthorities, PlatformAuthority } from '../../api.service';
 import { SnippetComponent } from '../../shared/snippet.component';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // The authorities the cluster publishes (SSL-09), found by the gateway rather
 // than fetched by hand: the files Kubernetes and OpenShift mount, the
@@ -26,12 +27,13 @@ import { SnippetComponent } from '../../shared/snippet.component';
 // Closes with the number of authorities trusted.
 @Component({
   selector: 'app-platform-trust-dialog',
-  imports: [DatePipe, LoadingIndicatorComponent, MatButtonModule, MatCheckboxModule, MatDialogModule, MatIconModule, MatListModule, SnippetComponent],
+  imports: [LoadingIndicatorComponent, MatButtonModule, MatCheckboxModule, MatDialogModule, MatIconModule, MatListModule, SnippetComponent, ZonedDatePipe],
   templateUrl: './platform-trust-dialog.component.html',
   styleUrl: './platform-trust-dialog.component.scss',
 })
 export class PlatformTrustDialogComponent {
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   private readonly ref = inject(MatDialogRef<PlatformTrustDialogComponent, number>);
   // The section's search, when it has one: opened on it, not asked again.
   private readonly given = inject<PlatformAuthorities | undefined>(MAT_DIALOG_DATA, { optional: true }) ?? undefined;
@@ -54,10 +56,10 @@ export class PlatformTrustDialogComponent {
   protected readonly blocked = computed(() => (this.result()?.notes ?? []).filter((n) => !n.absent));
 
   protected readonly sourceLabel: Record<PlatformAuthority['source'], string> = {
-    openshift: $localize`:@@Trust_src_openshift:OpenShift service CA, mounted in the pod`,
+    openshift: $localize`:@@Trust_src_openshift:OpenShift service CA`,
     'cert-manager': $localize`:@@Trust_src_cert_manager:cert-manager issuer`,
     'trust-manager': $localize`:@@Trust_src_trust_manager:trust-manager bundle`,
-    cluster: $localize`:@@Trust_src_cluster:Kubernetes cluster CA, mounted in the pod: signs the API server, rarely the services`,
+    cluster: $localize`:@@Trust_src_cluster:Kubernetes cluster CA: signs the API server, rarely the services`,
   };
 
   // What publishes an authority, when the cluster publishes none: a CA issuer
@@ -88,10 +90,6 @@ spec:
   private show(r: PlatformAuthorities): void {
     this.result.set(r);
     this.picked.set(r.found.filter((a) => a.preselect).map((a) => a.ref));
-  }
-
-  protected expiry(t: number): number {
-    return t * 1000;
   }
 
   protected routes(a: PlatformAuthority) {

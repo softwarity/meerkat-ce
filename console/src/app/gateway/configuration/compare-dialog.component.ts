@@ -56,7 +56,7 @@ export interface CompareDialogData {
       <mat-form-field subscriptSizing="dynamic">
         <mat-label i18n="@@Compare_NAME_with">Compare {{ data.from.name }} with</mat-label>
         <mat-select [value]="with()" (selectionChange)="compare($event.value)">
-          <mat-option [value]="running" i18n="@@What_runs_now">What this gateway runs now</mat-option>
+          <mat-option [value]="running" i18n="@@What_runs_now">Current configuration</mat-option>
           @for (o of data.others; track o.id) {
             <mat-option [value]="o">{{ o.name }}</mat-option>
           }
@@ -87,14 +87,14 @@ export class CompareDialogComponent {
   protected readonly running = 'running' as const;
   protected readonly with = signal<SavedConfiguration | 'running'>(this.running);
 
-  protected readonly nothingRunning = $localize`:@@Running_matches_saved:This gateway already runs exactly this configuration.`;
-  protected readonly nothingSaved = $localize`:@@Configurations_identical:These two configurations describe the same thing.`;
+  protected readonly nothingRunning = $localize`:@@Running_matches_saved:This configuration is already the one in use.`;
+  protected readonly nothingSaved = $localize`:@@Configurations_identical:These two configurations are identical.`;
 
   // Which way the lines read: "Added" is added going from the left to the right.
   protected readonly direction = computed(() => {
     const w = this.with();
     return w === this.running
-      ? $localize`:@@Serving_NAME_would:What serving ${this.data.from.name}:name: would change here:`
+      ? $localize`:@@Serving_NAME_would:What activating ${this.data.from.name}:name: would change:`
       : $localize`:@@Going_from_A_to_B:Going from ${this.data.from.name}:from: to ${w.name}:to::`;
   });
 

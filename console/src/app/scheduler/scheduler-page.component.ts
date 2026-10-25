@@ -95,7 +95,7 @@ export class SchedulerPageComponent {
   protected readonly metaHint = computed(
     () =>
       this.metaError() ||
-      $localize`:@@Metadata_filter_hint:key=value, or key=~expression`,
+      $localize`:@@Metadata_filter_hint:key=value or key=~regex`,
   );
 
   // Built here rather than in the service: the source repaints the view it was
@@ -276,7 +276,7 @@ export class SchedulerPageComponent {
       case "replay":
         return $localize`:@@Replay_short:replay`;
       case "asked":
-        return $localize`:@@Asked_short:called back`;
+        return $localize`:@@Asked_short:asked by the service`;
       default:
         return "";
     }
@@ -372,7 +372,7 @@ export class SchedulerPageComponent {
       const at = one.indexOf("=");
       if (at <= 0) {
         this.metaError.set(
-          $localize`:@@Meta_filter_shape:Write key=value, or key=~expression`,
+          $localize`:@@Meta_filter_shape:Write key=value or key=~regex`,
         );
         return null;
       }
@@ -382,7 +382,7 @@ export class SchedulerPageComponent {
           new RegExp(value.slice(1));
         } catch {
           this.metaError.set(
-            $localize`:@@Meta_filter_expr:That expression does not compile`,
+            $localize`:@@Meta_filter_expr:Invalid regular expression`,
           );
           return null;
         }
@@ -491,7 +491,7 @@ export class SchedulerPageComponent {
   protected async cancelRun(row: ScheduleRow): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Cancel_the_run_of_NAME:Cancel the run of "${row.name}:NAME:"?`,
-      message: $localize`:@@Cancel_run_message:The run is closed now. The service is told to stop at its next report; the next turn comes at the schedule's own time.`,
+      message: $localize`:@@Cancel_run_message:The run stops now and the service is told to stop at its next progress report. The next run happens at its scheduled time.`,
       confirmLabel: $localize`:@@Cancel_run:Cancel run`,
       danger: true,
     });

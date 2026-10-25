@@ -166,7 +166,7 @@ type profileMFAManageData struct {
 type trustedView struct {
 	ID         string
 	Label      string
-	UntilLabel string // localized "until YYYY-MM-DD"
+	UntilLabel template.HTML // localized "until YYYY-MM-DD", the date a <time> (when.go)
 	// Current marks the trust THIS browser carries (its cookie's hash).
 	Current bool
 }
@@ -393,6 +393,7 @@ func (h *Handler) trustedViews(r *http.Request, userID string) []trustedView {
 		return nil
 	}
 	until := h.tr(r, "untilDate")
+	loc := h.readerZone(r.Context(), userID)
 	current := ""
 	if token := trustTokenOf(r); token != "" {
 		current, _ = h.st.TrustedBrowserIDByHash(r.Context(), userID, hashTrust(token), time.Now().Unix())
@@ -407,7 +408,7 @@ func (h *Handler) trustedViews(r *http.Request, userID string) []trustedView {
 		}
 		out = append(out, trustedView{
 			ID: b.ID, Label: label,
-			UntilLabel: fmt.Sprintf(until, time.Unix(b.ExpiresAt, 0).Format("2006-01-02")),
+			UntilLabel: dayOf(b.ExpiresAt, loc).In(until),
 			Current:    isCurrent,
 		})
 	}

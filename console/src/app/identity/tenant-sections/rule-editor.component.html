@@ -26,7 +26,7 @@
     i18n-label="@@Upstream_group"
     label="Upstream group"
     i18n-hint="@@Upstream_group_hint"
-    hint="Exactly as the authority spells it. Leave empty for anyone from that authority."
+    hint="Exactly as the authority sends it. Leave empty for anyone from that authority."
   >
     <!-- Offered from the names actually reported: a rule written against a
          remembered spelling matches nothing, and says nothing about it. -->
@@ -49,7 +49,7 @@
       <mat-option [value]="name" class="mono">{{ name }}</mat-option>
     } @empty {
       <mat-option disabled i18n="@@No_group_reported_yet">
-        No group reported by an authority yet.
+        No group received from an authority yet.
       </mat-option>
     }
   </mat-autocomplete>

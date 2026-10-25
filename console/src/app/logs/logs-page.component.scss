@@ -71,6 +71,7 @@
 }
 .time {
   color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
 }
 .level {
   text-transform: uppercase;

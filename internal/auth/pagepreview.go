@@ -61,7 +61,36 @@ const (
 	// it sits beside the mails rather than among the pages. Before them,
 	// because it HAS a dark half and a message does not.
 	CategoryPortal = "portal"
+	// CategoryAccount is the account pages', for a page registered from
+	// outside this package (RegisterPreviewPage).
+	CategoryAccount = cAccount
 )
+
+// RegisterPreviewPage adds a page that is not this package's to the catalogue:
+// the notifications page (NOTIF-05) is Enterprise, and ee/notify registers it
+// here from its init(), the way ee/portal registers the bar. The community
+// image does not carry the page, so it does not carry the entry either - not a
+// switch kept off, code it does not have.
+//
+// The same rule as every entry here: build renders the page's REAL template
+// against made-up values, never a handler. titleKey is the catalogue key of the
+// page's own title. The entry goes after the last one of its category, so the
+// picker walks it with its neighbours; a category nobody uses yet goes last.
+// Called before any handler exists, like RegisterPortalBar.
+func RegisterPreviewPage(key, category, label, titleKey string, build func(c FlowChrome) (*template.Template, any)) {
+	p := PreviewPage{Key: key, Category: category, Label: label, title: titleKey, build: build}
+	at := len(PreviewPages)
+	for i, q := range PreviewPages {
+		if q.Key == key {
+			PreviewPages[i] = p
+			return
+		}
+		if q.Category == category {
+			at = i + 1
+		}
+	}
+	PreviewPages = append(PreviewPages[:at], append([]PreviewPage{p}, PreviewPages[at:]...)...)
+}
 
 // PreviewCategories is the closed list, in the order the toggles show it.
 var PreviewCategories = []struct{ Key, Label, Icon string }{
@@ -146,15 +175,9 @@ var previewErrors = map[string][]string{
 	"profile-tokens":      {"errTokenName"},
 	"profile-dev-key":     {"errBadKey"},
 	"profile-mfa":         {"errMfaRequiredOff", "errBadCode", "errTooManyAttempts"},
-}
-
-// errorsWithNoPage are refusals answered as PLAIN TEXT, not as a page: a
-// confirmation or reset link that has expired is answered by http.Error, so
-// there is no screen to put them on and no preview that could show them.
-var errorsWithNoPage = map[string]bool{
-	"errConfirmExpired":     true,
-	"errResetExpired":       true,
-	"errEmailChangeExpired": true,
+	// A mailed link that can no longer do its job. These were plain text
+	// once, with no screen to read them on.
+	"link-dead": {"errConfirmExpired", "errResetExpired", "errEmailChangeExpired", "errEmailTaken"},
 }
 
 // PreviewPages is the catalogue, in the order the picker walks it: the sign-in
@@ -211,7 +234,7 @@ var PreviewPages = []PreviewPage{
 			Hint: fmt.Sprintf(c.T["signinCodeSentHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
 	}},
-	{"select-tenant", cSignIn, "Organisation chooser", "titleChooseTenant", func(c flowChrome) (*template.Template, any) {
+	{"select-tenant", cSignIn, "Tenant chooser", "titleChooseTenant", func(c flowChrome) (*template.Template, any) {
 		return selectTenantPage, selectTenantData{
 			flowChrome: c, Error: c.PreviewErrors,
 			// Why the chooser is being shown, all three of them: it says one,
@@ -294,6 +317,9 @@ var PreviewPages = []PreviewPage{
 	{"confirmed", cSignIn, "Account confirmed", "titleConfirmed", func(c flowChrome) (*template.Template, any) {
 		return confirmedPage, struct{ flowChrome }{c}
 	}},
+	{"link-dead", cSignIn, "Expired link", "titleRegister", func(c flowChrome) (*template.Template, any) {
+		return linkDeadPage, linkDeadData{flowChrome: c, Error: c.PreviewErrors, Back: "/login", BackLabel: c.T["backToLogin"]}
+	}},
 	{"account-pending", cSignIn, "Waiting room", "titlePending", func(c flowChrome) (*template.Template, any) {
 		return pendingPage, pendingData{flowChrome: c, Public: samplePublicLinks()}
 	}},
@@ -308,7 +334,7 @@ var PreviewPages = []PreviewPage{
 			// The address dialog asks for the current password: shown, so
 			// its label has a screen to be read and translated on.
 			HasPassword: true,
-			IsDev:       true, Console: true, Apps: samplePublicLinks(),
+			IsDev:       true, Console: true, Apps: sampleProfileApps(c.T),
 		}
 	}},
 	{"profile-security", cAccount, "Security", "titleSecurity", func(c flowChrome) (*template.Template, any) {
@@ -341,7 +367,7 @@ var PreviewPages = []PreviewPage{
 			Required:    true,
 			ScratchLeft: 6, AllowTrust: true,
 			Trusted: []trustedView{
-				{ID: "t1", Label: "Chrome on macOS", UntilLabel: fmt.Sprintf(c.T["untilDate"], "2026-10-24"), Current: true},
+				{ID: "t1", Label: "Chrome on macOS", UntilLabel: sample("2026-10-24").In(c.T["untilDate"]), Current: true},
 			},
 		}
 	}},
@@ -356,8 +382,8 @@ var PreviewPages = []PreviewPage{
 			StatusLine:  fmt.Sprintf(c.T["mfaStatus"], 6, 8),
 			ScratchLeft: 6, AllowTrust: true,
 			Trusted: []trustedView{
-				{ID: "t1", Label: "Chrome on macOS", UntilLabel: fmt.Sprintf(c.T["untilDate"], "2026-10-24"), Current: true},
-				{ID: "t2", Label: "Safari on iPhone", UntilLabel: fmt.Sprintf(c.T["untilDate"], "2026-10-02")},
+				{ID: "t1", Label: "Chrome on macOS", UntilLabel: sample("2026-10-24").In(c.T["untilDate"]), Current: true},
+				{ID: "t2", Label: "Safari on iPhone", UntilLabel: sample("2026-10-02").In(c.T["untilDate"])},
 			},
 		}
 	}},
@@ -381,9 +407,9 @@ var PreviewPages = []PreviewPage{
 			Tokens: []apiTokenView{
 				{ID: "t1", Name: "Nightly export", Prefix: "mk_7fQ2", Context: "Acme Corporation",
 					Tenant: "Acme Corporation", Enabled: true,
-					Expiry: c.T["until"] + " 2026-12-31", LastUsed: c.T["lastUsed"] + " 2026-09-23"},
+					Expiry: sample("2026-12-31").In(c.T["until"]), LastUsed: sample("2026-09-23").In(c.T["lastUsed"])},
 				{ID: "t3", Name: "Old importer", Prefix: "mk_3zR8", Context: "Acme Corporation",
-					Tenant: "Acme Corporation", Enabled: true, Expiry: c.T["expired"], Expired: true},
+					Tenant: "Acme Corporation", Enabled: true, Expiry: template.HTML(template.HTMLEscapeString(c.T["expired"])), Expired: true},
 				{ID: "t2", Name: "Staging probe", Prefix: "mk_11bD", Context: c.T["tokenContextNone"],
 					Enabled: false},
 			},
@@ -400,7 +426,7 @@ var PreviewPages = []PreviewPage{
 			Durations: sampleDurations(c),
 			Tokens: []apiTokenView{
 				{ID: "t1", Name: "Nightly export", Prefix: "mk_7fQ2", Context: "Acme Corporation",
-					Tenant: "Acme Corporation", Enabled: true, Expiry: "2026-12-31", LastUsed: c.T["lastUsed"] + " 2026-09-23"},
+					Tenant: "Acme Corporation", Enabled: true, Expiry: sample("2026-12-31").In(c.T["until"]), LastUsed: sample("2026-09-23").In(c.T["lastUsed"])},
 			},
 		}
 	}},
@@ -411,11 +437,11 @@ var PreviewPages = []PreviewPage{
 	}},
 	{"profile-sessions", cAccount, "Active sessions", "titleSessions", func(c flowChrome) (*template.Template, any) {
 		return profileSessionsPage, profileSessionsData{flowChrome: c, Others: true, Sessions: []sessionView{
-			{ID: "a", Label: "Chrome - macOS", Meta: "203.0.113.24", Since: "2026-09-29 08:12", Current: true},
-			{ID: "b", Label: "Safari - iPhone", Meta: "198.51.100.7", Since: "2026-09-27 19:40"},
+			{ID: "a", Label: "Chrome - macOS", Meta: "203.0.113.24", Since: sample("2026-09-29T08:12"), Current: true},
+			{ID: "b", Label: "Safari - iPhone", Meta: "198.51.100.7", Since: sample("2026-09-27T19:40")},
 		}}
 	}},
-	{"profile-leave", cAccount, "Leave an organisation", "titleLeave", func(c flowChrome) (*template.Template, any) {
+	{"profile-leave", cAccount, "Leave a tenant", "titleLeave", func(c flowChrome) (*template.Template, any) {
 		return profileLeavePage, profileLeaveData{flowChrome: c, TenantName: "Acme Corp"}
 	}},
 	{"profile-history", cAccount, "Sign-in history", "titleHistory", func(c flowChrome) (*template.Template, any) {
@@ -428,21 +454,21 @@ var PreviewPages = []PreviewPage{
 			flowChrome: c,
 			Events: []loginEventView{
 				{Label: "Signed in", Method: c.T["methodTotp"],
-					Meta: "203.0.113.24 - France", When: "today, 09:14", Current: true},
+					Meta: "203.0.113.24 - France", When: sample("2026-09-29T09:14"), Current: true},
 				{Label: "Signed in", Method: c.T["methodPasskey"],
-					Meta: "203.0.113.24 - France", When: "yesterday, 18:02"},
+					Meta: "203.0.113.24 - France", When: sample("2026-09-28T18:02")},
 				{Label: "Signed in", Method: c.T["methodPasskeyTotp"],
-					Meta: "203.0.113.24 - France", When: "yesterday, 08:40"},
+					Meta: "203.0.113.24 - France", When: sample("2026-09-28T08:40")},
 				{Label: "Signed in", Method: c.T["methodEmailCode"],
-					Meta: "198.51.100.7 - Germany", When: "2 days ago, 21:05"},
+					Meta: "198.51.100.7 - Germany", When: sample("2026-09-27T21:05")},
 				{Label: "Signed in", Method: c.T["methodEmailCodeTotp"],
-					Meta: "198.51.100.7 - Germany", When: "2 days ago, 20:58"},
+					Meta: "198.51.100.7 - Germany", When: sample("2026-09-27T20:58")},
 				{Label: "Signed in", Method: c.T["methodExternal"],
-					Meta: "203.0.113.24 - France", When: "3 days ago, 11:22"},
+					Meta: "203.0.113.24 - France", When: sample("2026-09-26T11:22")},
 				{Label: "Signed in", Method: c.T["methodExternalTotp"],
-					Meta: "203.0.113.24 - France", When: "3 days ago, 09:03"},
+					Meta: "203.0.113.24 - France", When: sample("2026-09-26T09:03")},
 				{Label: "Refused", Method: c.T["methodPassword"],
-					Meta: "198.51.100.7 - Germany", When: "3 days ago, 02:41"},
+					Meta: "198.51.100.7 - Germany", When: sample("2026-09-26T02:41")},
 			},
 		}
 	}},
@@ -451,8 +477,8 @@ var PreviewPages = []PreviewPage{
 		return profileDevPage, profileDevData{
 			flowChrome: c,
 			Keys: []devKeyRow{
-				{ID: "k1", Fingerprint: "SHA256:8Xq1oS7m2VbN4cR0pK9tLwEjYh3dFzAu6QsPgIrMxTk", Comment: "alice@workstation", Added: "2026-09-01"},
-				{ID: "k2", Fingerprint: "SHA256:Qm3vT7dLp0cW9sFh2YxN6kJrB1uEaZoG4iRnHyXe5wA", Comment: "alice@laptop", Added: "2026-09-20"},
+				{ID: "k1", Fingerprint: "SHA256:8Xq1oS7m2VbN4cR0pK9tLwEjYh3dFzAu6QsPgIrMxTk", Comment: "alice@workstation", Added: sample("2026-09-01")},
+				{ID: "k2", Fingerprint: "SHA256:Qm3vT7dLp0cW9sFh2YxN6kJrB1uEaZoG4iRnHyXe5wA", Comment: "alice@laptop", Added: sample("2026-09-20")},
 			},
 		}
 	}},
@@ -497,13 +523,13 @@ var PreviewPages = []PreviewPage{
 			},
 		}
 	}},
-	// EVERY reason, stacked. This page prints one of four sentences depending on
-	// what turned the caller away, so a preview of one leaves three on no
+	// EVERY reason, stacked. This page prints one of five sentences depending on
+	// what turned the caller away, so a preview of one leaves four on no
 	// screen - the same call as the sign-in page's two refusals.
 	{"refused", cRefused, "Refused", "titleRefused", func(c flowChrome) (*template.Template, any) {
 		return refusedPage, refusedData{
 			flowChrome: c,
-			Reason:     stack(c, "refusedRoles", "refusedTenant", "refusedUser", "refusedOther"),
+			Reason:     stack(c, "refusedRoles", "refusedTenant", "refusedUser", "refusedApps", "refusedOther"),
 			Public:     samplePublicLinks(),
 		}
 	}},
@@ -615,10 +641,18 @@ func samplePublicLinks() []publicLink {
 	}
 }
 
+// sampleProfileApps is the profile's way back in at its busiest: the list,
+// with a container's modules grouped - the button the other cases draw is a
+// plainer version of the same line.
+func sampleProfileApps(t map[string]string) *appsControl {
+	ctl := appsList(samplePublicLinks(), t)
+	return &ctl
+}
+
 func samplePasskeys() []passkeyView {
 	return []passkeyView{
-		{ID: "k1", Label: "iPhone", Created: "2026-03-14", Current: true},
-		{ID: "k2", Label: "YubiKey 5C", Created: "2025-11-02"},
+		{ID: "k1", Label: "iPhone", Created: sample("2026-03-14"), Current: true},
+		{ID: "k2", Label: "YubiKey 5C", Created: sample("2025-11-02")},
 	}
 }
 

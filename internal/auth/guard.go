@@ -22,7 +22,14 @@ import (
 // frames its previews, and nobody else - a foreign page cannot lay a "Connect"
 // button under a decoy and steal the click. The consent asks for no frame at
 // all (oauthAuthorize).
-type routes struct{ mux *http.ServeMux }
+type routes struct{ mux Mux }
+
+// Mux is what the auth endpoints are mounted on: a *http.ServeMux, or a test
+// that records the patterns, since a ServeMux cannot be asked what it holds
+// (cmd/meerkat/apidocs_test.go holds every plane to its specification).
+type Mux interface {
+	Handle(pattern string, handler http.Handler)
+}
 
 // crossSiteOpen are the writes a forgery cannot abuse, and which a foreign
 // origin legitimately sends:

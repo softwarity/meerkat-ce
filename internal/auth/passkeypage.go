@@ -3,7 +3,6 @@ package auth
 import (
 	"encoding/base64"
 	"net/http"
-	"time"
 )
 
 var profilePasskeysPage = flowPage("profile-passkeys", profilePasskeysBody)
@@ -55,7 +54,7 @@ const profilePasskeysBody = `    <style>
       <div class="row">
         <span class="pk-name">{{.Label}}</span>
         {{if .Current}}<span class="pk-this">{{$.T.thisBrowser}}</span>{{end}}
-        <span class="pk-date">{{.Created}}</span>
+        <span class="pk-date">{{.Created.HTML}}</span>
         <form method="post" action="/profile/passkeys/delete">
           <input type="hidden" name="id" value="{{.ID}}">
           <button class="pk-x" type="submit" title="{{$.T.passkeyRemove}}" aria-label="{{$.T.passkeyRemove}}"><svg viewBox="0 -960 960 960" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button>
@@ -135,10 +134,11 @@ func (h *Handler) showPasskeys(w http.ResponseWriter, r *http.Request) {
 		current = c.Value
 	}
 	if keys, err := h.st.ListPasskeys(r.Context(), sess.UserID); err == nil {
+		loc := h.readerZone(r.Context(), sess.UserID)
 		for _, k := range keys {
 			data.Passkeys = append(data.Passkeys, passkeyView{
 				ID: k.ID, Label: k.Label,
-				Created: time.Unix(k.CreatedAt, 0).Format("2006-01-02"),
+				Created: dayOf(k.CreatedAt, loc),
 				Current: k.ID == current,
 			})
 		}

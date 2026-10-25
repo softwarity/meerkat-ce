@@ -81,14 +81,14 @@ export type ImportOutcome =
           Replace the current configuration
         </mat-radio-button>
         <p class="why" i18n="@@Replace_current_why">
-          What the file does not carry is removed.
+          What the file does not contain is removed.
         </p>
 
         <mat-radio-button value="merge" i18n="@@Add_to_the_current_one">
           Add it to the current configuration
         </mat-radio-button>
         <p class="why" i18n="@@Merge_why">
-          For a partial file. What it does not mention is left alone.
+          For a partial file. What it does not mention stays unchanged.
         </p>
       </mat-radio-group>
 

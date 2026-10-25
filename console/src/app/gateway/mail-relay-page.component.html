@@ -55,7 +55,7 @@
           <ng-container i18n="@@Recipients_will_see">Recipients will see</ng-container>
           <span class="mono"> {{ senderPreview() }}</span>
           <ng-container i18n="@@Sender_name_set_in_branding">
-            . The name is the application name, from Built-in pages, Branding.
+            . The name comes from Built-in pages, Branding.
           </ng-container>
         </p>
       }
@@ -224,11 +224,12 @@
     <mat-card appearance="outlined">
       <h3 i18n="@@Daily_digest">Daily digest</h3>
       <p class="hint text-muted" i18n="@@Digest_hint">
-        Once a day, administrators with an e-mail address get the accounts losing or just lost
-        access, and the vault entries near their reminder date. Nothing to say, nothing sent.
+        Once a day, administrators with an e-mail address receive the accounts about to lose or
+        that just lost access, and the vault entries near their reminder date. Sent only when
+        there is something to report.
       </p>
       <mat-slide-toggle [checked]="digestOn()" (change)="digestOn.set($event.checked)">
-        <ng-container i18n="@@Send_the_daily_notice">Send the daily notice</ng-container>
+        <ng-container i18n="@@Send_the_daily_notice">Send the daily digest</ng-container>
       </mat-slide-toggle>
 
       @if (digestOn()) {
@@ -257,7 +258,7 @@
         </div>
         @if (!host().trim()) {
           <p class="hint text-error" i18n="@@Digest_needs_a_relay">
-            No relay configured: the notice goes out once one answers.
+            No relay configured: the digest is sent once one works.
           </p>
         }
       }

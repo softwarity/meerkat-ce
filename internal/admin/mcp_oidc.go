@@ -90,7 +90,7 @@ func (a *API) oidcTools() []mcp.Tool {
 			Schema: object(map[string]any{
 				"id":   str("The client id, as list_oidc_clients spells it."),
 				"user": str("The account, by id or username."),
-				"tenant": str("Optional: the organisation the session would be opened in, by id or name. " +
+				"tenant": str("Optional: the tenant the session would be opened in, by id or name. " +
 					"Empty: the only one the person belongs to, as sign-in adopts it."),
 			}, "id", "user"),
 			Call: a.toolTryOIDCSignIn,

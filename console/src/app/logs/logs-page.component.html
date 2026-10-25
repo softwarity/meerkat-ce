@@ -21,8 +21,8 @@
 
 <div class="toolbar">
   <p class="hint" i18n="@@Logs_hint">
-    The last lines this gateway wrote about itself, live. In a cluster, only those of the node that
-    answered: {{ state()?.node }}.
+    Recent log lines of this gateway, live. In a cluster, only those of instance
+    {{ state()?.node }}.
   </p>
   <div class="filters">
     <mat-button-toggle-group
@@ -50,7 +50,7 @@
     <div class="lines">
       @for (e of filtered(); track e.seq) {
         <div class="line" [class]="e.level" [class.open]="open() === e.seq" (click)="toggle(e)">
-          <span class="time">{{ time(e) }}</span>
+          <span class="time" [title]="moment(e)">{{ time(e) }}</span>
           <span class="level">{{ e.level }}</span>
           <span class="message">
             {{ e.message }}
@@ -72,7 +72,7 @@
           }
         </div>
       } @empty {
-        <p class="empty" i18n="@@Logs_empty">No line matches.</p>
+        <p class="empty" i18n="@@Logs_empty">No matching lines.</p>
       }
     </div>
   }

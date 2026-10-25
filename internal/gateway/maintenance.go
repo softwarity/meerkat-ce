@@ -139,7 +139,7 @@ const maintenanceStripe = `<style>
 #mk-maint .g{flex:1}
 </style>
 <div id="mk-maint">
-<span>Under maintenance. Visitors get the unavailable page - you are through because you administer this gateway.</span>
+<span>Under maintenance. Visitors see the unavailable page; you can get through as an administrator.</span>
 <span class="g"></span>
 <a href="?` + bypassParam + `=0">Leave</a>
 </div>`

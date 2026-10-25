@@ -696,7 +696,15 @@ func (a *API) selfSignedCertificate(w http.ResponseWriter, r *http.Request, acto
 // through adopt - no network, no authority Meerkat has to know how to talk to.
 // It lands in the pool unplaced: it serves nothing until then.
 func (a *API) newSigningRequest(w http.ResponseWriter, r *http.Request, actor store.User) {
-	var p generatePayload
+	// The generation form WITHOUT the placement and the validity, rather than
+	// the form with them ignored: the signer decides how long it is valid, and
+	// a request is placed once signed, never before. A client sending them was
+	// told nothing while neither took effect; now it is told at once.
+	var p struct {
+		Names []string `json:"names"`
+		certs.Subject
+		KeyType string `json:"keyType,omitempty"`
+	}
 	if err := decodeStrict(r, &p); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed request: "+err.Error())
 		return

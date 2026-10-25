@@ -187,7 +187,7 @@ export interface VaultEntryFormData {
         i18n-label="@@Reminder_date"
         label="Reminder date"
         i18n-info="@@Reminder_date_hint"
-        info="A day to be warned on, before this lapses at its source - a token, a certificate. It does NOT make the secret obsolete: the reference keeps resolving. Empty means no reminder."
+        info="Date to be reminded, for example before a token or certificate expires where it was issued. The entry keeps working after this date."
         [clearable]="false"
       >
         <input matInput type="date" [value]="day()" (input)="setDay($any($event.target).value)" />
@@ -339,8 +339,8 @@ export class VaultEntryFormComponent implements OnInit {
   protected readonly nameRefHint = computed(() => {
     const n = this.name().trim();
     return n && this.nameOK.test(n)
-      ? $localize`:@@Vault_name_ref_named:Use it as $${n}:name: wherever it is needed`
-      : $localize`:@@Vault_name_ref_hint:Reference it by $name wherever it is needed`;
+      ? $localize`:@@Vault_name_ref_named:Use it in a field as $${n}:name:`
+      : $localize`:@@Vault_name_ref_hint:Use it in a field as $name`;
   });
 
   protected readonly canSave = computed(

@@ -101,7 +101,7 @@ export class RoleEditorComponent {
 
   // Why the name cannot be edited once the role exists.
   protected readonly renameInfo = () =>
-    $localize`:@@Role_name_is_identity:A role is its name, and the services behind this gateway read it out of a token - renaming it here would change this gateway's rules and nothing they hold. To change it: add the new role, point the rules at it, then delete this one.`;
+    $localize`:@@Role_name_is_identity:A role cannot be renamed: services read its name in their tokens. To change it, create the new role, use it where this one is used, then delete this one.`;
 
   constructor() {
     // Rebind whenever the drawer switches role (the URL drives it, the page

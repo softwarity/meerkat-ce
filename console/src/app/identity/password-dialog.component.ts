@@ -43,7 +43,7 @@ interface DialogData {
     <mat-dialog-content>
       <p class="hint" i18n="@@Shown_once_copy_it_now">Shown once: copy it now, it cannot be retrieved later.</p>
       @if (data.validHours) {
-        <p class="hint" i18n="@@Temporary_password_valid_HOURS">It works for {{ data.validHours }} hours, until its owner sets their own.</p>
+        <p class="hint" i18n="@@Temporary_password_valid_HOURS">Valid for {{ data.validHours }} hours, until the person sets their own.</p>
       }
       <div class="secret">
         <code>{{ data.password }}</code>

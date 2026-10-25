@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +7,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatRadioModule } from '@angular/material/radio';
 import { ApiService, Certificate, MountedCert, MountedPki } from '../../api.service';
 import { coversOne } from './cert-names';
+import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // The file system door of the pool (SSL-11): what the runtime MOUNTED in this
 // container - a Kubernetes Secret, a Swarm secret, a compose volume - read
@@ -17,12 +18,13 @@ import { coversOne } from './cert-names';
 // renewal written over it is served on its own.
 @Component({
   selector: 'app-file-certificate-dialog',
-  imports: [DatePipe, MatButtonModule, MatDialogModule, MatIconModule, MatProgressBarModule, MatRadioModule],
+  imports: [MatButtonModule, MatDialogModule, MatIconModule, MatProgressBarModule, MatRadioModule, ZonedDatePipe],
   templateUrl: './file-certificate-dialog.component.html',
   styleUrl: './file-certificate-dialog.component.scss',
 })
 export class FileCertificateDialogComponent {
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   private readonly ref = inject(MatDialogRef<FileCertificateDialogComponent, Certificate>);
   private readonly data = inject<{ taken: string[]; internalNames?: string[] }>(MAT_DIALOG_DATA);
   // The certificate files the pool already reads.
@@ -58,10 +60,6 @@ export class FileCertificateDialogComponent {
         this.loading.set(false);
       },
     });
-  }
-
-  protected until(t: number): number {
-    return t * 1000;
   }
 
   protected submit(): void {

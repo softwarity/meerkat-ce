@@ -14,9 +14,10 @@ import { TenantScope } from '../tenant-scope';
 import { IdentityDrawer } from '../identity-drawer';
 import { IdentityDrawerPanelComponent } from '../identity-drawer-panel.component';
 import { LiveChangesService } from '../../shared/live-changes.service';
+import { MeService } from '../../me.service';
 
 // One tenant's administration - a routed LAYOUT: every section is a child
-// route (/tenants/:id/general|groups|members|danger), so deep links work and
+// route (/tenants/:id/general|groups|members|notifications|danger), so deep links work and
 // the active entry is plain routerLinkActive. Left: the tenant's name over
 // the section nav. Right: a header owned by the layout (the active section's
 // search, the enabled toggle - persisted immediately) above the section's
@@ -51,6 +52,7 @@ export class TenantPageComponent {
   private readonly router = inject(Router);
   protected readonly scope = inject(TenantScope);
   protected readonly drawer = inject(IdentityDrawer);
+  protected readonly me = inject(MeService);
 
   protected readonly loading = signal(true);
 

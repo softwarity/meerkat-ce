@@ -110,7 +110,7 @@ export interface AddLocaleResult {
                same on every language but English, so it separates nothing
                here. -->
           <mat-select-trigger>{{ triggerLabel() }}</mat-select-trigger>
-          <mat-option value="" i18n="@@Nothing_English">Nothing - the pages show English</mat-option>
+          <mat-option value="" i18n="@@Nothing_English">Empty (pages show English)</mat-option>
           @for (l of data.existing; track l.code) {
             <mat-option [value]="l.code"><app-language-row [locale]="l" [showHoles]="false" /></mat-option>
           }
@@ -157,7 +157,7 @@ export class AddLocaleDialogComponent {
   // be a paragraph in a field.
   protected readonly triggerLabel = computed(() => {
     const code = this.from();
-    if (!code) return $localize`:@@Nothing_English:Nothing - the pages show English`;
+    if (!code) return $localize`:@@Nothing_English:Empty (pages show English)`;
     const own = this.data.existing.find((l) => l.code === code)?.name ?? '';
     return own ? code + ' - ' + own : code;
   });
@@ -174,13 +174,13 @@ export class AddLocaleDialogComponent {
     const v = this.raw().trim();
     if (!v) return '';
     const code = this.canonical();
-    if (!code) return $localize`:@@Language_tag_invalid:Not a language tag.`;
+    if (!code) return $localize`:@@Language_tag_invalid:Not a valid language tag (for example fr-CA).`;
     if (this.data.existing.some((l) => l.code === code)) {
-      return $localize`:@@Language_already_there:${code}:code: is already here.`;
+      return $localize`:@@Language_already_there:${code}:code: already exists.`;
     }
     // Well formed and naming nothing is the same answer: a tag whose language
     // no browser knows is a typo far more often than it is Occitan.
-    if (!this.label()) return $localize`:@@Language_tag_invalid:Not a language tag.`;
+    if (!this.label()) return $localize`:@@Language_tag_invalid:Not a valid language tag (for example fr-CA).`;
     return '';
   });
 

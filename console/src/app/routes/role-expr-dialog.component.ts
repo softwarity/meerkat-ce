@@ -46,7 +46,7 @@ const SHAPES: { label: string; pipe: string }[] = [
   { label: 'Two tags', pipe: '.Keep "tag:TAGNAME" "tag:OTHERTAG" | cutHead "ROLE_"' },
   { label: 'A tag plus named roles', pipe: '.Keep "tag:TAGNAME" "ROLE_USER" "ROLE_ADMIN" | cutHead "ROLE_"' },
   { label: 'Everything except one tag', pipe: '.Drop "tag:TAGNAME" | cutHead "ROLE_"' },
-  { label: "Under this service's own head", pipe: '.Keep "tag:TAGNAME" | cutHead "ROLE_" | addHead "app:"' },
+  { label: "With this service's own prefix", pipe: '.Keep "tag:TAGNAME" | cutHead "ROLE_" | addHead "app:"' },
   { label: 'Everything, untouched', pipe: '' },
   { label: $localize`:@@Roles_the_application_declares_shape:The roles the application declares`, pipe: '.Declared' },
 ];
@@ -309,12 +309,12 @@ const highlight = templateHighlight(ROLE_SYNTAX);
 
         <dl>
           <dt><code tpl=".Roles" [syntax]="SYNTAX"></code></dt>
-          <dd>the roles this caller holds, before anything is done to them.</dd>
+          <dd>the roles the user holds, unchanged.</dd>
 
           <dt><code [tpl]="KEEP" [syntax]="SYNTAX"></code> and <code [tpl]="DROP" [syntax]="SYNTAX"></code></dt>
           <dd>
-            keep (or remove) what the selectors name. <code tpl="&quot;tag:BILLING&quot;" [syntax]="SYNTAX"></code> is a
-            <strong>catalogue tag</strong>; anything else is a role name. <strong>Every selector listed counts</strong>.
+            keep (or remove) the roles the selectors name. <code tpl="&quot;tag:BILLING&quot;" [syntax]="SYNTAX"></code> is a
+            <strong>catalogue tag</strong>; anything else is a role name. <strong>A role matching any selector counts</strong>.
             @if (tags().length) {
               <div class="tags">In this catalogue: <code [style.color]="TAG_COLOR">{{ tags().join(', ') }}</code></div>
             }
@@ -324,26 +324,25 @@ const highlight = templateHighlight(ROLE_SYNTAX);
             <code tpl="cutHead &quot;ROLE_&quot;" [syntax]="SYNTAX"></code>,
             <code tpl="cutTail &quot;_V2&quot;" [syntax]="SYNTAX"></code>
           </dt>
-          <dd>remove that head or tail from each name that has it.</dd>
+          <dd>remove that prefix or suffix from each name that has it.</dd>
 
           <dt>
             <code tpl="addHead &quot;app:&quot;" [syntax]="SYNTAX"></code>,
             <code tpl="addTail &quot;:ro&quot;" [syntax]="SYNTAX"></code>
           </dt>
-          <dd>the opposite, for a service whose namespace differs from the catalogue's.</dd>
+          <dd>add that prefix or suffix to each name.</dd>
 
           <dt><code tpl=".Declared" [syntax]="SYNTAX"></code></dt>
           <dd i18n="@@Declared_verb_doc">
-            the roles the application's OpenAPI spec declares, among those this caller holds through their
-            mapping, under the <strong>application's own names</strong>. The mapping is set on the Endpoint
-            security screen.
+            the roles declared in the application's OpenAPI spec that the user holds through the mapping,
+            under the <strong>application's own names</strong>. The mapping is set on Endpoint security.
             @if (!maps) {
               This route maps none yet: it keeps nothing.
             }
           </dd>
 
           <dt><code tpl="lower" [syntax]="SYNTAX"></code>, <code tpl="upper" [syntax]="SYNTAX"></code></dt>
-          <dd>case, for a service that expects one.</dd>
+          <dd>change the case.</dd>
 
           <dt><code tpl="join &quot;,&quot;" [syntax]="SYNTAX"></code>, <code tpl="json" [syntax]="SYNTAX"></code></dt>
           <dd>
@@ -352,8 +351,8 @@ const highlight = templateHighlight(ROLE_SYNTAX);
 
           <dt><code [tpl]="IF_ELSE" [syntax]="SYNTAX"></code></dt>
           <dd>
-            decides instead of listing: a selection that keeps nothing is false, so the roles become the
-            <strong>one value</strong> an application wants - Grafana's Admin, Editor or Viewer.
+            gives <strong>one value</strong> instead of a list, such as Grafana's Admin, Editor or Viewer. A
+            selection that keeps nothing is false.
             <a href="https://meerkat.softwarity.dev/docs/auth/service-jwt#the-shape-of-the-roles" target="_blank" rel="noopener"
               >The full syntax, and shapes written for real applications</a
             >.

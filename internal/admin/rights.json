@@ -541,6 +541,36 @@
   },
   {
     "method": "GET",
+    "path": "/api/notifications",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/access",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/settings",
+    "guard": "domainAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/settings",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/notifications/{id}",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/{id}/readers",
+    "guard": "appAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/oidc/clients",
     "guard": "infraAdmin"
   },
@@ -757,12 +787,12 @@
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "serviceTokens"
+    "guard": "runReport"
   },
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "runReport"
+    "guard": "serviceTokens"
   },
   {
     "method": "POST",
@@ -1042,6 +1072,41 @@
   {
     "method": "POST",
     "path": "/api/tenants/{id}/members/{userId}/reset-password",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/notifications",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "POST",
+    "path": "/api/tenants/{id}/notifications",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/notifications/compose",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/notifications/settings",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/tenants/{id}/notifications/settings",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/tenants/{id}/notifications/{nid}",
+    "guard": "tenantScoped"
+  },
+  {
+    "method": "GET",
+    "path": "/api/tenants/{id}/notifications/{nid}/readers",
     "guard": "tenantScoped"
   },
   {

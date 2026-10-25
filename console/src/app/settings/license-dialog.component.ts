@@ -25,7 +25,7 @@ import { FileButtonComponent, FileDropDirective } from '../shared/file-pick';
     <h2 mat-dialog-title i18n="@@Change_license">Change license</h2>
     <mat-dialog-content>
       <p class="hint" i18n="@@Change_license_hint">
-        Paste the license file Softwarity sent, drop it here, or choose it. It is checked before it is kept.
+        Paste, drop or choose the license file Softwarity sent you. It is checked before it is saved.
       </p>
       <div class="drop" appFileDrop (filesDropped)="read($event[0])">
         <mat-form-field subscriptSizing="dynamic">

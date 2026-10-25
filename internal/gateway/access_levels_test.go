@@ -123,7 +123,7 @@ func TestAccessLevelsOverHTTP(t *testing.T) {
 		if res.StatusCode != http.StatusForbidden {
 			t.Fatalf("newcomer on api = %d, want 403", res.StatusCode)
 		}
-		if body := readBody(t, res); body == "" || !strings.Contains(body, "no organisation") {
+		if body := readBody(t, res); body == "" || !strings.Contains(body, "no tenant") {
 			t.Fatalf("403 body = %q, want it to name the missing organisation", body)
 		}
 	})

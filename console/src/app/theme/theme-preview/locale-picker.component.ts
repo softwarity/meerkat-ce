@@ -44,7 +44,7 @@ import { LanguageRowComponent } from '../../shared/language-row.component';
               i18n-matTooltip="@@Locale_holes_hint3">{{ current()?.holes }}</span>
           }
           @if (current()?.edited) {
-            <mat-icon class="edited" matTooltip="This installation changed wordings here"
+            <mat-icon class="edited" matTooltip="Texts changed on this gateway"
               i18n-matTooltip="@@Locale_edited_hint">edit</mat-icon>
           }
           <mat-icon class="caret">arrow_drop_down</mat-icon>

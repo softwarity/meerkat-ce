@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"html/template"
 	"net/http"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/evalmark"
+	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -137,6 +141,94 @@ func (h *Handler) Caller(r *http.Request) store.Caller {
 	return caller
 }
 
+// NotifyBadge is what the user button and the portal bar show of the
+// notifications (NOTIF-05): every unread one the reader may still act on, and
+// where the reader reads them.
+type NotifyBadge struct {
+	Total int    `json:"total"`
+	Page  string `json:"page"`
+	// InBar says the portal bar carries the notifications entry for this
+	// reader: the entry and the badge are then the bar's, and the user button
+	// inside it shows neither.
+	InBar bool `json:"inBar,omitempty"`
+}
+
+// Notifications is the badge for the session a request carries, ok false
+// when there is none, when the binary carries no notifications, or when they
+// are off for the reader's tenant.
+func (h *Handler) Notifications(r *http.Request) (NotifyBadge, bool) {
+	if h.NotifyBadge == nil || h.adminPlane {
+		return NotifyBadge{}, false
+	}
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil || sess.Pending != "" {
+		return NotifyBadge{}, false
+	}
+	return h.NotifyBadge(r.Context(), sess)
+}
+
+// NotificationsPagePath is the built-in notifications page. It answers
+// whatever page the portal names: the address everything leads to may be
+// the integrator's, the built-in one stays reachable.
+const NotificationsPagePath = "/meerkat/notifications"
+
+// The notifications' desktop helper (Enterprise): a service worker, because a
+// notification a page makes itself can carry no button, and a phone refuses
+// it. Its scope is a path that serves nothing, so it controls no page and
+// sees no request; the account button registers it, the first time it has
+// news for the desktop.
+const (
+	NotificationsWorkerPath  = "/meerkat/notify-sw.js"
+	NotificationsWorkerScope = "/meerkat/notify-sw/"
+)
+
+// NotifyPlace is where one reader reads their notifications.
+type NotifyPlace struct {
+	// Page is the address: the integrator's page when the portal names one
+	// and the reader may open its route, the built-in page otherwise.
+	Page string
+	// Route is the integrator's route serving Page, "" for the built-in page.
+	Route store.Route
+	// InBar says the bar carries the notifications entry for this reader:
+	// portal mode, the entry placed, and the integrator's route open to them.
+	InBar bool
+}
+
+// NotifyPlace resolves it for a caller. A reader the integrator's route
+// refuses is led to the built-in page, through the user button: the bar's
+// entry is filtered like any other. A route turned off, gone or no longer UI
+// leads everybody to the built-in page, and the entry stays where it is.
+func (h *Handler) NotifyPlace(ctx context.Context, caller store.Caller) NotifyPlace {
+	cfg := h.st.Portal(ctx)
+	place := NotifyPlace{Page: NotificationsPagePath}
+	allowed := true
+	if np := cfg.NotifyPage; np.RouteID != "" {
+		if rt, err := h.st.GetRoute(ctx, np.RouteID); err == nil && rt.IsUI {
+			entry := routeEntryPath(rt)
+			switch {
+			case !rt.Access.Grants(caller):
+				allowed = false
+			case rt.Enabled && entry != "":
+				place.Page, place.Route = NotifyHref(entry, np.Path), rt
+			}
+		}
+	}
+	place.InBar = allowed && !h.adminPlane && cfg.Mode == store.PortalModePortal && cfg.NotificationsEntry()
+	return place
+}
+
+// NotifyHref is a path under a route's address: "/inbox" under "/app" is
+// "/app/inbox", and under "/" it is "/inbox".
+func NotifyHref(entry, path string) string {
+	if path == "" {
+		path = "/"
+	}
+	if entry == "/" || entry == "" {
+		return path
+	}
+	return strings.TrimSuffix(entry, "/") + path
+}
+
 // RouteEntryPath is where a link to a UI route leads: its first path pattern,
 // cut at the first wildcard. Empty when the route has nowhere to land.
 func RouteEntryPath(rt store.Route) string { return routeEntryPath(rt) }
@@ -161,3 +253,82 @@ func Strings(lang string) map[string]string { return catalogue(lang) }
 
 // UserButtonScript is the <meerkat-user-button> component, which the bar mounts.
 func UserButtonScript() string { return userButtonScript() }
+
+// ── A page of the data plane, for a package outside this one ─────────────────
+//
+// The notifications page (NOTIF-05) is drawn by Enterprise code in the very
+// frame the sign-in pages wear: the theme, the arrangement, the language and
+// the scheme switch. These are the three pieces it needs, and nothing in them
+// is the notifications'.
+
+// FlowChrome is the model every flow page embeds.
+type FlowChrome = flowChrome
+
+// FlowPage builds a page from its body, in the flow pages' frame.
+func FlowPage(name, body string) *template.Template { return flowPage(name, body) }
+
+// FlowData is the frame's data for one request, titled by a catalogue key.
+func (h *Handler) FlowData(r *http.Request, titleKey string) FlowChrome {
+	return h.flowData(r, titleKey)
+}
+
+// WriteFlow writes a page built by FlowPage.
+func WriteFlow(w http.ResponseWriter, page *template.Template, data any, status int) {
+	writeFlow(w, page, data, status)
+}
+
+// AppPage makes a flow page a screen of the product (see flowChrome.App): the
+// brand, the background picture and the arrangement go, the theme, the
+// language and the scheme stay. The arrangement's block is dropped with it -
+// a split or a drawer is a way to dress a sign-in, not a list - and only the
+// evaluation banner's placement is kept.
+func AppPage(c FlowChrome) FlowChrome {
+	c.App = true
+	c.Layout = store.PageLayout{Name: store.LayoutCentered}
+	c.LayoutCSS = template.CSS(evalmark.FlowCSS) //nolint:gosec // a constant from ee/eval, never anyone's input
+	return c
+}
+
+// BehindPortal puts a flow page behind the portal the way a route page stands
+// there: in portal mode, on an image that carries the bar, the page agent and
+// the bar ride at the top of its body - the same fragment, so the same bar, in
+// the same place, with its badges kept live by the agent's channel. The
+// page's own language and scheme switches give way to the account menu the
+// bar mounts: one surface, not two corners. Anything else leaves the page as
+// it was.
+//
+// The agent drives this page's light/dark in place, as a route's mechanism
+// would: the body class the frame stamps (mk-scheme-*), and a rule that lets
+// it win over the scheme the page was rendered in, for "auto" picked on a page
+// served light or dark.
+func (h *Handler) BehindPortal(r *http.Request, c FlowChrome) FlowChrome {
+	if portalBar == nil || portalBar.Fragment == nil || h.adminPlane {
+		return c
+	}
+	if h.st.Portal(r.Context()).Mode != store.PortalModePortal {
+		return c
+	}
+	langs := h.offeredLanguages()
+	agent := `<script defer src="/meerkat/page.js?v=` + ChromeVersion + `" data-scheme="select"` +
+		` data-scheme-mechanism="class" data-scheme-tag="body" data-scheme-light="mk-scheme-light" data-scheme-dark="mk-scheme-dark"` +
+		` data-languages="` + template.HTMLEscapeString(strings.Join(langs, ",")) + `"></script>` +
+		`<style>:root:has(> body.mk-scheme-light) { color-scheme: light; } :root:has(> body.mk-scheme-dark) { color-scheme: dark; }</style>`
+	c.BodyStart = template.HTML(agent + portalBar.Fragment(store.Route{IsUI: true}, langs)) //nolint:gosec // constants, and language codes validated and escaped
+	c.SchemeSwitch = false
+	c.Langs = nil
+	return c
+}
+
+// ── A mail in the gateway's own look, for a package outside this one ─────────
+//
+// The notifications (NOTIF-05) are doubled by mail when a service asks: the
+// single template NOTIF-01 dresses every mail in, the strings in the reader's
+// language, and the relay the console configured.
+
+// BuildMail composes a message in the gateway's look.
+func (h *Handler) BuildMail(ctx context.Context, to string, spec mail.Spec) mail.Message {
+	return h.buildMail(ctx, to, spec)
+}
+
+// SendMail sends it through the configured relay.
+func (h *Handler) SendMail(ctx context.Context, msg mail.Message) error { return h.sendMail(ctx, msg) }

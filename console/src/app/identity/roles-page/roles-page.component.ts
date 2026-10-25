@@ -101,8 +101,8 @@ export class RolesPageComponent {
   // with holes in it, and dropping between two of them would mean nothing.
   protected readonly handleTip = computed(() =>
     this.filtering()
-      ? $localize`:@@Clear_the_filter_to_re_parent:Clear the filter to re-parent`
-      : $localize`:@@Drag_to_re_parent:Drag to re-parent`,
+      ? $localize`:@@Clear_the_filter_to_re_parent:Clear the filter to move roles`
+      : $localize`:@@Drag_to_re_parent:Drag to move under another role`,
   );
   protected readonly isRoot = (_: number, n: RoleNode): boolean => n.role === null;
 

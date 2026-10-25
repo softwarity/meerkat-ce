@@ -66,7 +66,9 @@ sélecteur.
 
 Le même mécanisme peut inscrire les informations propres à l'utilisateur - nom d'utilisateur,
 identifiant, nom complet, adresse e-mail, organisation, fuseau horaire, langue - chacune sous
-le nom d'attribut ou de meta que vous choisissez.
+le nom d'attribut ou de meta que vous choisissez. Une information que la personne n'a pas est
+omise : sans fuseau choisi sur son profil, pas d'attribut de fuseau, et la page prend celui du
+navigateur.
 
 > [!WARNING]
 > Une page marquée de cette façon appartient à **une seule personne**. La gateway interdit

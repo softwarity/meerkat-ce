@@ -24,19 +24,19 @@
           <p class="hint text-muted">
             @switch (mode()) {
               @case ('none') {
-                <ng-container i18n="@@Portal_mode_none_hint">No list: the account button and built-in pages
-                  show only the brand name.</ng-container>
+                <ng-container i18n="@@Portal_mode_none_hint">No application list. The account button and
+                  built-in pages show only your brand name.</ng-container>
               }
               @case ('links') {
-                <ng-container i18n="@@Portal_mode_links_hint">A menu in the account button injected into
-                  the applications, and on the built-in pages.</ng-container>
+                <ng-container i18n="@@Portal_mode_links_hint">An Applications menu in the account button,
+                  in your applications and on the built-in pages.</ng-container>
               }
               @case ('portal') {
                 <ng-container i18n="@@Portal_mode_portal_hint">A navigation bar on every application page,
                   carrying the account button.</ng-container>
               }
             }
-            <ng-container i18n="@@Portal_access_hint">Each visitor sees what their access opens.</ng-container>
+            <ng-container i18n="@@Portal_access_hint">Each user sees only the applications they can open.</ng-container>
           </p>
         </div>
         <mat-button-toggle-group [value]="mode()" (change)="setMode($event.value)"
@@ -58,6 +58,46 @@
         </mat-button-toggle-group>
       </div>
     </mat-card>
+
+    <!-- Where users read their notifications (NOTIF-05), once root turned
+         them on: everything that leads to them leads there. -->
+    @if (notifyOn()) {
+      <mat-card appearance="outlined">
+        <div class="row">
+          <mat-icon>notifications</mat-icon>
+          <div class="grow">
+            <h2 class="title" i18n="@@Portal_notify_page">Notifications page</h2>
+            <p class="hint text-muted" i18n="@@Portal_notify_page_hint">Where the bar, the account menu, the pop-up and
+              the mails lead. The built-in page stays open to everyone.</p>
+          </div>
+          <mat-button-toggle-group [value]="notifyCustom()" (change)="setNotifyCustom($event.value)"
+            hideSingleSelectionIndicator aria-label="Notifications page" i18n-aria-label="@@Portal_notify_page">
+            <mat-button-toggle [value]="false" i18n="@@Portal_notify_builtin">Built-in</mat-button-toggle>
+            <mat-button-toggle [value]="true" i18n="@@Portal_notify_custom">Your page</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        @if (notifyCustom()) {
+          <div class="row notify-custom">
+            <mat-form-field>
+              <mat-label i18n="@@Portal_notify_route">UI route</mat-label>
+              <mat-select [value]="notifyRoute()" (selectionChange)="setNotifyRoute($event.value)">
+                @for (r of uiRoutes(); track r.id) {
+                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>{{ notifyRoute() ? '' : savedOnceChosen }}</mat-hint>
+            </mat-form-field>
+            <mat-form-field class="grow">
+              <mat-label i18n="@@Portal_notify_path">Path</mat-label>
+              <span matTextPrefix>{{ notifyBase() }}</span>
+              <input matInput [value]="notifyPath()" placeholder="/#/notifications"
+                (change)="setNotifyPath($any($event.target).value)" />
+              <mat-hint i18n="@@Portal_notify_path_hint">Under the route, like /inbox or /#/inbox.</mat-hint>
+            </mat-form-field>
+          </div>
+        }
+      </mat-card>
+    }
 
     @if (isBar()) {
       <div class="arrange">
@@ -113,7 +153,7 @@
             </mat-slider>
           </div>
           @if (!brandLogo()) {
-            <p class="hint text-muted" i18n="@@Portal_logo_none">Branding carries no logo.</p>
+            <p class="hint text-muted" i18n="@@Portal_logo_none">No logo set in Branding.</p>
           }
         </div>
         <div class="opt">
@@ -137,7 +177,7 @@
         <span class="grow"></span>
         <mat-button-toggle-group class="widths" [value]="previewWidth()" (change)="setPreviewWidth($event.value)"
           hideSingleSelectionIndicator aria-label="Preview width" i18n-aria-label="@@Portal_preview_width">
-          <mat-button-toggle [value]="0" matTooltip="Full width - editable" i18n-matTooltip="@@Portal_width_full">
+          <mat-button-toggle [value]="0" matTooltip="Full width, editable" i18n-matTooltip="@@Portal_width_full">
             <mat-icon>desktop_windows</mat-icon><span i18n="@@Portal_width_edit">Edit</span>
           </mat-button-toggle>
           <mat-button-toggle [value]="768" matTooltip="Tablet" i18n-matTooltip="@@Portal_width_tablet">
@@ -147,6 +187,11 @@
             <mat-icon>smartphone</mat-icon>
           </mat-button-toggle>
         </mat-button-toggle-group>
+        @if (notifyOn() && !hasNotifyEntry()) {
+          <button matButton (click)="addNotifications()">
+            <mat-icon>notifications</mat-icon><span i18n="@@Portal_add_notifications">Add notifications</span>
+          </button>
+        }
         <button matButton (click)="addContainer()">
           <mat-icon>folder</mat-icon><span i18n="@@Portal_add_container">Add a container</span>
         </button>
@@ -169,7 +214,7 @@
          reads, edited in the same drawer: switching mode must not cost the work. -->
     @if (hasCatalogue() && !isBar()) {
       <div class="canvas-head">
-        <span class="text-muted" i18n="@@Portal_links_hint">Offered in this order</span>
+        <span class="text-muted" i18n="@@Portal_links_hint">Shown in this order</span>
         <span class="grow"></span>
         <button matButton (click)="addContainer()">
           <mat-icon>folder</mat-icon><span i18n="@@Portal_add_container">Add a container</span>
@@ -181,7 +226,7 @@
       <div class="links-split">
         @if (!entries().length) {
           <p class="empty text-muted" i18n="@@Portal_empty_links">
-            No application yet. Add one for each UI the menu should offer.
+            No application yet. Add one for each application the menu should list.
           </p>
         } @else {
           <mat-card appearance="outlined" class="links">
@@ -192,15 +237,18 @@
                   @if (isContainer(e)) {
                     <span><mat-icon class="kind">folder</mat-icon><b>{{ e.label }}</b></span>
                     @if (!(e.children ?? []).length) {
-                      <span class="text-muted path" i18n="@@Portal_container_empty">empty, not offered</span>
+                      <span class="text-muted path" i18n="@@Portal_container_empty">empty, not shown</span>
                     }
+                  } @else if (e.special) {
+                    <b>{{ label(e) }}</b>
+                    <span class="text-muted path" i18n="@@Portal_bar_only">portal bar only</span>
                   } @else {
                     <b>{{ e.label || routeNameOf(e.routeId) }}</b>
                     <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
                     @if (routeOff(e.routeId)) {
                       <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
                     } @else if (routeGone(e.routeId)) {
-                      <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+                      <span class="text-muted path" i18n="@@Portal_route_gone">route not found</span>
                     }
                   }
                 </span>
@@ -216,12 +264,17 @@
                   <div class="link-row sub" [class.off]="e.disabled || c.disabled">
                     <span class="pos">{{ i + 1 }}.{{ j + 1 }}</span>
                     <span class="grow">
-                      <b>{{ c.label || routeNameOf(c.routeId) }}</b>
-                      <span class="text-muted path">{{ routeNameOf(c.routeId) }}</span>
-                      @if (routeOff(c.routeId)) {
+                      @if (c.special) {
+                        <b>{{ label(c) }}</b>
+                        <span class="text-muted path" i18n="@@Portal_bar_only">portal bar only</span>
+                      } @else {
+                        <b>{{ c.label || routeNameOf(c.routeId) }}</b>
+                        <span class="text-muted path">{{ routeNameOf(c.routeId) }}</span>
+                      }
+                      @if (!c.special && routeOff(c.routeId)) {
                         <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
                       } @else if (routeGone(c.routeId)) {
-                        <span class="text-muted path" i18n="@@Portal_route_gone">no such UI route</span>
+                        <span class="text-muted path" i18n="@@Portal_route_gone">route not found</span>
                       }
                     </span>
                     <button matIconButton [disabled]="j === 0" (click)="moveChild(i, j, -1)"
@@ -241,7 +294,7 @@
             title="Applications menu preview" i18n-title="@@Portal_links_preview"></iframe>
           @if (linksDraft().length < 2) {
             <p class="hint text-muted" i18n="@@Portal_links_single">
-              Fewer than two applications offered: the account button draws no Applications menu.
+              With fewer than two applications, the account button shows no Applications menu.
             </p>
           }
         </div>

@@ -71,8 +71,8 @@ func (a *API) callTools() []mcp.Tool {
 				"per-endpoint security, filters, quotas, and the identity the route forwards to the service - " +
 				"so this is how to test what a service answers and what a rule lets through. " +
 				"By default the caller is \"agent\" holding EVERY role of the catalogue. Pass `as` and `roles` " +
-				"to call as somebody shaped otherwise, and `tenant` for a route reserved to organisations. " +
-				"A 403 says why in its body: the gateway names the role or the organisation missing, and a " +
+				"to call as somebody shaped otherwise, and `tenant` for a route reserved to tenants. " +
+				"A 403 says why in its body: the gateway names the role or the tenant missing, and a " +
 				"service may name its own reason. The call is REAL: a POST, PUT or DELETE changes the " +
 				"service's data. Every call is written to the audit trail.",
 			Schema: object(map[string]any{
@@ -88,7 +88,7 @@ func (a *API) callTools() []mcp.Tool {
 				"as": str("Optional: the username the call is made as. \"agent\" when omitted."),
 				"roles": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
 					"description": "Optional: the roles the caller holds, expanded through the hierarchy. Every role of the catalogue when omitted; [] for none."},
-				"tenant": str("Optional: the organisation the call is made in, by id or name."),
+				"tenant": str("Optional: the tenant the call is made in, by id or name."),
 			}, "routeId", "path"),
 			Call: a.toolCallRoute,
 		},
@@ -410,5 +410,5 @@ func (a *API) tenantRef(ctx context.Context, ref string) (string, error) {
 			return t.ID, nil
 		}
 	}
-	return "", fmt.Errorf("no organisation %q, by id or by name", ref)
+	return "", fmt.Errorf("no tenant %q, by id or by name", ref)
 }

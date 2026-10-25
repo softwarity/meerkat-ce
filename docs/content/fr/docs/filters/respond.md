@@ -42,6 +42,10 @@ L'appelant est disponible sous `{{.Username}}`, `{{.UserID}}`, `{{.Fullname}}`,
 que `{{.SignedIn}}`, qui vaut `false` quand personne n'est connecté. Rien d'autre
 n'est accessible : ni base de données, ni système de fichiers, ni autre compte.
 
+`{{.Timezone}}` est le fuseau choisi par la personne sur son profil, et vide quand elle
+n'en a choisi aucun : c'est alors celui de son navigateur qui s'applique, et seul le
+navigateur le connaît.
+
 Trois fonctions l'accompagnent :
 
 - `json` rend une valeur en JSON, guillemets et échappement compris.

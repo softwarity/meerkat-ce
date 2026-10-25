@@ -133,11 +133,11 @@ export class BrandingCardComponent {
     if (!file) return;
     if (!accepted.includes(file.type)) {
       const types = accepted.includes('image/x-icon') ? 'png, svg, ico or webp' : 'png, jpeg, webp or svg';
-      this.snack.open(`Use a ${types} image`, undefined, { duration: 3000 });
+      this.snack.open($localize`:@@Image_type_refused:Use a ${types}:types: image`, undefined, { duration: 3000 });
       return;
     }
     if (file.size > maxBytes) {
-      this.snack.open(`Keep the ${what} under ${Math.round(maxBytes / 1024)} KiB`, undefined, { duration: 3000 });
+      this.snack.open($localize`:@@Image_too_large:The ${what}:what: must be under ${Math.round(maxBytes / 1024)}:kib: KiB`, undefined, { duration: 3000 });
       return;
     }
     const reader = new FileReader();

@@ -142,7 +142,7 @@ export class PaletteEditorComponent {
     const d = derivedCore(this.colors());
     return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v.toLowerCase()])) as typeof d;
   });
-  protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:Built-in palette: duplicate it first`;
+  protected readonly tipReadOnly = $localize`:@@Theme_builtin_hint2:Built-in theme: duplicate it first`;
   protected readonly tipClean = $localize`:@@Theme_nothing_to_save:Nothing changed`;
 
   private readonly snack = inject(MatSnackBar);
@@ -205,25 +205,25 @@ export class PaletteEditorComponent {
         try {
           data = JSON.parse(text);
         } catch {
-          this.fail($localize`:@@Theme_import_bad:That file is not valid JSON`);
+          this.fail($localize`:@@Theme_import_bad:This file is not valid JSON`);
           return;
         }
         const recipe = this.readRecipe(data);
         if (!recipe) {
           this.fail(
-            $localize`:@@Theme_import_empty2:No theme found in that file: expected a Material Theme Builder export (coreColors)`,
+            $localize`:@@Theme_import_empty2:No theme in this file. Expected a Material Theme Builder export.`,
           );
           return;
         }
         this.imported.emit(recipe.recipe);
         const said = {
-          exact: $localize`:@@Theme_imported2:Theme imported - review it, then save`,
-          older: $localize`:@@Theme_imported_regenerated:Theme imported from its colours. The file is an older builder export: its contrast rules have changed since, so some roles differ from the file`,
-          palette: $localize`:@@Theme_imported_palette:Old palette file: its six colours were read off its tokens - review them, then save`,
+          exact: $localize`:@@Theme_imported2:Theme imported. Review it, then save.`,
+          older: $localize`:@@Theme_imported_regenerated:Theme imported from its colours. The file comes from an older Theme Builder, so some colours may differ. Review, then save.`,
+          palette: $localize`:@@Theme_imported_palette:Old palette file: its six colours were imported. Review them, then save.`,
         }[recipe.kind];
         this.snack.open(said, undefined, { duration: recipe.kind === 'exact' ? 3000 : 8000 });
       })
-      .catch(() => this.fail($localize`:@@Theme_import_read:Could not read that file`));
+      .catch(() => this.fail($localize`:@@Theme_import_read:This file could not be read`));
   }
 
   private readRecipe(data: unknown): { recipe: ImportedRecipe; kind: 'exact' | 'older' | 'palette' } | null {

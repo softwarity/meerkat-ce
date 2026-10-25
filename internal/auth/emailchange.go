@@ -104,7 +104,7 @@ func (h *Handler) doConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, email, err := h.st.TakeEmailTokenPayload(r.Context(), hashTrust(token), emailChangePurpose, time.Now().Unix())
 	if err != nil || email == "" {
-		http.Error(w, h.tr(r, "errEmailChangeExpired"), http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleProfile", "errEmailChangeExpired", "/profile", "backToProfile", http.StatusUnprocessableEntity)
 		return
 	}
 	h.applyEmailChange(w, r, userID, email)
@@ -147,7 +147,7 @@ func (h *Handler) doEmailChangeCode(w http.ResponseWriter, r *http.Request) {
 // address is checked again, since somebody may have taken it meanwhile.
 func (h *Handler) applyEmailChange(w http.ResponseWriter, r *http.Request, userID, email string) {
 	if id, err := h.st.UserIDByEmail(r.Context(), email); err == nil && id != userID {
-		http.Error(w, h.tr(r, "errEmailTaken"), http.StatusConflict)
+		h.renderLinkDead(w, r, "titleProfile", "errEmailTaken", "/profile", "backToProfile", http.StatusConflict)
 		return
 	}
 	if err := h.st.SetUserEmail(r.Context(), userID, email); err != nil {

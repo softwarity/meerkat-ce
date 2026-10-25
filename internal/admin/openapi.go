@@ -170,7 +170,7 @@ func (a *API) putRouteSecurity(w http.ResponseWriter, r *http.Request, actor sto
 		return
 	}
 	if err := a.st.SaveRoute(r.Context(), route); err != nil {
-		a.internal(w, err)
+		a.routeWriteFailed(w, err)
 		return
 	}
 	if err := a.reloadRouting(r.Context()); err != nil {
@@ -262,7 +262,7 @@ func (a *API) putRouteRoleMap(w http.ResponseWriter, r *http.Request, actor stor
 		created = append(created, role.Name)
 	}
 	if err := a.st.SaveRoute(r.Context(), route); err != nil {
-		a.internal(w, err)
+		a.routeWriteFailed(w, err)
 		return
 	}
 	if err := a.reloadRouting(r.Context()); err != nil {
@@ -327,7 +327,7 @@ func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.
 		return
 	}
 	if err := a.st.SaveRoute(r.Context(), route); err != nil {
-		a.internal(w, err)
+		a.routeWriteFailed(w, err)
 		return
 	}
 	if err := a.reloadRouting(r.Context()); err != nil {
@@ -338,6 +338,22 @@ func (a *API) putRouteAudit(w http.ResponseWriter, r *http.Request, actor store.
 	a.auditUpdate(r.Context(), actor, "route.audit", "route", route.ID, route.Name, "", before, after)
 	after.Endpoints = orEmpty(after.Endpoints)
 	writeJSON(w, http.StatusOK, after)
+}
+
+// routeWriteFailed answers the store's refusal of a route these screens
+// rewrote. Each of them reads the route, changes one block and writes it back
+// at the revision it read, so a save landing in between is a CONFLICT (409:
+// read again), and a rule the store's cleaning refuses is the caller's (422) -
+// neither is the gateway failing, which is all a 500 says.
+func (a *API) routeWriteFailed(w http.ResponseWriter, err error) {
+	if conflict(w, err) {
+		return
+	}
+	if isInvalid(err) {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	a.internal(w, err)
 }
 
 // auditOf returns the route's audited operations, or nil.
@@ -498,7 +514,7 @@ func (a *API) putRouteSpec(w http.ResponseWriter, r *http.Request, actor store.U
 	api.Spec = &decl
 	route.API = &api
 	if err := a.st.SaveRoute(r.Context(), route); err != nil {
-		a.internal(w, err)
+		a.routeWriteFailed(w, err)
 		return
 	}
 	if err := a.reloadRouting(r.Context()); err != nil {
@@ -531,7 +547,7 @@ func (a *API) deleteRouteSpec(w http.ResponseWriter, r *http.Request, actor stor
 	if route.API != nil && route.API.Spec != nil && route.API.Spec.Type == store.SpecFile {
 		route.API.Spec = nil
 		if err := a.st.SaveRoute(r.Context(), route); err != nil {
-			a.internal(w, err)
+			a.routeWriteFailed(w, err)
 			return
 		}
 		if err := a.reloadRouting(r.Context()); err != nil {

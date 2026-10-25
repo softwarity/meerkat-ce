@@ -83,7 +83,7 @@ export class UpstreamMarkComponent {
       const target = map[declared] ?? '';
       const how = target
         ? $localize`:@@Upstream_role_mapped:${declared}:ROLE:, mapped to ${target}:TARGET:.`
-        : $localize`:@@Upstream_role_unmapped:${declared}:ROLE:, not mapped: never forwarded.`;
+        : $localize`:@@Upstream_role_unmapped:${declared}:ROLE:, not mapped: never sent to the application.`;
       return { declared, target, tip: how + ' ' + this.appChecks };
     });
   });

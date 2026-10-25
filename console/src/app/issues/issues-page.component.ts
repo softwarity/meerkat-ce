@@ -17,6 +17,7 @@ import { ApiService, Issue, IssueStatus } from '../api.service';
 import { MeService } from '../me.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 
 // The embedded issue tracker (ISSUE-03): the reports users file from the
 // injected user-button panel, with their screenshot and captured context.
@@ -42,6 +43,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
     MatSlideToggleModule,
     MatTooltipModule,
     LoadingIndicatorComponent,
+    ZonedDatePipe,
   ],
   styleUrl: './issues-page.component.scss',
   templateUrl: './issues-page.component.html',
@@ -52,6 +54,7 @@ export class IssuesPageComponent {
   private readonly snack = inject(MatSnackBar);
   private readonly dialogs = inject(DialogsService);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly zone = inject(MeService).timezone;
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
 
   protected readonly statuses: IssueStatus[] = ['open', 'in-progress', 'closed'];
@@ -239,11 +242,8 @@ export class IssuesPageComponent {
     return text.split('\n', 1)[0];
   }
 
+  // The moment is written out; how long ago, on hover.
   protected relWhen(at: number): string {
     return DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toRelative() ?? '';
-  }
-
-  protected fullWhen(at: number): string {
-    return DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED);
   }
 }

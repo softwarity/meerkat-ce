@@ -105,9 +105,37 @@ func TestUISim(t *testing.T) {
 		return res.StatusCode, string(b)
 	}
 
+	// The writes ride the developer's cookie, so a neighbouring page (same
+	// site, other origin) must not be able to start or end a test with it.
+	t.Run("another site's page cannot start or end a test", func(t *testing.T) {
+		for _, m := range []string{"POST", "DELETE"} {
+			req, _ := http.NewRequest(m, srv.URL+"/meerkat/dev-sim?route=r-open", strings.NewReader(`{"route":"r-open","user":"jane"}`))
+			req.Header.Set("Content-Type", "text/plain")
+			req.Header.Set("Sec-Fetch-Site", "same-site")
+			res, err := devC.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = res.Body.Close()
+			if res.StatusCode != http.StatusForbidden {
+				t.Fatalf("%s from another site: %d, want 403", m, res.StatusCode)
+			}
+		}
+		if _, body := call("GET", "/meerkat/dev-sim?route=r-open", "", devC); !strings.Contains(body, `"active":false`) {
+			t.Fatalf("a forged write started a test: %s", body)
+		}
+	})
+
 	t.Run("dev-only, live routes only, roles filtered", func(t *testing.T) {
-		if code, _ := call("POST", "/meerkat/dev-sim", `{"route":"r-open","user":"jane"}`, bobC); code != http.StatusUnauthorized {
-			t.Fatalf("non-dev: %d, want 401", code)
+		// 401 when nobody is signed in, 403 when an account is but lacks the
+		// dev capability: the developer docs' split, on all three verbs.
+		for _, m := range []string{"GET", "POST", "DELETE"} {
+			if code, _ := call(m, "/meerkat/dev-sim?route=r-open", `{"route":"r-open","user":"jane"}`, http.DefaultClient); code != http.StatusUnauthorized {
+				t.Fatalf("%s anonymous: %d, want 401", m, code)
+			}
+			if code, _ := call(m, "/meerkat/dev-sim?route=r-open", `{"route":"r-open","user":"jane"}`, bobC); code != http.StatusForbidden {
+				t.Fatalf("%s non-dev: %d, want 403", m, code)
+			}
 		}
 		if code, _ := call("POST", "/meerkat/dev-sim", `{"route":"nope","user":"jane"}`, devC); code != http.StatusUnprocessableEntity {
 			t.Fatalf("unknown route: %d, want 422", code)

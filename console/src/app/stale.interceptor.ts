@@ -23,7 +23,7 @@ export const staleInterceptor: HttpInterceptorFn = (req, next) => {
       if (err instanceof HttpErrorResponse && err.status === 409) {
         snack
           .open(
-            $localize`:@@Changed_since_you_opened_it:Changed by someone else since you opened it. Not saved: reload, then apply your change again.`,
+            $localize`:@@Changed_since_you_opened_it:Someone else changed this since you opened it. Not saved: reload and make your change again.`,
             $localize`:@@Reload:Reload`,
             { duration: 15000, panelClass: 'stale-snack' },
           )

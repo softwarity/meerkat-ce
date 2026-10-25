@@ -288,7 +288,7 @@ var errNotEnterprise = notEnterprise{}
 type notEnterprise struct{}
 
 func (notEnterprise) Error() string {
-	return "exporting traces is an Enterprise feature: this is the community image, which links no exporter. " +
+	return "exporting traces is an Enterprise feature: this is the Community edition, which has no exporter. " +
 		"The trace context still travels (traceparent is generated and forwarded) and the identifier is in the access log."
 }
 
@@ -489,5 +489,5 @@ var errNotRelaying = notRelaying{}
 type notRelaying struct{}
 
 func (notRelaying) Error() string {
-	return "this gateway is not relaying browser spans: the export is off, or this is the community image"
+	return "this gateway is not relaying browser spans: the export is off, or this is the Community edition"
 }

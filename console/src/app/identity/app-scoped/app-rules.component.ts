@@ -27,7 +27,7 @@ import { TenantScope } from '../tenant-scope';
         <app-ee-lock
           feature="directories"
           i18n-why="@@Group_rules_ee_why"
-          why="Map a directory's groups to this installation's role groups, so access follows the directory."
+          why="Put people in groups from their directory groups, so access follows the directory."
         />
       </h1>
     </div>

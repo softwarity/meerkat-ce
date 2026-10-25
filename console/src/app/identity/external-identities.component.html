@@ -14,15 +14,15 @@
             }
           </div>
         } @else {
-          <span class="meta" i18n="@@No_group_reported">No group reported</span>
+          <span class="meta" i18n="@@No_group_reported">No groups received</span>
         }
       </div>
       @if (i.lastSeenAt) {
         <span
-          class="when"
+          class="when nowrap"
           i18n-matTooltip="@@Last_sign_in_through_this_authority"
           matTooltip="Last sign-in through this authority"
-          >{{ i.lastSeenAt * 1000 | date: 'yyyy-MM-dd HH:mm' }}</span
+          >{{ i.lastSeenAt | zoned: zone() }}</span
         >
       }
     </div>

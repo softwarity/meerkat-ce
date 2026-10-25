@@ -71,6 +71,9 @@ var agentClosedEndpoints = map[string]string{
 		"token used to bound; reading it stays open",
 	"POST /api/apidocs/token": "a test token for the developers' API docs: a credential, minted for a " +
 		"browser page",
+	"POST /api/tenants/{id}/notifications": "a notification is a service telling its users about its own " +
+		"objects, and an agent has none; this one is a person trying a message out on a tenant's page, " +
+		"in their own name - reading and withdrawing stay open",
 }
 
 // agentClosedSettings are the settings a document an agent applies may not

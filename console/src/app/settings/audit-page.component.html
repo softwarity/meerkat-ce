@@ -30,7 +30,7 @@
     <app-ee-lock
       feature="STORE-06"
       i18n-why="@@Audit_export_why"
-      why="Export the filtered trail as a file, for an auditor or a SIEM."
+      why="Download the filtered trail as a file, for an auditor or a SIEM."
     />
   </button>
 </div>
@@ -38,16 +38,16 @@
 <div class="toolbar">
   @if (trail === 'data' && view() === 'endpoint') {
     <p class="hint" i18n="@@Audit_hint_operations">
-      Every call of the operations ticked in Endpoint audit: who, what was asked, what was answered.
+      Calls to the operations selected in Endpoint audit: who called, the request and the response.
     </p>
     @if (callsDropped() > 0) {
       <p class="hint dropped" i18n="@@Audit_calls_dropped">
-        {{ callsDropped() }} calls came faster than they could be written since this gateway started, and are missing here.
+        {{ callsDropped() }} calls are missing: they came in faster than they could be recorded since this gateway started.
       </p>
     }
   } @else if (trail === 'data') {
     <p class="hint" i18n="@@Audit_hint_data_plane">
-      Every sign-in to the applications, every refusal, and every change to a way into an account.
+      Sign-ins to the applications, refused attempts, and changes to how an account signs in.
     </p>
   } @else {
     <p class="hint" i18n="@@Audit_hint_system">
@@ -70,7 +70,7 @@
           <app-ee-lock
             feature="AUD-04"
             i18n-why="@@Audit_operations_why"
-            why="The calls of the operations a route audits, kept in this trail."
+            why="Record calls to chosen operations of a route in this trail."
           />
         </mat-button-toggle>
       </mat-button-toggle-group>
@@ -126,7 +126,7 @@
       @for (e of filtered(); track e.id) {
         <div class="event" [class.security]="security(e)" [class.refused]="refused(e)">
           <div class="meta">
-            <div class="when" [title]="fullWhen(e.at)">{{ relWhen(e.at) }}</div>
+            <div class="when nowrap" [title]="relWhen(e.at)">{{ e.at | zoned: me.timezone() }}</div>
             @if (e.data; as c) {
               <div class="action">{{ c.method }} {{ c.operation }}</div>
             } @else {
@@ -147,7 +147,7 @@
                      it is the difference between "root did this" and "the agent
                      root handed a token to did this". -->
                 <span class="token" i18n-matTooltip="@@Acted_through_an_admin_token"
-                      matTooltip="Acted through an admin token, not a browser">
+                      matTooltip="Done with an admin token, not from a browser">
                   <mat-icon>smart_toy</mat-icon>{{ e.actorToken }}
                 </span>
               }

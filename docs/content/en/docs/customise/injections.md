@@ -59,7 +59,9 @@ as one attribute on a tag of your choice, or as a `<meta>`. No client JavaScript
 CSS can then hide or show elements by role with nothing but a selector.
 
 The same mechanism can stamp the user's own facts - username, id, full name, e-mail, organisation,
-time zone, locale - each under an attribute or meta name you choose.
+time zone, locale - each under an attribute or meta name you choose. A fact the person does not
+have is left out: no time zone chosen on the profile, no time zone attribute, and the page uses the
+browser's.
 
 > [!WARNING]
 > A page stamped this way belongs to **one person**, so the gateway makes it non-storable: `no-store`,

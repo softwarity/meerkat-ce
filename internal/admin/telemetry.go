@@ -115,9 +115,8 @@ type telemetryProbe struct {
 // answers the question ("does the collector answer?"); anything more answers
 // somebody else's.
 type telemetryProbeResult struct {
-	Status int    `json:"status"`
-	Ms     int64  `json:"ms"`
-	Note   string `json:"note,omitempty"`
+	Status int   `json:"status"`
+	Ms     int64 `json:"ms"`
 }
 
 // probeTimeout: a collector that has not answered in five seconds has not

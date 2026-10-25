@@ -85,9 +85,16 @@ indique, ligne par ligne, ce qui manque à chacune.
   reçoit un 429 avec les en-têtes standard. Il manque l'écran qui montre la
   consommation, la possibilité de ralentir plutôt que de refuser, et des compteurs
   qui restent justes en cluster.
-- **Les notifications** - le relais SMTP est livré, avec un gabarit unique aux
-  couleurs du thème, et le récapitulatif quotidien des accès qui arrivent à
-  échéance part tout seul. Il manque un gabarit par événement, chacun traduit.
+- **Notifier vos utilisateurs** (Enterprise) - un service publie, ses
+  utilisateurs l'apprennent dans l'application qu'ils ont ouverte, sur leur
+  bureau et par mail, et peuvent être invités à l'acquitter. Voir
+  [Notifier vos utilisateurs](/docs/operations/notifications). Il manque une
+  file de mails qui survive à un redémarrage, la liste de la console qui suive en
+  direct une publication d'un service, des messages en plusieurs langues, et le
+  désabonnement des mails.
+- **Les mails** - le relais SMTP est livré, avec un gabarit unique aux couleurs
+  du thème, et le récapitulatif quotidien des accès qui arrivent à échéance part
+  tout seul. Il manque un gabarit par événement, chacun traduit.
 - **L'identité transmise aux upstreams** - le jeton signé est émis, avec son JWKS
   publié et la rotation des clés. Il manque un endpoint d'échange qui rende un
   couple jeton d'accès / jeton de rafraîchissement, et les modes qui portent un
@@ -120,8 +127,8 @@ indique, ligne par ligne, ce qui manque à chacune.
   Docker, pour les installations qui en ont déjà un et n'en veulent pas un second.
 - **Les signalements poussés vers GitHub, GitLab ou Jira**, plutôt que lus dans
   un écran de plus.
-- **Les notifications Web Push**, pour ce qu'un exploitant doit savoir sans
-  garder un onglet ouvert.
+- **Le Web Push**, pour qu'une notification du bureau atteigne une personne, un
+  exploitant d'abord, même quand aucune application n'est ouverte.
 
 ## Pas sur la liste
 

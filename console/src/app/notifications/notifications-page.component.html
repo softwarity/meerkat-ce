@@ -1,0 +1,263 @@
+<mat-drawer-container>
+  <mat-drawer-content>
+    <div class="banner">
+      <h1 i18n="@@Notifications">Notifications</h1>
+      @if (settings(); as s) {
+        <span class="muted">
+          @if (anyOn()) {
+            <ng-container i18n="@@Notifications_on">On</ng-container>
+          } @else {
+            <ng-container i18n="@@Notifications_off">Off</ng-container>
+          }
+        </span>
+        <span class="grow"></span>
+        <button matButton="outlined" (click)="openSettings()">
+          <ng-container i18n="@@Settings">Settings</ng-container>
+        </button>
+        <!-- How a service publishes, then who may: the scheduler's two
+             buttons, in its order. -->
+        <button
+          matButton="outlined"
+          (click)="openHowto()"
+          i18n-matTooltip="@@How_a_service_notifies"
+          matTooltip="How a service publishes a notification"
+        >
+          <ng-container i18n="@@API">API</ng-container>
+        </button>
+        <!-- Who may publish, and how they are recognised: the scheduler's
+             question, asked of this API. -->
+        <button
+          matButton="outlined"
+          (click)="openAccess()"
+          i18n-matTooltip="@@Who_may_publish"
+          matTooltip="Who may publish a notification"
+        >
+          <ng-container i18n="@@Access">Access</ng-container>
+        </button>
+      }
+    </div>
+
+    <div class="body">
+      @if (unavailable()) {
+        <div class="empty">{{ unavailable() }}</div>
+      } @else if (list().length === 0) {
+        <div class="empty" i18n="@@No_notifications_sent">
+          No notifications sent yet. Services publish them on the internal
+          plane.
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <mat-table [dataSource]="list()">
+            <ng-container matColumnDef="title">
+              <mat-header-cell *matHeaderCellDef i18n="@@Notification">Notification</mat-header-cell>
+              <mat-cell *matCellDef="let n">
+                <span class="lines">
+                  <span class="name">
+                    <span class="level" [class]="n.level"></span>{{ title(n) }}
+                  </span>
+                  @if (state(n) !== "live") {
+                    <span class="muted">
+                      @if (state(n) === "withdrawn") {
+                        <ng-container i18n="@@Withdrawn">Withdrawn</ng-container>
+                      } @else {
+                        <ng-container i18n="@@Expired">Expired</ng-container>
+                      }
+                    </span>
+                  }
+                </span>
+              </mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="sender">
+              <mat-header-cell *matHeaderCellDef i18n="@@Sender">Sender</mat-header-cell>
+              <mat-cell *matCellDef="let n"><span class="mono">{{ n.sender }}</span></mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="tenant">
+              <mat-header-cell *matHeaderCellDef i18n="@@Tenant">Tenant</mat-header-cell>
+              <mat-cell *matCellDef="let n">{{ tenantName(n.tenantId) }}</mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="reads">
+              <mat-header-cell *matHeaderCellDef i18n="@@Read_by">Read by</mat-header-cell>
+              <mat-cell *matCellDef="let n">{{ n.reads }} / {{ n.recipients }}</mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="sent">
+              <mat-header-cell *matHeaderCellDef i18n="@@Sent">Sent</mat-header-cell>
+              <mat-cell *matCellDef="let n">{{ n.createdAt | zoned: me.timezone() }}</mat-cell>
+            </ng-container>
+            <mat-header-row *matHeaderRowDef="columns(); sticky: true"></mat-header-row>
+            <mat-row
+              *matRowDef="let n; columns: columns()"
+              (click)="open(n)"
+              [class.off]="state(n) !== 'live'"
+              [class.selected]="selected()?.id === n.id"
+            ></mat-row>
+          </mat-table>
+        </div>
+      }
+    </div>
+  </mat-drawer-content>
+
+  <mat-drawer
+    position="end"
+    mode="over"
+    [class.wide]="panel() === 'howto'"
+    [opened]="selected() !== null || panel() !== ''"
+    (closedStart)="closePanel()"
+  >
+    @if (panel() === "access") {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2 i18n="@@Who_may_publish_notifications">Who may publish notifications</h2>
+          <button matIconButton (click)="closePanel()" i18n-aria-label="@@Close" aria-label="Close">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <app-scheduler-access target="notifications" (closed)="closePanel()" />
+      </div>
+    } @else if (panel() === "howto") {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2 i18n="@@Publishing_notifications">Publishing notifications</h2>
+          <button matIconButton (click)="closePanel()" i18n-aria-label="@@Close" aria-label="Close">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <app-notifications-api />
+      </div>
+    } @else if (panel() === "settings") {
+      @if (settings(); as s) {
+        <div class="drawer">
+          <div class="drawer-head">
+            <h2 i18n="@@Notification_settings">Notification settings</h2>
+            <button matIconButton (click)="closePanel()" i18n-aria-label="@@Close" aria-label="Close">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          @if (s.single) {
+            <p class="lead" i18n="@@Notifications_levels_lead_single">
+              Users see notifications on their notifications page, with a count
+              on the user button or portal bar. Root and the application admin
+              can each turn them off, and publishing is then refused.
+            </p>
+          } @else {
+            <p class="lead" i18n="@@Notifications_levels_lead">
+              A tenant receives notifications only when root, the application
+              admin and the tenant admin all allow it. Turned off at any level,
+              publishing to it is refused.
+            </p>
+          }
+          @if (!s.single && s.level === "root") {
+            <mat-slide-toggle
+              class="master"
+              [checked]="draft().enabled"
+              (change)="setEnabled($event.checked)"
+              i18n="@@Notifications_on_for_the_gateway"
+              >Notifications on for the gateway</mat-slide-toggle
+            >
+            @if (!draft().enabled) {
+              <p class="muted" i18n="@@Notifications_gateway_off">Off for every tenant while this switch is off.</p>
+            }
+          }
+          <div class="toggles">
+            @for (t of s.tenants; track t.id) {
+              @let b = box(t);
+              <span class="box" [matTooltip]="b.tip" [matTooltipDisabled]="!b.tip">
+                <mat-checkbox
+                  [checked]="b.checked"
+                  [indeterminate]="b.indeterminate"
+                  [disabled]="b.disabled"
+                  (change)="flip(t, $event)"
+                >
+                  @if (s.single) {
+                    <ng-container i18n="@@Notifications_on_toggle">Notifications on</ng-container>
+                  } @else {
+                    {{ t.name }}
+                  }
+                </mat-checkbox>
+              </span>
+            }
+          </div>
+          @if (s.rootEditable) {
+            <mat-form-field class="cap">
+              <mat-label i18n="@@Audience_cap">Audience cap</mat-label>
+              <input matInput type="number" [formField]="f.cap" />
+              <mat-hint i18n="@@Audience_cap_hint">Notifications with more recipients are refused</mat-hint>
+            </mat-form-field>
+          }
+          <p class="muted">
+            <ng-container i18n="@@Services_publish_at">Services publish at</ng-container>
+            <span class="mono"> POST :7070{{ s.path }}</span>
+          </p>
+          @if (problem()) {
+            <p class="error">{{ problem() }}</p>
+          }
+          @if (s.editable) {
+            <div class="drawer-actions">
+              <button matButton="filled" [disabled]="saving() || f().invalid()" (click)="save()" i18n="@@Save">
+                Save
+              </button>
+            </div>
+          }
+        </div>
+      }
+    } @else if (selected(); as n) {
+      <div class="drawer">
+        <div class="drawer-head">
+          <h2><span class="level" [class]="n.level"></span>{{ title(n) }}</h2>
+          <button matIconButton (click)="closePanel()" i18n-aria-label="@@Close" aria-label="Close">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        @if (body(n)) {
+          <p class="text">{{ body(n) }}</p>
+        }
+        <dl>
+          <dt i18n="@@Sender">Sender</dt>
+          <dd><span class="mono">{{ n.sender }}</span></dd>
+          @if (!settings()?.single) {
+            <dt i18n="@@Tenant">Tenant</dt>
+            <dd>{{ tenantName(n.tenantId) }}</dd>
+          }
+          @if (n.detailUrl) {
+            <dt i18n="@@Detail">Detail</dt>
+            <dd><span class="mono">{{ n.detailUrl }}</span></dd>
+          }
+          @for (a of n.actions ?? []; track $index) {
+            <dt>{{ label(a.label) }}</dt>
+            <dd><span class="mono">GET {{ a.url }}</span></dd>
+          }
+          @if (metaOf(n).length) {
+            <dt i18n="@@Metadata">Metadata</dt>
+            <dd><span class="mono">{{ metaOf(n).join(", ") }}</span></dd>
+          }
+          <dt i18n="@@Sent">Sent</dt>
+          <dd class="nowrap">{{ n.createdAt | zoned: me.timezone() : "long" }}</dd>
+          <dt i18n="@@Expires">Expires</dt>
+          <dd class="nowrap">{{ n.expiresAt | zoned: me.timezone() : "long" }}</dd>
+        </dl>
+
+        <h3>
+          <ng-container i18n="@@Recipients">Recipients</ng-container>
+          <span class="muted"> {{ n.reads }} / {{ n.recipients }}</span>
+        </h3>
+        <ul class="readers">
+          @for (r of readers(); track r.userId) {
+            <li>
+              <span>{{ r.username || r.userId }}</span>
+              @if (r.readAt) {
+                <span class="muted nowrap">{{ r.readAt | zoned: me.timezone() }}</span>
+              } @else {
+                <span class="muted" i18n="@@Not_read">Not read</span>
+              }
+            </li>
+          }
+        </ul>
+
+        @if (state(n) === "live") {
+          <div class="drawer-actions">
+            <button matButton="outlined" class="danger" (click)="withdraw(n)" i18n="@@Withdraw">Withdraw</button>
+          </div>
+        }
+      </div>
+    }
+  </mat-drawer>
+</mat-drawer-container>

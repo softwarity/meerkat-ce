@@ -1,15 +1,16 @@
-import { DatePipe } from '@angular/common';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { catchError, of } from 'rxjs';
 import { ApiService, LoginEvent } from '../api.service';
+import { MeService } from '../me.service';
+import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 
 // A user's sign-in history, read-only: the same data the user sees on
 // /profile/history. Loads itself - with a tenantId the tenant-scoped endpoint
 // answers (OWNER/ADMIN), otherwise the root one.
 @Component({
   selector: 'app-login-history',
-  imports: [DatePipe, LoadingIndicatorComponent],
+  imports: [LoadingIndicatorComponent, ZonedDatePipe],
   styles: [
     `
       :host {
@@ -74,7 +75,7 @@ import { ApiService, LoginEvent } from '../api.service';
             }
           </div>
           <span class="method">{{ methodLabel(e.method) }}</span>
-          <span class="when">{{ e.at * 1000 | date: 'yyyy-MM-dd HH:mm' }}</span>
+          <span class="when">{{ e.at | zoned: zone() }}</span>
         </div>
       } @empty {
         <p class="empty" i18n="@@No_sign_in_recorded_yet">No sign-in recorded yet.</p>
@@ -89,6 +90,7 @@ export class LoginHistoryComponent {
   readonly tenantId = input('');
 
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   protected readonly events = signal<LoginEvent[] | null>(null);
 
   constructor() {

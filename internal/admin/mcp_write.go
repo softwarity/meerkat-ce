@@ -89,7 +89,7 @@ func (a *API) writeTools() []mcp.Tool {
 		{
 			Name: "save_configuration", Allow: isRoot, Title: "Save the current state under a name",
 			Description: "Take the whole state of the gateway as it is right now - routes, roles, " +
-				"organisations, settings - and keep it under a name. It changes nothing: it is a copy, " +
+				"tenants, settings - and keep it under a name. It changes nothing: it is a copy, " +
 				"kept beside the running gateway. " +
 				"This is what to do when someone says 'save the current configuration before you start': " +
 				"it gives a named point to come back to, on top of the automatic restore points. " +
@@ -128,7 +128,7 @@ func (a *API) writeTools() []mcp.Tool {
 			Name: "import_configuration", Allow: isRoot, Title: "Apply a configuration document",
 			Description: "Apply a configuration document - the YAML or JSON export_configuration answers, or " +
 				"a file somebody wrote - to this gateway. This is how an installation is set up from a " +
-				"file: routes, roles, organisations, groups, authorities, OIDC clients, themes, settings and " +
+				"file: routes, roles, tenants, groups, authorities, OIDC clients, themes, settings and " +
 				"the branding all at once. An OIDC client carrying a secretHash keeps that secret; one without " +
 				"keeps the secret it has here, or is created with none until a person draws one. " +
 				"\n\nBY DEFAULT IT MERGES: what the document does not mention is left alone, so an import " +
@@ -181,7 +181,7 @@ func routeSchema() map[string]any {
 			"description": "This route serves pages to a browser rather than an API. It is what turns on the " +
 				"injected user button, the page decorations and the per-route CSS."},
 		"access": map[string]any{"type": "object",
-			"description": "Who may reach it: level 'auth' (signed in), 'tenant' (with an organisation chosen), " +
+			"description": "Who may reach it: level 'auth' (signed in), 'tenant' (with a tenant chosen), " +
 				"'tenants' with a list, 'deny', or absent to let the upstream decide. 'roles' and 'users' refine it."},
 		// The nested objects are DECLARED, with their shape left to get_route.
 		// They were left out on the grounds that a read-modify-write carries

@@ -33,16 +33,19 @@
     const sel = document.getElementById('mk-spec');
     const raw = document.getElementById('mk-raw');
     if (window.self !== window.top) document.getElementById('mk-pop').hidden = false;
-    function mount(url) {
+    // A document whose entry says tryIt false is read, not tried.
+    function mount(spec) {
+      const url = spec.url;
       raw.href = url;
       window.ui = SwaggerUIBundle({
         url,
         dom_id: '#swagger',
         presets: [SwaggerUIBundle.presets.apis],
         layout: 'BaseLayout',
-        docExpansion: 'list',
+        docExpansion: 'none',
         defaultModelsExpandDepth: 0,
-        tryItOutEnabled: true,
+        tryItOutEnabled: spec.tryIt,
+        supportedSubmitMethods: spec.tryIt ? ['get', 'put', 'post', 'delete', 'patch', 'head', 'options'] : [],
         deepLinking: false,
         validatorUrl: null,
         // Try it out crosses origins (admin page -> data plane): send the
@@ -61,8 +64,17 @@
         o.textContent = s.name;
         sel.appendChild(o);
       }
+      // The plane chosen is kept in the address, so a reload or a shared
+      // link opens on it.
+      const chosen = () => specs.find((s) => s.url === sel.value) || specs[0];
+      const fromHash = specs.find((s) => '#' + s.url === location.hash);
+      if (fromHash) sel.value = fromHash.url;
+      sel.addEventListener('change', () => {
+        history.replaceState(null, '', '#' + sel.value);
+        mount(chosen());
+      });
       if (specs.length) {
-        mount(specs[0].url);
+        mount(chosen());
       } else {
         document.getElementById('swagger').innerHTML =
           '<p class="mk-error">No specification to show - declare an OpenAPI url on a route, or expose the Meerkat API (Infra › Others).</p>';
@@ -72,7 +84,6 @@
       document.getElementById('swagger').innerHTML =
         '<p class="mk-error">Could not load the specification list - is your session still alive?</p>';
     });
-    sel.addEventListener('change', () => mount(sel.value));
   </script>
 </body>
 </html>

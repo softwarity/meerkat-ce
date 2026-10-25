@@ -15,6 +15,8 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { SecretFieldComponent } from '../../shared/secret-field.component';
 import { UrlInputComponent } from '../../shared/url-input.component';
 import { isRef } from '../../shared/vault-ref';
+import { zoned } from '../../shared/zoned-date.pipe';
+import { MeService } from '../../me.service';
 
 // Which config field of each kind holds a secret. Mirrors idp.SecretFields:
 // the server enforces it (a literal never comes back), this side is what tells
@@ -100,6 +102,7 @@ export class AuthProviderEditorComponent {
   readonly closed = output<void>();
 
   private readonly api = inject(ApiService);
+  private readonly zone = inject(MeService).timezone;
   private readonly snack = inject(MatSnackBar);
   private readonly dialogs = inject(DialogsService);
 
@@ -365,7 +368,7 @@ export class AuthProviderEditorComponent {
   }
 
   protected seen(at?: number): string {
-    return at ? new Date(at * 1000).toLocaleString() : '';
+    return zoned(at, this.zone());
   }
 
   protected check(): void {
@@ -390,7 +393,7 @@ export class AuthProviderEditorComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_provider_NAME:Delete "${p.name}:NAME:"?`,
       // Deleting strands the accounts that only came in this way.
-      message: $localize`:@@Delete_provider_hint:Its accounts are kept, but lose this way in.`,
+      message: $localize`:@@Delete_provider_hint:Its accounts are kept, but can no longer sign in this way.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

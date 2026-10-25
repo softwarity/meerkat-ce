@@ -77,6 +77,9 @@ const (
 	CallerContainer = "container"
 	// CallerUnidentified: nothing said who it was; only the address is known.
 	CallerUnidentified = "unidentified"
+	// CallerConsole: an administrator in the console, named by their
+	// username (a notification sent from a tenant's page to try one out).
+	CallerConsole = "console"
 )
 
 // SanitizeInternalAccess normalises the setting and refuses what cannot be
@@ -158,9 +161,15 @@ func (s *Store) SetInternalAccess(ctx context.Context, a InternalAccess) error {
 // every account's, enabled, of perimeter schedules. What the Access drawer
 // offers in token mode, where a token's name is the caller's identity.
 func (s *Store) ScheduleTokenNames(ctx context.Context) ([]string, error) {
+	return s.TokenNamesOfScope(ctx, ScopeSchedules)
+}
+
+// TokenNamesOfScope are the names of the enabled tokens of one perimeter: a
+// service's identity in token mode, on whichever door of the internal plane.
+func (s *Store) TokenNamesOfScope(ctx context.Context, scope string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT DISTINCT name FROM api_tokens WHERE scope = ? AND enabled = ? ORDER BY name`,
-		ScopeSchedules, true)
+		scope, true)
 	if err != nil {
 		return nil, fmt.Errorf("store: list the schedules tokens: %w", err)
 	}

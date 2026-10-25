@@ -65,6 +65,19 @@ Read more: [Scheduled calls](/docs/operations/scheduler).
 - **Nothing to install**: no broker, no lock; in a cluster the calls spread over the nodes.
 - **A live console screen**: pause, run now, remove, and the history of every run - when, how it ended, what answered - with a failed one run again in one click.
 
+## Notifying your users
+
+A service tells its users something, and they see it in whichever application they have open. **Enterprise** *partly*
+
+Read more: [Notifying your users](/docs/operations/notifications).
+
+- **One request from the service**: a title, a text, a link to the detail and up to five actions, named by the service and the path it already knows; the gateway finds the public address.
+- **Seen where people work**: a count on the account button or the portal bar, a snackbar on the page in front of them, a desktop notification when the tab is in the background, a mail if asked, and a page that lists them all.
+- **Only to those who may act on it**: the audience is the tenant's members, narrowed to roles or names, and to the people who may open what it leads to.
+- **Acknowledged when it matters**: by one reader for everyone, or by each of them; the service is called back at each acknowledgement, and the audit trail keeps who and when.
+- **Every tenant at once**: one message, a copy per tenant, and a person in several of them sees it once.
+- **Turned on in three places**: root, the application admin and each tenant's admin, each able to turn it off for their part.
+
 ## Routing and traffic protection
 
 A complete API gateway, run from the console.

@@ -137,7 +137,7 @@ import { ConfigPlan } from '../../api.service';
                     aria-label="Apply every line"
                   />
                 </td>
-                <td colspan="3" i18n="@@Plan_pick_hint">Untick a line to keep what this gateway holds for it.</td>
+                <td colspan="3" i18n="@@Plan_pick_hint">Untick a line to keep its current value.</td>
               </tr>
             }
             @for (c of changes(); track c.kind + c.id + c.label) {
@@ -171,8 +171,8 @@ import { ConfigPlan } from '../../api.service';
         <div class="note warn">
           <mat-icon>vpn_key_off</mat-icon>
           <p i18n="@@Plan_missing_note">
-            This configuration expects vault entries this installation has not got. They are
-            created empty, and anything using one does not serve until it is filled.
+            This configuration uses vault entries that do not exist here. They are created empty,
+            and whatever uses one does not work until it is filled.
           </p>
         </div>
       }
@@ -193,7 +193,7 @@ import { ConfigPlan } from '../../api.service';
         <div class="note warn">
           <mat-icon>workspace_premium</mat-icon>
           <div>
-            <p i18n="@@Plan_not_applied_note">Left out on this community image:</p>
+            <p i18n="@@Plan_not_applied_note">Left out in Community edition:</p>
             <ul>
               @for (n of p.notApplied; track n) {
                 <li>{{ n }}</li>
@@ -287,7 +287,7 @@ export class PlanTableComponent {
       case 'mailRelay':
         return $localize`:@@Mail_relay:Mail relay`;
       case 'tenant':
-        return $localize`:@@Organisation:Organisation`;
+        return $localize`:@@Organisation:Tenant`;
       case 'group':
         return $localize`:@@Group:Group`;
       default:

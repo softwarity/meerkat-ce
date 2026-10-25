@@ -1,0 +1,354 @@
+<header>
+  <h2 i18n="@@New_notification">New notification</h2>
+  @if (opts(); as o) {
+    <span class="tenant"><mat-icon>domain</mat-icon>{{ o.tenant }}</span>
+  }
+  <span class="grow"></span>
+  <button matIconButton (click)="drawer.close()" i18n-aria-label="@@Close" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<!-- An action's method: how the reader's browser calls it. -->
+<ng-template #methodSelect let-method>
+  <mat-form-field class="method">
+    <mat-label i18n="@@Method">Method</mat-label>
+    <mat-select [formField]="method">
+      @for (m of methods; track m) {
+        <mat-option [value]="m">{{ m }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</ng-template>
+
+<!-- A route and a path under it, or an address outside the gateway. An
+     action's method stands before it, as in a request line. -->
+<ng-template #linkEditor let-link let-value="value" let-detail="detail" let-calls="calls" let-err="err" let-method="method">
+  @if (value.kind === 'route') {
+    <div class="request">
+      @if (method) {
+        <ng-container *ngTemplateOutlet="methodSelect; context: { $implicit: method }" />
+      }
+      <mat-form-field>
+        <mat-label i18n="@@Route">Route</mat-label>
+        <mat-select [formField]="link.route">
+          <mat-select-trigger>{{ routeOf(value)?.name }}</mat-select-trigger>
+          @for (r of detail ? uiRoutes() : allRoutes(); track r.route) {
+            <mat-option [value]="r.route">
+              {{ r.name }} <span class="service">{{ r.service }}</span>
+            </mat-option>
+          }
+        </mat-select>
+        <mat-hint>{{ serviceHint(value) }}</mat-hint>
+      </mat-form-field>
+    </div>
+    @if (routeProblem(value, detail); as problem) {
+      <p class="problem">{{ problem }}</p>
+    }
+    @if (routeOf(value); as r) {
+      <!-- Below a hint: the room the drawer leaves between a hint and the
+           next field, so the hint never touches this field's label. -->
+      <app-form-field
+        class="path"
+        i18n-label="@@Path"
+        label="Path"
+        [prefix]="(r.base ?? '') + '/'"
+        [hint]="opens(value) ? (calls ? callHint(opens(value)) : openHint(opens(value))) : ''"
+      >
+        <input matInput [formField]="link.path" spellcheck="false" autocapitalize="off" />
+      </app-form-field>
+    }
+  } @else if (value.kind === 'url') {
+    <div class="request">
+      @if (method) {
+        <ng-container *ngTemplateOutlet="methodSelect; context: { $implicit: method }" />
+      }
+      <app-form-field i18n-label="@@Address" label="Address" [error]="link.url().errors()[0]?.message ?? ''">
+        <input matInput [formField]="link.url" spellcheck="false" autocapitalize="off" placeholder="https://" />
+      </app-form-field>
+    </div>
+  }
+  @if (err) {
+    <p class="problem refusal">{{ err }}</p>
+  }
+</ng-template>
+
+@if (opts(); as o) {
+  <nav mat-tab-nav-bar [tabPanel]="panel" mat-stretch-tabs="false">
+    <button mat-tab-link [active]="tab() === 'edit'" (click)="tab.set('edit')" i18n="@@Edit">Edit</button>
+    <button mat-tab-link [active]="tab() === 'json'" (click)="tab.set('json')" i18n="@@Notify_json">JSON</button>
+  </nav>
+
+  <mat-tab-nav-panel #panel>
+    @if (tab() === 'edit') {
+      <div class="form">
+        <section>
+          <h3 i18n="@@Audience">Audience</h3>
+          <p class="muted" i18n="@@Notify_audience_hint">Both empty: every member who may open its links.</p>
+          <div class="pair">
+            <mat-form-field>
+              <mat-label i18n="@@Roles">Roles</mat-label>
+              <mat-select multiple [formField]="f.roles">
+                @for (r of o.roles; track r.name) {
+                  <mat-option [value]="r.name">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label i18n="@@Members">Members</mat-label>
+              <mat-select multiple [formField]="f.users">
+                <mat-select-trigger>{{ draft().users.join(', ') }}</mat-select-trigger>
+                @for (m of o.members; track m.username) {
+                  <mat-option [value]="m.username">
+                    {{ m.username }}
+                    @if (m.fullname) {
+                      <span class="service">{{ m.fullname }}</span>
+                    }
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          @if (audienceError(); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+        </section>
+
+        <section>
+          <h3 i18n="@@Message">Message</h3>
+          <span class="label" i18n="@@Level">Level</span>
+          <mat-button-toggle-group
+            class="kind"
+            [value]="draft().level"
+            (change)="setLevel($event.value)"
+            i18n-aria-label="@@Level"
+            aria-label="Level"
+          >
+            <mat-button-toggle value="info"><span class="dot info"></span><ng-container i18n="@@Notify_level_info">Information</ng-container></mat-button-toggle>
+            <mat-button-toggle value="success"><span class="dot success"></span><ng-container i18n="@@Notify_level_success">Success</ng-container></mat-button-toggle>
+            <mat-button-toggle value="warning"><span class="dot warning"></span><ng-container i18n="@@Notify_level_warning">Warning</ng-container></mat-button-toggle>
+            <mat-button-toggle value="error"><span class="dot error"></span><ng-container i18n="@@Notify_level_error">Error</ng-container></mat-button-toggle>
+          </mat-button-toggle-group>
+          <app-form-field i18n-label="@@Title" label="Title" [error]="f.title().errors()[0]?.message ?? ''">
+            <input matInput [formField]="f.title" />
+          </app-form-field>
+          <mat-form-field>
+            <mat-label i18n="@@Text">Text</mat-label>
+            <textarea matInput [formField]="f.body" rows="3"></textarea>
+            <mat-hint class="problem">{{ f.body().errors()[0]?.message }}</mat-hint>
+          </mat-form-field>
+          @if (errorOn('title') || errorOn('body') || errorOn('level'); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+        </section>
+
+        <section>
+          <h3 i18n="@@Notify_detail">Detail</h3>
+          <mat-button-toggle-group
+            class="kind"
+            [value]="draft().detail.kind"
+            (change)="setKind('detail', $event.value)"
+            i18n-aria-label="@@Notify_detail"
+            aria-label="Detail"
+          >
+            <mat-button-toggle value="none" i18n="@@None">None</mat-button-toggle>
+            <mat-button-toggle value="route" i18n="@@Route">Route</mat-button-toggle>
+            <mat-button-toggle value="url" i18n="@@Address">Address</mat-button-toggle>
+          </mat-button-toggle-group>
+          <ng-container
+            *ngTemplateOutlet="
+              linkEditor;
+              context: { $implicit: f.detail, value: draft().detail, detail: true, err: errorOn('detail') }
+            "
+          />
+        </section>
+
+        <section>
+          <h3 i18n="@@Actions">Actions</h3>
+          @for (a of f.actions; track $index; let i = $index) {
+            <div class="action">
+              <div class="action-head">
+                <app-form-field
+                  class="grow"
+                  i18n-label="@@Label"
+                  label="Label"
+                  [error]="a.label().errors()[0]?.message ?? ''"
+                >
+                  <input matInput [formField]="a.label" />
+                </app-form-field>
+                <mat-button-toggle-group
+                  class="kind"
+                  [value]="draft().actions[i].link.kind"
+                  (change)="setKind(i, $event.value)"
+                  i18n-aria-label="@@Notify_action_target"
+                  aria-label="Leads to"
+                >
+                  <mat-button-toggle value="route" i18n="@@Route">Route</mat-button-toggle>
+                  <mat-button-toggle value="url" i18n="@@Address">Address</mat-button-toggle>
+                </mat-button-toggle-group>
+                <button matIconButton (click)="removeAction(i)" i18n-matTooltip="@@Remove" matTooltip="Remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              <ng-container
+                *ngTemplateOutlet="
+                  linkEditor;
+                  context: {
+                    $implicit: a.link,
+                    method: a.method,
+                    value: draft().actions[i].link,
+                    detail: false,
+                    calls: draft().actions[i].method !== 'GET',
+                    err: errorOn('actions.' + i) || errorOn('actions.' + i + '.label') || errorOn('actions.' + i + '.method'),
+                  }
+                "
+              />
+              @if (draft().actions[i].method !== 'GET') {
+                <app-json-editor
+                  class="body"
+                  [formField]="a.body"
+                  i18n-label="@@Notify_body"
+                  label="Body (JSON)"
+                  i18n-hint="@@Notify_body_hint"
+                  hint="Sent as is. The reader can see it: nothing secret."
+                  [error]="errorOn('actions.' + i + '.body')"
+                />
+              }
+            </div>
+          }
+          @if (errorOn('actions'); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+          <button matButton (click)="addAction()" [disabled]="draft().actions.length >= o.maxActions">
+            <mat-icon>add</mat-icon>
+            <ng-container i18n="@@Add_action">Add action</ng-container>
+          </button>
+        </section>
+
+        <section>
+          <h3 i18n="@@Notify_ack">Acknowledgement</h3>
+          <mat-button-toggle-group
+            class="kind"
+            [value]="draft().ack"
+            (change)="setAck($event.value)"
+            i18n-aria-label="@@Notify_ack"
+            aria-label="Acknowledgement"
+          >
+            <mat-button-toggle value="none" i18n="@@None">None</mat-button-toggle>
+            <mat-button-toggle value="single" i18n="@@Notify_ack_single">One reader</mat-button-toggle>
+            <mat-button-toggle value="all" i18n="@@Notify_ack_all">Every reader</mat-button-toggle>
+          </mat-button-toggle-group>
+          @if (draft().ack !== 'none') {
+            <p class="muted ack-hint">
+              @if (draft().ack === 'single') {
+                <ng-container i18n="@@Notify_ack_single_hint">The first reader to acknowledge it closes it for everyone.</ng-container>
+              } @else {
+                <ng-container i18n="@@Notify_ack_all_hint">Each reader acknowledges it; they cannot delete it before.</ng-container>
+              }
+            </p>
+            <span class="label" i18n="@@Notify_on_ack">Tell your service at each acknowledgement</span>
+            <mat-button-toggle-group
+              class="kind"
+              [value]="draft().onAck.kind"
+              (change)="setKind('onAck', $event.value)"
+              i18n-aria-label="@@Notify_on_ack"
+              aria-label="Tell your service at each acknowledgement"
+            >
+              <mat-button-toggle value="none" i18n="@@None">None</mat-button-toggle>
+              <mat-button-toggle value="route" i18n="@@Route">Route</mat-button-toggle>
+            </mat-button-toggle-group>
+          }
+          @if (errorOn('ack'); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+          @if (draft().ack !== 'none') {
+            <ng-container
+              *ngTemplateOutlet="
+                linkEditor;
+                context: { $implicit: f.onAck, value: draft().onAck, detail: false, calls: true, err: errorOn('onAck') }
+              "
+            />
+          }
+        </section>
+
+        <mat-expansion-panel class="more" [expanded]="moreOpen()" (expandedChange)="moreOpen.set($event)">
+          <mat-expansion-panel-header>
+            <mat-panel-title i18n="@@More">More</mat-panel-title>
+          </mat-expansion-panel-header>
+          <p>
+            <mat-form-field>
+              <mat-label i18n="@@Notify_lifetime">Lifetime</mat-label>
+              <mat-select [formField]="f.expires">
+                @for (l of lives; track l.key) {
+                  <mat-option [value]="l.key">{{ l.label }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint i18n="@@Notify_lifetime_hint">Then it leaves every list.</mat-hint>
+            </mat-form-field>
+          </p>
+          @if (errorOn('expires'); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+          <p>
+            <app-form-field
+              i18n-label="@@Notify_key"
+              label="Deduplication key"
+              i18n-hint="@@Notify_key_hint"
+              hint="Sent again with the same key while live: nobody is told twice."
+              [error]="f.key().errors()[0]?.message ?? ''"
+            >
+              <input matInput [formField]="f.key" spellcheck="false" />
+            </app-form-field>
+          </p>
+          @if (errorOn('key'); as e) {
+            <p class="problem refusal">{{ e }}</p>
+          }
+          <div class="meta">
+            <span class="label" i18n="@@Metadata">Metadata</span>
+            @for (m of f.meta; track $index; let i = $index) {
+              <div class="meta-row">
+                <app-form-field i18n-label="@@Key" label="Key">
+                  <input matInput [formField]="m.key" spellcheck="false" />
+                </app-form-field>
+                <app-form-field i18n-label="@@Value" label="Value">
+                  <input matInput [formField]="m.value" spellcheck="false" />
+                </app-form-field>
+                <button matIconButton (click)="removeMeta(i)" i18n-matTooltip="@@Remove" matTooltip="Remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            }
+            <button matButton (click)="addMeta()">
+              <mat-icon>add</mat-icon>
+              <ng-container i18n="@@Add_metadata">Add metadata</ng-container>
+            </button>
+          </div>
+          <p class="mail">
+            <mat-slide-toggle [formField]="f.mail" i18n="@@Notify_also_mail">Also send by mail</mat-slide-toggle>
+            @if (errorOn('mail'); as e) {
+              <span class="problem refusal">{{ e }}</span>
+            } @else if (!o.mail) {
+              <span class="muted" i18n="@@Notify_no_mail_relay">No mail relay is configured.</span>
+            }
+          </p>
+        </mat-expansion-panel>
+      </div>
+    } @else {
+      <div class="payload">
+        <app-snippet filename="notification.json" [downloadable]="false" [content]="json()" />
+        <p class="where" i18n="@@Notify_where">A service sends it with <code>{{ endpoint() }}</code> and its token.</p>
+      </div>
+    }
+  </mat-tab-nav-panel>
+
+  <footer>
+    @if (loose(); as e) {
+      <span class="problem">{{ e }}</span>
+    }
+    <span class="grow"></span>
+    <button matButton="filled" [disabled]="!ready() || sending()" (click)="send()">
+      <mat-icon>send</mat-icon>
+      <ng-container i18n="@@Send">Send</ng-container>
+    </button>
+  </footer>
+}

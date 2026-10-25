@@ -51,6 +51,19 @@ transformer en barre, puis revenir en arrière : les entrées sont conservées.
    L'édition n'est possible qu'en pleine largeur, et la largeur choisie n'est
    jamais enregistrée.
 
+## Notifications
+
+Une fois les [notifications](/docs/console/notifications) activées par root
+(Enterprise), deux choses de plus apparaissent :
+
+- une carte **Notifications page** : **Built-in**, la page que sert la gateway,
+  ou **Your page**, une route UI et un chemin dessous. Tout ce qui mène aux
+  notifications mène là ; qui ne peut pas ouvrir cette route reçoit la page
+  intégrée ;
+- en mode Portal, **Add notifications** à côté d'Add a container : une entrée
+  Notifications pour la barre, qui porte l'unique badge des non lues. Sans elle,
+  le bouton de compte porte l'entrée et le badge.
+
 ## Une entrée
 
 **Add a module** ajoute une application, **Add a container** un groupe de modules.

@@ -1,0 +1,6136 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Meerkat Data Plane",
+    "description": "What Meerkat serves on the data plane besides your routes: sign-in and profile pages, the account button and portal bar, the live channel, developer tools and, in the Enterprise edition, the OpenID provider and notifications. Developers read your routes' APIs at /meerkat/apidocs.\n\nBrowsers are identified by the session cookie set at sign-in, programs by a personal API token (`Authorization: Bearer mk_...`, from /profile/tokens). Pages answer HTML and redirect (303) to sign-in when needed. A POST from another site's page is refused (403). Page form submissions are not listed.",
+    "version": "dev"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    },
+    {
+      "apiToken": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Pages",
+      "description": "Sign-in, profile and other pages, and the calls they make."
+    },
+    {
+      "name": "Assets",
+      "description": "Scripts, icons, fonts and images."
+    },
+    {
+      "name": "User button",
+      "description": "Data for the account button, portal bar, issue panel and browser tracing."
+    },
+    {
+      "name": "Live",
+      "description": "WebSocket for live updates."
+    },
+    {
+      "name": "Notifications",
+      "description": "The signed-in user's notifications (Enterprise edition)."
+    },
+    {
+      "name": "OpenID provider",
+      "description": "OpenID provider for the applications behind Meerkat (Enterprise edition)."
+    },
+    {
+      "name": "Developer",
+      "description": "Developer docs and UI test mode. Requires the developer capability."
+    },
+    {
+      "name": "Probes",
+      "description": "Liveness and readiness probes."
+    }
+  ],
+  "paths": {
+    "/account-pending": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the waiting page",
+        "description": "For an account in no tenant yet: it waits for an administrator. Lists the applications it can already open.",
+        "operationId": "accountPendingPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a step pending",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/confirm": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Confirm a registration",
+        "description": "The registration mail's link, valid once: verifies the address and notifies the administrators.",
+        "operationId": "confirmRegistration",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No token",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Link expired or used (a page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Address not verified",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Token from the mail",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      }
+    },
+    "/confirm-email": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Confirm a new address",
+        "description": "The address-change mail's link: the account takes the new address. Works signed in or not.",
+        "operationId": "confirmEmailChange",
+        "responses": {
+          "303": {
+            "description": "Changed: to `/profile?email=confirmed`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "404": {
+            "description": "No token",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Address used by another account (a page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Link expired or used (a page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Address not saved",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Token from the mail",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      }
+    },
+    "/forgot-password": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the forgotten-password page",
+        "description": "Mails a reset link and code.",
+        "operationId": "forgotPasswordPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No mail relay, or local passwords disabled",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Probes"
+        ],
+        "summary": "Check liveness",
+        "operationId": "healthz",
+        "description": "Answers while the process runs, checking nothing else.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the sign-in page",
+        "description": "Password form, external providers, passkey and mailed code, as configured. Send `next`, the path to return to.",
+        "operationId": "loginPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "security": []
+      }
+    },
+    "/login/captcha": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Get a new sign-in picture code",
+        "operationId": "loginCaptcha",
+        "description": "Shown after too many failed attempts. Valid 10 minutes: `id` goes in the form, `img` in the picture.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "A new code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captcha"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "Account lockout policy off",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Code not generated",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login/code": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the sign-in by mailed code",
+        "description": "Mails a one-time sign-in code.",
+        "operationId": "signInCodePage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sign-in by code off, or no mail relay",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "security": []
+      }
+    },
+    "/login/passkey/finish": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Finish a passkey sign-in",
+        "operationId": "passkeyLoginFinish",
+        "description": "Verifies the passkey and the account, and opens a full session: a passkey counts as both factors.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "challenge",
+            "in": "query",
+            "required": true,
+            "description": "Challenge id from `/login/passkey/start`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAssertion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "303": {
+            "description": "Signed in: to the tenant or group chooser, or `next`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Unreadable assertion, with the reason",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Passkey not verified. `X-Passkey-Unknown: 1`: unknown here, the browser should forget it",
+            "headers": {
+              "X-Passkey-Unknown": {
+                "description": "1 when the passkey is unknown here",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "1"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Passkeys off, account refused by its provider, or cross-site",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Challenge expired or used: start again",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login/passkey/start": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Start a passkey sign-in",
+        "operationId": "passkeyLoginStart",
+        "description": "No username needed. Returns a single-use challenge (5 minutes) and the options for `navigator.credentials.get()`. Byte fields are base64url.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The challenge and its options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyLoginStart"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Passkeys off, or cross-site",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Challenge not saved",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login/{provider}": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Sign in with an external provider",
+        "description": "For OIDC, GitHub and SAML. A directory (LDAP) uses the password form and answers 400.",
+        "operationId": "startExternalSignIn",
+        "responses": {
+          "303": {
+            "description": "To the provider's sign-in page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Password provider: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider unreachable or misconfigured: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "Provider id, as on the Authentication screen",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "security": []
+      }
+    },
+    "/login/{provider}/callback": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Receive the provider's answer",
+        "description": "Where the provider sends the browser back. The person is matched to a local account, then the sign-in goes on. Started from the profile, it connects the provider to the account instead.",
+        "operationId": "finishExternalSignIn",
+        "responses": {
+          "303": {
+            "description": "Signed in: to the next step, or `next`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Attempt expired or for another provider: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refused by the provider, or account disabled: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Person not invited here: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider unreachable: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider's id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Receive a SAML answer",
+        "operationId": "relaySamlAnswer",
+        "description": "The SAML assertion consumer. The only sign-in endpoint that accepts a cross-site post: it answers a page that posts the answer again from this origin.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The SAML provider's id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "SAMLResponse": {
+                    "type": "string",
+                    "description": "Signed answer, base64"
+                  },
+                  "RelayState": {
+                    "type": "string",
+                    "description": "State sent with the request"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Page that posts the answer again",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Signed in (second post): to the next step, or `next`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Unreadable form or expired attempt: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refused by the provider: sign-in page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login/{provider}/metadata": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Get the SAML metadata",
+        "operationId": "samlMetadata",
+        "description": "XML for the identity provider: entity id and assertion consumer (`/login/{provider}/callback`).",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The SAML provider's id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The metadata",
+            "content": {
+              "application/samlmetadata+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown provider, or not SAML",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not generated, with the reason",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logout": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Sign out",
+        "description": "For applications to link to. From this site it signs out at once; otherwise a confirmation page. Also the OpenID provider's `end_session_endpoint`.",
+        "operationId": "signOutFromApplication",
+        "responses": {
+          "200": {
+            "description": "Confirmation page (request from another site)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Signed out: to `/login`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ]
+      }
+    },
+    "/meerkat/apidocs": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Open the developer API docs",
+        "operationId": "devDocsRedirect",
+        "security": [],
+        "responses": {
+          "301": {
+            "description": "To `/meerkat/apidocs/`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/apidocs/": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the developer API docs",
+        "description": "swagger-ui over the specs of every route that declares one. Try calls as a simulated identity. Developer capability.",
+        "operationId": "devDocsPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in: to `/login`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "403": {
+            "description": "Developer capability required",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/meerkat/apidocs/assets/{file}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get a file of the developer docs",
+        "operationId": "devDocsAsset",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=3600"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown file",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "description": "The file",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "swagger-ui-bundle.js",
+                "swagger-ui.css",
+                "skin.css"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/meerkat/apidocs/catalog.json": {
+      "get": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "Get the developer docs' catalogue",
+        "operationId": "devDocsCatalog",
+        "description": "The developer, roles, groups with effective roles, users with their groups, and the routes with a spec.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevCatalog"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Developer capability required",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/apidocs/spec/{id}": {
+      "get": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "Get a route's spec",
+        "operationId": "devDocsSpec",
+        "description": "The uploaded or fetched OpenAPI document, servers rewritten to this origin, each operation annotated with the roles it requires.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Route id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The spec",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "An OpenAPI document"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Developer capability required",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown route, or no spec",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Spec not fetched or unreadable, with the reason",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service down",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/background": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the sign-in background",
+        "description": "The branding's background picture. Send the `ETag` back for a 304.",
+        "operationId": "background",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=60"
+                }
+              },
+              "ETag": {
+                "description": "Picture checksum",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified"
+          },
+          "404": {
+            "description": "No picture",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "ETag of the cached copy",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/meerkat/background-dark": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the dark-scheme background",
+        "description": "Or the light one when the branding has a single picture.",
+        "operationId": "backgroundDark",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=60"
+                }
+              },
+              "ETag": {
+                "description": "Picture checksum",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified"
+          },
+          "404": {
+            "description": "No picture",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "ETag of the cached copy",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/meerkat/dev-sim": {
+      "get": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "Read the UI test on a route",
+        "operationId": "getUiTest",
+        "description": "Whether this session browses the route as a simulated identity, and as whom.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "required": true,
+            "description": "UI route id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The test, or `active` false",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiTest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No developer capability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "Start a UI test on a route",
+        "operationId": "startUiTest",
+        "description": "For this session only, for one hour: every request through that route carries the simulated user and roles (expanded down the hierarchy). Recorded in the audit trail.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The test running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiTest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No developer capability, or cross-site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No active route, or no simulated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "End the UI test on a route",
+        "operationId": "endUiTest",
+        "description": "Idempotent. Recorded in the audit trail.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "required": true,
+            "description": "UI route id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No test: `active` false",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiTest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No developer capability, or cross-site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/events": {
+      "get": {
+        "tags": [
+          "Live"
+        ],
+        "summary": "Open the live channel",
+        "operationId": "liveChannel",
+        "description": "WebSocket (RFC 6455, version 13, HTTP/1.1), server to page only: each text frame is one `LiveMessage`. Every page gets `served` and `unserved`; signed-in pages also their account's messages; developers also developer messages. A notification message carries only its id and change: read the rest through the API. Same origin only.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Upgrade",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "websocket"
+              ]
+            }
+          },
+          {
+            "name": "Connection",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Upgrade"
+            }
+          },
+          {
+            "name": "Sec-WebSocket-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "13"
+              ]
+            }
+          },
+          {
+            "name": "Sec-WebSocket-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket open: `LiveMessage` text frames",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handshake key missing",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Another origin",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Not a WebSocket 13 handshake over HTTP/1.1",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Connection not opened",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Channel full (4096 connections per gateway): try again later",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/events/echo": {
+      "post": {
+        "tags": [
+          "Live"
+        ],
+        "summary": "Send a message to your own pages",
+        "operationId": "liveEcho",
+        "description": "To your own open pages only, to check the WebSocket reaches the browser. Developer capability.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Sent"
+          },
+          "400": {
+            "description": "Malformed body (not JSON, or over 4 KiB)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No developer capability, or cross-site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/favicon": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the tab icon",
+        "description": "The branding's favicon, else its logo, else Meerkat's (SVG).",
+        "operationId": "favicon",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=60 for the branding's, 86400 for Meerkat's"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/favicon.svg": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the tab icon (former path)",
+        "description": "Same as `/meerkat/favicon`.",
+        "operationId": "faviconLegacy",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=60 for the branding's, 86400 for Meerkat's"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/fonts/{file}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get a typeface",
+        "description": "A typeface or its licence. Cached permanently, readable from any origin.",
+        "operationId": "font",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "font/woff2": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=31536000, immutable"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown file",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "description": "A `.woff2` file, or `licenses/<name>.txt`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": false,
+            "description": "Content hash",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/meerkat/issues": {
+      "post": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Report an issue",
+        "operationId": "reportIssue",
+        "description": "From the account button's panel. The reporter comes from the session. Overlong context fields are cut, the console to its last 200 lines.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueReport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Filed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed report, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or account disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "Issue tracker off",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over 2 MiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No description, or screenshot not a png, jpeg or webp data URI under about 1.5 MiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/locale": {
+      "post": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Save the language on the account",
+        "operationId": "setLocale",
+        "description": "It then follows the person to other browsers and to their mail. Signed out, only the cookie keeps it.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "locale": {
+                    "type": "string",
+                    "description": "A language the routes offer, e.g. `fr`"
+                  }
+                },
+                "required": [
+                  "locale"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved, or nobody signed in"
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "422": {
+            "description": "Not a language the routes offer",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not saved",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/notifications": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the notifications",
+        "operationId": "notificationsPage",
+        "description": "Enterprise edition. Newest first, from all your tenants: mark read, open, delete. One from another tenant than the current one is labelled with it, and opens from there. Updated live. The built-in page: a portal may lead users to a page of its own instead (notifyPage), and this one stays reachable.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a step pending: to `/login`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off in all your tenants",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Delete all my notifications",
+        "operationId": "deleteAllMyNotifications",
+        "description": "Every notification you hold, in all your tenants or in the one `tenant` names, not only the ones a page loaded. For you only and for good: the senders and the other readers keep theirs. Other tabs and devices update at once. What waits for your acknowledgement is kept, and the answer says how many.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "description": "Tenant id: only what was sent there, a message sent to several tenants in all of them; all tenants without it",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "integer",
+                      "description": "Copies deleted"
+                    },
+                    "kept": {
+                      "type": "integer",
+                      "description": "Notifications kept, waiting for your acknowledgement"
+                    }
+                  },
+                  "required": [
+                    "deleted",
+                    "kept"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off in all your tenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/notifications.json": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List my notifications",
+        "operationId": "listMyNotifications",
+        "description": "Newest first, in the reader's language: from every tenant of theirs with notifications on, those they can still open there, with the actions they may use. `here` is false for one of another tenant than the current one: read or delete it here, open it or run its actions after switching to its tenant. A message sent to all of the reader's tenants is one item naming each of them in `tenants`. For an application with its own list.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "description": "`true` or `1`: unread only",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "description": "One level only",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "info",
+                "success",
+                "warning",
+                "error"
+              ]
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "description": "Unix seconds: the next page",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 100 (default 50)",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "description": "Tenant id: what was sent there only",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "required": false,
+            "description": "Route id the detail leads to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Language; default from `Accept-Language`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off in all your tenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/notifications/counts": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Count my unread notifications",
+        "operationId": "countMyNotifications",
+        "description": "The unread count over all the reader's tenants, a message sent to several of them counted once, where the reader reads them, and whether the portal bar carries the notifications entry: the badge of the account button or the bar.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationBadge"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off in all your tenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not counted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/notifications/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark all my notifications read",
+        "operationId": "readAllMyNotifications",
+        "description": "In all your tenants, or in the one `tenant` names. Other tabs and devices update at once.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "required": false,
+            "description": "Tenant id: only what was sent there, a message sent to several tenants in all of them; all tenants without it",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Marked"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off in all your tenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not marked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Delete a notification",
+        "operationId": "deleteMyNotification",
+        "description": "For you only and for good: the sender and the other readers keep theirs. A message sent to several of your tenants goes from all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off, or unknown notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It waits for your acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark a notification read",
+        "operationId": "readMyNotification",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Marked"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off, or unknown notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise",
+        "description": "A message sent to several of your tenants is read in all of them."
+      }
+    },
+    "/meerkat/notifications/{id}/ack": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Acknowledge a notification",
+        "operationId": "acknowledgeMyNotification",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Acknowledged"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off, or unknown notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It does not ask for an acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise",
+        "description": "For one that asks to be acknowledged; it is read too. From a session in any of your tenants. A message sent to several of your tenants is acknowledged in all of them; asked of one reader (single), your acknowledgement closes it for everyone, every copy of it. Done already: nothing changes. The other readers' pages update at once."
+      }
+    },
+    "/meerkat/notify-sw.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the desktop notifications helper",
+        "description": "Enterprise edition. The service worker the account button registers to show a notification on the desktop with its buttons: open the detail, run an action. It controls no page and intercepts no request.",
+        "operationId": "notificationsWorkerScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/authorize": {
+      "get": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Authorize an application",
+        "operationId": "oidcAuthorize",
+        "description": "Authorization code flow with PKCE, no consent screen. The first route of the client whose rule admits the person decides the claims. Errors before the client and redirect are verified show a page; after, they go back to the application.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "Client id, from the OIDC / JWT drawer",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "description": "Under the path and host of an enabled route bound to the client",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "description": "Only `code`",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "description": "Space separated, with `openid`; `profile` and `email` honoured",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "Returned as is",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "in": "query",
+            "required": false,
+            "description": "Copied into the ID token",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": false,
+            "description": "PKCE challenge; required without a client secret",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": false,
+            "description": "Only `S256`",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "S256"
+              ]
+            }
+          },
+          {
+            "name": "prompt",
+            "in": "query",
+            "required": false,
+            "description": "`none`: no page, answer `login_required` or `access_denied`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "request",
+            "in": "query",
+            "required": false,
+            "description": "Not supported (`request_not_supported`)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "request_uri",
+            "in": "query",
+            "required": false,
+            "description": "Not supported (`request_not_supported`)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To `redirect_uri` with `code` (or `error`) and `state`; or to sign-in, the tenant chooser or the refusal page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown client, redirect not allowed, or unreadable request (refusal page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No route of the client admits anyone",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Code not issued",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No public address in Domains & TLS (refusal page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      },
+      "post": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Authorize an application (form)",
+        "operationId": "oidcAuthorizePost",
+        "description": "Same as the GET, in a form body (64 KiB at most).",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OidcAuthorizeForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "303": {
+            "description": "To `redirect_uri` with `code` (or `error`) and `state`; or to sign-in, the tenant chooser or the refusal page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown client, redirect not allowed, or unreadable request (refusal page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No route of the client admits anyone",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Code not issued",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No public address in Domains & TLS (refusal page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/jwks": {
+      "get": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Get the signing keys",
+        "operationId": "oidcJwks",
+        "description": "Readable from any origin, for browser code. RS256.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The key set",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Keys unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`temporarily_unavailable`: no public address set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/token": {
+      "post": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Exchange a code or a refresh token",
+        "operationId": "oidcToken",
+        "description": "Each refresh token works once and ends with the user's Meerkat session; each refresh checks the routes again. A client with a secret sends it by Basic or in the form; one without proves itself with PKCE. Also on the internal plane.",
+        "security": [
+          {
+            "clientSecretBasic": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OidcTokenForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tokens",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcTokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_grant` or `unsupported_grant_type`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`invalid_client`: unknown client or wrong secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`server_error`: tokens not issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`temporarily_unavailable`: no public address set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/oidc/userinfo": {
+      "get": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Read the token's user",
+        "operationId": "oidcUserinfo",
+        "description": "Also on the internal plane.",
+        "security": [
+          {
+            "oidcAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`sub` and the route's claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sub": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sub"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`invalid_request` (no token) or `invalid_token` (invalid or expired)",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`temporarily_unavailable`: no public address set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      },
+      "post": {
+        "tags": [
+          "OpenID provider"
+        ],
+        "summary": "Read the token's user (form)",
+        "operationId": "oidcUserinfoPost",
+        "description": "Same as the GET; the token may also be sent as `access_token` in the form.",
+        "security": [
+          {
+            "oidcAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`sub` and the route's claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sub": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sub"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`invalid_request` (no token) or `invalid_token` (invalid or expired)",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`temporarily_unavailable`: no public address set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/page.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the page script",
+        "description": "Applies the route's language and colour scheme and watches the session's expiry.",
+        "operationId": "pageAgentScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/portal.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the portal bar",
+        "description": "Enterprise edition. The `<meerkat-portal-nav>` component: navigation between applications, with the account button.",
+        "operationId": "portalScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/portal.json": {
+      "get": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Get the portal bar's data",
+        "operationId": "portalData",
+        "description": "Enterprise edition. Layout, brand, theme and the entries the caller may open (turned-off routes greyed out), with unread counts when notifications are on. Never cached.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bar's data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalBar"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not encoded",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/meerkat/scheme": {
+      "post": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Save the colour scheme on the account",
+        "operationId": "setScheme",
+        "description": "`auto` or empty follows the system. Signed out, only the cookie keeps it.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scheme": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "light",
+                      "dark",
+                      ""
+                    ]
+                  }
+                },
+                "required": [
+                  "scheme"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved, or nobody signed in"
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "422": {
+            "description": "Unknown scheme (the message lists them)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/scheme.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get a route's scheme script",
+        "description": "Served from this origin so `script-src 'self'` allows it. Without a script, a one-line comment.",
+        "operationId": "routeSchemeScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300 (no-store when the route declares no script)"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "r",
+            "in": "query",
+            "required": true,
+            "description": "Route id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": false,
+            "description": "Script hash",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/meerkat/telemetry": {
+      "post": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Forward a page's traces",
+        "operationId": "relayTelemetry",
+        "description": "Forwards the browser's trace batches to the collector, which stays private. Enterprise edition.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "OTLP/JSON trace export (`resourceSpans`), forwarded as is.",
+                "properties": {
+                  "resourceSpans": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "OTLP ResourceSpans"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Forwarded, or an empty batch"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "Export off, or Community edition",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over 1 MiB",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Collector refused or unreachable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/telemetry.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the browser tracing bundle",
+        "description": "Enterprise edition.",
+        "operationId": "telemetryScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=3600"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Community edition",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/user-button.js": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get the account button",
+        "description": "The `<meerkat-user-button>` component. In a frame it shows nothing without the `in-frame` attribute.",
+        "operationId": "userButtonScript",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Browser cache lifetime",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=300"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meerkat/user-button.json": {
+      "get": {
+        "tags": [
+          "User button"
+        ],
+        "summary": "Get the account button's data",
+        "operationId": "userButtonData",
+        "description": "Who is signed in, tenants and groups to switch to, applications, roles, developer entries, the notifications badge (Enterprise edition), theme and labels. Signed out: display fields only. Never cached.",
+        "security": [
+          {},
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The button's data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserButton"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not encoded",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plugged": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show what developers serve",
+        "description": "Shown at the end of the sign-in while services are served from developers' machines. Nothing served: straight to `next`.",
+        "operationId": "pluggedPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, a step pending, or nothing served (to `next`)",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the profile",
+        "description": "Photo, name, address, time zone, and links to the other profile pages. Also on the admin port.",
+        "operationId": "profilePage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Path for the back link (this site only)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "description": "`confirmed`: shows that the address changed",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "confirmed"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/authorities": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the connected providers",
+        "description": "Connect or disconnect each external provider.",
+        "operationId": "profileAuthoritiesPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a step pending",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/connect/{provider}": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Connect an external provider",
+        "description": "Sends the browser to the provider; back to `/profile/authorities` once connected.",
+        "operationId": "connectAuthority",
+        "responses": {
+          "303": {
+            "description": "To the provider, or `/login` when signed out",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "400": {
+            "description": "A directory (LDAP) cannot be connected: page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider unreachable: page with an error",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider's id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/dev": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the developer page",
+        "description": "API docs, UI test mode and public keys. Developer capability.",
+        "operationId": "profileDevPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "403": {
+            "description": "Developer capability required",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/dev/key": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the developer key page",
+        "description": "Add or remove the public SSH key for plugged services. Developer capability and an open tunnel.",
+        "operationId": "profileDevKeyPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "403": {
+            "description": "Developer capability required, or tunnel closed",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/history": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the sign-in history",
+        "description": "Recent sign-ins: method, time, browser and address.",
+        "operationId": "profileHistoryPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/leave": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Confirm leaving the tenant",
+        "description": "Only with several tenants; otherwise back to the profile.",
+        "operationId": "profileLeavePage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, a step pending, or nothing to leave (to `/profile`)",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/mfa": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the second-factor settings",
+        "description": "State, backup codes left and trusted browsers; or the enrolment.",
+        "operationId": "profileMfaPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/passkeys": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the passkeys",
+        "description": "The account's passkeys, and adding one.",
+        "operationId": "profilePasskeysPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a step pending",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "404": {
+            "description": "Passkeys off",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/passkeys/register/finish": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Finish registering a passkey",
+        "operationId": "passkeyRegisterFinish",
+        "description": "Verifies and saves the passkey, labelled with the browser and system.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "challenge",
+            "in": "query",
+            "required": true,
+            "description": "Challenge id from `/profile/passkeys/register/start`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAttestation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Unreadable credential, with the reason",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or account disabled",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Passkeys off, or cross-site",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Challenge expired, or passkey not verified",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not saved",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/passkeys/register/start": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Start registering a passkey",
+        "operationId": "passkeyRegisterStart",
+        "description": "Returns a single-use challenge (5 minutes) and the options for `navigator.credentials.create()`. Discoverable passkeys only. Byte fields are base64url.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The challenge and its options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegisterStart"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or account disabled",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Passkeys off, not allowed for this account (with the reason), or cross-site",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Challenge not saved",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/password": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the password change",
+        "operationId": "profilePasswordPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/security": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the security page",
+        "description": "Second factor, password, passkeys, providers and personal API tokens.",
+        "operationId": "profileSecurityPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/sessions": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the open sessions",
+        "description": "Up to 100, each can be closed.",
+        "operationId": "profileSessionsPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "500": {
+            "description": "Not readable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/profile/tokens": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the personal API tokens",
+        "description": "List and create tokens; a new token is shown once.",
+        "operationId": "profileTokensPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or a sign-in step pending: to that page",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "404": {
+            "description": "Personal API tokens off",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "Probes"
+        ],
+        "summary": "Check readiness",
+        "operationId": "readyz",
+        "description": "Ready when the database answers within 2 seconds and the routes are loaded.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready: `reason` says why",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/refused": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the refusal page",
+        "description": "What was refused, and the applications the session may open instead.",
+        "operationId": "refusedPage",
+        "responses": {
+          "303": {
+            "description": "Not signed in: to `/login`",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "403": {
+            "description": "The refusal page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "why",
+            "in": "query",
+            "required": false,
+            "description": "`tenant`: another tenant's route; `roles`: roles not held; `user`: reserved for named people; else a general refusal",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "tenant",
+                "roles",
+                "user"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/register": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the registration page",
+        "description": "Creates an account, confirmed by a mailed link or code.",
+        "operationId": "registerPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Self-registration closed, or no mail relay",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/register/captcha": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Get a new registration picture code",
+        "operationId": "registerCaptcha",
+        "description": "Valid 10 minutes.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "A new code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captcha"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "Self-registration closed, or no picture code",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Code not generated",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reset-password": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the password reset page",
+        "description": "The reset mail's link, valid until the form is posted.",
+        "operationId": "resetPasswordPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No token",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Link expired or used (a page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Token from the mail",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      }
+    },
+    "/select-group": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the group chooser",
+        "description": "For tenants with exclusive groups (SINGLE). With one group or none, goes on to `next`.",
+        "operationId": "selectGroupPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Nothing to choose: onward",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/next"
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/select-tenant": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the tenant chooser",
+        "description": "With a single tenant it enters it and goes on. Also shown when switching would open a route, with `why`.",
+        "operationId": "selectTenantPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, a step pending, or nothing to choose: onward",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "403": {
+            "description": "Only tenant outside its working hours",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "why",
+            "in": "query",
+            "required": false,
+            "description": "`tenant`: another tenant's route; `roles`: roles not granted here; `user`: reserved for named people",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "tenant",
+                "roles",
+                "user"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/totp": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the second-factor challenge",
+        "description": "Authenticator code, backup code or mailed code. Only while this step is pending.",
+        "operationId": "totpPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or not this step: onward",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/totp-enroll": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the required second-factor enrolment",
+        "description": "When a second factor is required and none is enrolled: QR code and secret, then backup codes.",
+        "operationId": "totpEnrollPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, not this step, or enrolled: onward",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/update-password": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Show the required password change",
+        "description": "When the password must change (generated, expired or reset). Self-service change: `/profile/password`.",
+        "operationId": "updatePasswordPage",
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Not signed in, or no change pending: onward",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "MEERKAT_SESSION",
+        "description": "Session cookie set at sign-in (`__Host-MEERKAT_SESSION` over HTTPS, with an optional installation suffix). HttpOnly, SameSite=Lax."
+      },
+      "apiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Personal API token (`mk_...`) from /profile/tokens. Acts as its owner in its tenant and group. Refused on the admin port."
+      },
+      "clientSecretBasic": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Client id and secret (`mko_...`), form-encoded."
+      },
+      "oidcAccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "An access token from the OpenID provider."
+      }
+    },
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "next": {
+        "name": "next",
+        "in": "query",
+        "required": false,
+        "description": "Path of this site to land on (anything else lands on `/`)",
+        "schema": {
+          "type": "string",
+          "example": "/app/orders"
+        }
+      }
+    },
+    "responses": {
+      "CrossSite": {
+        "description": "Cross-site request refused",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ProbeStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "UP",
+              "DOWN"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why not ready (readyz, DOWN only)"
+          },
+          "version": {
+            "type": "string",
+            "description": "The Meerkat version"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ]
+      },
+      "Captcha": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "For the form's `captcha_id`"
+          },
+          "img": {
+            "type": "string",
+            "description": "`data:image/png;base64,...` URI"
+          }
+        },
+        "required": [
+          "id",
+          "img"
+        ]
+      },
+      "WebAuthnDescriptor": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "public-key"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "Credential id, base64url"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PasskeyRegisterStart": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "Single-use challenge id, for the finish call's `challenge`"
+          },
+          "options": {
+            "type": "object",
+            "description": "WebAuthn creation options",
+            "properties": {
+              "publicKey": {
+                "type": "object",
+                "description": "PublicKeyCredentialCreationOptions (W3C WebAuthn)",
+                "properties": {
+                  "rp": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "user": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Account id, base64url"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "challenge": {
+                    "type": "string",
+                    "description": "base64url"
+                  },
+                  "pubKeyCredParams": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "alg": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Milliseconds"
+                  },
+                  "excludeCredentials": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/WebAuthnDescriptor"
+                    }
+                  },
+                  "authenticatorSelection": {
+                    "type": "object",
+                    "properties": {
+                      "authenticatorAttachment": {
+                        "type": "string"
+                      },
+                      "requireResidentKey": {
+                        "type": "boolean"
+                      },
+                      "residentKey": {
+                        "type": "string",
+                        "description": "Always `required`"
+                      },
+                      "userVerification": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "attestation": {
+                    "type": "string"
+                  },
+                  "extensions": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "mediation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "challenge",
+          "options"
+        ]
+      },
+      "PasskeyLoginStart": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "Single-use challenge id, for the finish call's `challenge`"
+          },
+          "options": {
+            "type": "object",
+            "description": "WebAuthn assertion options",
+            "properties": {
+              "publicKey": {
+                "type": "object",
+                "description": "PublicKeyCredentialRequestOptions (W3C WebAuthn), no allowed credentials",
+                "properties": {
+                  "challenge": {
+                    "type": "string",
+                    "description": "base64url"
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Milliseconds"
+                  },
+                  "rpId": {
+                    "type": "string"
+                  },
+                  "allowCredentials": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/WebAuthnDescriptor"
+                    }
+                  },
+                  "userVerification": {
+                    "type": "string"
+                  },
+                  "extensions": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "mediation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "challenge",
+          "options"
+        ]
+      },
+      "PasskeyAttestation": {
+        "type": "object",
+        "description": "PublicKeyCredential with an attestation response, base64url",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "rawId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "attestationObject": {
+                "type": "string"
+              },
+              "clientDataJSON": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "attestationObject",
+              "clientDataJSON"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ]
+      },
+      "PasskeyAssertion": {
+        "type": "object",
+        "description": "PublicKeyCredential with an assertion response, base64url",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "rawId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "authenticatorData": {
+                "type": "string"
+              },
+              "clientDataJSON": {
+                "type": "string"
+              },
+              "signature": {
+                "type": "string"
+              },
+              "userHandle": {
+                "type": "string",
+                "nullable": true,
+                "description": "Account id"
+              }
+            },
+            "required": [
+              "authenticatorData",
+              "clientDataJSON",
+              "signature"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ]
+      },
+      "IdName": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "NotificationBadge": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Unread notifications the reader can open, all their tenants"
+          },
+          "page": {
+            "type": "string",
+            "description": "The notifications page for this reader: the portal's page when they may open its route, else `/meerkat/notifications`"
+          },
+          "inBar": {
+            "type": "boolean",
+            "description": "The portal bar carries the notifications entry and the badge; the account button then shows neither"
+          }
+        },
+        "required": [
+          "total",
+          "page"
+        ]
+      },
+      "ServedName": {
+        "type": "object",
+        "description": "A service served from a developer's machine",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Cluster service name"
+          },
+          "who": {
+            "type": "string",
+            "description": "Who serves it; absent for a program"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UserButton": {
+        "type": "object",
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "description": "Signed in; false fills display fields only"
+          },
+          "username": {
+            "type": "string"
+          },
+          "fullname": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "initials": {
+            "type": "string",
+            "description": "Shown when there is no photo"
+          },
+          "avatar": {
+            "type": "string",
+            "description": "Photo, data URI"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Current tenant"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdName"
+            },
+            "description": "Tenants to switch to, when several"
+          },
+          "apps": {
+            "type": "array",
+            "description": "Applications the session may open, when several",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Container of the link"
+                },
+                "head": {
+                  "type": "boolean",
+                  "description": "First link of its container"
+                }
+              },
+              "required": [
+                "name",
+                "href"
+              ]
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdName"
+            },
+            "description": "Groups to choose from (exclusive mode)"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Active group"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Role names set as classes on `<body>`"
+          },
+          "scheme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "Colour scheme"
+          },
+          "schemeImposed": {
+            "type": "boolean",
+            "description": "Scheme imposed by the route: no switch"
+          },
+          "issues": {
+            "type": "boolean",
+            "description": "Show Report an issue"
+          },
+          "devDocs": {
+            "type": "boolean",
+            "description": "Show the Developer menu"
+          },
+          "devKey": {
+            "type": "boolean",
+            "description": "A developer key is set"
+          },
+          "plug": {
+            "type": "boolean",
+            "description": "Developer tunnel open"
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Menu strings by key, in the visitor's language"
+          },
+          "themeCss": {
+            "type": "string",
+            "description": "Theme tokens for `:host`"
+          },
+          "served": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServedName"
+            },
+            "description": "Services served from developers' machines"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/NotificationBadge"
+          }
+        },
+        "required": [
+          "authenticated",
+          "scheme",
+          "labels",
+          "themeCss"
+        ]
+      },
+      "PortalEntry": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string",
+            "description": "SVG drawn as a mask; else the label's initial"
+          },
+          "href": {
+            "type": "string",
+            "description": "Link; a container's first enabled module"
+          },
+          "description": {
+            "type": "string"
+          },
+          "badge": {
+            "type": "string",
+            "description": "Unread notifications, on the notifications entry and the container holding it"
+          },
+          "route": {
+            "type": "string",
+            "description": "Route id; `notifications` for the notifications entry"
+          },
+          "off": {
+            "type": "boolean",
+            "description": "Route turned off: greyed out"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortalEntry"
+            }
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "PortalBar": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Portal mode is on"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "header",
+              "rail"
+            ],
+            "description": "header: parents on top, children in a rail; rail: the reverse"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right"
+            ],
+            "description": "Rail side"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "both",
+              "icon",
+              "label"
+            ]
+          },
+          "showName": {
+            "type": "boolean"
+          },
+          "hideLogo": {
+            "type": "boolean"
+          },
+          "logoRadius": {
+            "type": "integer",
+            "description": "Logo corner radius, pixels"
+          },
+          "brand": {
+            "type": "object",
+            "properties": {
+              "appName": {
+                "type": "string"
+              },
+              "logo": {
+                "type": "string",
+                "description": "Data URI"
+              }
+            },
+            "required": [
+              "appName"
+            ]
+          },
+          "themeCss": {
+            "type": "string",
+            "description": "Theme tokens for `:host`"
+          },
+          "scheme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ]
+          },
+          "schemeImposed": {
+            "type": "boolean"
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortalEntry"
+            },
+            "description": "Entries the caller may open"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sign-in page languages"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/NotificationBadge"
+          }
+        },
+        "required": [
+          "enabled",
+          "layout",
+          "side",
+          "display",
+          "brand",
+          "themeCss",
+          "scheme",
+          "labels"
+        ]
+      },
+      "IssueReport": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Required, 4000 characters kept"
+          },
+          "url": {
+            "type": "string",
+            "description": "The page, 2000 characters kept"
+          },
+          "userAgent": {
+            "type": "string",
+            "description": "400 characters kept"
+          },
+          "viewport": {
+            "type": "string",
+            "description": "e.g. 1280x720, 20 characters kept"
+          },
+          "screen": {
+            "type": "string",
+            "description": "20 characters kept"
+          },
+          "dpr": {
+            "type": "number",
+            "description": "Device pixel ratio"
+          },
+          "language": {
+            "type": "string",
+            "description": "20 characters kept"
+          },
+          "console": {
+            "type": "array",
+            "description": "Browser console, last 200 lines kept",
+            "items": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "type": "string",
+                  "description": "10 characters kept"
+                },
+                "at": {
+                  "type": "string",
+                  "description": "40 characters kept"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "600 characters kept"
+                }
+              },
+              "required": [
+                "level",
+                "text"
+              ]
+            }
+          },
+          "screenshot": {
+            "type": "string",
+            "description": "png, jpeg or webp base64 data URI, under about 1.5 MiB"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "LiveMessage": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "`served`, `unserved`, `notification`, `notification-state`, or an echo's type"
+          },
+          "data": {
+            "description": "A served service for served and unserved; `{id, change}` for notifications; anything for an echo"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "DevGroup": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Effective role names, hierarchy applied"
+          }
+        },
+        "required": [
+          "name",
+          "roles"
+        ]
+      },
+      "DevCatalog": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The developer"
+          },
+          "groupMode": {
+            "type": "string",
+            "enum": [
+              "SINGLE",
+              "MULTIPLE",
+              ""
+            ],
+            "description": "Group mode; empty without a tenant"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every role"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevGroup"
+            },
+            "description": "Current tenant's groups"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DevGroup"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "groups"
+              ]
+            },
+            "description": "Every user, with their groups here"
+          },
+          "specs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "disabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            },
+            "description": "Routes with a spec"
+          }
+        },
+        "required": [
+          "username",
+          "groupMode",
+          "roles",
+          "groups",
+          "users",
+          "specs"
+        ]
+      },
+      "UiTest": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "user": {
+            "type": "string",
+            "description": "The simulated username"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Simulated roles, hierarchy expanded"
+          }
+        },
+        "required": [
+          "active"
+        ]
+      },
+      "UiTestRequest": {
+        "type": "object",
+        "properties": {
+          "route": {
+            "type": "string",
+            "description": "Enabled route id"
+          },
+          "user": {
+            "type": "string",
+            "description": "The simulated username"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Role names; those not valid as a CSS class are dropped"
+          }
+        },
+        "required": [
+          "route",
+          "user"
+        ]
+      },
+      "NotificationLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "external": {
+            "type": "string",
+            "description": "Host of an external link"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "MyNotification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "In the reader's language"
+          },
+          "body": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string",
+            "description": "Who published it"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds"
+          },
+          "read": {
+            "type": "boolean",
+            "description": "The same in every tenant it reached the reader in"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/NotificationLink"
+          },
+          "actions": {
+            "type": "array",
+            "description": "Actions the reader may use; a route link carries `notification=<id>`. Call `url` with `method`, and `body` as JSON when present",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "external": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "body": {
+                  "description": "JSON value to send, with `Content-Type: application/json`"
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "method"
+              ]
+            }
+          },
+          "route": {
+            "type": "string",
+            "description": "Route id of the detail"
+          },
+          "tenant": {
+            "type": "object",
+            "description": "The tenant it was sent in; for a message sent to several of the reader's tenants, the current one when it reached them there",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "here": {
+            "type": "boolean",
+            "description": "Sent in the current tenant. False: open it and run its actions from its own tenant"
+          },
+          "tenants": {
+            "type": "array",
+            "description": "Every tenant it reached the reader in: one, or several for a message sent to all of them",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "group": {
+            "type": "string",
+            "description": "A message sent to several tenants: the same for every copy, reader and session"
+          },
+          "ids": {
+            "type": "array",
+            "description": "With `group`: the ids of every copy the reader holds; any of them reads or deletes this item",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ack": {
+            "type": "string",
+            "enum": [
+              "single",
+              "all"
+            ],
+            "description": "It asks to be acknowledged: `single`, the first reader closes it for everyone; `all`, each reader. Absent when it asks for none."
+          },
+          "acknowledged": {
+            "type": "object",
+            "description": "With `ack`, once done for you: when, and who when somebody else closed it (single). Absent while you owe it: then it cannot be deleted.",
+            "properties": {
+              "at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix seconds"
+              },
+              "by": {
+                "type": "string",
+                "description": "Who closed it, when it was not you"
+              },
+              "self": {
+                "type": "boolean",
+                "description": "You did"
+              }
+            },
+            "required": [
+              "at",
+              "self"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "title",
+          "sender",
+          "createdAt",
+          "read",
+          "here"
+        ]
+      },
+      "NotificationTenantCount": {
+        "type": "object",
+        "description": "A tenant the reader holds notifications in",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "here": {
+            "type": "boolean",
+            "description": "The current tenant"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Notifications held there, a message sent to several tenants counted in each"
+          },
+          "unread": {
+            "type": "integer",
+            "description": "Unread among them"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "here",
+          "total",
+          "unread"
+        ]
+      },
+      "NotificationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyNotification"
+            }
+          },
+          "more": {
+            "type": "boolean",
+            "description": "More pages: ask again with `before` the last `createdAt`"
+          },
+          "tenants": {
+            "type": "array",
+            "description": "First page only (no `before`): every tenant the reader holds notifications in, by name, whatever `tenant` asked. Offer a filter when there are two or more",
+            "items": {
+              "$ref": "#/components/schemas/NotificationTenantCount"
+            }
+          },
+          "unread": {
+            "type": "integer",
+            "description": "First page only: unread over all the reader's tenants, a message sent to several of them counted once"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ]
+      },
+      "OidcAuthorizeForm": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "redirect_uri": {
+            "type": "string"
+          },
+          "response_type": {
+            "type": "string",
+            "enum": [
+              "code"
+            ]
+          },
+          "scope": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "code_challenge": {
+            "type": "string"
+          },
+          "code_challenge_method": {
+            "type": "string",
+            "enum": [
+              "S256"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "redirect_uri",
+          "response_type",
+          "scope"
+        ]
+      },
+      "OidcTokenForm": {
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "refresh_token"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "authorization_code: the code"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "description": "authorization_code: as sent to authorize"
+          },
+          "code_verifier": {
+            "type": "string",
+            "description": "authorization_code: the PKCE verifier"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "refresh_token: valid once"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "When not using HTTP Basic"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "client_secret_post; not with HTTP Basic"
+          }
+        },
+        "required": [
+          "grant_type"
+        ]
+      },
+      "OidcTokens": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Signed JWT: the route's claims and sub, iss, aud, client_id, scope, iat, exp, jti"
+          },
+          "id_token": {
+            "type": "string",
+            "description": "Signed JWT (RS256): the route's claims and sub, iss, aud, azp, iat, exp, nonce, auth_time"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Valid once; ends with the user's Meerkat session"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Granted, among openid, profile, email"
+          }
+        },
+        "required": [
+          "access_token",
+          "id_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "scope"
+        ]
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "OAuth error code"
+          },
+          "error_description": {
+            "type": "string",
+            "description": "What failed"
+          }
+        },
+        "required": [
+          "error",
+          "error_description"
+        ]
+      },
+      "Jwks": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kty": {
+                  "type": "string",
+                  "enum": [
+                    "RSA",
+                    "EC",
+                    "OKP"
+                  ]
+                },
+                "kid": {
+                  "type": "string"
+                },
+                "alg": {
+                  "type": "string",
+                  "enum": [
+                    "RS256",
+                    "ES256",
+                    "EdDSA"
+                  ]
+                },
+                "use": {
+                  "type": "string",
+                  "enum": [
+                    "sig"
+                  ]
+                },
+                "n": {
+                  "type": "string",
+                  "description": "RSA modulus"
+                },
+                "e": {
+                  "type": "string",
+                  "description": "RSA exponent"
+                },
+                "crv": {
+                  "type": "string",
+                  "enum": [
+                    "P-256",
+                    "Ed25519"
+                  ]
+                },
+                "x": {
+                  "type": "string"
+                },
+                "y": {
+                  "type": "string",
+                  "description": "EC only"
+                }
+              },
+              "required": [
+                "kty",
+                "kid",
+                "alg",
+                "use"
+              ]
+            }
+          }
+        },
+        "required": [
+          "keys"
+        ]
+      }
+    },
+    "headers": {
+      "Location": {
+        "description": "Where the browser goes",
+        "schema": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

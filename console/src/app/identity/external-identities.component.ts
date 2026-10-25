@@ -1,10 +1,11 @@
-import { DatePipe } from '@angular/common';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { catchError, of } from 'rxjs';
 import { ApiService, UserIdentities } from '../api.service';
+import { MeService } from '../me.service';
+import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 
 // The authorities a person can sign in through (AUTH-19), and what each one
 // last said about them. Read-only, and deliberately raw.
@@ -17,7 +18,7 @@ import { ApiService, UserIdentities } from '../api.service';
 // that: what is displayed has to be exactly what a mapping would match.
 @Component({
   selector: 'app-external-identities',
-  imports: [DatePipe, MatIconModule, MatTooltipModule, LoadingIndicatorComponent],
+  imports: [MatIconModule, MatTooltipModule, LoadingIndicatorComponent, ZonedDatePipe],
   styleUrl: './external-identities.component.scss',
   templateUrl: './external-identities.component.html',
 })
@@ -28,6 +29,7 @@ export class ExternalIdentitiesComponent {
   readonly hasPassword = input<boolean | undefined>(undefined);
 
   private readonly api = inject(ApiService);
+  protected readonly zone = inject(MeService).timezone;
   protected readonly identities = signal<UserIdentities | null>(null);
 
   constructor() {

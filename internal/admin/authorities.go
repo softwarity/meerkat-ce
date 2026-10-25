@@ -123,11 +123,16 @@ func (a *API) updateAuthority(w http.ResponseWriter, r *http.Request, actor stor
 		writeErr(w, http.StatusNotFound, "authority not found")
 		return
 	}
-	var x certs.Authority
-	if err := decodeStrict(r, &x); err != nil {
+	// Decoded as the VIEW, saved as the model, like an authentication
+	// authority: a client changing one field sends back the object it was
+	// listed, and refusing what the server itself wrote (eabSecretSet, uses)
+	// would make that a 400. They are read-only, so they are taken and dropped.
+	var in authorityView
+	if err := decodeStrict(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "malformed authority: "+err.Error())
 		return
 	}
+	x := in.Authority
 	old := cfg.ACME.Authorities[i]
 	// A blank secret means "leave it alone": the console never received the
 	// literal, so it cannot resend it (VAULT-05).

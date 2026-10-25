@@ -68,7 +68,7 @@
     <lw-live-indicator
       class="rail-live"
       i18n-title="@@Live_channel_title"
-      title="Live: screens follow what others change. Click to reconnect."
+      title="Live updates. Click to reconnect."
     />
     <app-user-menu />
   </rail-nav>
@@ -78,7 +78,7 @@
            not move every page down while it lasts. -->
       <div class="paused" role="status">
         <mat-icon>pause_circle</mat-icon>
-        <span i18n="@@Gateway_paused">Paused: the applications answer the maintenance page and nothing is written.</span>
+        <span i18n="@@Gateway_paused">Gateway paused: applications show the maintenance page and changes cannot be saved.</span>
         <button matButton any-role="root" (click)="pause.set(false)" i18n="@@Resume">Resume</button>
       </div>
     }

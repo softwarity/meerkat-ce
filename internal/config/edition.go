@@ -55,7 +55,7 @@ func notOnCommunity(doc *Document) []string {
 		}
 	}
 	if hours {
-		out = append(out, "organisations' working hours (Enterprise)")
+		out = append(out, "tenants' working hours (Enterprise)")
 	}
 	// The organisations' own fields (MODEL-03): the definitions and every
 	// value, together - a value without its definition would be dropped on

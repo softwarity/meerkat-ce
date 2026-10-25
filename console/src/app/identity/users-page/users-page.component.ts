@@ -87,7 +87,9 @@ export class UsersPageComponent {
   // what the person is looking at, and closing the drawer under it would
   // answer a question they did not ask.
   protected onEscape(): void {
-    if (document.querySelector(".cdk-overlay-container .cdk-overlay-pane")) return;
+    // Anywhere in the page: a select's panel is drawn as a popover beside
+    // its field, not in the overlay container.
+    if (document.querySelector(".cdk-overlay-pane")) return;
     if (!this.creating() && !this.editing()) return;
     this.onBackdrop();
   }
@@ -103,10 +105,10 @@ export class UsersPageComponent {
   // above the table would change.
   protected readonly devCount = computed(() => this.users().filter((u) => u.dev && !u.root).length);
   protected readonly clearingDev = signal(false);
-  protected readonly noDevTooltip = $localize`:@@No_account_has_developer_mode:No account but root has developer mode`;
+  protected readonly noDevTooltip = $localize`:@@No_account_has_developer_mode:Only root has developer mode`;
   // Root's dev badge is drawn on and cannot be clicked: root always has the
   // developer tooling, whatever its flag says (DEV-01).
-  protected readonly rootDevTooltip = $localize`:@@Root_always_develops:Root always has the developer tooling`;
+  protected readonly rootDevTooltip = $localize`:@@Root_always_develops:Root always has the developer tools`;
   protected readonly users = signal<User[]>([]);
   private readonly settings = signal<Settings | null>(null);
   protected readonly columns = ["identity", "summary"];
@@ -163,7 +165,7 @@ export class UsersPageComponent {
     const n = this.devCount();
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Remove_developer_mode_title:Remove developer mode from every account?`,
-      message: $localize`:@@Remove_developer_mode_message:${n}:COUNT: accounts lose the developer tools: Developer menu, UI test mode, API docs, the plug tunnel. Root keeps its own.`,
+      message: $localize`:@@Remove_developer_mode_message:${n}:COUNT: accounts lose the developer tools: Developer menu, UI test mode, API docs, plug. Root keeps them.`,
       confirmLabel: $localize`:@@Remove_developer_mode:Remove developer mode`,
       danger: true,
     });
@@ -240,22 +242,22 @@ export class UsersPageComponent {
     {
       key: "root" as const,
       label: "root",
-      tooltip: $localize`:@@Tooltip_root:Administers the whole gateway: routes, users, tenants, settings`,
+      tooltip: $localize`:@@Tooltip_root:Full control of the gateway: routes, users, tenants, settings`,
     },
     {
       key: "infraAdmin" as const,
       label: $localize`:@@infra_admin:infra admin`,
-      tooltip: $localize`:@@Tooltip_infra_admin:Administers the routing plane: routes and the built-in pages`,
+      tooltip: $localize`:@@Tooltip_infra_admin:Manages routes and the built-in pages`,
     },
     {
       key: "appAdmin" as const,
       label: $localize`:@@app_admin:app admin`,
-      tooltip: $localize`:@@Tooltip_app_admin:Administers the application identity: users, roles, settings`,
+      tooltip: $localize`:@@Tooltip_app_admin:Manages users, roles and application settings`,
     },
     {
       key: "dev" as const,
       label: "dev",
-      tooltip: $localize`:@@Tooltip_dev:Unlocks the developer tooling: dev keys, service substitution (plug)`,
+      tooltip: $localize`:@@Tooltip_dev:Gives the developer tools: Developer menu, API docs, plug`,
     },
     // Single-organisation installations never show this one: there is one
     // organisation, nobody names it, and a second cannot be created - so the
@@ -264,7 +266,7 @@ export class UsersPageComponent {
     {
       key: "tenantCreator" as const,
       label: $localize`:@@tenant_creator:tenant creator`,
-      tooltip: $localize`:@@Tooltip_tenant_creator:May create tenants, and owns the tenants they create`,
+      tooltip: $localize`:@@Tooltip_tenant_creator:Can create tenants, and owns the ones they create`,
     },
   ];
 

@@ -44,3 +44,16 @@ var DevPage []byte
 //
 //go:embed meerkat-admin.json
 var AdminSpec []byte
+
+// InternalSpec describes the internal plane: what the services of the cluster
+// call - the keys, the scheduler, the notifications.
+//
+//go:embed meerkat-internal.json
+var InternalSpec []byte
+
+// DataSpec describes what Meerkat itself answers on the data plane, beside
+// the routes: the sign-in flow, the profile, the user button, the live
+// channel, the notifications, the OpenID provider.
+//
+//go:embed meerkat-data.json
+var DataSpec []byte

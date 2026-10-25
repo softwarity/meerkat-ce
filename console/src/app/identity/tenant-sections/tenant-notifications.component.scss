@@ -1,0 +1,127 @@
+@use '../../../styles/table';
+
+// The switch over the list, the list filling what is left and scrolling
+// under its own sticky header - the Data plane screen's shape.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.grow {
+  flex: 1;
+}
+
+.hint {
+  margin: 0 0 12px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+  padding: 12px 0;
+}
+
+.table-wrap {
+  @include table.frame;
+
+  .mat-column-title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .mat-column-sender {
+    flex: 0 0 220px;
+  }
+  .mat-column-reads {
+    flex: 0 0 90px;
+  }
+  .mat-column-ack {
+    flex: 0 0 140px;
+  }
+  .mat-column-sent {
+    flex: 0 0 170px;
+    white-space: nowrap;
+  }
+  mat-row {
+    cursor: pointer;
+  }
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// The level as a dot before the title, as on the Data plane screen.
+.level {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-inline-end: 8px;
+  vertical-align: middle;
+  background: var(--mat-sys-primary);
+
+  &.success {
+    background: var(--mat-sys-tertiary);
+  }
+  &.warning {
+    background: var(--mat-sys-secondary);
+  }
+  &.error {
+    background: var(--mat-sys-error);
+  }
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+
+// An acknowledgement asked: waiting in the primary colour, done quieter.
+.ack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--mat-sys-primary);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+  &.done {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.off {
+  opacity: 0.55;
+}
+
+// The console's table look, and a sticky header that rows pass under.
+@include table.banded-rows;

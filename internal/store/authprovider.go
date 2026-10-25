@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -104,13 +105,14 @@ func ProviderIDReserved(id string) bool {
 	return false
 }
 
+// ProviderKinds are the kinds we know how to drive. One list, read by the
+// check and by the refusal that names what is allowed, so the two cannot
+// disagree - they did, and the refusal left out github and local.
+var ProviderKinds = []string{ProviderOIDC, ProviderGitHub, ProviderLDAP, ProviderSAML, ProviderLocal}
+
 // ValidProviderKind reports whether kind is one we know how to drive.
 func ValidProviderKind(kind string) bool {
-	switch kind {
-	case ProviderLocal, ProviderOIDC, ProviderLDAP, ProviderSAML, ProviderGitHub:
-		return true
-	}
-	return false
+	return slices.Contains(ProviderKinds, kind)
 }
 
 // LocalSignInEnabled reports whether the accounts held here may still answer
@@ -401,6 +403,29 @@ type LinkedPerson struct {
 	Identity
 	Username string `json:"username"`
 	Fullname string `json:"fullname,omitempty"`
+}
+
+// LinkedPeople counts, per authority id, the accounts linked to it: what its
+// deletion would strand. Accounts, not identities - one person linked twice
+// to the same authority is still one person. An authority nobody came in
+// through is absent, which reads as zero.
+func (s *Store) LinkedPeople(ctx context.Context) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT provider_id, COUNT(DISTINCT user_id) FROM user_identities GROUP BY provider_id`)
+	if err != nil {
+		return nil, fmt.Errorf("store: count linked accounts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]int{}
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("store: scan linked accounts: %w", err)
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
 }
 
 // IdentitiesOfProvider lists the accounts linked to one authority, the most

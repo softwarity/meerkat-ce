@@ -91,6 +91,7 @@ modifier une revient au service, sur le plan interne.
 - `/.well-known/jwks.json` - les clés publiques avec lesquelles se vérifie le [JWT d'identité](/docs/auth/service-jwt). Aucun jeton n'est demandé.
 - `/.well-known/openid-configuration` - le document de découverte : l'émetteur, et l'endroit où se trouvent ces clés. Aucun jeton n'est demandé.
 - `/api/schedules/...` - les [appels planifiés](/docs/operations/scheduler), écrits par le service qui en a besoin, qui présente ce que demande l'accès du scheduler : rien, un jeton dont le périmètre est `schedules`, ou le jeton de ServiceAccount de son pod.
+- `/api/notifications/...` - les [notifications](/docs/operations/notifications) qu'un service envoie à ses utilisateurs (Enterprise), derrière un accès qui leur est propre, réglé comme celui du scheduler : rien, un jeton dont le périmètre est `notifications`, ou le jeton de ServiceAccount de son pod.
 - `/healthz`.
 
 En HTTP simple par défaut, puisqu'un service l'atteint par un nom interne au

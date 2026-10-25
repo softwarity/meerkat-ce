@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,6 +18,8 @@ import (
 
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/jsonbody"
+	"github.com/softwarity/meerkat/internal/notifier"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -68,6 +69,15 @@ func (a *API) authed(next userHandler) http.Handler {
 		if sess.TokenScope == store.ScopeSchedules && !strings.HasPrefix(r.URL.Path, schedulesPath) {
 			writeErr(w, http.StatusForbidden,
 				"this token opens "+schedulesPath+" and nothing else: it is a service's credential, not an operator's")
+			return
+		}
+		// The same for a token that publishes notifications (NOTIF-05), and
+		// narrower still: it opens the internal plane's door and nothing on
+		// the control plane at all.
+		if sess.TokenScope == store.ScopeNotifications && throughDoor(r.Context()) != store.ScopeNotifications {
+			writeErr(w, http.StatusForbidden,
+				"this token publishes notifications on the internal plane ("+notifier.InternalPath+
+					") and opens nothing else: it is a service's credential, not an operator's")
 			return
 		}
 		// A browser session (no token) that writes must prove it came from the
@@ -426,6 +436,20 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 	if err := store.ValidFromUntil(u.ValidFrom, u.ValidUntil); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	// The account's own working hours: the same rule as on an update. Created
+	// with a window of its own, the account skipped both the Enterprise check
+	// and the time-zone one, and a zone nobody knows fails open at sign-in.
+	store.SanitizeBusinessAccess(&u.BusinessAccess)
+	if !u.BusinessAccess.Inherited {
+		if err := edition.Require("access hours"); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err := checkBusinessAccess(u.BusinessAccess); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 	}
 	// ?invite=true: the person is mailed a link to choose their password and
 	// none is shown (AUTH-25). Checked BEFORE the account exists, so a refusal
@@ -851,7 +875,7 @@ func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.U
 	// A SECOND organisation is what the licence covers - every installation
 	// owns one from its first boot, and single-tenant mode never names it.
 	if n, err := a.st.CountTenants(r.Context()); err == nil && n >= 1 {
-		if err := edition.Require("more than one organisation"); err != nil {
+		if err := edition.Require("more than one tenant"); err != nil {
 			writeErr(w, http.StatusForbidden, err.Error())
 			return
 		}
@@ -861,7 +885,7 @@ func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.U
 		// which one.
 		if a.st.Tenancy(r.Context()) == store.TenancySingle {
 			writeErr(w, http.StatusConflict,
-				"this gateway serves a single organisation: turn on several organisations in Application / General before creating another")
+				"this gateway serves a single tenant: turn on several tenants in Application / General before creating another")
 			return
 		}
 	}
@@ -1026,6 +1050,21 @@ func (a *API) deleteTenant(w http.ResponseWriter, r *http.Request, actor store.U
 	if !actor.Root && t.OwnerID != actor.ID {
 		writeErr(w, http.StatusForbidden, "deleting a tenant requires root or its owner")
 		return
+	}
+	// Every installation holds at least one organisation, and a single one
+	// serves the oldest: deleting the last left groups and memberships with
+	// nowhere to hang, and deleting the served one put another - hidden by
+	// single mode until then - in service without a word.
+	if n, err := a.st.CountTenants(r.Context()); err == nil && n <= 1 {
+		writeErr(w, http.StatusConflict, "the last tenant cannot be deleted")
+		return
+	}
+	if a.st.Tenancy(r.Context()) == store.TenancySingle {
+		if primary, err := a.st.PrimaryTenant(r.Context()); err == nil && primary.ID == id {
+			writeErr(w, http.StatusConflict,
+				"this gateway serves a single tenant and this is the one it serves: it cannot be deleted")
+			return
+		}
 	}
 	existed, err := a.st.DeleteTenant(r.Context(), id)
 	if err != nil {
@@ -1293,7 +1332,10 @@ func (a *API) loadSettingsPayload(ctx context.Context) (settingsPayload, error) 
 	// turning an export on points every span this gateway produces - route
 	// names, endpoint templates, status codes, an operational map - at an
 	// address in the request. That is a destination somebody decides.
-	p.Telemetry = a.st.RawTelemetry(ctx)
+	// A literal header is held back, as the telemetry screen holds it: this
+	// read is open to every console account, and a collector's header is
+	// most often its credential.
+	p.Telemetry, _ = hideLiterals(a.st.RawTelemetry(ctx))
 	smtp := a.st.GetSMTP(ctx)
 	p.SMTP = smtpPayload{
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
@@ -1403,6 +1445,59 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		writeErr(w, http.StatusForbidden, err.Error())
 		return
 	}
+	// A zone the gateway does not know fails open at every sign-in, the same
+	// check as an organisation's, a member's and an account's. On the change
+	// only, like the edition gate: a window stored before this check must not
+	// stop the rest of the screen from saving.
+	if !businessAccessEqual(before.BusinessAccess, p.BusinessAccess) {
+		if err := checkBusinessAccess(p.BusinessAccess); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+	}
+	// Rate limiting (SEC-10): sane bounds; 0 attempts disables a limiter.
+	if p.RateLimit.LoginAttempts < 0 || p.RateLimit.LoginAttempts > 1000 ||
+		p.RateLimit.TotpAttempts < 0 || p.RateLimit.TotpAttempts > 100 ||
+		p.RateLimit.AccountAttempts < 0 || p.RateLimit.AccountAttempts > 1000 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"rate limit attempts out of range (login 0-1000, totp 0-100, account 0-1000; 0 disables)")
+		return
+	}
+	if p.RateLimit.LoginWindow == "" {
+		p.RateLimit.LoginWindow = "PT15M"
+	}
+	if _, err := store.ParseISODuration(p.RateLimit.LoginWindow); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, "rate limit window: "+err.Error())
+		return
+	}
+	switch p.PagesScheme {
+	case "", "light", "dark":
+	default:
+		writeErr(w, http.StatusUnprocessableEntity,
+			"pages scheme "+p.PagesScheme+" is not allowed: use \"\" (the visitor decides), light or dark")
+		return
+	}
+	// The portal (PORTAL-01) is validated against the routes as they are now:
+	// every module must bind to a UI route, and an unknown one is refused
+	// naming what is allowed. A route deleted LATER leaves a dangling
+	// reference the served bar skips, and the stored portal lets it through.
+	portal := p.Portal
+	if err := store.RequirePortalMode(portal); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	routes, err := a.st.ListRoutes(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	stored := a.st.Portal(r.Context())
+	if err := store.SanitizePortalConfig(&portal, routes, &stored); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	// Everything above refuses; everything below writes. A refusal in between
+	// left half of this screen saved and the caller told it was not.
 	if err := a.st.SetSetting(r.Context(), store.SettingBusinessAccess, p.BusinessAccess); err != nil {
 		a.internal(w, err)
 		return
@@ -1453,21 +1548,6 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		a.internal(w, err)
 		return
 	}
-	// Rate limiting (SEC-10): sane bounds; 0 attempts disables a limiter.
-	if p.RateLimit.LoginAttempts < 0 || p.RateLimit.LoginAttempts > 1000 ||
-		p.RateLimit.TotpAttempts < 0 || p.RateLimit.TotpAttempts > 100 ||
-		p.RateLimit.AccountAttempts < 0 || p.RateLimit.AccountAttempts > 1000 {
-		writeErr(w, http.StatusUnprocessableEntity,
-			"rate limit attempts out of range (login 0-1000, totp 0-100, account 0-1000; 0 disables)")
-		return
-	}
-	if p.RateLimit.LoginWindow == "" {
-		p.RateLimit.LoginWindow = "PT15M"
-	}
-	if _, err := store.ParseISODuration(p.RateLimit.LoginWindow); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, "rate limit window: "+err.Error())
-		return
-	}
 	if err := a.st.SetSetting(r.Context(), store.SettingRateLimit, p.RateLimit); err != nil {
 		a.internal(w, err)
 		return
@@ -1478,38 +1558,12 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 		FromName: smtp.FromName, RelayHost: smtp.Host, RelayFrom: smtp.Address(),
 		Sender: smtp.Sender(), RelayConfigured: smtp.Configured(),
 	}
-	switch p.PagesScheme {
-	case "", "light", "dark":
-		if err := a.st.SetSetting(r.Context(), store.SettingPagesScheme, p.PagesScheme); err != nil {
-			a.internal(w, err)
-			return
-		}
-	default:
-		writeErr(w, http.StatusUnprocessableEntity,
-			"pages scheme "+p.PagesScheme+" is not allowed: use \"\" (the visitor decides), light or dark")
+	if err := a.st.SetSetting(r.Context(), store.SettingPagesScheme, p.PagesScheme); err != nil {
+		a.internal(w, err)
 		return
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingPageLayout, layout); err != nil {
 		a.internal(w, err)
-		return
-	}
-	// The portal (PORTAL-01) is validated against the routes as they are now:
-	// every module must bind to a UI route, and an unknown one is refused
-	// naming what is allowed. A route deleted LATER leaves a dangling
-	// reference the served bar skips, and the stored portal lets it through.
-	portal := p.Portal
-	if err := store.RequirePortalMode(portal); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	routes, err := a.st.ListRoutes(r.Context())
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	stored := a.st.Portal(r.Context())
-	if err := store.SanitizePortalConfig(&portal, routes, &stored); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	if err := a.st.SetSetting(r.Context(), store.SettingPortal, portal); err != nil {
@@ -1536,9 +1590,7 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, actor store.Us
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 func decodeStrict(r *http.Request, v any) error {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	return dec.Decode(v)
+	return jsonbody.Decode(r.Body, v)
 }
 
 func newID() string {

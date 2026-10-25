@@ -299,7 +299,7 @@ CREATE TABLE IF NOT EXISTS users (
   -- Beside the language for the same reason - both are read by the pages the
   -- gateway serves, and both follow the PERSON rather than the machine.
   scheme               TEXT NOT NULL DEFAULT '',
-  timezone             TEXT NOT NULL DEFAULT 'UTC',
+  timezone             TEXT NOT NULL DEFAULT '',
   created_at           BIGINT NOT NULL DEFAULT 0,
   updated_at           BIGINT NOT NULL DEFAULT 0,
   last_connection_at   BIGINT NOT NULL DEFAULT 0,
@@ -1260,6 +1260,69 @@ CREATE TABLE IF NOT EXISTS schedule_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_schedule_runs_of ON schedule_runs (schedule_id, ended_at);
 CREATE INDEX IF NOT EXISTS idx_schedules_route ON schedules (route_id);
+-- The notifications the services behind the gateway send their users
+-- (NOTIF-05, v94). One row per notification, and one per recipient below:
+-- the audience is worked out ONCE, on receipt, and frozen - a role resolved at
+-- read time would show it to somebody who arrived the next day, and the trail
+-- could no longer say who was told. Written by the Enterprise image only; the
+-- community one carries the empty tables like it carries oidc_clients.
+CREATE TABLE IF NOT EXISTS notifications (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL DEFAULT '',
+  -- Who sent it, in the internal plane's own words (a token's name, a
+  -- ServiceAccount, a workload) and how that was known. A sender withdraws its
+  -- own notifications and nobody else's.
+  sender       TEXT NOT NULL DEFAULT '',
+  sender_via   TEXT NOT NULL DEFAULT '',
+  -- The sender's deduplication key: the same one published again while the
+  -- first is alive answers the first.
+  dedup_key    TEXT NOT NULL DEFAULT '',
+  level        TEXT NOT NULL DEFAULT 'info',
+  -- Plain text, as a JSON object by language ("" when one string was sent).
+  title        TEXT NOT NULL DEFAULT '{}',
+  body         TEXT NOT NULL DEFAULT '{}',
+  -- Where the detail leads, already translated to its public address, and the
+  -- route that serves it ("" for an external link).
+  detail_url   TEXT NOT NULL DEFAULT '',
+  detail_route TEXT NOT NULL DEFAULT '',
+  -- The actions, a JSON list of {label, url, route}.
+  actions      TEXT NOT NULL DEFAULT '',
+  metadata     TEXT NOT NULL DEFAULT '',
+  mail         BOOLEAN NOT NULL DEFAULT FALSE,
+  recipients   BIGINT NOT NULL DEFAULT 0,
+  created_at   BIGINT NOT NULL DEFAULT 0,
+  expires_at   BIGINT NOT NULL DEFAULT 0,
+  -- Set when its sender took it back: gone from every page at once, the rows
+  -- kept until the purge so the trail can still say who had read it.
+  withdrawn_at BIGINT NOT NULL DEFAULT 0,
+  -- The copies of one message sent to every tenant share it (v96), empty for
+  -- a message sent to one: a reader member of several tenants holds one item
+  -- for them all, read and deleted at once.
+  broadcast_id TEXT NOT NULL DEFAULT '',
+  -- Whether its readers are asked to acknowledge it (v97): '' not asked,
+  -- 'single' the first acknowledgement closes it for everybody, 'all' each
+  -- reader acknowledges their own. on_ack is where the sender's service is
+  -- called at each acknowledgement, a JSON {url, route}. ack_complete_at is
+  -- when the request was closed (the first one, or the last reader), and
+  -- ack_by who closed a 'single' one.
+  ack             TEXT NOT NULL DEFAULT '',
+  on_ack          TEXT NOT NULL DEFAULT '',
+  ack_complete_at BIGINT NOT NULL DEFAULT 0,
+  ack_by          TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, dedup_key);
+CREATE INDEX IF NOT EXISTS idx_notifications_expires ON notifications (expires_at);
+CREATE TABLE IF NOT EXISTS notification_recipients (
+  notification_id TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  read_at         BIGINT NOT NULL DEFAULT 0,
+  -- Hidden by its reader: gone from their page, not from anybody else's.
+  hidden_at       BIGINT NOT NULL DEFAULT 0,
+  -- When this reader acknowledged it (v97), 0 while they have not.
+  acked_at        BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (notification_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_recipients_user ON notification_recipients (user_id);
 -- The SAML assertions already spent (v75, AUTH-19): an assertion is a bearer
 -- credential for its few minutes of validity, so the one this gateway has
 -- accepted is refused a second time - on every node, hence a table and not a
@@ -1321,7 +1384,15 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // the additive pass, empty - nothing said, nothing sent again.
 // 93 carries no step: tenants.fields is filled in by the additive pass, empty
 // - an organisation carries nothing until somebody defines what it may.
-const schemaVersion = 93
+// 94 carries no step: notifications and notification_recipients are new,
+// created by the DDL above (NOTIF-05).
+// 95 has a step: a user's zone left unchosen is empty, no longer UTC.
+// 96 carries no step: notifications.broadcast_id is filled in by the additive
+// pass, empty - what was sent before was sent to one tenant each time.
+// 97 carries no step: notifications.ack, on_ack, ack_complete_at, ack_by and
+// notification_recipients.acked_at are filled in by the additive pass, empty
+// - nothing sent before asked to be acknowledged.
+const schemaVersion = 97
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -2550,9 +2621,6 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 		return fmt.Errorf("store: create user %q: mfaRequired: %w", u.Username, err)
 	}
 	now := time.Now().Unix()
-	if u.Timezone == "" {
-		u.Timezone = "UTC"
-	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
 		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
@@ -2900,12 +2968,9 @@ func (s *Store) SetUserScheme(ctx context.Context, id, scheme string) error {
 
 // SetUserTimezone stores a user's own timezone (self-service, from the profile
 // page). The NAME is validated by the caller against the platform's zone
-// database; the store only refuses an empty one, which would mean "no zone" -
-// a user always has one, defaulting to UTC.
+// database; empty is "no choice": the screens use the browser's zone.
 func (s *Store) SetUserTimezone(ctx context.Context, id, tz string) error {
-	if strings.TrimSpace(tz) == "" {
-		tz = "UTC"
-	}
+	tz = strings.TrimSpace(tz)
 	res, err := s.db.ExecContext(ctx, `UPDATE users SET timezone = ? WHERE id = ?`, tz, id)
 	if err != nil {
 		return fmt.Errorf("store: set timezone: %w", err)

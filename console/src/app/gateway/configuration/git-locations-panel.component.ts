@@ -275,7 +275,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Name"
           label="Name"
           i18n-info="@@Git_location_name_info"
-          info="What you call this platform. It is the name you pick from when pulling or pushing."
+          info="Your name for this platform, shown when you pull or push."
         >
           <input matInput [value]="form().name || ''" (input)="set('name', $any($event.target).value)" />
         </app-form-field>
@@ -322,7 +322,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             i18n-label="@@Repository_URL"
             label="Repository URL"
             i18n-info="@@Repository_URL_info"
-            info="An https URL. SSH is not supported: it would need a private key in the vault and a host-key policy."
+            info="An https URL. SSH is not supported."
           >
             <input
               matInput
@@ -340,7 +340,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Branch"
           label="Branch"
           i18n-info="@@Branch_info"
-          info="The branch this directory lives on. A push is refused if somebody else has moved it since this configuration was read - there is no force."
+          info="The branch the directory is on. A push replaces that directory in a new commit."
         >
           <input
             matInput
@@ -354,7 +354,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Directory"
           label="Directory"
           i18n-info="@@Directory_info"
-          info="The directory inside the repository, empty for its root. This is what lets one repository hold one directory per platform."
+          info="The directory in the repository, empty for its root. One repository can hold one directory per platform."
         >
           <input
             matInput
@@ -377,11 +377,11 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           @if (createLink(); as link) {
             <a [href]="link" target="_blank" rel="noopener">
               <mat-icon>open_in_new</mat-icon>
-              <ng-container i18n="@@Git_open_token_page">Open the page that makes it</ng-container>
+              <ng-container i18n="@@Git_open_token_page">Open the token creation page</ng-container>
             </a>
           } @else if (provider().create) {
             <span class="wait" i18n="@@Git_fill_repository_first"
-              >Fill in the repository first: the link opens its own token page.</span
+              >Fill in the repository first to get the link to its token page.</span
             >
           }
         </div>
@@ -405,7 +405,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             i18n-label="@@Token_username"
             label="Token username"
             i18n-info="@@Token_username_info2"
-            info="Sent beside the token: on Gitea and Forgejo, the account the token belongs to; on another server, the name it expects."
+            info="Sent with the token: on Gitea and Forgejo, the account that owns the token; elsewhere, the name the server expects."
           >
             <input
               matInput
@@ -417,7 +417,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           </app-form-field>
         } @else if (provider().userFixed) {
           <p class="full fixed-user" i18n="@@Git_user_fixed">
-            Sent with the username <code>{{ provider().user }}</code>, the only one {{ provider().name }} accepts beside this token.
+            Sent with the username <code>{{ provider().user }}</code>, the only one {{ provider().name }} accepts with this token.
           </p>
         }
 
@@ -426,7 +426,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           i18n-label="@@Fallback_commit_author"
           label="Fallback commit author"
           i18n-info="@@Fallback_commit_author_info"
-          info="A commit is attributed to whoever pushed it. This address is used only for an account that has none of its own."
+          info="Commits are attributed to the user who pushes. This address is used only when that user has no e-mail address."
         >
           <input
             matInput
@@ -443,9 +443,9 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
           <mat-icon>{{ v.ok ? 'check_circle' : 'error' }}</mat-icon>
           @if (v.ok) {
             @if (v.holds) {
-              <p i18n="@@Check_ok_holds">It answers, and it already holds a configuration you can pull.</p>
+              <p i18n="@@Check_ok_holds">Reachable, and it holds a configuration you can pull.</p>
             } @else {
-              <p i18n="@@Check_ok_empty">It answers, and there is nothing there yet: push one to it.</p>
+              <p i18n="@@Check_ok_empty">Reachable, and empty: push a configuration to it.</p>
             }
           } @else {
             <p>{{ v.error }}</p>
@@ -618,7 +618,7 @@ export class GitLocationsPanelComponent {
   // live without pushing the list off the screen.
   protected readonly tokenInfo = computed(() => {
     const f = this.provider();
-    const rule = $localize`:@@Token_is_a_reference:A vault reference, never the token itself: paste it and the key button puts it in the vault.`;
+    const rule = $localize`:@@Token_is_a_reference:Stored as a vault reference: paste the token and the key button moves it to the vault.`;
     return f ? rule + ' ' + f.needs + (f.note ? ' ' + f.note : '') : rule;
   });
 
@@ -795,8 +795,8 @@ export class GitLocationsPanelComponent {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_git_location:Delete ${r.name}:name:?`,
       message: r.bound?.length
-        ? $localize`:@@Delete_git_location_bound:${r.bound.join(', ')}:bound: stay as saved copies, no longer bound anywhere. Nothing is removed from the repository.`
-        : $localize`:@@Delete_git_location_message:Nothing is removed from the repository: this forgets where it is.`,
+        ? $localize`:@@Delete_git_location_bound:${r.bound.join(', ')}:bound: stay as saved copies, no longer linked to a location. Nothing is removed from the repository.`
+        : $localize`:@@Delete_git_location_message:Nothing is removed from the repository; only this location is forgotten.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

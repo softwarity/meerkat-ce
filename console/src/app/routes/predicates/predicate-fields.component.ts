@@ -109,7 +109,7 @@ export class MethodPredicateComponent {
           matInput
           [disabled]="values().length > 0"
           i18n-placeholder="@@empty_presence_only"
-          placeholder="empty = presence only"
+          placeholder="empty: being present is enough"
           [value]="regexp()"
           (input)="set('regexp', $any($event.target).value)"
         />
@@ -429,7 +429,7 @@ export class VersionPredicateComponent {
       return {
         state: 'out',
         icon: 'block',
-        text: $localize`:@@No_version_found:nothing extracted - this route would not match`,
+        text: $localize`:@@No_version_found:no version found: this route would not match`,
       };
     }
     return a.matches

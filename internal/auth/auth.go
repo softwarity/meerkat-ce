@@ -238,7 +238,7 @@ const specimenBody = `    <form onsubmit="return false">
 `
 
 const flowTop = `<!doctype html>
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="{{.Lang}}" dir="{{.Dir}}"{{if .Timezone}} data-tz="{{.Timezone}}"{{end}}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -788,11 +788,19 @@ const flowTop = `<!doctype html>
        .watch would otherwise lose to body.list, which is written above and is
        exactly as specific. */
     {{.LayoutCSS}}
+    /* An APPLICATION page (App): a screen of the product, not a step of the
+       sign-in. The theme's surface edge to edge, no grain, no card column -
+       the page draws its own frame from the top. */
+    body.mk-app { display: block; place-items: normal; padding: 0 0 52px; background: var(--mk-surface); }
+    body.mk-app::after { display: none; }
+    /* justify-items too: a browser that aligns blocks would still shrink the
+       page to its content and centre it, as the column it was. */
+    body.mk-app .watch { width: 100%; display: block; justify-items: normal; text-align: start; }
   </style>
-</head>
-<body class="{{if .List}}list {{end}}mk-{{.Layout.Name}}{{if .Layout.Side}} side-{{.Layout.Side}}{{end}}{{if .Brand.HasBackground}} has-bg{{end}}{{if ne .Scheme "auto"}} mk-scheme-{{.Scheme}}{{end}}">
-{{.EvalBanner}}  <main class="watch">
-    <div class="brand">
+` + whenScript + `</head>
+<body class="{{if .List}}list {{end}}mk-{{.Layout.Name}}{{if .Layout.Side}} side-{{.Layout.Side}}{{end}}{{if .Brand.HasBackground}} has-bg{{end}}{{if .App}} mk-app{{end}}{{if ne .Scheme "auto"}} mk-scheme-{{.Scheme}}{{end}}">
+{{.BodyStart}}{{.EvalBanner}}  <main class="watch">
+    {{if not .App}}<div class="brand">
     <div class="mark{{if .Brand.Meerkat}} pulse{{end}}" aria-hidden="true">
       {{if .Brand.LogoURL}}<img class="applogo{{with .Brand.LogoSize}} {{.}}{{end}}" src="{{.Brand.LogoURL}}" alt="">{{end}}
       {{if not .Brand.Meerkat}}<svg class="generic"{{if or .Brand.LogoURL .Brand.HasBackground}} style="display:none"{{end}} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -812,7 +820,7 @@ const flowTop = `<!doctype html>
     </div>
     <h1 class="wordmark">{{.Brand.AppName}}{{if .Brand.Edition}}<span class="edition">{{.Brand.Edition}}</span>{{end}}</h1>
     <p class="tagline">{{.Brand.Tagline}}</p>
-    </div>
+    </div>{{end}}
     <div class="pane">
 `
 
@@ -827,7 +835,7 @@ const pwRulesBlock = `{{if .PwRules}}      <ul class="pw-rules" data-pw-rules>
       </ul>
 {{end}}`
 
-const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
+const flowBottom = `    {{if and .Brand.Meerkat (not .App)}}<p class="foot">on watch</p>{{end}}
     {{if or .SchemeSwitch (gt (len .Langs) 1)}}<div class="prefs">
       {{if gt (len .Langs) 1}}<div class="langbox">
         <button type="button" class="lang-toggle" id="lang-toggle" aria-haspopup="menu" title="{{.T.languages}}">
@@ -1050,7 +1058,7 @@ const flowBottom = `    {{if .Brand.Meerkat}}<p class="foot">on watch</p>{{end}}
     addEventListener('submit', function (e) { e.preventDefault(); }, true);
   })();
   </script>{{end}}
-</body>
+` + localScript + `</body>
 </html>`
 
 // The username comes back filled in when the page answers a refusal that
@@ -1289,11 +1297,32 @@ const profileBody = `    <style>
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
       .mfa-link .mfa-state.on { color: var(--mk-tertiary); }
-      /* the way back into the applications, right from the hub */
-      /* A card like the others: the list of applications used to sit on the
-         background image, where a branded photograph decides whether it can
-         be read at all. */
-      .apps { gap: 10px; }
+      /* The way back into the applications: ONE control, a field high - a
+         button, or a list with its Open button on the same line. */
+      .apps-btn {
+        display: block; margin: 14px 0 0; padding: 12px; text-align: center; text-decoration: none;
+        border-radius: var(--mk-radius-small); background: var(--mk-primary); color: var(--mk-on-primary);
+        font-size: .95rem; font-weight: 700; letter-spacing: .02em;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .apps-btn:hover { filter: brightness(1.06); }
+      .apps-btn:focus-visible, .apps-open:focus-visible { outline: 2px solid var(--mk-primary); outline-offset: 2px; }
+      .apps-pick { display: flex; align-items: stretch; gap: 8px; margin: 14px 0 0; }
+      .apps-select {
+        flex: 1; min-width: 0; padding: 11px 13px; border-radius: var(--mk-radius-small);
+        border: 1px solid var(--mk-outline); background: var(--mk-surface-container-high);
+        color: var(--mk-on-surface); font: inherit; font-size: .92rem; cursor: pointer;
+      }
+      .apps-select:focus {
+        outline: none; border-color: var(--mk-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--mk-primary) 22%, transparent);
+      }
+      .apps-select option, .apps-select optgroup {
+        background: var(--mk-surface-container-high); color: var(--mk-on-surface);
+      }
+      .apps-open { margin: 0; padding: 0 18px; box-shadow: none; }
+      .apps-open:hover { box-shadow: none; }
+      .apps-open[disabled] { opacity: .45; cursor: default; filter: none; }
       /* Signing out is not a card and not a primary action: it is the way out,
          and it should not look like the thing to click next. */
       .signout {
@@ -1321,7 +1350,6 @@ const profileBody = `    <style>
         background: color-mix(in srgb, var(--mk-error) 14%, var(--mk-surface-container));
         border-color: var(--mk-error);
       }
-      .apps .public-links { justify-content: flex-start; margin-top: 0; }
       /* One zone list, and under it the two things a visitor asks of it:
          what time is it there, and the buttons that SAY what they do. */
       .tz-form { width: 100%; margin: 2px 0 12px; display: grid; gap: 8px; text-align: start; }
@@ -1459,6 +1487,9 @@ const profileBody = `    <style>
       const detect = document.getElementById('tz-detect');
       const zones = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).slice();
       if (!zones.length) return; // very old browser: keep the plain field
+      // UTC itself is not in that list (it holds the places, not the
+      // reference), and it is a choice somebody makes on purpose: offered.
+      if (!zones.includes('UTC')) zones.push('UTC');
       const saved = {{.Timezone}};
       // Offset in minutes, now: it groups the list and it is what the clock
       // line spells out, so nobody has to know a city to read the field.
@@ -1495,16 +1526,20 @@ const profileBody = `    <style>
         }));
         return g;
       }));
-      // Nothing stored yet (or a zone this browser does not know): the field
-      // opens on the browser's own zone, as a PROPOSAL - Save stays lit until
-      // the visitor accepts it, so the page never sits on an empty field.
+      // Nothing stored (or a zone this browser does not know): the field says
+      // so - the browser's zone, named - and Detect picks that zone for good.
       const mine = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      sel.value = byZone.has(saved) ? saved : (byZone.has(mine) ? mine : 'UTC');
+      // First, no choice at all: every screen then follows the browser.
+      const follow = document.createElement('option');
+      follow.value = '';
+      follow.textContent = {{.T.tzBrowser}} + (byZone.has(mine) ? ' (' + mine + ')' : '');
+      sel.prepend(follow);
+      sel.value = byZone.has(saved) ? saved : '';
       // The clock is the explanation: pick a zone, read the time it is there.
       const tick = () => {
-        const z = sel.value;
+        const z = sel.value || mine;
         if (!byZone.has(z)) { now.textContent = ''; return; }
-        const t = new Intl.DateTimeFormat({{.Lang}}, { timeZone: z, hour: '2-digit', minute: '2-digit' }).format(new Date());
+        const t = new Intl.DateTimeFormat('en-GB', { timeZone: z, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(new Date());
         now.textContent = t + '  ' + label(byZone.get(z));
       };
       const refresh = () => { tick(); save.disabled = sel.value === saved; };
@@ -1525,14 +1560,45 @@ const profileBody = `    <style>
       <span class="mfa-state">&rsaquo;</span>
     </a>
     {{end}}
-    {{if .Apps}}
-    <div class="apps panel">
-      <h2>{{.T.applications}}</h2>
-      <nav class="public-links">
-        {{range .Apps}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
-      </nav>
+    {{with .Apps}}{{if .Href}}
+    <a class="apps-btn" href="{{.Href}}">{{.Label}}</a>
+    {{else}}
+    <div class="apps-pick">
+      <select class="apps-select" id="apps-select" aria-label="{{.Label}}">
+        <option value="" selected disabled hidden>{{.Label}}</option>
+        {{range .Groups}}{{if .Label}}<optgroup label="{{.Label}}">{{range .Links}}<option value="{{.Href}}">{{.Name}}</option>{{end}}</optgroup>{{else}}{{range .Links}}<option value="{{.Href}}">{{.Name}}</option>{{end}}{{end}}{{end}}
+      </select>
+      <button type="button" class="apps-open" id="apps-open" disabled>{{$.T.openApp}}</button>
     </div>
-    {{end}}
+    <script>
+    (() => {
+      // Choosing with the pointer is a decision, and goes at once. The arrow
+      // keys on a closed list only move the choice - which is how a keyboard
+      // reads a list - so Enter, or the Open button beside it, goes.
+      const sel = document.getElementById('apps-select');
+      const open = document.getElementById('apps-open');
+      if (!sel || !open) return;
+      // Only a path of this site or a web address is ever followed.
+      const go = () => {
+        const v = sel.value;
+        if ((v.startsWith('/') && !v.startsWith('//')) || v.startsWith('https://') || v.startsWith('http://')) {
+          location.assign(v);
+        }
+      };
+      let pointer = false;
+      sel.addEventListener('pointerdown', () => { pointer = true; });
+      sel.addEventListener('keydown', (e) => {
+        pointer = false;
+        if (e.key === 'Enter') { e.preventDefault(); go(); }
+      });
+      sel.addEventListener('change', () => {
+        open.disabled = !sel.value;
+        if (pointer) go();
+      });
+      open.addEventListener('click', go);
+    })();
+    </script>
+    {{end}}{{end}}
     {{if .Console}}<p class="back"><a href="/">{{.T.backToConsole}}</a></p>{{end}}
     <form method="post" action="logout" class="signout">
       <button class="leave" type="submit">{{.T.signOut}}</button>
@@ -1693,7 +1759,7 @@ const profileDevKeyBody = `    <style>
     <form method="post" action="/profile/dev-key" class="dk-form dk-key">
       <div class="dk-fact">
         <span class="dk-value">{{.Fingerprint}}</span>
-        <span class="dk-comment">{{if .Comment}}{{.Comment}} - {{end}}added {{.Added}}</span>
+        <span class="dk-comment">{{if .Comment}}{{.Comment}} - {{end}}added {{.Added.HTML}}</span>
       </div>
       <input type="hidden" name="action" value="remove">
       <input type="hidden" name="id" value="{{.ID}}">
@@ -1877,6 +1943,10 @@ type Handler struct {
 	// behaves as "SMTP not configured"; main wires the real sender, tests a
 	// recording fake.
 	Mailer func(ctx context.Context, msg mail.Message) error
+	// NotifyBadge is the notifications' count for a session (NOTIF-05), set by
+	// main when the binary carries them: nil on the community image, where the
+	// user button and the bar draw no badge.
+	NotifyBadge func(ctx context.Context, sess store.Session) (NotifyBadge, bool)
 
 	// Covers says whether a certificate placed on this handler's plane
 	// carries a host name: the one test a mailed link's address has to pass
@@ -1924,6 +1994,11 @@ type Handler struct {
 	// the pages that have to say so. Nil when nothing can write to it - the
 	// community image, or a test - and every reader treats that as "nothing".
 	served *devtunnel.Registry
+
+	// pages is the mux this handler's pages are mounted on, when it is one:
+	// asked whether a path is one of them (profileapps.go), since a page the
+	// handler draws itself is never an application to go back to.
+	pages *http.ServeMux
 }
 
 // WatchServed hands the handler the registry the developer tunnel fills. Set
@@ -2174,10 +2249,13 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 }
 
 // Register mounts the auth endpoints on mux.
-func (h *Handler) Register(raw *http.ServeMux) {
+func (h *Handler) Register(raw Mux) {
 	// Every write behind the cross-site guard, every page framed by its own
 	// origin only (guard.go).
 	mux := routes{mux: raw}
+	if m, ok := raw.(*http.ServeMux); ok {
+		h.pages = m
+	}
 	if !h.adminPlane {
 		mux.HandleFunc("GET /select-tenant", h.showSelectTenant)
 		mux.HandleFunc("POST /select-tenant", h.doSelectTenant)
@@ -2949,9 +3027,9 @@ type profileData struct {
 	// date an application shows them should be rendered in.
 	Timezone string
 	IsDev    bool
-	// Apps: the UI routes this session may open - the way back into the
-	// applications from the profile flow.
-	Apps []publicLink
+	// Apps is the one way back into the applications (profileapps.go): a
+	// button, or a list. Nil on the admin plane, which has Console instead.
+	Apps *appsControl
 	// Console marks the ADMIN plane's copy of this page, which needs a way
 	// back for the same reason the data plane's needs its apps menu: someone
 	// who came here to add a passkey has finished, and the browser's back
@@ -3021,7 +3099,7 @@ type profileDevData struct {
 type passkeyView struct {
 	ID      string
 	Label   string
-	Created string
+	Created moment
 	// Current marks the passkey THIS browser registered or last used.
 	Current bool
 }
@@ -3228,11 +3306,9 @@ func (h *Handler) doProfileTimezone(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
+	// Empty is "no choice": every screen then uses the browser's zone.
 	tz := strings.TrimSpace(r.PostFormValue("timezone"))
-	if tz == "" {
-		tz = "UTC"
-	}
-	if _, err := time.LoadLocation(tz); err != nil {
+	if _, err := time.LoadLocation(tz); tz != "" && err != nil {
 		h.renderProfile(w, r, sess, h.tr(r, "errBadTimezone"), http.StatusBadRequest)
 		return
 	}
@@ -3352,7 +3428,7 @@ type devKeyRow struct {
 	ID          string
 	Fingerprint string
 	Comment     string
-	Added       string
+	Added       moment
 }
 
 func (h *Handler) devKeyRows(r *http.Request, userID string) []devKeyRow {
@@ -3362,10 +3438,11 @@ func (h *Handler) devKeyRows(r *http.Request, userID string) []devKeyRow {
 		return nil
 	}
 	rows := make([]devKeyRow, 0, len(keys))
+	loc := h.readerZone(r.Context(), userID)
 	for _, k := range keys {
 		fp, comment := devKeyView(k.Line)
 		rows = append(rows, devKeyRow{ID: k.ID, Fingerprint: fp, Comment: comment,
-			Added: time.Unix(k.CreatedAt, 0).UTC().Format(time.DateOnly)})
+			Added: dayOf(k.CreatedAt, loc)})
 	}
 	return rows
 }
@@ -3399,10 +3476,6 @@ func (h *Handler) renderProfileNotice(w http.ResponseWriter, r *http.Request, se
 
 func (h *Handler) renderProfileWith(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg, notice string, status int) {
 	data := profileData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg, Notice: notice}
-	// Through safeNext, which is the same guard every post-login destination
-	// goes through: a relative path of this site, never an absolute URL. The
-	// value arrives in a query string, so it is a stranger until it passes.
-	back := safeNext(r.URL.Query().Get("from"))
 	if avatar, err := h.st.GetUserAvatar(r.Context(), sess.UserID); err == nil {
 		data.Avatar = template.URL(avatar) //nolint:gosec // SanitizeAvatar gates writes
 	}
@@ -3428,28 +3501,11 @@ func (h *Handler) renderProfileWith(w http.ResponseWriter, r *http.Request, sess
 			data.TenantName = t.Name
 		}
 	}
-	// The apps menu is the way back INTO the applications: it belongs to the
-	// plane that serves them. The console has its own navigation.
+	// The way back INTO the applications belongs to the plane that serves
+	// them. The console has its own navigation.
 	if !h.adminPlane {
-		data.Apps = h.reachableLinks(r.Context(), sess)
-		// The application someone CAME FROM points back where they were, not
-		// at its front door. "Go to NEO" and "go back to NEO" are one intent
-		// when you just left it, and the entry path - a route pattern cut at
-		// its first wildcard - could only ever offer the root.
-		//
-		// Only that one entry moves; the others stay what they are, a way in.
-		//
-		// And a return that matches NO application is dropped rather than
-		// offered, which is the whole guard: safeNext proves an address
-		// belongs to this site, not that it is a place anyone wants to go
-		// back to. A profile offering "back to /login" to somebody who is
-		// signed in is the shape that mistake takes.
-		for i, app := range data.Apps {
-			if back != "" && underEntry(back, app.Href) {
-				data.Apps[i].Href = back
-				break
-			}
-		}
+		apps := h.profileApps(r, sess, data.Brand.AppName, data.T)
+		data.Apps = &apps
 	}
 	data.Console = h.adminPlane
 	writeFlow(w, profilePage, data, status)
@@ -3493,10 +3549,11 @@ func (h *Handler) renderProfileSecurity(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	if keys, err := h.st.ListPasskeys(r.Context(), sess.UserID); err == nil {
+		loc := h.readerZone(r.Context(), sess.UserID)
 		for _, k := range keys {
 			data.Passkeys = append(data.Passkeys, passkeyView{
 				ID: k.ID, Label: k.Label,
-				Created: time.Unix(k.CreatedAt, 0).Format("2006-01-02"),
+				Created: dayOf(k.CreatedAt, loc),
 				Current: k.ID == current,
 			})
 		}
@@ -3882,6 +3939,13 @@ type publicLink struct {
 // applications only needs a way back in - the first entry the caller may open,
 // which is also where a fresh sign-in lands.
 func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) []publicLink {
+	return h.catalogueAt(ctx, grants, routeEntryPath)
+}
+
+// catalogueAt is the catalogue with each link's address worked out by addr:
+// the entry path everywhere a page only links within its own host, the full
+// address on the profile, which follows a route to the host it answers on.
+func (h *Handler) catalogueAt(ctx context.Context, grants func(store.Route) bool, addr func(store.Route) string) []publicLink {
 	// The admin plane offers no application links at all: application routes
 	// are a data-plane affair, and the console offers nothing anonymous.
 	if h.adminPlane {
@@ -3908,7 +3972,9 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 	}
 	var modules []module
 	for i, e := range cfg.Entries {
-		if e.Disabled {
+		// The notifications entry is no application: the user button carries
+		// its own when the bar does not.
+		if e.Disabled || e.Special != "" {
 			continue
 		}
 		if !e.IsContainer() {
@@ -3916,7 +3982,7 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 			continue
 		}
 		for _, c := range e.Children {
-			if !c.Disabled {
+			if !c.Disabled && c.Special == "" {
 				modules = append(modules, module{routeID: c.RouteID, label: c.Label, group: e.Label, run: i + 1})
 			}
 		}
@@ -3933,7 +3999,7 @@ func (h *Handler) catalogue(ctx context.Context, grants func(store.Route) bool) 
 		if !ok || !rt.Enabled || !rt.IsUI || !grants(rt) {
 			continue
 		}
-		href := routeEntryPath(rt)
+		href := addr(rt)
 		if href == "" {
 			continue
 		}
@@ -3958,20 +4024,13 @@ func (h *Handler) publicLinks(ctx context.Context) []publicLink {
 
 // reachableLinks is the catalogue THIS session may open: the public entries,
 // the authenticated ones, and the role-gated ones whose role the active tenant
-// actually grants. This feeds the profile hub and the user button's
-// Applications submenu - the way back into the apps.
+// actually grants. This feeds the user button's Applications submenu and the
+// refusal pages - the way back into the apps.
 func (h *Handler) reachableLinks(ctx context.Context, sess store.Session) []publicLink {
-	// The caller, to test each route's Access. Memberships are NOT filled in:
-	// this list is what one can open right now, in the organisation currently
+	// The caller, to test each route's Access, in the tenant currently
 	// active - offering a link that would land on the tenant chooser would be
 	// offering a detour, not an application.
-	caller := store.Caller{Authenticated: true, TenantID: h.st.SessionTenant(ctx, sess.UserID, sess.TenantID)}
-	if u, err := h.st.GetUserByID(ctx, sess.UserID); err == nil {
-		caller.Username = u.Username
-	}
-	if names, err := h.st.SessionRoleNames(ctx, sess.UserID, caller.TenantID, sess.GroupID); err == nil {
-		caller.Roles = names
-	}
+	caller := h.sessionCaller(ctx, sess)
 	return h.catalogue(ctx, func(rt store.Route) bool { return rt.Access.Grants(caller) })
 }
 
@@ -4143,18 +4202,4 @@ func (h *Handler) doPlugged(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.continueAfterStep(w, r, sess.UserID, safeNext(r.PostFormValue("next")))
-}
-
-// underEntry says whether a path lies inside a route's entry path - the test
-// for "this is where they came from" among the applications on offer.
-//
-// A prefix, but a prefix on SEGMENTS: /embedded is not inside /embed, and a
-// plain strings.HasPrefix would have said it was.
-func underEntry(path, entry string) bool {
-	if entry == "" || entry == "/" {
-		return false
-	}
-	entry = strings.TrimSuffix(entry, "/")
-	return path == entry || strings.HasPrefix(path, entry+"/") ||
-		strings.HasPrefix(path, entry+"?") || strings.HasPrefix(path, entry+"#")
 }

@@ -42,7 +42,7 @@
           <span i18n="@@Locale_reset_all">Reset this language</span>
         </button>
         <div class="menu-why" i18n="@@Locale_reset_hint">
-          Puts back the wordings the product ships.
+          Restores the default texts.
         </div>
       }
     </mat-menu>
@@ -51,7 +51,7 @@
   @if (loading()) {
     <p class="text-muted" i18n="@@Loading">Loading...</p>
   } @else if (!strings().length) {
-    <p class="text-muted" i18n="@@Locale_no_strings">This screen renders no text of its own.</p>
+    <p class="text-muted" i18n="@@Locale_no_strings">No text to translate on this screen.</p>
   } @else {
     @for (sec of sections(); track sec.group) {
       <!-- A heading per kind. The server sorts, the screen only says where one
@@ -98,7 +98,7 @@
             [class.gone]="!s.overridden"
             [disabled]="!s.overridden"
             (click)="revert(s)"
-            matTooltip="Put back what the product ships"
+            matTooltip="Restore the default text"
             i18n-matTooltip="@@Locale_revert_one"
             aria-label="Revert"
             i18n-aria-label="@@Revert"
@@ -109,7 +109,7 @@
       </div>
       @if (s.overridden && s.embedded) {
         <div class="shipped text-muted">
-          <span i18n="@@Locale_shipped">ships as</span> {{ s.embedded }}
+          <span i18n="@@Locale_shipped">Default:</span> {{ s.embedded }}
         </div>
       }
       }

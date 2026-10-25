@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -32,7 +31,6 @@ interface FeatureRow {
 @Component({
   selector: 'app-license-page',
   imports: [
-    DatePipe,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -71,7 +69,7 @@ interface FeatureRow {
                 <p class="hint">{{ e.notice }}</p>
               } @else {
                 <p class="hint" i18n="@@License_perpetual_hint">
-                  A license is perpetual: its term only covers updates, nothing gets switched off.
+                  A license never expires. Its date only limits the updates you can install.
                 </p>
               }
               @if (e.license; as l) {
@@ -84,9 +82,9 @@ interface FeatureRow {
                   }
                   <dt i18n="@@Updates_until">Updates until</dt>
                   <dd>
-                    {{ l.updatesUntil | date: 'longDate' }}
+                    <span class="nowrap">{{ l.updatesUntil }}</span>
                     @if (l.covered === false) {
-                      <span class="late" i18n="@@Build_not_covered">this build was released after it</span>
+                      <span class="late" i18n="@@Build_not_covered">this version was released after that date</span>
                     }
                   </dd>
                 </dl>
@@ -118,10 +116,10 @@ interface FeatureRow {
               <mat-icon>visibility_off</mat-icon>
               <div class="grow">
                 <div class="title" i18n="@@Organisations_held_back">
-                  {{ hidden() }} organisations are not being served
+                  {{ hidden() }} tenants are not served
                 </div>
                 <p class="hint" i18n="@@Organisations_held_back_hint">
-                  Single-organisation mode serves only the first. Nothing is deleted.
+                  Single-tenant mode serves only the first. Nothing is deleted.
                 </p>
               </div>
             </div>
@@ -135,7 +133,7 @@ interface FeatureRow {
           <div class="features-head">
             <h3>
               @if (e.enterprise) {
-                <ng-container i18n="@@EE_features_bought">What the Enterprise edition carries</ng-container>
+                <ng-container i18n="@@EE_features_bought">Included in the Enterprise edition</ng-container>
               } @else {
                 <ng-container i18n="@@EE_features_offer">What the Enterprise edition adds</ng-container>
               }
@@ -157,7 +155,7 @@ interface FeatureRow {
                     @if (f.where) {
                       <a [routerLink]="f.where">{{ f.whereLabel }}</a>
                     } @else if (f.status !== 'planned') {
-                      <span class="noscreen" i18n="@@Feature_no_screen">No screen: it is in the image.</span>
+                      <span class="noscreen" i18n="@@Feature_no_screen">Built in, nothing to set.</span>
                     }
                   </div>
                 </div>
@@ -335,7 +333,7 @@ export class LicensePageComponent {
   private readonly dialog = inject(MatDialog);
   protected readonly me = inject(MeService);
 
-  protected readonly fromFile = $localize`:@@License_from_file:Set by the deployment (MEERKAT_LICENSE_FILE): change it where it is mounted.`;
+  protected readonly fromFile = $localize`:@@License_from_file:Set by the deployment (MEERKAT_LICENSE_FILE). Change it there.`;
 
   protected readonly loading = signal(true);
   protected readonly edition = signal<Edition | null>(null);

@@ -149,7 +149,7 @@ export class InjectionsComponent implements FormValueControl<Injection[]> {
     { value: 'body-end', label: $localize`:@@Injection_body_end:End of the body` },
   ];
   protected readonly loads: { value: InjectionLoad; label: string; fileOnly: boolean }[] = [
-    { value: '', label: $localize`:@@Injection_load_classic:Where it stands`, fileOnly: false },
+    { value: '', label: $localize`:@@Injection_load_classic:In place`, fileOnly: false },
     { value: 'defer', label: $localize`:@@Injection_load_defer:Deferred`, fileOnly: true },
     { value: 'async', label: $localize`:@@Injection_load_async:Async`, fileOnly: true },
     { value: 'module', label: $localize`:@@Injection_load_module:Module`, fileOnly: false },

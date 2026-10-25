@@ -159,10 +159,10 @@ export class RoutesTableComponent {
     }
   }
 
-  protected readonly uiTip = $localize`:@@Serves_pages_in_a_browser:UI: serves pages in a browser`;
-  protected readonly notUiTip = $localize`:@@Not_a_UI_route:Not a UI route: serves an API`;
-  protected readonly tracedTip = $localize`:@@Route_is_traced:Traced: pushed to OpenTelemetry`;
-  protected readonly notTracedTip = $localize`:@@Route_not_traced:Not traced`;
+  protected readonly uiTip = $localize`:@@Serves_pages_in_a_browser:UI route: serves pages to a browser`;
+  protected readonly notUiTip = $localize`:@@Not_a_UI_route:Service route`;
+  protected readonly tracedTip = $localize`:@@Route_is_traced:Sent to OpenTelemetry`;
+  protected readonly notTracedTip = $localize`:@@Route_not_traced:Not sent to OpenTelemetry`;
 
   // Whether the route produces traces: the export is on and the route is not
   // left out.

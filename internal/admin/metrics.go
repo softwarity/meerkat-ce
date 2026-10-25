@@ -57,7 +57,7 @@ func (a *API) registerMetrics(mux Mux) {
 		if !ok {
 			writeErr(w, http.StatusForbidden,
 				"the live channel answers an administrator: root, the gateway-admin or app-admin capability, "+
-					"or the administration of an organisation")
+					"or the administration of a tenant")
 			return
 		}
 		a.Live(p, w, r)

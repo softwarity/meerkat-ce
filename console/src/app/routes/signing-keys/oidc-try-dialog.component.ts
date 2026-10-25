@@ -76,9 +76,9 @@ import { SnippetComponent } from '../../shared/snippet.component';
           </mat-select>
         </mat-form-field>
         <mat-form-field>
-          <mat-label i18n="@@Organisation">Organisation</mat-label>
+          <mat-label i18n="@@Organisation">Tenant</mat-label>
           <mat-select [value]="tenant()" (selectionChange)="tenant.set($event.value)">
-            <mat-option value="" i18n="@@Oidc_try_only_membership">Their only one</mat-option>
+            <mat-option value="" i18n="@@Oidc_try_only_membership">Their only tenant</mat-option>
             @for (t of tenants(); track t.id) {
               <mat-option [value]="t.id">{{ t.name }}</mat-option>
             }
@@ -97,7 +97,7 @@ import { SnippetComponent } from '../../shared/snippet.component';
         } @else {
           <p class="verdict refused">
             <mat-icon>block</mat-icon>
-            <span i18n="@@Oidc_try_refused">No route bound to this client lets this person in: the gateway refuses the sign-in.</span>
+            <span i18n="@@Oidc_try_refused">No route using this client lets this person in: the sign-in is refused.</span>
           </p>
         }
         @if (t.refused.length) {

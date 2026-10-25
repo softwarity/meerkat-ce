@@ -120,9 +120,13 @@ func TestTheChannelEchoOnlyReachesItsOwnPages(t *testing.T) {
 	_, bobR := dialEvents(t, srv.URL, bobCookie)
 	waitFor(t, h.Events(), 2)
 
-	// A non-dev is refused: same gate as the rest of the developer surface.
-	if rec := postJSON(t, mux, "/meerkat/events/echo", `{"type":"probe"}`, bobCookie); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("a non-dev reached the echo: %d", rec.Code)
+	// A non-dev is refused: same gate as the rest of the developer surface,
+	// and the same split - 401 says "sign in", 403 "you are, without the right".
+	if rec := postJSON(t, mux, "/meerkat/events/echo", `{"type":"probe"}`, nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("an anonymous caller reached the echo: %d, want 401", rec.Code)
+	}
+	if rec := postJSON(t, mux, "/meerkat/events/echo", `{"type":"probe"}`, bobCookie); rec.Code != http.StatusForbidden {
+		t.Fatalf("a non-dev reached the echo: %d, want 403", rec.Code)
 	}
 	// A message needs a type - it is what the page switches on.
 	if rec := postJSON(t, mux, "/meerkat/events/echo", `{"data":{"a":1}}`, devCookie); rec.Code != http.StatusUnprocessableEntity {

@@ -1,0 +1,242 @@
+// A fixed header and tab bar, the tab's content scrolling under them, and
+// the Send under both tabs.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+header,
+footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+}
+header {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+footer {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  padding: 10px 20px;
+}
+header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+// The tenant it goes to, drawn as the console draws a tenant: its icon and
+// its name, in a tag.
+.tenant {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px 1px 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font-size: 0.8rem;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
+.grow {
+  flex: 1;
+}
+
+nav {
+  flex: none;
+  padding: 0 8px;
+}
+mat-tab-nav-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.form {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+// Each part keeps its height and the column scrolls: the panel, which hides
+// its overflow, would otherwise be squeezed under its neighbours.
+.form > * {
+  flex: none;
+}
+// The fields stacked as in the other drawers: each one's own line under it
+// is the space to the next.
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+section h3 {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+}
+section > button,
+.meta > button {
+  align-self: flex-start;
+}
+mat-form-field,
+app-form-field {
+  width: 100%;
+}
+
+.kind {
+  align-self: flex-start;
+  margin-bottom: 12px;
+}
+section p {
+  margin: 0 0 8px;
+}
+
+// Roles and members, side by side.
+.pair {
+  display: flex;
+  gap: 12px;
+}
+.pair > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+// An action: its label and what it leads to, framed as one.
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 14px 14px 0;
+  margin-bottom: 8px;
+}
+// The label, what it leads to and its removal on the centre line of the
+// field's 56px box, above the line kept for its hint: the 42px toggles and
+// the 40px button pushed down by half the difference.
+.action-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.action-head .kind {
+  margin: 7px 0 0;
+}
+.action-head > button {
+  margin: 8px 0 0;
+}
+// An action's method, then where it goes: the method wide enough for DELETE
+// and the select's arrow, no wider, the route or address taking the rest.
+.request {
+  display: flex;
+  gap: 8px;
+}
+.request > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.request > .method {
+  flex: none;
+  width: 116px;
+}
+// A hint under the route: the 12px the drawer leaves between a hint and the
+// next field (as under More), so the hint never touches the Path label.
+.path {
+  margin-top: 12px;
+}
+// The body it sends, under where it goes.
+.action .body {
+  margin-bottom: 8px;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.meta .label {
+  margin-bottom: 12px;
+  color: var(--mat-sys-on-surface-variant);
+}
+.meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mail {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+// The route's service, quiet beside its name.
+.service {
+  margin-left: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-inline-end: 10px;
+  vertical-align: middle;
+  background: var(--mat-sys-primary);
+
+  &.success {
+    background: var(--mat-sys-tertiary);
+  }
+  &.warning {
+    background: var(--mat-sys-secondary);
+  }
+  &.error {
+    background: var(--mat-sys-error);
+  }
+}
+
+.problem {
+  color: var(--mat-sys-error);
+  font-size: 0.85rem;
+}
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+
+// The message as a service sends it, read-only.
+.payload {
+  padding: 18px 20px;
+}
+.where {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+.where code {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  word-break: break-all;
+}
+
+// The acknowledgement: what the chosen mode does, on one line, and the
+// service it calls.
+section .ack-hint {
+  margin: -4px 0 12px;
+}
+section > .label {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+}

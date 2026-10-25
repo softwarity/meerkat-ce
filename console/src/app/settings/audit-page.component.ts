@@ -14,6 +14,7 @@ import { ApiService, AuditChange, AuditEvent, AuditKind, AuditQuery } from '../a
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { MeService } from '../me.service';
 import { LiveChangesService } from '../shared/live-changes.service';
+import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 
 // The audit trail (phase 2): who changed what, with the exact field-level diff.
 // Its own transverse section (not under Application). Read-only and scoped
@@ -33,6 +34,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
     MatTooltipModule,
     LoadingIndicatorComponent,
     EeLockComponent,
+    ZonedDatePipe,
   ],
   styleUrl: './audit-page.component.scss',
   templateUrl: './audit-page.component.html',
@@ -45,7 +47,7 @@ export class AuditPageComponent {
   // follows the half that is shown: offering "route" on the security half is
   // offering a filter that can only answer nothing.
   private readonly adminTargets = [
-    'route', 'authprovider', 'certificate', 'theme', 'locale', 'user', 'role', 'schedule', 'settings',
+    'route', 'authprovider', 'certificate', 'theme', 'locale', 'user', 'role', 'schedule', 'notification', 'settings',
     'issue', 'tenant', 'membership', 'group', 'grouprule', 'vault', 'token', 'configuration', 'config', 'backup',
   ];
   // The target filter is for the changes only: the two sign-in views ARE a
@@ -210,12 +212,9 @@ export class AuditPageComponent {
     }
   }
 
+  // The moment is written out on the line; how long ago, on hover.
   protected relWhen(at: number): string {
     return DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toRelative() ?? '';
-  }
-
-  protected fullWhen(at: number): string {
-    return DateTime.fromSeconds(at).reconfigure({ locale: this.locale }).toLocaleString(DateTime.DATETIME_MED);
   }
 
   // A change value as a short readable string: empty/absent shows a placeholder,

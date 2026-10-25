@@ -107,6 +107,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+// A date or a time never breaks over two lines: `2026-10-25T10:41` read as
+// two halves is two values.
+.nowrap { white-space: nowrap; }
 
 // --- Colors (bound to M3 system tokens) ---
 .text-primary       { color: var(--mat-sys-primary); }

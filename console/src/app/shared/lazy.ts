@@ -21,7 +21,7 @@ export class Lazy {
     } catch {
       this.snack
         .open(
-          $localize`:@@Console_updated:The console has been updated since this page was opened`,
+          $localize`:@@Console_updated:A new version of the console is available`,
           $localize`:@@Reload:Reload`,
           { duration: 15000 },
         )

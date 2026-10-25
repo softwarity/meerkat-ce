@@ -33,6 +33,7 @@ never sit in a shared cache.
 | `/account-pending` | the waiting room: an account that exists and has been granted nothing yet |
 | `/refused` | signed in, and turned away. It names the rule that refused and offers what this session *can* open |
 | `/profile/...` | the person's own pages: identity, password, second factor, passkeys, authorities, sign-in history, active sessions, API tokens, leaving an organisation |
+| `/meerkat/notifications` | the person's notifications, from all their tenants. Enterprise: see [Notifying your users](/docs/operations/notifications) |
 
 The unavailability page has no path of its own: it answers **any** path with
 `503` while maintenance is on, names the reason from a closed list, and gives an
@@ -41,6 +42,41 @@ administrator a way through.
 The console's sign-in page is the same machinery on the admin port, with one
 difference: it is always English and always dark. The console is Meerkat's own
 door and does not take the integrator's settings.
+
+## The profile
+
+`/profile` is the person's own page, the same on the applications' side and on
+the console's. Two things on it reach beyond the page itself.
+
+**The way back to the applications.** The profile offers one control to go back
+to work, the first of these that applies:
+
+1. **Back**, to the page the person came from, while it is still open to them in
+   the tenant they are working in;
+2. in Portal mode, a button under the application's name, leading to the first
+   module they may open;
+3. in Links mode, a one-line list of the [catalogue](/docs/customise/portal),
+   its containers as groups;
+4. in None mode, a list of the UI routes they may open.
+
+A list of one is a plain button with that one's name, and a route on another
+host is offered at its full address. When nothing is open to them, an
+**Applications** button leads to the page that says no application is open to
+their account yet.
+
+**The time zone.** Chosen once, it is used wherever the person reads a time:
+the gateway's pages, the console for an administrator, and the applications
+that ask for it.
+
+- With no choice, the first option, **My browser's zone**, every screen follows
+  the browser. **UTC** is offered like any other zone.
+- Every date and time is written one way, ISO on one line: `2026-10-25T17:41`,
+  followed by `Z` in UTC, and `2026-10-25` for a day alone.
+- An application is given the zone the person chose. With no choice, it is
+  given no `timezone` at all, and uses the browser's.
+
+An account that was on UTC only because nobody had chosen follows the browser
+since this choice exists; whoever wants UTC picks it again.
 
 ## Colours
 
