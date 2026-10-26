@@ -4,6 +4,10 @@
 
 ---
 
+## 1.19.0
+
+---
+
 ## 1.18.0
 
 - **Tenants carry their own fields (Enterprise, several tenants).** Infra > Model now has a
