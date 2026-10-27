@@ -144,7 +144,10 @@ l'adresse publique.
 `billing` est l'hôte de l'upstream de la route, ou son premier segment :
 `billing.svc.acme.internal` se trouve par `billing`. Derrière une route qui
 répond à `/billing/**` et retire son premier segment, le lecteur reçoit
-`/billing/invoices/INV-2026-0142`.
+`/billing/invoices/INV-2026-0142`. Derrière une route qui garde son chemin, le
+service voit lui-même `/billing/invoices/...` ; un chemin donné depuis
+l'intérieur de l'application, `/invoices/INV-2026-0142`, est placé sous l'entrée
+de la route de la même façon.
 
 Un lien est refusé, avec la raison, quand aucune route active ne sert ce
 service, quand plusieurs le servent (la gateway n'en choisit jamais une au

@@ -25,14 +25,12 @@ func Record(ctx context.Context, st *store.Store, actorID, label string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	stripped, err := WithoutImages(doc)
+	file, err := Text(doc)
 	if err != nil {
 		return false, err
 	}
-	file, err := Marshal(stripped)
-	if err != nil {
-		return false, err
-	}
+	// The same digest Fingerprint answers: a point and a saved configuration
+	// are compared by it (the tape's "saved as").
 	digest := store.DigestOf(string(file))
 	switch last, err := st.LastConfigPoint(ctx); {
 	case err == nil && last.Digest == digest:

@@ -351,7 +351,9 @@ func (a *API) toolSaveConfiguration(ctx context.Context, args json.RawMessage) (
 	if taken {
 		return nil, fmt.Errorf("a configuration called %s already exists: pick another name, or pass replace: true to refresh it from the running state", name)
 	}
-	file, err := a.liveDocumentText(ctx)
+	// The same capture as the console's, pictures in: a copy saved here
+	// without its logo would push to git without one.
+	_, file, err := a.runningDocument(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -373,15 +375,18 @@ func (a *API) toolSaveConfiguration(ctx context.Context, args json.RawMessage) (
 }
 
 func (a *API) toolListConfigurations(ctx context.Context, _ json.RawMessage) (any, error) {
-	list, err := a.st.ListConfigurations(ctx)
+	running, _, err := a.runningDocument(ctx)
 	if err != nil {
 		return nil, err
 	}
-	running, err := a.liveDocumentText(ctx)
+	// The console's current card asks the same question with the same
+	// function: comparing this listing's fingerprint (pictures out) with a
+	// capture's (pictures in) answered false straight after every capture on
+	// a gateway that wears a logo.
+	matching, list, err := a.matchesRunning(ctx, running)
 	if err != nil {
 		return nil, err
 	}
-	digest := store.DigestOf(running)
 	type line struct {
 		Name        string `json:"name"`
 		Description string `json:"description,omitempty"`
@@ -395,7 +400,7 @@ func (a *API) toolListConfigurations(ctx context.Context, _ json.RawMessage) (an
 	for _, c := range list {
 		out = append(out, line{
 			Name: c.Name, Description: c.Description, Active: c.Active,
-			MatchesRunning: c.Digest == digest,
+			MatchesRunning: matching[c.ID],
 		})
 	}
 	return map[string]any{"configurations": out}, nil

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/softwarity/meerkat/internal/idp"
 	"github.com/softwarity/meerkat/internal/routing"
@@ -65,7 +67,6 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 	// The revision is this installation's bookkeeping - which write each row is
 	// on - and it means nothing in a document that travels. Carried, it would
 	// also turn every import into a STALE write against rows that do not exist
@@ -83,7 +84,6 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.Slice(tenants, func(i, j int) bool { return tenants[i].ID < tenants[j].ID })
 	for i := range tenants {
 		tenants[i].Rev = 0
 	}
@@ -93,7 +93,6 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		if err != nil {
 			return nil, nil, err
 		}
-		sort.Slice(groups, func(i, j int) bool { return groups[i].ID < groups[j].ID })
 		for i := range groups {
 			groups[i].Rev = 0
 		}
@@ -104,12 +103,6 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.SliceStable(providers, func(i, j int) bool {
-		if providers[i].Order != providers[j].Order {
-			return providers[i].Order < providers[j].Order
-		}
-		return providers[i].ID < providers[j].ID
-	})
 	for i := range providers {
 		providers[i].Rev = 0
 	}
@@ -165,7 +158,129 @@ func Export(ctx context.Context, st *store.Store) (*Document, []Literal, error) 
 		doc.Settings = nil
 	}
 
+	order(doc)
 	return doc, stripSecrets(doc), nil
+}
+
+// order puts every list whose order means nothing in one order, the same for
+// an export and for a comparison. Routes keep theirs, which is significant
+// (first match wins); the rest is sorted by what identifies it, which is
+// arbitrary but stable.
+//
+// A group's roles are a SET, read from the database in whatever order it
+// hands them - no ORDER BY, so two gateways, or two engines, wrote the same
+// group two ways, and a file edited by hand a third. Sorted here, the export
+// is the same bytes for the same state, and a role list somebody reordered by
+// hand is not a change.
+func order(doc *Document) {
+	sort.Slice(doc.Roles, func(i, j int) bool { return doc.Roles[i].Name < doc.Roles[j].Name })
+	sort.Slice(doc.Tenants, func(i, j int) bool { return doc.Tenants[i].ID < doc.Tenants[j].ID })
+	// By organisation, then by id: the groups of one organisation together,
+	// as they were listed tenant by tenant.
+	sort.Slice(doc.Groups, func(i, j int) bool {
+		a, b := doc.Groups[i], doc.Groups[j]
+		if a.TenantID != b.TenantID {
+			return a.TenantID < b.TenantID
+		}
+		return a.ID < b.ID
+	})
+	for i := range doc.Groups {
+		sort.Strings(doc.Groups[i].Roles)
+	}
+	sort.SliceStable(doc.AuthProviders, func(i, j int) bool {
+		a, b := doc.AuthProviders[i], doc.AuthProviders[j]
+		if a.Order != b.Order {
+			return a.Order < b.Order
+		}
+		return a.ID < b.ID
+	})
+	sort.Slice(doc.OIDCClients, func(i, j int) bool { return doc.OIDCClients[i].ID < doc.OIDCClients[j].ID })
+}
+
+// exportedRoute is a route as a document writes it: a COPY, trimmed the way
+// Export trims. Every comparison of a route goes through it, on both sides.
+//
+// The export drops what the store materialised (see trimRoute), and the
+// console saves a route with everything its form holds - a user button that is
+// off still has its height, a roles block that is off still has its tag. So
+// the row behind a route and the document it was exported to differ by exactly
+// what the trim took out, and comparing one raw against the other reported
+// such a route as "update" on every plan: a capture pushed to git and pulled
+// back named nine routes that had not moved. Trimming both sides with the SAME
+// function is what keeps it true for a field added tomorrow: whatever the
+// export learns to leave out, the comparison stops seeing.
+//
+// A copy, never the caller's route: the trim rewrites the ui and identity
+// blocks in place, and the route an import is about to SAVE must keep what
+// its document said.
+func exportedRoute(r store.Route) store.Route {
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return r
+	}
+	var out store.Route
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return r
+	}
+	// What the store does to a route on its way in, so that a document
+	// written by hand compares as the row it would become. A rule it would
+	// refuse is left as written: the save says so, not the comparison.
+	_ = store.SanitizeAccess(&out.Access)
+	_ = store.SanitizeRateLimits(out.Limits)
+	trimRoute(&out)
+	return out
+}
+
+// exported is doc with every object the way an export writes it - what a
+// comparison of two documents, or of a document and what runs, must look at.
+// A copy: only the lists it rewrites are new.
+func exported(doc *Document) *Document {
+	if doc == nil {
+		return nil
+	}
+	out := *doc
+	if doc.Routes != nil {
+		out.Routes = make([]store.Route, len(doc.Routes))
+		for i, r := range doc.Routes {
+			out.Routes[i] = exportedRoute(r)
+		}
+	}
+	if doc.Groups != nil {
+		out.Groups = make([]store.Group, len(doc.Groups))
+		for i, g := range doc.Groups {
+			out.Groups[i] = exportedGroup(g)
+		}
+	}
+	if doc.Tenants != nil {
+		out.Tenants = make([]store.Tenant, len(doc.Tenants))
+		for i, t := range doc.Tenants {
+			out.Tenants[i] = exportedTenant(t)
+		}
+	}
+	out.Roles = slices.Clone(doc.Roles)
+	out.AuthProviders = slices.Clone(doc.AuthProviders)
+	out.OIDCClients = slices.Clone(doc.OIDCClients)
+	order(&out)
+	return &out
+}
+
+// exportedGroup is a group as the store keeps it once saved: its window
+// sanitised (a group that never mentioned hours inherits them - the store
+// writes inherited true for it), its roles in order. A copy.
+func exportedGroup(g store.Group) store.Group {
+	g.Name = strings.TrimSpace(g.Name)
+	g.Roles = slices.Clone(g.Roles)
+	sort.Strings(g.Roles)
+	g.BusinessAccess.Days = slices.Clone(g.BusinessAccess.Days)
+	store.SanitizeBusinessAccess(&g.BusinessAccess)
+	return g
+}
+
+// exportedTenant is a tenant as the store keeps it once saved. A copy.
+func exportedTenant(t store.Tenant) store.Tenant {
+	t.BusinessAccess.Days = slices.Clone(t.BusinessAccess.Days)
+	store.SanitizeBusinessAccess(&t.BusinessAccess)
+	return t
 }
 
 // trimRoute drops what a route says only because the store materialised it.
@@ -199,7 +314,11 @@ func trimRoute(r *store.Route) {
 			}
 		}
 	}
-	if r.API != nil && r.Spec().Empty() && r.API.Security == nil && len(r.API.Audit) == 0 {
+	// The role map counts: a route may map its declared roles without a spec
+	// of its own, and an export that dropped the block lost them - which the
+	// comparison, trimming both sides the same way, would then not even see.
+	if r.API != nil && r.Spec().Empty() && r.API.Security == nil && len(r.API.Audit) == 0 &&
+		len(r.API.RoleMap) == 0 {
 		r.API = nil
 	}
 }

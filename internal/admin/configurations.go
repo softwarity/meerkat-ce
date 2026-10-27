@@ -119,12 +119,18 @@ type configurationRef struct {
 }
 
 func (a *API) currentConfiguration(w http.ResponseWriter, r *http.Request, _ store.User) {
-	file, ok := a.liveDocument(w, r)
-	if !ok {
+	running, _, err := a.runningDocument(r.Context())
+	if err != nil {
+		a.internal(w, err)
 		return
 	}
-	out := currentState{Digest: store.DigestOf(file)}
-	list, err := a.st.ListConfigurations(r.Context())
+	digest, err := config.Fingerprint(running)
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	out := currentState{Digest: digest}
+	matching, list, err := a.matchesRunning(r.Context(), running)
 	if err != nil {
 		a.internal(w, err)
 		return
@@ -138,7 +144,7 @@ func (a *API) currentConfiguration(w http.ResponseWriter, r *http.Request, _ sto
 		// one the screen is about. Any other match still counts as saved -
 		// what matters to an operator is whether this state exists somewhere,
 		// not which row the mark happens to sit on.
-		if c.Digest == out.Digest && (out.SavedAs == nil || c.Active) {
+		if matching[c.ID] && (out.SavedAs == nil || c.Active) {
 			out.SavedAs = ref
 		}
 	}
@@ -229,15 +235,10 @@ func (a *API) recaptureConfiguration(w http.ResponseWriter, r *http.Request, act
 // recapture refreshes a saved configuration from the running gateway and
 // names it the current one. Shared by the endpoint and the agent's tool.
 func (a *API) recapture(ctx context.Context, actor store.User, c store.Configuration) (store.Configuration, error) {
-	doc, _, err := config.Export(ctx, a.st)
+	_, file, err := a.runningDocument(ctx)
 	if err != nil {
 		return c, err
 	}
-	raw, err := config.Marshal(doc)
-	if err != nil {
-		return c, err
-	}
-	file := string(raw)
 	if file == c.Document && c.Active {
 		// Nothing to save AND already the current one: answering the row as it
 		// stands beats a write that pretends something happened. (A document
@@ -622,17 +623,83 @@ func (a *API) configuration(w http.ResponseWriter, r *http.Request) (store.Confi
 // liveDocument renders what the gateway is running as a portable file - the
 // same bytes the export hands over, secrets left behind as $names.
 func (a *API) liveDocument(w http.ResponseWriter, r *http.Request) (string, bool) {
-	doc, _, err := config.Export(r.Context(), a.st)
+	_, file, err := a.runningDocument(r.Context())
 	if err != nil {
 		a.internal(w, err)
 		return "", false
+	}
+	return file, true
+}
+
+// runningDocument is what the gateway runs now, pictures in: what a capture
+// saves, whoever asks for it - the console's Save and Capture, the agent's
+// save_configuration. One rendering, so that every saved copy of the same
+// state is the same file.
+func (a *API) runningDocument(ctx context.Context) (*config.Document, string, error) {
+	doc, _, err := config.Export(ctx, a.st)
+	if err != nil {
+		return nil, "", err
 	}
 	file, err := config.Marshal(doc)
 	if err != nil {
-		a.internal(w, err)
-		return "", false
+		return nil, "", err
 	}
-	return string(file), true
+	return doc, string(file), nil
+}
+
+// savedDocument is a saved configuration's row with its document read; doc is
+// nil when the document no longer reads, and such a one matches nothing.
+type savedDocument struct {
+	store.Configuration
+	doc *config.Document
+}
+
+// savedDocuments reads every saved configuration WITH its document. Whether
+// one is what runs is a comparison of documents (config.Matches), which the
+// row's digest cannot answer: it fingerprints the file as it was saved,
+// pictures in or out depending on the door it came through.
+func (a *API) savedDocuments(ctx context.Context) ([]savedDocument, error) {
+	list, err := a.st.ListConfigurations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]savedDocument, 0, len(list))
+	for _, row := range list {
+		c, err := a.st.GetConfiguration(ctx, row.ID)
+		if errors.Is(err, store.ErrConfigurationNotFound) {
+			continue // deleted between the two reads
+		}
+		if err != nil {
+			return nil, err
+		}
+		doc, err := config.Unmarshal([]byte(c.Document))
+		if err != nil {
+			doc = nil
+		}
+		out = append(out, savedDocument{Configuration: row, doc: doc})
+	}
+	return out, nil
+}
+
+// matchesRunning says which saved configurations ARE what runs: one answer
+// for the console's current card, the agent's list and the tape's "saved as".
+func (a *API) matchesRunning(ctx context.Context, running *config.Document) (map[string]bool, []savedDocument, error) {
+	saved, err := a.savedDocuments(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	out := map[string]bool{}
+	for _, c := range saved {
+		if c.doc == nil {
+			continue
+		}
+		same, err := config.Matches(c.doc, running)
+		if err != nil {
+			return nil, nil, err
+		}
+		out[c.ID] = same
+	}
+	return out, saved, nil
 }
 
 // freeName validates the name and refuses a collision with a sentence. Two

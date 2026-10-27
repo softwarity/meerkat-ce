@@ -137,7 +137,9 @@ its rewrites, and gives the reader the public address.
 `billing` is the host of the route's upstream, or its first label:
 `billing.svc.acme.internal` is found by `billing`. Behind a route that matches
 `/billing/**` and strips its first segment, the reader gets
-`/billing/invoices/INV-2026-0142`.
+`/billing/invoices/INV-2026-0142`. Behind one that keeps its path, the service
+sees `/billing/invoices/...` itself; a path given from inside the application,
+`/invoices/INV-2026-0142`, is placed under the route's entry all the same.
 
 A link is refused, with the reason, when no enabled route serves that service,
 when several do (the gateway never picks one at random), or when the route

@@ -40,13 +40,16 @@ var sectionKind = map[string]string{
 }
 
 // sections is the document as JSON, section by section, with the version left
-// out: it says which format the file is in, not what it configures.
+// out: it says which format the file is in, not what it configures. Each
+// object is read the way an export writes it, as the plan reads it: a file
+// edited by hand that spells out a default must not compare differently here
+// and there (see exportedRoute).
 func sections(doc *Document) map[string]json.RawMessage {
 	out := map[string]json.RawMessage{}
 	if doc == nil {
 		return out
 	}
-	raw, err := json.Marshal(doc)
+	raw, err := json.Marshal(exported(doc))
 	if err != nil {
 		return out
 	}

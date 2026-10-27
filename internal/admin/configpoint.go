@@ -98,14 +98,23 @@ func (a *API) listConfigPoints(w http.ResponseWriter, r *http.Request, _ store.U
 		a.internal(w, err)
 		return
 	}
-	saved, err := a.st.ListConfigurations(r.Context())
+	saved, err := a.savedDocuments(r.Context())
 	if err != nil {
 		a.internal(w, err)
 		return
 	}
+	// A point is keyed by its fingerprint, pictures out; a saved
+	// configuration's own digest is of its file, pictures in when it has
+	// any - so the two never met on a gateway with a logo. Each saved one is
+	// fingerprinted the way a point is.
 	byDigest := map[string]string{}
 	for _, c := range saved {
-		byDigest[c.Digest] = c.Name
+		if c.doc == nil {
+			continue
+		}
+		if digest, err := config.Fingerprint(c.doc); err == nil {
+			byDigest[digest] = c.Name
+		}
 	}
 	live := ""
 	if file, err := a.liveDocumentText(r.Context()); err == nil {
@@ -253,11 +262,7 @@ func (a *API) liveDocumentText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stripped, err := config.WithoutImages(doc)
-	if err != nil {
-		return "", err
-	}
-	file, err := config.Marshal(stripped)
+	file, err := config.Text(doc)
 	if err != nil {
 		return "", err
 	}

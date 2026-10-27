@@ -467,7 +467,7 @@ func importTenants(ctx context.Context, st *store.Store, doc *Document, plan *Pl
 				t.OwnerID, t.CreatedBy = fallback, fallback
 			}
 		}
-		action := decide(had, before, t)
+		action := decide(had, exportedTenant(before), exportedTenant(t))
 		plan.Changes = append(plan.Changes, Change{
 			Kind: "tenant", ID: t.ID, Label: t.Name, Action: action,
 		})
@@ -531,7 +531,9 @@ func importGroups(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 		for _, g := range groups {
 			seen[g.ID] = true
 			before, had := known[g.ID]
-			action := decide(had, before, g)
+			// As the store keeps it, on both sides: a group written without
+			// hours is saved as inheriting them (see exportedGroup).
+			action := decide(had, exportedGroup(before), exportedGroup(g))
 			plan.Changes = append(plan.Changes, Change{
 				Kind: "group", ID: g.ID, Label: g.Name, Action: action,
 			})
@@ -587,7 +589,10 @@ func importRoutes(ctx context.Context, st *store.Store, doc *Document, plan *Pla
 	for _, r := range doc.Routes {
 		seen[r.ID] = true
 		before, had := known[r.ID]
-		action := decide(had, before, r)
+		// Both sides as an export writes them: the stored row carries what
+		// the console's form materialised, the document only what the
+		// export kept (see exportedRoute).
+		action := decide(had, exportedRoute(before), exportedRoute(r))
 		plan.Changes = append(plan.Changes, Change{
 			Kind: "route", ID: r.ID, Label: r.Name, Action: action,
 		})
