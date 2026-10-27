@@ -10,13 +10,13 @@
     "icons:build": "node scripts/build-icon-bank.mjs"
   },
   "dependencies": {
-    "@angular/cdk": "^22.2.3",
+    "@angular/cdk": "^22.2.4",
     "@angular/common": "^22.2.3",
     "@angular/compiler": "^22.2.3",
     "@angular/core": "^22.2.3",
     "@angular/forms": "^22.2.3",
     "@angular/localize": "^22.2.3",
-    "@angular/material": "^22.2.3",
+    "@angular/material": "^22.2.4",
     "@angular/platform-browser": "^22.2.3",
     "@angular/router": "^22.2.3",
     "@catppuccin/codemirror": "^1.0.3",
@@ -41,8 +41,8 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
-    "@angular/build": "^22.2.3",
-    "@angular/cli": "^22.2.3",
+    "@angular/build": "^22.2.4",
+    "@angular/cli": "^22.2.4",
     "@angular/compiler-cli": "^22.2.3",
     "@material-symbols/svg-400": "^0.48.0",
     "@types/luxon": "^3.7.6",
