@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.20.0
+
 - **A configuration pulled back from git no longer shows every route as changed.** The
   activation plan, the pull plan and Compare now read both sides the way an export writes them
   and the gateway keeps them: a route saved from the console, captured and read back, shows no
