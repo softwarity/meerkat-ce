@@ -2,6 +2,59 @@
 
 ## NEXT RELEASE
 
+- **A configuration pulled back from git no longer shows every route as changed.** The
+  activation plan, the pull plan and Compare now read both sides the way an export writes them
+  and the gateway keeps them: a route saved from the console, captured and read back, shows no
+  line to update. "Matches what runs" has one answer for the console, the agent and the restore
+  points, so it is true right after a save, logo included.
+- **A notification's link opens the screen it names.** Behind a route that keeps its path, a
+  path given from inside the application (`/en/registry`) is placed under the route's entry, so
+  Open lands on the screen instead of the gateway's root.
+- **A notification has one id, the sender's, and it is required.** Every message carries
+  `"id"`, a UUID of the service's choice: it lets the service retry without duplicates, replace or
+  withdraw the notification, and follow its acknowledgements and mails. A message without one is
+  refused; a service that will never come back to a notification sends a fresh UUID and does not
+  keep it. The gateway never makes an id up. The id belongs to the service as the internal plane
+  recognises it (a token's name, a ServiceAccount, the workload behind the address), so two
+  services may use the same one; the source is kept on every notification and shown in the
+  console. Published again under the same id before it expires, even after it was withdrawn or
+  replaced, the answer is the notification already there, with `"existing": true`: nothing is
+  created and nobody is told twice. Sent to every tenant, the id names the whole send. Actions are
+  called with `notification=<id>` and `onAck` receives the same id. The `key` field is gone.
+- **Replace and withdraw by id.** A message carrying `"replaces": "<id>"` ends the earlier one:
+  its readers no longer see it, the replacement stands in its place. `DELETE
+  /api/notifications/{id}` withdraws one, every copy of a message sent to every tenant with it,
+  and answers `{"withdrawn": [...]}` (or `"already"` when it had ended). A withdrawn
+  notification stays in the reader's list as a row saying it was withdrawn, with nothing of
+  what it said, out of the count. In both cases the mails not sent yet are cancelled, and the
+  console keeps both with their state.
+- **Calls that arrive out of order are handled.** A withdrawal or a replacement naming an id not
+  received yet is kept (a withdrawal answers `202`, for 30 days or what `?expires=` says, 90 at
+  most): when that id arrives, the notification is stored already ended, and nobody is told or
+  mailed.
+- **Exercises say so.** `"exercise": true` keeps a realistic level and the same audience, and
+  labels the notification EXERCISE, in the reader's language, on the list, the snackbar, the
+  desktop notification, the mail's subject and first lines, and the console. The New
+  notification drawer has the switch.
+- **Notification mails survive a restart.** Each reader's mail is queued in the database and
+  sent one at a time by one node: a gateway stopped halfway sends the rest when it, or another
+  node, runs again. A temporary refusal is tried again for 24 hours, a permanent one fails with
+  the relay's code, and a connection lost after the message was sent is marked unknown and never
+  sent twice. Every attempt carries the same Message-ID. A service reads the outcomes in its list
+  (`mails`: accepted by the relay, failed, unknown, cancelled, no address), and the console shows
+  each reader's mail.
+- **Someone who joins later still receives what is live.** A notification keeps the audience its
+  sender named. When someone joins the tenant, or is granted a role there (through a group of
+  roles), the live notifications that now target them are given to them in the background, with
+  one message "Notifications you missed: N" leading to their list and one digest mail when at least
+  one asks for mail. Opening the list catches up too. Saving a membership or signing in is never
+  held up by it.
+- **The audit trail follows the internal plane.** A service's publication, a replacement, a
+  withdrawal, a notification's mail outcome (one line per notification) and the notifications
+  given after their publication are written with the sender, or the gateway, as the actor, next
+  to each acknowledgement. Reading stays off the trail. The Data plane Notifications screen
+  follows publications from the internal plane live.
+
 ---
 
 ## 1.19.0

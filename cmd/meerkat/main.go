@@ -1009,6 +1009,10 @@ func run(o options) error {
 	digestCtx, stopDigest := context.WithCancel(context.Background())
 	defer stopDigest()
 	go expiry.New(st, mailer).Run(digestCtx)
+	// The notifications' mail queue (NOTIF-05), in the database: what a node
+	// stopped halfway left is sent by whichever node runs it next.
+	notify.Start(digestCtx)
+	st.OnRightsMoved(notify.RightsMoved)
 
 	// The developer tunnel follows the developer-mode switch: mode off, no
 	// agent, no port, nothing listening. The community image linked no agent

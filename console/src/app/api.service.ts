@@ -1565,7 +1565,9 @@ export interface SentNotification {
   tenantId: string;
   sender: string;
   senderVia: string;
-  key?: string;
+  // The id its sender gave it, required. `id` above is the gateway's own,
+  // for this console.
+  ref: string;
   level: NotificationLevel;
   title: Record<string, string>;
   body: Record<string, string>;
@@ -1579,6 +1581,12 @@ export interface SentNotification {
   createdAt: number;
   expiresAt: number;
   withdrawnAt?: number;
+  // How it ended before its time, withdrawnAt being when: withdrawn, or
+  // replaced by a later notification of its sender (replacedBy).
+  endedAs?: 'withdrawn' | 'replaced';
+  replacedBy?: string;
+  // Sent to practise: labelled EXERCISE wherever it shows.
+  exercise?: boolean;
   // Asked of its readers: one acknowledgement closes it (single), or every
   // reader's (all). How many gave theirs, when it was closed, and by whom
   // when one closed it for everyone.
@@ -1632,6 +1640,11 @@ export interface NotificationReader {
   readAt?: number;
   hiddenAt?: number;
   ackedAt?: number;
+  // This reader's mail, when one was asked: pending, sending, accepted (by
+  // the relay), failed (with the relay's code), unknown, cancelled or
+  // noaddress.
+  mail?: 'pending' | 'sending' | 'accepted' | 'failed' | 'unknown' | 'cancelled' | 'noaddress';
+  mailCode?: number;
 }
 
 // What the License screen shows of a license: never the file itself.

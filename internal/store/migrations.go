@@ -55,12 +55,34 @@ var migrations = []migration{
 	{Version: 83, Name: "the signing keys are sealed", Up: signingKeysSealed},
 	{Version: 90, Name: "the internal plane keeps asking for the tokens it handed out", Up: internalAccessKept},
 	{Version: 95, Name: "a zone nobody chose follows the browser", Up: zoneUnchosen},
+	{Version: 102, Name: "a notification has one id for its sender", Up: notificationRefs},
 }
 
 // zoneUnchosen empties the zone of the accounts that hold UTC (v95). UTC was
 // what an account got when nobody chose, so a stored UTC cannot tell a choice
 // from the default; following the browser is the better guess, and whoever
 // really wants UTC picks it again on their profile.
+// notificationRefs gives a notification one id for its sender (v102): the key
+// a sender gave was a second name for the same thing, so dedup_key becomes
+// ref - in the notifications and in what a replacement or a withdrawal kept
+// for later. A notification its sender gave no key keeps an empty one: the
+// gateway never hands a sender an id of its own.
+func notificationRefs(ctx context.Context, tx *transaction) error {
+	for _, table := range []string{"notifications", "notification_ends"} {
+		has, err := tx.hasColumn(ctx, table, "dedup_key")
+		if err != nil {
+			return fmt.Errorf("%s: %w", table, err)
+		}
+		if !has {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE `+table+` RENAME COLUMN dedup_key TO ref`); err != nil {
+			return fmt.Errorf("%s: renaming dedup_key to ref: %w", table, err)
+		}
+	}
+	return nil
+}
+
 func zoneUnchosen(ctx context.Context, tx *transaction) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE users SET timezone = '' WHERE timezone = 'UTC'`); err != nil {
 		return fmt.Errorf("users: emptying the zones left at UTC: %w", err)

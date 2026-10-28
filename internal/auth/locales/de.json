@@ -354,5 +354,8 @@
   "notifAckedBy": "Bestätigt von %s",
   "notifAckAsked": "Wartet auf Ihre Bestätigung",
   "notifDeleteOwed": "Bestätigen Sie sie, bevor Sie sie löschen.",
-  "notifKept": "Behalten: %s warten auf Ihre Bestätigung."
+  "notifKept": "Behalten: %s warten auf Ihre Bestätigung.",
+  "notifWithdrawn": "Diese Benachrichtigung wurde zurückgezogen",
+  "notifExercise": "ÜBUNG",
+  "notifMissed": "Verpasste Benachrichtigungen: %s"
 }

@@ -36,10 +36,12 @@
         <mat-header-cell *matHeaderCellDef i18n="@@Notification">Notification</mat-header-cell>
         <mat-cell *matCellDef="let n">
           <span class="lines">
-            <span class="name"><span class="level" [class]="n.level"></span>{{ title(n) }}</span>
+            <span class="name"><span class="level" [class]="n.level"></span>@if (n.exercise) {<span class="exercise" i18n="@@Notify_exercise_label">EXERCISE</span>}{{ title(n) }}</span>
             @if (state(n) !== 'live') {
               <span class="muted">
-                @if (state(n) === 'withdrawn') {
+                @if (state(n) === 'replaced') {
+                  <ng-container i18n="@@Notify_replaced">Replaced</ng-container>
+                } @else if (state(n) === 'withdrawn') {
                   <ng-container i18n="@@Withdrawn">Withdrawn</ng-container>
                 } @else {
                   <ng-container i18n="@@Expired">Expired</ng-container>

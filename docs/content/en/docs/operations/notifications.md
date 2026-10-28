@@ -37,8 +37,17 @@ The screens an administrator uses are on
   its result.
 - **A mail**, when you ask for one and a mail relay is configured: the text, and
   a button to the notifications page. Never an action.
+- **The label EXERCISE** before the title, everywhere it shows, on a
+  notification sent [to practise](#exercises).
 
 ![The notifications page of a reader in two tenants: the tenant filter, a message sent to both tenants on one row, one waiting for an acknowledgement, and one unfolded with Open and its action](img/console/notifications-page.webp)
+
+A notification its sender **withdrew** stays in the list the way a deleted
+message does in a chat: a row saying *This notification was withdrawn*, with
+none of what it said (no title, text, link, action or tenant), read, out of the
+count, never on a snackbar or the desktop. It leaves the list when it expires,
+or when the reader deletes it. A notification its sender **replaced** is not
+shown at all: the replacement stands in its place.
 
 On the page, **Delete** takes a notification off the reader's list for good;
 the sender and the other readers keep theirs. **Mark all as read** and
@@ -53,13 +62,16 @@ and the button says so. A message sent to every tenant is **one** row naming
 them, counted once, read and deleted once.
 
 **Withdraw and Delete are not the same thing.** Withdraw is the sender's, or an
-administrator's: the notification leaves every reader's page at once. Delete is
-the reader's: it leaves their own list and nobody else's.
+administrator's: the notification turns into the placeholder on every reader's
+page at once and leaves their count. Delete is the reader's: it leaves their
+own list and nobody else's.
 
 ## Who receives it
 
-The audience is decided **once, at publication**, and kept: one line per
-reader. It starts from the enabled members of the tenant, narrowed to the
+At publication the gateway works out the readers and keeps **one line per
+reader**. It also keeps the audience you named, so someone who comes within it
+later still receives it (see [Rights gained later](#rights-gained-later)). The
+audience starts from the enabled members of the tenant, narrowed to the
 `roles` and `users` you name (either matches; neither means every member), and
 keeps only the people who may **open what it leads to**:
 
@@ -74,6 +86,32 @@ tenant, or lost the role, no longer sees it, and an action a reader may not use
 is not offered to them. A publication that would reach more people than the cap
 an administrator set (5000 unless changed) is refused.
 
+### Rights gained later
+
+Two moments give a live notification to someone who did not have it: they
+**join or leave the tenant** (leaving gives nothing), or a **role is granted**
+to them there. A role is held through a group of roles: it is granted when
+they are put in a group of roles that holds it, or when a group of roles of
+theirs is given it.
+At that moment the gateway looks at the tenant's live notifications (not
+expired, not withdrawn, not replaced) whose kept audience now takes them in,
+with the same rules as above, and gives them those they do not hold.
+
+- They are told **once**, whatever the count: a snackbar, or a desktop
+  notification when the tab is not in front of them, saying *Notifications you
+  missed: 3*, leading to their list. Never one per notification.
+- When at least one of them asks for mail, they receive **one digest mail**
+  listing them, through the same [mail queue](#mail), never one mail each.
+- Opening their list does the same work again, quietly: whatever a moment
+  missed is given then.
+- The work runs in the background: a membership saved, or a sign-in that
+  grants a tenant or a role, is never held up by it.
+
+A right lost changes nothing to the lines: the page checks access each time it
+shows them, and hides what the reader may no longer open. A notification
+published before this version kept no audience, and is given to nobody
+afterwards.
+
 ## Publishing
 
 On the **internal plane**, port 7070, like
@@ -85,7 +123,7 @@ the gateway's internal name, never from a browser.
 | `POST /api/notifications` | publish |
 | `GET /api/notifications` | yours that are still live, newest first, filtered by `meta.<key>` |
 | `GET /api/notifications/{id}/acks` | who acknowledged one of yours, and who has not yet |
-| `DELETE /api/notifications/{id}` | withdraw one of yours |
+| `DELETE /api/notifications/{id}` | withdraw one of yours by its id: every copy of one sent to every tenant |
 | `DELETE /api/notifications?meta.<key>=<value>` | withdraw every one of yours that matches |
 
 **Who may call it** is set in the console, **Data plane, Notifications,
@@ -111,17 +149,30 @@ means sent under that name.
 | `title` | required. Plain text, 200 characters at most |
 | `body` | plain text, 4000 characters at most |
 | `level` | `info` (default), `success`, `warning` or `error` |
+| `exercise` | `true` for a message sent to practise. See [Exercises](#exercises) |
 | `detail` | where it leads: a [link](#links-a-service-and-a-path), on a UI route |
 | `actions` | buttons, 5 at most: a `label` (60 characters), a link, and [how to call it](#actions-a-method-and-a-body) |
-| `mail` | `true` to send it by mail too. Refused when no mail relay is configured |
+| `mail` | `true` to send it by mail too. Refused when no mail relay is configured. See [Mail](#mail) |
 | `expires` | a duration (`P7D`, `PT12H`) or a date (`2026-11-01T08:00:00Z`): 30 days by default, 90 at most. Then it leaves every list |
-| `key` | your deduplication key, 200 characters. Sent again to the same tenant while the first is live, it answers that one and notifies nobody again |
+| `id` | required, a UUID of your choice: it lets you retry without duplicates, replace or withdraw the notification, and follow its acknowledgements and mails. 200 characters at most, letters, digits and `-_.:`. See [Its id](#its-id-replacing-and-withdrawing) |
+| `replaces` | the id of an earlier notification of yours, which ends as replaced. See [Replacing](#its-id-replacing-and-withdrawing) |
 | `meta` | your labels, such as `{"invoice": "INV-2026-0142"}`, to find and withdraw your own. Never shown to readers |
 | `ack` | `none` (default), `single` or `all`: see [Acknowledgement](#acknowledgement) |
 | `onAck` | your service, called at each acknowledgement. Needs `ack` |
 
 The texts are in **one language** for every reader: write them in the language
 your users share. An object by language is refused.
+
+### Exercises
+
+A drill must look like the real thing, and must never be taken for it. Send it
+with `"exercise": true` and a realistic `level`: it carries the label
+**EXERCISE**, in the reader's language, before its title on the page, on the
+snackbar and on the desktop notification, and in the subject, the heading and
+the first line of its mail. The console shows it with the same label. Nothing
+else changes: its audience is worked out as for any other notification, so
+choosing who takes part in the drill is your service's choice of `roles` and
+`users`, and it counts and reads like the others.
 
 ### Links: a service and a path
 
@@ -181,15 +232,80 @@ which it has to grant.
 ### Every tenant at once
 
 `"tenant": "*"` sends one copy to every enabled tenant whose notifications are
-on, each with its own id and its own readers. A tenant where nobody may receive
+on, each with its own readers, all under the one id of the send. A tenant where
+nobody may receive
 it is skipped, and the answer says so. The users named in `users` are taken in
 the tenants they belong to. A reader who is a member of several of these
 tenants sees **one** notification naming them, with one snackbar, one desktop
 notification and one mail.
 
-The key is kept per tenant: sent again with the same key, the copies still live
-are answered and the missing ones are published. A publication cut halfway
-finishes by sending it again.
+Sent again with the same id, the copies already published are answered and the
+missing ones are published: a publication cut halfway finishes by sending it
+again. Replacing or withdrawing by that id acts on every copy.
+
+### Its id, replacing and withdrawing
+
+**One id, yours, required.** Every message carries an `id`, a UUID of your
+choice: it lets you retry without duplicates, replace or withdraw the
+notification, and follow its acknowledgements and mails. A message without
+one is refused (`422` on `id`). A service that will never come back to a
+notification sends a fresh UUID and does not keep it. The gateway never makes
+an id up. Its source is kept on every notification, and the console shows it.
+An id is scoped by its source, the caller the internal
+plane recognises: a Meerkat token's name, the pod's ServiceAccount, or the
+workload behind the address (an address alone only when nothing better is
+known). Another service may use the same id. Published again from the same
+source under an id already used, before that notification expires, the answer
+is the notification already there, with `"existing": true`: nothing is
+created, nobody is told twice, and the content is not compared. This holds
+even after you withdrew or replaced it: an id you ended does not come back by
+being sent again.
+
+Your actions are called with `notification=<id>`, and `onAck` receives the same
+id: the one you know.
+
+**Replacing.** Publish the new notification with `"replaces"` naming the
+earlier one's id. Give the replacement an id of its own: under the id it
+replaces, it would only find that one again, and that is refused.
+
+```json
+{ "id": "job-7-80", "title": "Export 7 is at 80%", "replaces": "job-7-40" }
+```
+
+The earlier one ends as **replaced**: it leaves every reader's list and count,
+the replacement standing in its place, its mails not sent yet are cancelled,
+and it asks for no acknowledgement any more. The answer says what it ended, in
+`replaced`. Sending the same replacement again answers it with
+`"existing": true` and ends nothing more.
+
+**Withdrawing.** `DELETE /api/notifications/{id}` ends it as **withdrawn**:
+the readers see the placeholder, its mails not sent yet are cancelled. An id
+sent to every tenant withdraws every copy. The answer says whether it ended
+now, or had ended before:
+
+```json
+{ "withdrawn": ["job-7-80"] }
+{ "withdrawn": [], "already": ["job-7-80"] }
+```
+
+**When your calls arrive out of order.** Nothing guarantees that a withdrawal
+or a replacement reaches the gateway after the notification it names. When it
+names an id none of your notifications carries yet, the gateway keeps it: a
+withdrawal answers `202` with `{"withdrawn": [], "pending": "<id>"}`, a
+replacement is published and its `replaced` list is empty. When that id
+arrives, the notification is stored **already ended**, withdrawn or replaced,
+and nobody is told or mailed; the answer carries `"state"`. What is kept lives
+as long as a notification would: the replacement's own life, or for a
+withdrawal 30 days unless `?expires=` says otherwise (90 at most).
+
+| A notification is | On the reader's page | In the count |
+|---|---|---|
+| live | as sent | while unread |
+| withdrawn | the placeholder *This notification was withdrawn*, nothing of what it said | no |
+| replaced | not shown: its replacement stands in its place | no |
+| expired | gone, with every reader's state | no |
+
+The console shows every one of them with its state, its sender and its id.
 
 ### A full example
 
@@ -209,7 +325,7 @@ curl -X POST http://meerkat:7070/api/notifications \
         "path": "/invoices/INV-2026-0142/remind",
         "method": "POST", "body": { "channel": "email" } }
     ],
-    "key": "overdue-INV-2026-0142",
+    "id": "overdue-INV-2026-0142",
     "meta": { "invoice": "INV-2026-0142" },
     "ack": "single",
     "onAck": { "service": "billing", "path": "/notifications/acked" }
@@ -220,15 +336,15 @@ curl -X POST http://meerkat:7070/api/notifications \
 HTTP/1.1 201 Created
 Content-Type: application/json
 
-{"id": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "recipients": 4}
+{"id": "overdue-INV-2026-0142", "recipients": 4}
 ```
 
 ### The answers
 
 | Status | Body | Meaning |
 |---|---|---|
-| `201` | `{"id", "recipients"}` | published |
-| `200` | the same, with `"existing": true` | the key is already live: nobody is notified again |
+| `201` | `{"id", "recipients"}` | published under your `id`. With `replaces`, `replaced` says what it ended; `"state"` when the id was named by a withdrawal or a replacement before it arrived |
+| `200` | the same, with `"existing": true` | the id is already known: nobody is notified again. `"state"` says `withdrawn` or `replaced` when it ended |
 | `400` | `{"error"}` | not JSON, an unknown field, or over 64 KiB |
 | `422` | `{"error"}` | refused: the sentence names the field and what is allowed |
 | `401`, `403` | `{"error"}` | the access refused the caller: what is missing, and who is allowed |
@@ -249,10 +365,11 @@ Sent to every tenant, the `201` lists the copies and the tenants left out:
 
 ```json
 {
+  "id": "maintenance-2026-10-25",
   "recipients": 37,
   "tenants": [
-    { "tenant": "7c1e2a90", "name": "Acme Logistics", "id": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "recipients": 21 },
-    { "tenant": "b2f4c8d1", "name": "Acme Retail", "id": "ntf_e81d07c3a9b24f5e6d1c8a72", "recipients": 16 }
+    { "tenant": "7c1e2a90", "name": "Acme Logistics", "recipients": 21 },
+    { "tenant": "b2f4c8d1", "name": "Acme Retail", "recipients": 16 }
   ],
   "skipped": [
     { "tenant": "40aa9e3b", "name": "Acme Labs", "reason": "notifications are off, turned off by the tenant admin" }
@@ -292,11 +409,11 @@ tried twice more.
 ```http
 POST /notifications/acked
 Content-Type: application/json
-Meerkat-Notification: ntf_5c0e9a1f2b7d4e6a8c3b1d0f
+Meerkat-Notification: overdue-INV-2026-0142
 Meerkat-Attempt: 1
 
-{"notification": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "tenant": "7c1e2a90",
- "tenantName": "Acme Logistics", "key": "overdue-INV-2026-0142",
+{"notification": "overdue-INV-2026-0142", "tenant": "7c1e2a90",
+ "tenantName": "Acme Logistics",
  "meta": {"invoice": "INV-2026-0142"}, "ack": "single",
  "by": {"id": "u_41f2", "username": "alice", "name": "Alice Martin"},
  "at": "2026-10-25T09:12:44Z", "acknowledged": 1, "recipients": 4, "complete": true}
@@ -323,9 +440,73 @@ curl -X DELETE "http://meerkat:7070/api/notifications?meta.invoice=INV-2026-0142
 `meta.<key>=<value>` matches a value, `meta.<key>=~<regex>` a regular
 expression (RE2), and every condition must match. Withdrawing by filter needs at
 least one: everything a sender ever sent is not one request. The answer lists
-what was withdrawn, `{"withdrawn": ["ntf_..."]}`, and those notifications leave
-every reader's page at once. The console keeps them, marked Withdrawn, with who
-read them.
+what was withdrawn, `{"withdrawn": ["<id>", ...], "count": 2}`, and those notifications show
+as withdrawn on every reader's page at once. The console keeps them, marked
+Withdrawn, with who read them.
+
+## Mail
+
+With `"mail": true`, each reader who has an address receives one mail in their
+language, in the gateway's mail template: the text, and a button to their
+notifications page when the gateway knows its public address. A mail never
+carries an action. A message sent to every tenant is mailed once to a reader
+of several of them.
+
+**The queue is in the database**, one mail per reader, each with its state on
+the reader's line of the notification. The nodes send them one at a time, one
+every 200 ms, and only one node sends at a time, so an audience of thousands
+does not reach the relay at once. Two nodes never send the same mail: a node
+claims a mail before sending it. A gateway stopped halfway, or restarted,
+loses nothing: what is still to send is sent by the next node that runs, or by
+the same one when it starts again.
+
+| A reader's mail is | Meaning |
+|---|---|
+| `pending` | to send, now or at its next attempt |
+| `sending` | a node is sending it |
+| `accepted` | the relay accepted it. The most the gateway knows: never "delivered" |
+| `failed` | the relay refused it for good (a `5yz` reply), or a temporary refusal (`4yz`) lasted past 24 hours, or past the notification's life. The reply code is kept |
+| `unknown` | the connection went after the whole message was sent and before the relay answered, or the node sending it stopped: the relay may have taken it, so it is never sent again on its own |
+| `cancelled` | the notification was withdrawn, replaced or expired before it left |
+| `noaddress` | the reader has no address, or their account is disabled |
+
+A temporary refusal, or a relay that cannot be reached, is tried again after
+1, 5, 15 and 30 minutes, then every hour, for 24 hours at most. Every attempt at
+one mail carries the same `Message-ID`, so a mailbox that receives it twice can
+tell.
+
+**Where they stand.** For a notification sent with mail, your list carries
+`mails`, the count of its readers' mails by state:
+
+```json
+{ "id": "overdue-INV-2026-0142", "mail": true,
+  "mails": { "accepted": 38, "failed": 1, "noaddress": 2 } }
+```
+
+Once nothing is left to send, the outcome is one line of the audit trail for
+the notification, `notification.mail`, never one per reader. The console shows
+each reader's mail beside the time they read it.
+
+## What the audit trail keeps
+
+What a service does on the internal plane is on the
+[audit trail](/docs/operations/audit), with the sender as the actor, named as
+the access recognised it (a token's name, a ServiceAccount, an address), in the
+notification's tenant:
+
+| Action | Written when |
+|---|---|
+| `notification.publish` | a notification is published: its sender, its tenant, how many recipients, whether it is an exercise, and whether it arrived already withdrawn or replaced. Sent to every tenant, one line per copy |
+| `notification.replace` | a notification is replaced, naming the one that replaced it |
+| `notification.withdraw` | a notification is withdrawn, by its sender or an administrator |
+| `notification.mail` | a notification's mailing is over: one line for the notification, never one per recipient, with how many mails the relay accepted, how many failed, how many readers had no address, and how many were cancelled |
+| `notification.given` | notifications were given to someone after their publication, having joined the tenant or been granted a role, or on opening their list: one line naming the person and the notifications, the gateway as the actor |
+| `notification.ack` | a reader acknowledges one: one line per acknowledgement, the reader as the actor, kept after the notification expired |
+
+Reading and deleting are the reader's, kept on their line of the notification,
+and are not on the trail. The console's **Data plane,
+Notifications** screen and the tenant's **Notifications** section follow every
+publication live, the internal plane's as much as the console's.
 
 ## A notifications page of your own
 

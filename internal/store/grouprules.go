@@ -297,6 +297,14 @@ func (s *Store) SyncMappedGroups(ctx context.Context, userID, providerID string,
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("store: sync mapped groups: %w", err)
 	}
+	// A tenant joined or left, or a role granted through a group of roles:
+	// whatever moved, the tenants it touched.
+	for tenantID := range tenants {
+		s.rightsChanged(tenantID, userID)
+	}
+	for _, tenantID := range dropped {
+		s.rightsChanged(tenantID, userID)
+	}
 	out := make([]string, 0, len(tenants))
 	for tenantID := range tenants {
 		out = append(out, tenantID)

@@ -219,8 +219,9 @@ var auditTargets = map[string]AuditTarget{
 	"user":     {Domains: []string{AuditDomainApp}},
 	"role":     {Domains: []string{AuditDomainApp}},
 	"schedule": {Domains: []string{AuditDomainApp}},
-	// A notification sent or withdrawn from the console, or acknowledged by
-	// one of its readers (NOTIF-05). A tenant admin sends and withdraws them
+	// A notification published (console or internal plane), replaced,
+	// withdrawn, mailed, given after its publication, or acknowledged by one
+	// of its readers (NOTIF-05). A tenant admin sends and withdraws them
 	// from the tenant's page too, so their screens are told it moved; the
 	// trail itself shows them their tenants' rows only (tenant_id).
 	"notification": {Domains: []string{AuditDomainApp, AuditDomainTenant}},

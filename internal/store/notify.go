@@ -348,11 +348,15 @@ var NotificationMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 
 // Notification is one message, as stored.
 type Notification struct {
-	ID          string               `json:"id"`
-	TenantID    string               `json:"tenantId"`
-	Sender      string               `json:"sender"`
-	SenderVia   string               `json:"senderVia"`
-	Key         string               `json:"key,omitempty"`
+	ID        string `json:"id"`
+	TenantID  string `json:"tenantId"`
+	Sender    string `json:"sender"`
+	SenderVia string `json:"senderVia"`
+	// Ref is the id its sender gave it, required - one per sender, shared
+	// by the copies of a message sent to every tenant ("" only on what was
+	// stored before it was). ID is the gateway's own, for its pages and its
+	// console, never handed to the sender.
+	Ref         string               `json:"ref"`
 	Level       string               `json:"level"`
 	Title       Localized            `json:"title"`
 	Body        Localized            `json:"body"`
@@ -378,6 +382,41 @@ type Notification struct {
 	OnAck         *NotificationLink `json:"onAck,omitempty"`
 	AckCompleteAt int64             `json:"ackCompleteAt,omitempty"`
 	AckBy         string            `json:"-"`
+	// EndedAs says how it ended, WithdrawnAt being when: EndedWithdrawn or
+	// EndedReplaced, "" while it is live. ReplacedBy names the notification
+	// that replaced it.
+	EndedAs    string `json:"endedAs,omitempty"`
+	ReplacedBy string `json:"replacedBy,omitempty"`
+	// Exercise marks a message sent to practise: it keeps a realistic level,
+	// and wears the EXERCISE label wherever it shows.
+	Exercise bool `json:"exercise,omitempty"`
+	// AudienceRoles and AudienceUsers are the audience its sender named,
+	// kept (AudienceKept) so an account given the rights afterwards is given
+	// it then. Neither: the whole tenant. Sent before they were kept,
+	// AudienceKept is false, and it is given to nobody afterwards.
+	AudienceRoles []string `json:"audienceRoles,omitempty"`
+	AudienceUsers []string `json:"audienceUsers,omitempty"`
+	AudienceKept  bool     `json:"-"`
+}
+
+// How a notification ends before it expires.
+const (
+	// EndedWithdrawn: its sender, or an administrator, took it back.
+	EndedWithdrawn = "withdrawn"
+	// EndedReplaced: its sender published another one in its place.
+	EndedReplaced = "replaced"
+)
+
+// Ended says how it ended, "" while it is live: a withdrawal written before
+// ended_as existed reads as one.
+func (n Notification) Ended() string {
+	if n.WithdrawnAt == 0 {
+		return ""
+	}
+	if n.EndedAs == "" {
+		return EndedWithdrawn
+	}
+	return n.EndedAs
 }
 
 // The ways a notification asks to be acknowledged.
@@ -441,23 +480,25 @@ var ErrNotificationNotFound = errors.New("no such notification")
 // owes the acknowledgement it asks for.
 var ErrNotificationOwed = errors.New("the notification waits for an acknowledgement")
 
-const notificationColumns = `id, tenant_id, sender, sender_via, dedup_key, level, title, body, detail_url,
+const notificationColumns = `id, tenant_id, sender, sender_via, ref, level, title, body, detail_url,
 	detail_route, actions, metadata, mail, recipients, created_at, expires_at, withdrawn_at, broadcast_id,
-	ack, on_ack, ack_complete_at, ack_by`
+	ack, on_ack, ack_complete_at, ack_by, ended_as, replaced_by, exercise, audience_roles, audience_users,
+	audience_kept`
 
 func scanNotification(row interface{ Scan(...any) error }, extra ...any) (Notification, error) {
 	var n Notification
-	var title, body, actions, meta, onAck string
-	dest := []any{&n.ID, &n.TenantID, &n.Sender, &n.SenderVia, &n.Key, &n.Level, &title, &body, &n.DetailURL,
+	var title, body, actions, meta, onAck, aRoles, aUsers string
+	dest := []any{&n.ID, &n.TenantID, &n.Sender, &n.SenderVia, &n.Ref, &n.Level, &title, &body, &n.DetailURL,
 		&n.DetailRoute, &actions, &meta, &n.Mail, &n.Recipients, &n.CreatedAt, &n.ExpiresAt, &n.WithdrawnAt,
-		&n.BroadcastID, &n.Ack, &onAck, &n.AckCompleteAt, &n.AckBy}
+		&n.BroadcastID, &n.Ack, &onAck, &n.AckCompleteAt, &n.AckBy, &n.EndedAs, &n.ReplacedBy, &n.Exercise, &aRoles, &aUsers, &n.AudienceKept}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return n, err
 	}
 	for _, f := range []struct {
 		raw string
 		out any
-	}{{title, &n.Title}, {body, &n.Body}, {actions, &n.Actions}, {meta, &n.Meta}} {
+	}{{title, &n.Title}, {body, &n.Body}, {actions, &n.Actions}, {meta, &n.Meta}, {aRoles, &n.AudienceRoles},
+		{aUsers, &n.AudienceUsers}} {
 		if f.raw == "" {
 			continue
 		}
@@ -489,10 +530,16 @@ func jsonText(v any) (string, error) {
 }
 
 // CreateNotification stores a notification and its recipients in one
-// transaction. When the sender already holds a live one under the same key in
-// the same tenant, that one is returned instead and existed is true: a sender
-// retrying after a cut does not tell everybody twice, and the same message
-// sent to two tenants is two notifications.
+// transaction. When the sender already used the same id (Ref) in the same
+// tenant, for a notification that has not expired - live, withdrawn or
+// replaced - that one is returned instead and existed is true: a sender
+// retrying after a cut does not tell everybody twice, and an id it withdrew
+// does not come back by being sent again. The caller looks in the other
+// tenants first (SenderNotifications): one id names one notification of its
+// sender, or one message sent to every tenant.
+//
+// An id a replacement or a withdrawal named before it arrived (RememberEnd)
+// is stored already ended: the caller then tells nobody, and mails nobody.
 func (s *Store) CreateNotification(ctx context.Context, n Notification, userIDs []string) (out Notification, existed bool, err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -500,15 +547,25 @@ func (s *Store) CreateNotification(ctx context.Context, n Notification, userIDs 
 	}
 	defer func() { _ = tx.Rollback() }()
 	now := time.Now().Unix()
-	if n.Key != "" {
+	if n.Ref != "" {
 		row := tx.QueryRowContext(ctx, `SELECT `+notificationColumns+` FROM notifications
-			WHERE sender = ? AND dedup_key = ? AND tenant_id = ? AND withdrawn_at = 0 AND expires_at > ?`,
-			n.Sender, n.Key, n.TenantID, now)
+			WHERE sender = ? AND ref = ? AND tenant_id = ? AND expires_at > ?
+			ORDER BY created_at DESC LIMIT 1`,
+			n.Sender, n.Ref, n.TenantID, now)
 		prev, err := scanNotification(row)
 		if err == nil {
 			return prev, true, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
+			return n, false, fmt.Errorf("store: create notification: %w", err)
+		}
+		var as, by string
+		err = tx.QueryRowContext(ctx, `SELECT ended_as, replaced_by FROM notification_ends
+			WHERE sender = ? AND ref = ? AND expires_at > ?`, n.Sender, n.Ref, now).Scan(&as, &by)
+		switch {
+		case err == nil:
+			n.WithdrawnAt, n.EndedAs, n.ReplacedBy = now, as, by
+		case !errors.Is(err, sql.ErrNoRows):
 			return n, false, fmt.Errorf("store: create notification: %w", err)
 		}
 	}
@@ -540,11 +597,22 @@ func (s *Store) CreateNotification(ctx context.Context, n Notification, userIDs 
 			return n, false, err
 		}
 	}
+	aRoles, aUsers := "", ""
+	if len(n.AudienceRoles) > 0 {
+		if aRoles, err = jsonText(n.AudienceRoles); err != nil {
+			return n, false, err
+		}
+	}
+	if len(n.AudienceUsers) > 0 {
+		if aUsers, err = jsonText(n.AudienceUsers); err != nil {
+			return n, false, err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO notifications (`+notificationColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.ID, n.TenantID, n.Sender, n.SenderVia, n.Key, n.Level, title, body, n.DetailURL,
-		n.DetailRoute, actions, meta, n.Mail, n.Recipients, n.CreatedAt, n.ExpiresAt, 0, n.BroadcastID,
-		n.Ack, onAck, 0, ""); err != nil {
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ID, n.TenantID, n.Sender, n.SenderVia, n.Ref, n.Level, title, body, n.DetailURL,
+		n.DetailRoute, actions, meta, n.Mail, n.Recipients, n.CreatedAt, n.ExpiresAt, n.WithdrawnAt, n.BroadcastID,
+		n.Ack, onAck, 0, "", n.EndedAs, n.ReplacedBy, n.Exercise, aRoles, aUsers, n.AudienceKept); err != nil {
 		return n, false, fmt.Errorf("store: create notification: %w", err)
 	}
 	for _, u := range userIDs {
@@ -623,12 +691,11 @@ func (s *Store) ListNotifications(ctx context.Context, f NotificationFilter) ([]
 	return out, rows.Err()
 }
 
-// WithdrawNotification marks one taken back by its sender. Another sender's,
-// or one already gone, is not found: a sender cannot learn the ids of the
-// others by trying them.
-func (s *Store) WithdrawNotification(ctx context.Context, sender, id string) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE notifications SET withdrawn_at = ?
-		WHERE id = ? AND sender = ? AND withdrawn_at = 0`, time.Now().Unix(), id, sender)
+// WithdrawAny takes one back for an administrator, whoever sent it. One
+// already ended is not found.
+func (s *Store) WithdrawAny(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE notifications SET withdrawn_at = ?, ended_as = ?
+		WHERE id = ? AND withdrawn_at = 0`, time.Now().Unix(), EndedWithdrawn, id)
 	if err != nil {
 		return fmt.Errorf("store: withdraw notification %q: %w", id, err)
 	}
@@ -638,15 +705,56 @@ func (s *Store) WithdrawNotification(ctx context.Context, sender, id string) err
 	return nil
 }
 
-// WithdrawAny is WithdrawNotification for an administrator: whoever sent it.
-func (s *Store) WithdrawAny(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE notifications SET withdrawn_at = ?
-		WHERE id = ? AND withdrawn_at = 0`, time.Now().Unix(), id)
-	if err != nil {
-		return fmt.Errorf("store: withdraw notification %q: %w", id, err)
+// SenderNotifications are the notifications a sender's id names, live or
+// ended, not expired: one, or every copy of a message sent to every tenant.
+// Another sender's are never found.
+func (s *Store) SenderNotifications(ctx context.Context, sender, ref string) ([]Notification, error) {
+	if ref == "" {
+		return []Notification{}, nil
 	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return ErrNotificationNotFound
+	rows, err := s.db.QueryContext(ctx, `SELECT `+notificationColumns+` FROM notifications
+		WHERE sender = ? AND ref = ? AND expires_at > ? ORDER BY created_at, id`, sender, ref, time.Now().Unix())
+	if err != nil {
+		return nil, fmt.Errorf("store: notifications %q of %q: %w", ref, sender, err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := []Notification{}
+	for rows.Next() {
+		n, err := scanNotification(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: notifications %q of %q: %w", ref, sender, err)
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// EndNotification ends one live notification, as withdrawn or replaced (by
+// the notification named). It answers whether it was live: ending one already
+// ended changes nothing, so a sender retrying is not an error.
+func (s *Store) EndNotification(ctx context.Context, id, as, replacedBy string) (bool, error) {
+	if as != EndedWithdrawn && as != EndedReplaced {
+		return false, fmt.Errorf("store: end notification %q as %q: allowed are %s and %s", id, as,
+			EndedWithdrawn, EndedReplaced)
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE notifications SET withdrawn_at = ?, ended_as = ?, replaced_by = ?
+		WHERE id = ? AND withdrawn_at = 0`, time.Now().Unix(), as, replacedBy, id)
+	if err != nil {
+		return false, fmt.Errorf("store: end notification %q: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// RememberEnd keeps a replacement or a withdrawal naming an id its sender has
+// not published yet, until expiresAt: published then, the notification is
+// stored already ended. Named again, the first decision stands.
+func (s *Store) RememberEnd(ctx context.Context, sender, ref, as, replacedBy string, expiresAt int64) error {
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO notification_ends
+		(sender, ref, ended_as, replaced_by, at, expires_at) VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (sender, ref) DO NOTHING`, sender, ref, as, replacedBy, time.Now().Unix(),
+		expiresAt); err != nil {
+		return fmt.Errorf("store: remember the end of %q of %q: %w", ref, sender, err)
 	}
 	return nil
 }
@@ -679,12 +787,17 @@ type NotificationReader struct {
 	HiddenAt int64  `json:"hiddenAt,omitempty"`
 	// AckedAt is when they acknowledged it, for one that asks.
 	AckedAt int64 `json:"ackedAt,omitempty"`
+	// Mail is where their mail stands (MailStates), "" when none was asked;
+	// MailCode is the relay's reply code of a failed one.
+	Mail     string `json:"mail,omitempty"`
+	MailCode int    `json:"mailCode,omitempty"`
 }
 
 // NotificationReaders says who was told and who read, readers first.
 func (s *Store) NotificationReaders(ctx context.Context, id string) ([]NotificationReader, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT r.user_id, COALESCE(u.username, ''), COALESCE(u.fullname, ''),
-		r.read_at, r.hidden_at, r.acked_at FROM notification_recipients r LEFT JOIN users u ON u.id = r.user_id
+		r.read_at, r.hidden_at, r.acked_at, r.mail_state, r.mail_code FROM notification_recipients r
+		LEFT JOIN users u ON u.id = r.user_id
 		WHERE r.notification_id = ? ORDER BY r.read_at DESC, u.username`, id)
 	if err != nil {
 		return nil, fmt.Errorf("store: readers of %q: %w", id, err)
@@ -693,7 +806,8 @@ func (s *Store) NotificationReaders(ctx context.Context, id string) ([]Notificat
 	out := []NotificationReader{}
 	for rows.Next() {
 		var r NotificationReader
-		if err := rows.Scan(&r.UserID, &r.Username, &r.Fullname, &r.ReadAt, &r.HiddenAt, &r.AckedAt); err != nil {
+		if err := rows.Scan(&r.UserID, &r.Username, &r.Fullname, &r.ReadAt, &r.HiddenAt, &r.AckedAt, &r.Mail,
+			&r.MailCode); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -786,8 +900,9 @@ type ReceivedFilter struct {
 	Limit  int
 }
 
-// ReceivedNotifications is what a user was given and still holds: live, not
-// hidden, newest first. Whether they may still open what it leads to is the
+// ReceivedNotifications is what a user was given and still holds: not
+// expired, not hidden, newest first - ended ones included, which the reader's
+// page shows as such. Whether they may still open what it leads to is the
 // caller's question, asked with their session.
 func (s *Store) ReceivedNotifications(ctx context.Context, userID string, f ReceivedFilter) ([]Received, error) {
 	cols := strings.ReplaceAll(notificationColumns, "\n\t", " ")
@@ -797,10 +912,12 @@ func (s *Store) ReceivedNotifications(ctx context.Context, userID string, f Rece
 	}
 	q := `SELECT ` + strings.Join(prefixed, ", ") + `, r.read_at, r.acked_at FROM notification_recipients r
 		JOIN notifications n ON n.id = r.notification_id
-		WHERE r.user_id = ? AND r.hidden_at = 0 AND n.withdrawn_at = 0 AND n.expires_at > ?`
+		WHERE r.user_id = ? AND r.hidden_at = 0 AND n.expires_at > ?`
 	args := []any{userID, time.Now().Unix()}
+	// An ended one stays listed, marked, and is never unread: nothing waits
+	// for its reader any more.
 	if f.Unread {
-		q += ` AND r.read_at = 0`
+		q += ` AND r.read_at = 0 AND n.withdrawn_at = 0`
 	}
 	if f.TenantID != "" {
 		q += ` AND n.tenant_id = ?`
@@ -884,7 +1001,7 @@ func (s *Store) ReceivedCopies(ctx context.Context, userID string, broadcastIDs 
 	}
 	q := `SELECT ` + strings.Join(prefixed, ", ") + `, r.read_at, r.acked_at FROM notification_recipients r
 		JOIN notifications n ON n.id = r.notification_id
-		WHERE r.user_id = ? AND r.hidden_at = 0 AND n.withdrawn_at = 0 AND n.expires_at > ?
+		WHERE r.user_id = ? AND r.hidden_at = 0 AND n.expires_at > ?
 		AND n.broadcast_id IN (?` + strings.Repeat(", ?", len(broadcastIDs)-1) + `)
 		ORDER BY n.created_at DESC, n.id`
 	args := []any{userID, time.Now().Unix()}
@@ -908,13 +1025,14 @@ func (s *Store) ReceivedCopies(ctx context.Context, userID string, broadcastIDs 
 	return out, rows.Err()
 }
 
-// LiveBroadcast is the message sent to every tenant a sender's key already
-// names while one of its copies is live, "" when none: sent again with the
-// same key, the copies it adds join the ones already there.
-func (s *Store) LiveBroadcast(ctx context.Context, sender, key string) (string, error) {
+// RefBroadcast is the message sent to every tenant a sender's id already
+// names while one of its copies has not expired, live or ended, "" when none:
+// sent again with the same id, the copies it adds join the ones already
+// there.
+func (s *Store) RefBroadcast(ctx context.Context, sender, key string) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx, `SELECT broadcast_id FROM notifications
-		WHERE sender = ? AND dedup_key = ? AND broadcast_id <> '' AND withdrawn_at = 0 AND expires_at > ?
+		WHERE sender = ? AND ref = ? AND broadcast_id <> '' AND expires_at > ?
 		ORDER BY created_at DESC LIMIT 1`, sender, key, time.Now().Unix()).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
@@ -1241,9 +1359,72 @@ func (s *Store) PurgeNotifications(ctx context.Context, now int64) (int64, error
 	if err != nil {
 		return 0, fmt.Errorf("store: purge notifications: %w", err)
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM notification_ends WHERE expires_at <= ?`, now); err != nil {
+		return 0, fmt.Errorf("store: purge notifications: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("store: purge notifications: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// GivenLater are the live notifications of a tenant an account holds no line
+// of, among those whose audience was kept: what an account that joined the
+// tenant, or was granted a role there, may be given now. Whether they target it
+// is the caller's question.
+func (s *Store) GivenLater(ctx context.Context, tenantID, userID string) ([]Notification, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+notificationColumns+` FROM notifications n
+		WHERE n.tenant_id = ? AND n.audience_kept = ? AND n.withdrawn_at = 0 AND n.expires_at > ?
+		AND NOT EXISTS (SELECT 1 FROM notification_recipients r WHERE r.notification_id = n.id AND r.user_id = ?)
+		ORDER BY n.created_at, n.id`, tenantID, true, time.Now().Unix(), userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: notifications %q may be given in %q: %w", userID, tenantID, err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := []Notification{}
+	for rows.Next() {
+		n, err := scanNotification(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: notifications %q may be given in %q: %w", userID, tenantID, err)
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// GiveNotification gives a notification to one more account, after its
+// publication, and answers whether this call did: two nodes giving it at
+// once give it once. Its count of recipients follows.
+func (s *Store) GiveNotification(ctx context.Context, id, userID string) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("store: give notification %q to %q: %w", id, userID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, `INSERT INTO notification_recipients (notification_id, user_id) VALUES (?, ?)
+		ON CONFLICT (notification_id, user_id) DO NOTHING`, id, userID)
+	if err != nil {
+		return false, fmt.Errorf("store: give notification %q to %q: %w", id, userID, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE notifications SET recipients = recipients + 1 WHERE id = ?`, id); err != nil {
+		return false, fmt.Errorf("store: give notification %q to %q: %w", id, userID, err)
+	}
+	return true, tx.Commit()
+}
+
+// HoldsBroadcast says an account holds a copy, other than except, of a
+// message sent to every tenant.
+func (s *Store) HoldsBroadcast(ctx context.Context, userID, broadcastID, except string) (bool, error) {
+	var one int
+	err := s.db.QueryRowContext(ctx, `SELECT 1 FROM notification_recipients r JOIN notifications n
+		ON n.id = r.notification_id WHERE r.user_id = ? AND n.broadcast_id = ? AND n.id <> ? LIMIT 1`,
+		userID, broadcastID, except).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }

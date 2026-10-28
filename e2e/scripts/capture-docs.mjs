@@ -638,9 +638,11 @@ async function layNotifications(api) {
     }
   }
   const sent = {};
+  // Every message carries its id, the service's own.
   const publish = async (from, key, message) => {
     if (!services[from]) return;
-    const r = await soft(`notification ${key}`, () => services[from].post('/api/notifications', { data: message }));
+    const data = { id: `doc-${key}`, ...message };
+    const r = await soft(`notification ${key}`, () => services[from].post('/api/notifications', { data }));
     if (r) sent[key] = (await r.json()).id;
     // One second apart: the lists sort by the second they were sent in.
     await new Promise((res) => setTimeout(res, 1100));
@@ -662,7 +664,7 @@ async function layNotifications(api) {
   await publish('warehouse', 'alarm', {
     tenant: logistics, level: 'error', title: NOTE.alarm,
     body: 'Sensor CR3 reads 9.4 C since 06:12. Check the door seal and the compressor.',
-    ack: 'single', onAck: { service: 'orders', path: '/orders/alerts/acked' }, key: 'cr3-temperature',
+    ack: 'single', onAck: { service: 'orders', path: '/orders/alerts/acked' }, id: 'cr3-temperature',
   });
   await publish('invoicing', 'saturday', {
     tenant: '*', title: 'Billing is read-only on Saturday night',
@@ -674,12 +676,12 @@ async function layNotifications(api) {
     detail: { service: 'billing', path: '/invoices/INV-2026-0142' },
     actions: [{ label: 'Send a reminder', service: 'billing', path: '/invoices/INV-2026-0142/remind',
       method: 'POST', body: { channel: 'email' } }],
-    key: 'overdue-INV-2026-0142', meta: { invoice: 'INV-2026-0142' },
+    id: 'overdue-INV-2026-0142', meta: { invoice: 'INV-2026-0142' },
   });
   // From the console, as the tenant page's drawer sends it.
   if (TENANT) {
     await soft('notification from the console', () => api.post(`${ADMIN}/api/tenants/${TENANT}/notifications`, {
-      data: { level: 'success', title: 'Stock count closed',
+      data: { id: 'stock-count-2026-10-24', level: 'success', title: 'Stock count closed',
         body: 'The stock count of 2026-10-24 is closed. 3 differences are left to review.' },
     }));
   }
@@ -694,8 +696,13 @@ async function layNotifications(api) {
     ? request.newContext({ baseURL: DATA, storageState: `${tmp}/data-${name}.json` }) : null;
   const bob = await reader('bob');
   if (bob) {
-    for (const key of ['alarm', 'floor']) {
-      if (sent[key]) await soft(`bob acknowledges ${key}`, () => bob.post(`/meerkat/notifications/${sent[key]}/ack`));
+    // The reader's page names a notification by its own id, read from the
+    // list: the sender's id is the sender's.
+    const list = await json(await soft('bob reads his list', () => bob.get('/meerkat/notifications.json')));
+    for (const it of list?.items ?? []) {
+      if (it.title === NOTE.alarm || it.title === NOTE.floor) {
+        await soft(`bob acknowledges ${it.title}`, () => bob.post(`/meerkat/notifications/${it.id}/ack`));
+      }
     }
     await bob.dispose();
   }

@@ -567,12 +567,22 @@ func (a *API) publishToTenant(w http.ResponseWriter, r *http.Request, actor stor
 		writeJSON(w, http.StatusOK, p)
 		return
 	}
-	title := ""
-	if n, err := a.st.GetNotification(ctx, p.ID); err == nil {
-		title = n.Title.Pick("en")
+	// The answer names it by the id its sender knows it by; the trail by
+	// the gateway's own, as every other line about a notification.
+	// Published without an id, it is the administrator's latest one there.
+	title, id := "", ""
+	list, err := a.st.SenderNotifications(ctx, actor.Username, p.ID)
+	if err == nil && len(list) == 0 {
+		list, err = a.st.ListNotifications(ctx, store.NotificationFilter{Sender: actor.Username, TenantID: t.ID, Limit: 1})
 	}
-	a.auditEvent(ctx, actor, "notification.publish", "notification", p.ID, title, t.ID,
-		fmt.Sprintf("%d recipients", p.Recipients))
+	if err == nil && len(list) > 0 {
+		title, id = list[0].Title.Pick("en"), list[0].ID
+	}
+	detail := fmt.Sprintf("%d recipients", p.Recipients)
+	if p.ID != "" {
+		detail += ", id " + p.ID
+	}
+	a.auditEvent(ctx, actor, "notification.publish", "notification", id, title, t.ID, detail)
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -597,7 +607,7 @@ func (a *API) notificationTools() []mcp.Tool {
 		},
 		{
 			Name: "withdraw_notification", Allow: administersIdentity, Title: "Withdraw a notification",
-			Description: "Take a notification back, whoever sent it: it leaves every recipient's page and badge at " +
+			Description: "Take a notification back, whoever sent it: it shows as withdrawn on every recipient's page and leaves their badge at " +
 				"once. The trail keeps who had read it. Take the id from list_notifications.",
 			Schema: object(map[string]any{"id": str("The notification's id, as list_notifications gives it.")}, "id"),
 			Call:   a.toolWithdrawNotification,

@@ -267,7 +267,34 @@ func (s *Store) SaveGroup(ctx context.Context, g Group) error {
 			return fmt.Errorf("store: save group %q roles: %w", g.Name, err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// The members of this group of roles may hold a role they did not.
+	if s.rightsMoved.Load() != nil {
+		if members, err := s.groupMembers(ctx, g.ID); err == nil {
+			s.rightsChanged(g.TenantID, members...)
+		}
+	}
+	return nil
+}
+
+// groupMembers are the accounts holding a group.
+func (s *Store) groupMembers(ctx context.Context, groupID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT user_id FROM member_groups WHERE group_id = ?`, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("store: members of group %q: %w", groupID, err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 // GetGroup returns one group by id.
@@ -417,7 +444,11 @@ func (s *Store) SetMemberGroups(ctx context.Context, tenantID, userID string, gr
 			return fmt.Errorf("store: set member groups: %w", err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.rightsChanged(tenantID, userID)
+	return nil
 }
 
 // MemberGroups returns the groups a user holds in a tenant WITH their names -

@@ -53,11 +53,13 @@
               <mat-cell *matCellDef="let n">
                 <span class="lines">
                   <span class="name">
-                    <span class="level" [class]="n.level"></span>{{ title(n) }}
+                    <span class="level" [class]="n.level"></span>@if (n.exercise) {<span class="exercise" i18n="@@Notify_exercise_label">EXERCISE</span>}{{ title(n) }}
                   </span>
                   @if (state(n) !== "live") {
                     <span class="muted">
-                      @if (state(n) === "withdrawn") {
+                      @if (state(n) === "replaced") {
+                        <ng-container i18n="@@Notify_replaced">Replaced</ng-container>
+                      } @else if (state(n) === "withdrawn") {
                         <ng-container i18n="@@Withdrawn">Withdrawn</ng-container>
                       } @else {
                         <ng-container i18n="@@Expired">Expired</ng-container>
@@ -202,7 +204,7 @@
     } @else if (selected(); as n) {
       <div class="drawer">
         <div class="drawer-head">
-          <h2><span class="level" [class]="n.level"></span>{{ title(n) }}</h2>
+          <h2><span class="level" [class]="n.level"></span>@if (n.exercise) {<span class="exercise" i18n="@@Notify_exercise_label">EXERCISE</span>}{{ title(n) }}</h2>
           <button matIconButton (click)="closePanel()" i18n-aria-label="@@Close" aria-label="Close">
             <mat-icon>close</mat-icon>
           </button>
@@ -213,6 +215,10 @@
         <dl>
           <dt i18n="@@Sender">Sender</dt>
           <dd><span class="mono">{{ n.sender }}</span></dd>
+          @if (n.ref) {
+            <dt i18n="@@Id">Id</dt>
+            <dd><span class="mono">{{ n.ref }}</span></dd>
+          }
           @if (!settings()?.single) {
             <dt i18n="@@Tenant">Tenant</dt>
             <dd>{{ tenantName(n.tenantId) }}</dd>
@@ -243,6 +249,9 @@
           @for (r of readers(); track r.userId) {
             <li>
               <span>{{ r.username || r.userId }}</span>
+              @if (r.mail) {
+                <span class="muted">{{ mailText(r) }}</span>
+              }
               @if (r.readAt) {
                 <span class="muted nowrap">{{ r.readAt | zoned: me.timezone() }}</span>
               } @else {

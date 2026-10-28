@@ -20,6 +20,8 @@ type fakeNotifier struct{ st *store.Store }
 func (fakeNotifier) Internal() []notifier.Endpoint { return nil }
 func (fakeNotifier) MountData(notifier.Mux)        {}
 func (fakeNotifier) Receive(string)                {}
+func (fakeNotifier) RightsMoved(string, string)    {}
+func (fakeNotifier) Start(context.Context)         {}
 func (fakeNotifier) Badge(context.Context, store.Session) (notifier.Badge, bool) {
 	return notifier.Badge{}, false
 }

@@ -114,8 +114,8 @@ export class TenantNotificationsComponent {
     return { text: `${n.acknowledged} / ${n.recipients}`, done: !!n.ackCompleteAt };
   }
 
-  protected state(n: SentNotification): 'live' | 'expired' | 'withdrawn' {
-    if (n.withdrawnAt) return 'withdrawn';
+  protected state(n: SentNotification): 'live' | 'expired' | 'withdrawn' | 'replaced' {
+    if (n.withdrawnAt) return n.endedAs === 'replaced' ? 'replaced' : 'withdrawn';
     return n.expiresAt * 1000 < Date.now() ? 'expired' : 'live';
   }
 }

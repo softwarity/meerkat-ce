@@ -5842,6 +5842,17 @@
               "at",
               "self"
             ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "withdrawn"
+            ],
+            "description": "Its sender withdrew it: show a placeholder saying so. The item then carries nothing of what it said (no level, title, text, sender, link, action or tenant), is read, and asks for nothing. A replaced notification is not listed: its replacement stands in its place."
+          },
+          "exercise": {
+            "type": "boolean",
+            "description": "Sent to practise: show it labelled EXERCISE (translated as the page's other strings)."
           }
         },
         "required": [

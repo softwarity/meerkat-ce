@@ -354,5 +354,8 @@
   "notifAckedBy": "Bevestigd door %s",
   "notifAckAsked": "Wacht op je bevestiging",
   "notifDeleteOwed": "Bevestig deze voordat je hem verwijdert.",
-  "notifKept": "Bewaard: %s wachten op je bevestiging."
+  "notifKept": "Bewaard: %s wachten op je bevestiging.",
+  "notifWithdrawn": "Deze melding is ingetrokken",
+  "notifExercise": "OEFENING",
+  "notifMissed": "Gemiste meldingen: %s"
 }

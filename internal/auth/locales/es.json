@@ -354,5 +354,8 @@
   "notifAckedBy": "Confirmada por %s",
   "notifAckAsked": "Esperando tu confirmación",
   "notifDeleteOwed": "Confírmala antes de eliminarla.",
-  "notifKept": "Conservadas: %s esperan tu confirmación."
+  "notifKept": "Conservadas: %s esperan tu confirmación.",
+  "notifWithdrawn": "Esta notificación fue retirada",
+  "notifExercise": "SIMULACRO",
+  "notifMissed": "Notificaciones que te perdiste: %s"
 }

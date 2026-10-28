@@ -82,7 +82,8 @@ const (
 	TopicEvent = "event"
 	// TopicNotification says that a notification arrived, was withdrawn or
 	// changed state (NOTIF-05), so every node pushes it to the recipients
-	// whose pages it holds. The argument is the kind ("new" or "gone"), a
+	// whose pages it holds. The argument is the kind ("new", "withdrawn",
+	// "replaced", "ack", "group"), a
 	// space and the notification's id: ONE message whatever the audience,
 	// where an event per recipient would put five thousand on the bus for an
 	// organisation of five thousand. The rows are the truth; each node reads

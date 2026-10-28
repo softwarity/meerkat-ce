@@ -354,5 +354,8 @@
   "notifAckedBy": "%s ने पावती दी",
   "notifAckAsked": "आपकी पावती की प्रतीक्षा है",
   "notifDeleteOwed": "हटाने से पहले इसकी पावती दें।",
-  "notifKept": "आपकी पावती की प्रतीक्षा में %s रखी गईं।"
+  "notifKept": "आपकी पावती की प्रतीक्षा में %s रखी गईं।",
+  "notifWithdrawn": "यह सूचना वापस ले ली गई",
+  "notifExercise": "अभ्यास",
+  "notifMissed": "आपसे छूटी सूचनाएँ: %s"
 }

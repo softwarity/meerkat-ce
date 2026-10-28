@@ -40,6 +40,8 @@ utilisateurs. Les écrans de l'administrateur sont décrits dans
 - **Un mail**, quand vous le demandez et qu'un relais de messagerie est
   configuré : le texte, et un bouton vers la page des notifications. Jamais
   d'action.
+- **L'étiquette EXERCICE** devant le titre, partout où elle paraît, sur une
+  notification envoyée [pour s'exercer](#les-exercices).
 
 ![La page des notifications d'une lectrice de deux tenants : le filtre par tenant, un message envoyé aux deux sur une seule rangée, une notification qui attend son acquittement, et une autre dépliée avec Ouvrir et son action](img/console/notifications-page.webp)
 
@@ -55,15 +57,26 @@ supprime ; son détail et ses actions attendent qu'il passe sur ce tenant, et le
 bouton le dit. Un message envoyé à tous les tenants n'est **qu'une** rangée qui
 les nomme, comptée une fois, lue et supprimée en une fois.
 
+Une notification que son émetteur a **retirée** reste dans la liste comme un
+message supprimé dans une messagerie : une rangée qui dit *Cette notification a
+été retirée*, sans rien de ce qu'elle disait (ni titre, ni texte, ni lien, ni
+action, ni tenant), lue, hors du compte, jamais sur un snackbar ni sur le
+bureau. Elle quitte la liste à son expiration, ou quand le lecteur la supprime.
+Une notification que son émetteur a **remplacée** n'est pas montrée du tout :
+la remplaçante tient sa place.
+
 **Retirer et Supprimer ne sont pas la même chose.** Retirer appartient à
-l'émetteur, ou à un administrateur : la notification quitte aussitôt la page de
-chaque lecteur. Supprimer appartient au lecteur : elle quitte sa propre liste,
-et celle de personne d'autre.
+l'émetteur, ou à un administrateur : la notification devient aussitôt la
+rangée de remplacement sur la page de chaque lecteur et quitte son compte. Supprimer appartient au
+lecteur : elle quitte sa propre liste, et celle de personne d'autre.
 
 ## Qui la reçoit
 
-L'audience est arrêtée **une fois, à la publication**, et conservée : une ligne
-par lecteur. Elle part des membres actifs du tenant, réduits aux `roles` et aux
+À la publication, la gateway calcule les lecteurs et garde **une ligne par
+lecteur**. Elle garde aussi l'audience que vous avez nommée, si bien que
+quelqu'un qui y entre plus tard la reçoit encore (voir
+[Les droits acquis ensuite](#les-droits-acquis-ensuite)). L'audience part des
+membres actifs du tenant, réduits aux `roles` et aux
 `users` que vous nommez (l'un ou l'autre suffit ; aucun des deux veut dire tous
 les membres), et ne garde que les personnes qui peuvent **ouvrir ce vers quoi
 elle mène** :
@@ -79,6 +92,34 @@ le rôle, ne la voit plus, et une action qu'un lecteur ne peut pas utiliser ne
 lui est pas proposée. Une publication qui toucherait plus de personnes que le
 plafond fixé par un administrateur (5000 sauf réglage) est refusée.
 
+### Les droits acquis ensuite
+
+Deux moments donnent une notification active à quelqu'un qui ne l'avait pas :
+il **rejoint ou quitte le tenant** (le quitter ne donne rien), ou un **rôle lui
+est attribué** dans ce tenant. Un rôle se tient par un groupe de rôles : il est
+attribué quand on le met dans un groupe de rôles qui le porte, ou quand un de
+ses groupes de rôles le reçoit. À ce moment, la gateway regarde les notifications
+actives du tenant (ni expirées, ni retirées, ni remplacées) dont l'audience
+gardée le comprend désormais, avec les mêmes règles que ci-dessus, et lui donne
+celles qu'il n'a pas.
+
+- Il est prévenu **une fois**, quel que soit le nombre : un snackbar, ou une
+  notification du bureau quand l'onglet n'est pas devant lui, qui dit
+  *Notifications manquées : 3* et mène à sa liste. Jamais une par notification.
+- Quand au moins l'une d'elles demande un mail, il reçoit **un seul mail
+  récapitulatif** qui les liste, par la même [file des mails](#le-mail), jamais
+  un mail chacune.
+- Ouvrir sa liste refait le même travail, sans bruit : ce qu'un moment a manqué
+  est donné alors.
+- Le travail se fait en arrière-plan : l'enregistrement d'une appartenance, ou
+  une connexion qui attribue un tenant ou un rôle, n'est jamais retardé par
+  lui.
+
+Un droit perdu ne change rien aux lignes : la page revérifie l'accès à chaque
+affichage et cache ce que le lecteur ne peut plus ouvrir. Une notification
+publiée avant cette version n'a pas gardé d'audience, et n'est donnée à
+personne ensuite.
+
 ## Publier
 
 Sur le **plan interne**, port 7070, comme les
@@ -90,7 +131,7 @@ cluster par le nom interne de la gateway, jamais par un navigateur.
 | `POST /api/notifications` | publier |
 | `GET /api/notifications` | les vôtres encore actives, les plus récentes d'abord, filtrées par `meta.<clé>` |
 | `GET /api/notifications/{id}/acks` | qui a acquitté l'une des vôtres, et qui pas encore |
-| `DELETE /api/notifications/{id}` | retirer l'une des vôtres |
+| `DELETE /api/notifications/{id}` | retirer l'une des vôtres par son id : tous les exemplaires d'une envoyée à tous les tenants |
 | `DELETE /api/notifications?meta.<clé>=<valeur>` | retirer toutes les vôtres qui correspondent |
 
 **Qui peut l'appeler** se règle dans la console, **Data plane, Notifications,
@@ -117,17 +158,30 @@ cette page, veut dire envoyées sous ce nom.
 | `title` | obligatoire. Texte brut, 200 caractères au plus |
 | `body` | texte brut, 4000 caractères au plus |
 | `level` | `info` (par défaut), `success`, `warning` ou `error` |
+| `exercise` | `true` pour un message envoyé pour s'exercer. Voir [Les exercices](#les-exercices) |
 | `detail` | où elle mène : un [lien](#les-liens-un-service-et-un-chemin), sur une route UI |
 | `actions` | des boutons, 5 au plus : un `label` (60 caractères), un lien, et [la façon de l'appeler](#les-actions-method-et-body) |
-| `mail` | `true` pour l'envoyer aussi par mail. Refusé quand aucun relais de messagerie n'est configuré |
+| `mail` | `true` pour l'envoyer aussi par mail. Refusé quand aucun relais de messagerie n'est configuré. Voir [Le mail](#le-mail) |
 | `expires` | une durée (`P7D`, `PT12H`) ou une date (`2026-11-01T08:00:00Z`) : 30 jours par défaut, 90 au plus. Ensuite elle quitte toutes les listes |
-| `key` | votre clé de déduplication, 200 caractères. Renvoyée au même tenant tant que la première est active, elle répond celle-ci et ne prévient personne de nouveau |
+| `id` | obligatoire, un UUID de votre choix : il permet de renvoyer sans doublon, de remplacer ou de retirer la notification, et de suivre ses acquittements et ses mails. 200 caractères au plus, lettres, chiffres et `-_.:`. Voir [Son id](#son-id-remplacer-et-retirer) |
+| `replaces` | l'id d'une de vos notifications antérieures, qui se termine comme remplacée. Voir [Remplacer](#son-id-remplacer-et-retirer) |
 | `meta` | vos étiquettes, comme `{"invoice": "INV-2026-0142"}`, pour retrouver et retirer les vôtres. Jamais montrées aux lecteurs |
 | `ack` | `none` (par défaut), `single` ou `all` : voir [L'acquittement](#lacquittement) |
 | `onAck` | votre service, appelé à chaque acquittement. Exige `ack` |
 
 Les textes sont dans **une seule langue** pour tous les lecteurs : écrivez-les
 dans la langue que partagent vos utilisateurs. Un objet par langue est refusé.
+
+### Les exercices
+
+Un exercice doit ressembler à la réalité, et ne jamais être pris pour elle.
+Envoyez-le avec `"exercise": true` et un `level` réaliste : il porte l'étiquette
+**EXERCICE**, dans la langue du lecteur, devant son titre sur la page, sur le
+snackbar et sur la notification du bureau, et dans l'objet, le titre et la
+première ligne de son mail. La console le montre avec la même étiquette. Rien
+d'autre ne change : son audience est calculée comme pour toute autre
+notification, si bien que choisir qui participe à l'exercice revient à votre
+service, par `roles` et `users`, et il se compte et se lit comme les autres.
 
 ### Les liens : un service et un chemin
 
@@ -191,15 +245,80 @@ CORS), qu'il doit accorder.
 ### Tous les tenants d'un coup
 
 `"tenant": "*"` envoie un exemplaire à chaque tenant actif dont les
-notifications sont activées, chacun avec son id et ses lecteurs. Un tenant où
+notifications sont activées, chacun avec ses lecteurs, tous sous l'id unique de
+l'envoi. Un tenant où
 personne ne peut la recevoir est écarté, et la réponse le dit. Les utilisateurs
 nommés dans `users` sont pris dans les tenants dont ils sont membres. Un lecteur
 membre de plusieurs de ces tenants n'en voit **qu'une**, qui les nomme, avec un
 seul snackbar, une seule notification du bureau et un seul mail.
 
-La clé vaut par tenant : renvoyé avec la même clé, le message répond les
-exemplaires encore actifs et publie ceux qui manquent. Une publication coupée en
-route se termine en la renvoyant.
+Renvoyé avec le même id, le message répond les exemplaires déjà publiés et
+publie ceux qui manquent : une publication coupée en route se termine en la
+renvoyant. Remplacer ou retirer par cet id agit sur chaque exemplaire.
+
+### Son id, remplacer et retirer
+
+**Un seul id, le vôtre, obligatoire.** Chaque message porte un `id`, un UUID de
+votre choix : il permet de renvoyer sans doublon, de remplacer ou de retirer la
+notification, et de suivre ses acquittements et ses mails. Un message sans id
+est refusé (`422` sur `id`). Un service qui ne reviendra jamais sur une
+notification envoie un UUID neuf et ne le garde pas. La gateway n'invente
+jamais d'id. Sa source est gardée sur chaque notification, et la console la
+montre. Un id vaut pour
+sa source, l'appelant que reconnaît le plan interne : le nom d'un jeton Meerkat, le
+ServiceAccount du pod, ou le workload derrière l'adresse (une adresse seule
+seulement quand rien de mieux n'est connu). Un autre service peut utiliser le
+même id. Republiée depuis la même source sous un id déjà utilisé, avant
+l'expiration de cette notification, la réponse est la notification déjà là,
+avec `"existing": true` : rien n'est créé, personne n'est prévenu deux fois, et
+le contenu n'est pas comparé. C'est vrai même après l'avoir retirée ou
+remplacée : un id que vous avez clos ne revient pas en le renvoyant.
+
+Vos actions sont appelées avec `notification=<id>`, et `onAck` reçoit le même
+id : celui que vous connaissez.
+
+**Remplacer.** Publiez la nouvelle notification avec `"replaces"` qui nomme
+l'id de l'ancienne. Donnez à la remplaçante un id à elle : sous l'id qu'elle
+remplace, elle ne retrouverait que celle-ci, et c'est refusé.
+
+```json
+{ "id": "job-7-80", "title": "Export 7 is at 80%", "replaces": "job-7-40" }
+```
+
+L'ancienne se termine comme **remplacée** : elle quitte la liste et le compte de
+chaque lecteur, la remplaçante tenant sa place, ses mails pas encore partis
+sont annulés, et elle ne demande plus d'acquittement. La réponse dit ce qu'elle
+a clos, dans `replaced`. Renvoyer la même remplaçante la répond avec
+`"existing": true` et ne clôt rien de plus.
+
+**Retirer.** `DELETE /api/notifications/{id}` la termine comme **retirée** : les
+lecteurs voient la rangée de remplacement, ses mails pas encore partis sont
+annulés. Un id envoyé à tous les tenants retire chaque exemplaire. La réponse
+dit si elle a été close maintenant, ou l'était déjà :
+
+```json
+{ "withdrawn": ["job-7-80"] }
+{ "withdrawn": [], "already": ["job-7-80"] }
+```
+
+**Quand vos appels arrivent dans le désordre.** Rien ne garantit qu'un retrait
+ou un remplacement atteigne la gateway après la notification qu'il nomme. S'il
+nomme un id qu'aucune de vos notifications ne porte encore, la gateway le
+garde : un retrait répond `202` avec `{"withdrawn": [], "pending": "<id>"}`, un
+remplacement est publié et sa liste `replaced` est vide. Quand cet id arrive,
+la notification est enregistrée **déjà close**, retirée ou remplacée, et
+personne n'est prévenu ni écrit ; la réponse porte `"state"`. Ce qui est gardé
+vit autant qu'une notification : la durée de la remplaçante, ou pour un retrait
+30 jours sauf si `?expires=` dit autre chose (90 au plus).
+
+| Une notification est | Sur la page du lecteur | Dans le compte |
+|---|---|---|
+| active | telle qu'envoyée | tant qu'elle n'est pas lue |
+| retirée | la rangée *Cette notification a été retirée*, sans rien de ce qu'elle disait | non |
+| remplacée | absente : la remplaçante tient sa place | non |
+| expirée | disparue, avec l'état de chaque lecteur | non |
+
+La console les montre toutes avec leur état, leur émetteur et leur id.
 
 ### Un exemple complet
 
@@ -219,7 +338,7 @@ curl -X POST http://meerkat:7070/api/notifications \
         "path": "/invoices/INV-2026-0142/remind",
         "method": "POST", "body": { "channel": "email" } }
     ],
-    "key": "overdue-INV-2026-0142",
+    "id": "overdue-INV-2026-0142",
     "meta": { "invoice": "INV-2026-0142" },
     "ack": "single",
     "onAck": { "service": "billing", "path": "/notifications/acked" }
@@ -230,15 +349,15 @@ curl -X POST http://meerkat:7070/api/notifications \
 HTTP/1.1 201 Created
 Content-Type: application/json
 
-{"id": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "recipients": 4}
+{"id": "overdue-INV-2026-0142", "recipients": 4}
 ```
 
 ### Les réponses
 
 | Statut | Corps | Sens |
 |---|---|---|
-| `201` | `{"id", "recipients"}` | publiée |
-| `200` | le même, avec `"existing": true` | la clé est déjà active : personne n'est prévenu de nouveau |
+| `201` | `{"id", "recipients"}` | publiée sous votre `id`. Avec `replaces`, `replaced` dit ce qu'elle a clos ; `"state"` quand un retrait ou un remplacement avait nommé l'id avant son arrivée |
+| `200` | le même, avec `"existing": true` | l'id est déjà connu : personne n'est prévenu de nouveau. `"state"` vaut `withdrawn` ou `replaced` quand elle est close |
 | `400` | `{"error"}` | pas du JSON, un champ inconnu, ou plus de 64 Kio |
 | `422` | `{"error"}` | refusée : la phrase nomme le champ et ce qui est permis |
 | `401`, `403` | `{"error"}` | l'accès a refusé l'appelant : ce qui manque, et qui est admis |
@@ -260,10 +379,11 @@ Envoyé à tous les tenants, le `201` liste les exemplaires et les tenants
 
 ```json
 {
+  "id": "maintenance-2026-10-25",
   "recipients": 37,
   "tenants": [
-    { "tenant": "7c1e2a90", "name": "Acme Logistics", "id": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "recipients": 21 },
-    { "tenant": "b2f4c8d1", "name": "Acme Retail", "id": "ntf_e81d07c3a9b24f5e6d1c8a72", "recipients": 16 }
+    { "tenant": "7c1e2a90", "name": "Acme Logistics", "recipients": 21 },
+    { "tenant": "b2f4c8d1", "name": "Acme Retail", "recipients": 16 }
   ],
   "skipped": [
     { "tenant": "40aa9e3b", "name": "Acme Labs", "reason": "notifications are off, turned off by the tenant admin" }
@@ -305,11 +425,11 @@ Tout ce qui n'est pas un 2xx est retenté deux fois.
 ```http
 POST /notifications/acked
 Content-Type: application/json
-Meerkat-Notification: ntf_5c0e9a1f2b7d4e6a8c3b1d0f
+Meerkat-Notification: overdue-INV-2026-0142
 Meerkat-Attempt: 1
 
-{"notification": "ntf_5c0e9a1f2b7d4e6a8c3b1d0f", "tenant": "7c1e2a90",
- "tenantName": "Acme Logistics", "key": "overdue-INV-2026-0142",
+{"notification": "overdue-INV-2026-0142", "tenant": "7c1e2a90",
+ "tenantName": "Acme Logistics",
  "meta": {"invoice": "INV-2026-0142"}, "ack": "single",
  "by": {"id": "u_41f2", "username": "alice", "name": "Alice Martin"},
  "at": "2026-10-25T09:12:44Z", "acknowledged": 1, "recipients": 4, "complete": true}
@@ -336,9 +456,74 @@ curl -X DELETE "http://meerkat:7070/api/notifications?meta.invoice=INV-2026-0142
 `meta.<clé>=<valeur>` compare une valeur, `meta.<clé>=~<regex>` une expression
 régulière (RE2), et toutes les conditions doivent correspondre. Retirer par
 filtre en exige au moins une : tout ce qu'un émetteur a jamais envoyé n'est pas
-une requête. La réponse liste ce qui a été retiré, `{"withdrawn": ["ntf_..."]}`,
-et ces notifications quittent aussitôt la page de chaque lecteur. La console les
-garde, marquées Withdrawn, avec qui les a lues.
+une requête. La réponse liste ce qui a été retiré, `{"withdrawn": ["<id>", ...], "count": 2}`,
+et ces notifications apparaissent aussitôt retirées sur la page de chaque
+lecteur. La console les garde, marquées Withdrawn, avec qui les a lues.
+
+## Le mail
+
+Avec `"mail": true`, chaque lecteur qui a une adresse reçoit un mail dans sa
+langue, au gabarit des mails de la gateway : le texte, et un bouton vers sa page
+de notifications quand la gateway connaît son adresse publique. Un mail ne
+porte jamais d'action. Un message envoyé à tous les tenants n'est écrit qu'une
+fois au lecteur de plusieurs d'entre eux.
+
+**La file est dans la base**, un mail par lecteur, chacun avec son état sur la
+ligne du lecteur. Les nœuds les envoient un par un, un toutes les 200 ms, et un
+seul nœud envoie à la fois, si bien qu'une audience de milliers de personnes
+n'arrive pas d'un coup au relais. Deux nœuds n'envoient jamais le même mail :
+un nœud réserve un mail avant de l'envoyer. Une gateway arrêtée en route, ou
+redémarrée, ne perd rien : ce qui reste à envoyer part par le prochain nœud qui
+tourne, ou par le même à son redémarrage.
+
+| Le mail d'un lecteur est | Sens |
+|---|---|
+| `pending` | à envoyer, maintenant ou à sa prochaine tentative |
+| `sending` | un nœud est en train de l'envoyer |
+| `accepted` | le relais l'a accepté. Le plus que la gateway sache : jamais « remis » |
+| `failed` | le relais l'a refusé pour de bon (une réponse `5yz`), ou un refus temporaire (`4yz`) a duré plus de 24 heures, ou plus que la vie de la notification. Le code de réponse est gardé |
+| `unknown` | la connexion est tombée après l'envoi du message entier et avant la réponse du relais, ou le nœud qui l'envoyait s'est arrêté : le relais l'a peut-être pris, donc il n'est jamais renvoyé de lui-même |
+| `cancelled` | la notification a été retirée, remplacée ou a expiré avant son départ |
+| `noaddress` | le lecteur n'a pas d'adresse, ou son compte est désactivé |
+
+Un refus temporaire, ou un relais injoignable, est retenté après 1, 5, 15 et
+30 minutes, puis toutes les heures, pendant 24 heures au plus. Chaque tentative
+d'un même mail porte le même `Message-ID`, pour qu'une boîte qui le reçoit deux
+fois puisse le reconnaître.
+
+**Où ils en sont.** Pour une notification envoyée avec mail, votre liste porte
+`mails`, le compte des mails de ses lecteurs par état :
+
+```json
+{ "id": "overdue-INV-2026-0142", "mail": true,
+  "mails": { "accepted": 38, "failed": 1, "noaddress": 2 } }
+```
+
+Une fois qu'il ne reste rien à envoyer, le résultat tient en une ligne de la
+piste d'audit pour la notification, `notification.mail`, jamais une par
+lecteur. La console montre le mail de chaque lecteur à côté de l'heure de sa
+lecture.
+
+## Ce que garde la piste d'audit
+
+Ce qu'un service fait sur le plan interne est dans la
+[piste d'audit](/docs/operations/audit), l'émetteur pour acteur, nommé comme
+l'accès l'a reconnu (le nom d'un jeton, un ServiceAccount, une adresse), dans
+le tenant de la notification :
+
+| Action | Écrite quand |
+|---|---|
+| `notification.publish` | une notification est publiée : son émetteur, son tenant, combien de destinataires, si c'est un exercice, et si elle est arrivée déjà retirée ou remplacée. Envoyée à tous les tenants, une ligne par exemplaire |
+| `notification.replace` | une notification est remplacée, en nommant celle qui la remplace |
+| `notification.withdraw` | une notification est retirée, par son émetteur ou un administrateur |
+| `notification.mail` | l'envoi des mails d'une notification est terminé : une ligne pour la notification, jamais une par destinataire, avec combien de mails le relais a acceptés, combien ont échoué, combien de lecteurs n'avaient pas d'adresse, et combien ont été annulés |
+| `notification.given` | des notifications ont été données à quelqu'un après leur publication, parce qu'il a rejoint le tenant ou reçu un rôle, ou à l'ouverture de sa liste : une ligne qui nomme la personne et les notifications, la gateway pour acteur |
+| `notification.ack` | un lecteur en acquitte une : une ligne par acquittement, le lecteur pour acteur, gardée après l'expiration de la notification |
+
+Lire et supprimer appartiennent au lecteur, gardés sur sa ligne de la
+notification, et ne sont pas dans la piste. L'écran **Data plane,
+Notifications** de la console et la section **Notifications** du tenant suivent
+chaque publication en direct, celles du plan interne comme celles de la console.
 
 ## Votre propre page de notifications
 

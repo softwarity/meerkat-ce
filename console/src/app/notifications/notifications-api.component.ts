@@ -34,16 +34,21 @@ export class NotificationsApiComponent {
 # notification.json is the message below, without its comments.
 curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
   -H "Content-Type: application/json" --data @notification.json
-# {"id":"ntf_b5605a88...","recipients":3}
+# {"id":"5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0","recipients":3}
 
-# The same key again while it is live: 200, the same notification,
-# nobody is told twice.
-# {"id":"ntf_b5605a88...","recipients":3,"existing":true}`,
+# The same id again, before it expires: 200, the same notification,
+# nobody is told twice. "state" says when it was withdrawn or replaced.
+# Without an id: 422, it is required.
+# {"id":"5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0","recipients":3,"existing":true}`,
   );
 
   // Annotated, and named .jsonc for it: the values a field takes belong
   // beside the field.
   protected readonly payload = `{
+  "id": "5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0",
+                                  // required, a UUID of your choice:
+                                  // retry, replace, withdraw, follow
+                                  // acks and mails
   "tenant": "acme",               // tenant id or name, optional when
                                   // there is only one. "*": a copy
                                   // to every tenant
@@ -55,6 +60,8 @@ curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
   "body": "No reading since 08:10. The on-call team was paged.",
   "level": "error",               // info (default), success, warning,
                                   // error
+  "exercise": false,              // true: sent to practise, labelled
+                                  // EXERCISE wherever it shows
 
   "detail": {                     // where it leads: a screen of a
     "service": "station-ui",      // service, named as in the cluster,
@@ -76,8 +83,9 @@ curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
   "mail": true,                   // also by mail (needs a mail relay)
   "expires": "P7D",               // a duration or a date: 30 days by
                                   // default, 90 at most
-  "key": "station-42-down",       // sent again while live: the same
-                                  // notification, nobody told twice
+  "replaces": "4d1e9a77-0b3c-4f0e-8d21-6a1b9c3e5f42",
+                                  // an earlier one of yours, by id:
+                                  // it ends as replaced
   "meta": { "station": "42" },    // your own labels, to find and
                                   // withdraw it. Never shown
 
@@ -95,12 +103,12 @@ curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
 
 curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
   -H "Content-Type: application/json" \\
-  -d '{"tenant":"*","title":"Maintenance tonight at 22:00","key":"maint-1025"}'
-# 201: one copy per tenant, each with its own id, and the tenants left out.
-# {"recipients":41,
+  -d '{"id":"maint-1025","tenant":"*","title":"Maintenance tonight at 22:00"}'
+# 201: one copy per tenant under the one id, and the tenants left out.
+# {"id":"maint-1025","recipients":41,
 #  "tenants":[
-#    {"tenant":"038ae636...","name":"Acme","id":"ntf_1c8e...","recipients":38},
-#    {"tenant":"f5a445af...","name":"Globex","id":"ntf_2687...","recipients":3}],
+#    {"tenant":"038ae636...","name":"Acme","recipients":38},
+#    {"tenant":"f5a445af...","name":"Globex","recipients":3}],
 #  "skipped":[
 #    {"tenant":"9c1d07e2...","name":"Initech",
 #     "reason":"notifications are off, turned off by the tenant admin"}]}`,
@@ -112,24 +120,45 @@ curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
 # Your live notifications, newest first, filtered by metadata.
 curl "${this.origin()}/api/notifications?meta.station=42" -H "$AUTH"
 curl "${this.origin()}/api/notifications?meta.station=~^4[0-9]$" -H "$AUTH"
-# [{"id":"ntf_b5605a88...","tenantId":"038ae636...","sender":"stations",
+# [{"id":"5f0c2b8e-...","tenantId":"038ae636...","sender":"stations",
 #   "title":{"":"Station 42 is down"},"meta":{"station":"42"},"recipients":3,
 #   "ack":"single","ackState":"pending","acknowledged":0, ...}]
 
-# Withdraw one: 204. It leaves every reader's page at once.
-curl -X DELETE ${this.origin()}/api/notifications/ntf_b5605a88 -H "$AUTH"
+# Withdraw one by its id.
+curl -X DELETE ${this.origin()}/api/notifications/5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0 -H "$AUTH"
+# {"withdrawn":["5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0"]}
 
 # Withdraw every one the filter matches; one meta condition at least.
 curl -X DELETE "${this.origin()}/api/notifications?meta.station=42" -H "$AUTH"
-# {"withdrawn":["ntf_1c8e...","ntf_2687..."]}`,
+# {"withdrawn":["5f0c2b8e-...","9b2d7c41-..."]}`,
+  );
+
+  protected readonly replaceCmd = computed(
+    () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
+
+# Replace: publish the new one, naming the earlier one by its id.
+curl -X POST ${this.origin()}/api/notifications -H "$AUTH" \\
+  -H "Content-Type: application/json" \\
+  -d '{"id":"job-7-80","title":"Job 7 at 80%","replaces":"job-7-40"}'
+# {"id":"job-7-80","recipients":3,"replaced":["job-7-40"]}
+
+# Withdraw: 200 and the id it ended now; "already" when it had ended.
+curl -X DELETE ${this.origin()}/api/notifications/job-7-80 -H "$AUTH"
+# {"withdrawn":["job-7-80"]}
+
+# An id not received yet: 202, kept for 30 days, or what expires says.
+curl -X DELETE "${this.origin()}/api/notifications/job-8?expires=P7D" -H "$AUTH"
+# {"withdrawn":[],"pending":"job-8"}
+
+# 400: an id with a character it may not carry.`,
   );
 
   protected readonly acksCmd = computed(
     () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
 
 # Who acknowledged it, when, and who has not yet.
-curl ${this.origin()}/api/notifications/ntf_b5605a88/acks -H "$AUTH"
-# {"id":"ntf_b5605a88...","ack":"single","ackState":"done","acknowledged":1,
+curl ${this.origin()}/api/notifications/5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0/acks -H "$AUTH"
+# {"id":"5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0","ack":"single","ackState":"done","acknowledged":1,
 #  "ackBy":{"id":"eb7f08a2...","username":"bob","name":"Bob Durand"},
 #  "acks":[{"id":"eb7f08a2...","username":"bob","name":"Bob Durand",
 #           "at":1792945051}],
@@ -137,6 +166,19 @@ curl ${this.origin()}/api/notifications/ntf_b5605a88/acks -H "$AUTH"
 
 # 409 when it does not ask for an acknowledgement.`,
   );
+
+  protected readonly mails = `// GET /api/notifications: a notification sent with mail counts its
+// readers' mails by state.
+{"id": "5f0c2b8e-4d1e-4b2a-9a77-02c6f2c4e1a0", "mail": true,
+ "mails": {"accepted": 38, "failed": 1, "noaddress": 2}}
+
+// pending    to send, now or at its next attempt
+// sending    a node is sending it
+// accepted   accepted by the relay
+// failed     refused for good, or refused for now for 24 hours
+// unknown    the connection went before the relay answered
+// cancelled  withdrawn, replaced or expired first
+// noaddress  the reader has no address`;
 
   protected readonly refused = `HTTP/1.1 422 Unprocessable Entity
 
@@ -146,12 +188,12 @@ curl ${this.origin()}/api/notifications/ntf_b5605a88/acks -H "$AUTH"
 Content-Type: application/json
 X-Remote-User: meerkat                 # the caller, with no role, passed
                                        # the way your route passes identity
-Meerkat-Notification: ntf_b5605a88...  # the notification
+Meerkat-Notification: 5f0c2b8e-...    # the id you gave
 Meerkat-Attempt: 1                     # 2 or 3: sent again after a failure
 User-Agent: meerkat-notifications
 
-{"notification":"ntf_b5605a88...","tenant":"038ae636...","tenantName":"Acme",
- "key":"station-42-down","meta":{"station":"42"},"ack":"single",
+{"notification":"5f0c2b8e-...","tenant":"038ae636...","tenantName":"Acme",
+ "meta":{"station":"42"},"ack":"single",
  "by":{"id":"eb7f08a2...","username":"bob","name":"Bob Durand"},
  "at":"2026-10-25T16:17:31Z","acknowledged":1,"recipients":3,"complete":true}`;
 }

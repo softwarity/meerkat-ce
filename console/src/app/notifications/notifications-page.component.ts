@@ -23,8 +23,9 @@ import { MeService } from "../me.service";
 import { ZonedDatePipe } from "../shared/zoned-date.pipe";
 import { SchedulerAccessComponent } from "../scheduler/scheduler-access.component";
 import { DialogsService } from "../shared/dialogs.service";
+import { LiveChangesService } from "../shared/live-changes.service";
 import { NotificationsApiComponent } from "./notifications-api.component";
-import { offByText } from "./notify-levels";
+import { mailText, offByText } from "./notify-levels";
 
 // One level's decision on a tenant, while the drawer is open: turned off,
 // allowed again, or forced on (what the levels below decided is cleared).
@@ -113,6 +114,25 @@ export class NotificationsPageComponent {
 
   constructor() {
     this.load();
+    // Published, replaced or withdrawn by a service on the internal plane, or
+    // from another console: the list, and the notification open in the
+    // drawer, read again.
+    if (this.me.mayWatch()) {
+      inject(LiveChangesService).on("notification", () => this.reload());
+    }
+  }
+
+  private reload(): void {
+    if (!this.settings()) return;
+    this.api.sentNotifications().subscribe((l) => {
+      this.list.set(l);
+      const open = this.selected();
+      const fresh = open && l.find((n) => n.id === open.id);
+      if (fresh && JSON.stringify(fresh) !== JSON.stringify(open)) {
+        this.selected.set(fresh);
+        this.api.notificationReaders(fresh.id).subscribe((r) => this.readers.set(r));
+      }
+    });
   }
 
   protected load(): void {
@@ -124,6 +144,8 @@ export class NotificationsPageComponent {
       error: (e: HttpErrorResponse) => this.unavailable.set(e.error?.error ?? e.message),
     });
   }
+
+  protected readonly mailText = mailText;
 
   protected title(n: SentNotification): string {
     return n.title["en"] ?? n.title[""] ?? Object.values(n.title)[0] ?? "";
@@ -141,9 +163,9 @@ export class NotificationsPageComponent {
     return this.tenantNames().get(id) ?? id;
   }
 
-  // Live, expired or withdrawn: a word, not a chip.
-  protected state(n: SentNotification): "live" | "expired" | "withdrawn" {
-    if (n.withdrawnAt) return "withdrawn";
+  // Live, expired, withdrawn or replaced: a word, not a chip.
+  protected state(n: SentNotification): "live" | "expired" | "withdrawn" | "replaced" {
+    if (n.withdrawnAt) return n.endedAs === "replaced" ? "replaced" : "withdrawn";
     return n.expiresAt * 1000 < Date.now() ? "expired" : "live";
   }
 

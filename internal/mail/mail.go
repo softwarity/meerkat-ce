@@ -6,11 +6,13 @@ package mail
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"mime"
 	"net"
 	netmail "net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 )
@@ -132,6 +134,42 @@ type Message struct {
 	Subject string
 	Text    string
 	HTML    string
+	// MessageID, when set, is the Message-ID header without its angle
+	// brackets: the same on every attempt at one mail, so a relay or a
+	// mailbox that received it twice can tell.
+	MessageID string
+}
+
+// SendError is a send that failed, as a queue needs to read it: the relay's
+// reply code when it gave one (0 when the connection failed before any), and
+// Lost when the connection went after the whole message was written but
+// before the relay answered - the relay may have taken it, so sending it
+// again could deliver it twice. Its text is the step that failed, as before.
+type SendError struct {
+	Code int
+	Lost bool
+	err  error
+}
+
+func (e *SendError) Error() string {
+	if e.err == nil {
+		return fmt.Sprintf("mail: the relay answered %d", e.Code)
+	}
+	return e.err.Error()
+}
+func (e *SendError) Unwrap() error { return e.err }
+
+// failed wraps the error of one step: the reply code is read from it when the
+// relay gave one.
+func failed(err error, lost bool, format string, args ...any) error {
+	se := &SendError{err: fmt.Errorf(format+": %w", append(args, err)...)}
+	var tp *textproto.Error
+	if errors.As(err, &tp) {
+		se.Code = tp.Code
+	} else {
+		se.Lost = lost
+	}
+	return se
 }
 
 // Send delivers msg through cfg. The dial is bounded; every failure names the
@@ -159,19 +197,23 @@ func Send(ctx context.Context, cfg Config, msg Message) error {
 		conn, err = d.DialContext(ctx, "tcp", addr)
 	}
 	if err != nil {
-		return fmt.Errorf("mail: connect %s: %w", addr, err)
+		return failed(err, false, "mail: connect %s", addr)
+	}
+	// A relay that stops answering holds nobody past the caller's deadline.
+	if dl, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(dl)
 	}
 	c, err := smtp.NewClient(conn, cfg.Host)
 	if err != nil {
 		_ = conn.Close()
-		return fmt.Errorf("mail: SMTP handshake with %s: %w", addr, err)
+		return failed(err, false, "mail: SMTP handshake with %s", addr)
 	}
 	defer func() { _ = c.Close() }()
 
 	if cfg.Security == "" || cfg.Security == "starttls" {
 		if ok, _ := c.Extension("STARTTLS"); ok {
 			if err := c.StartTLS(&tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12}); err != nil {
-				return fmt.Errorf("mail: STARTTLS with %s: %w", addr, err)
+				return failed(err, false, "mail: STARTTLS with %s", addr)
 			}
 		} else if cfg.Security == "starttls" {
 			return fmt.Errorf("mail: %s does not offer STARTTLS (allowed security modes: starttls, tls, none)", addr)
@@ -183,28 +225,32 @@ func Send(ctx context.Context, cfg Config, msg Message) error {
 			return err
 		}
 		if err := c.Auth(auth); err != nil {
-			return fmt.Errorf("mail: authentication refused by %s: %w", addr, err)
+			return failed(err, false, "mail: authentication refused by %s", addr)
 		}
 	}
 	if err := c.Mail(from.Address); err != nil {
-		return fmt.Errorf("mail: sender refused: %w", err)
+		return failed(err, false, "mail: sender refused")
 	}
 	for _, to := range msg.To {
 		if err := c.Rcpt(to); err != nil {
-			return fmt.Errorf("mail: recipient %q refused: %w", to, err)
+			return failed(err, false, "mail: recipient %q refused", to)
 		}
 	}
 	w, err := c.Data()
 	if err != nil {
-		return fmt.Errorf("mail: DATA refused: %w", err)
+		return failed(err, false, "mail: DATA refused")
 	}
 	if _, err := w.Write(Build(cfg.Sender(), msg)); err != nil {
-		return fmt.Errorf("mail: write body: %w", err)
+		return failed(err, false, "mail: write body")
 	}
+	// The end of the data: the relay's answer here is the outcome. No answer
+	// at all - the connection gone - leaves it unknown.
 	if err := w.Close(); err != nil {
-		return fmt.Errorf("mail: message refused: %w", err)
+		return failed(err, true, "mail: message refused")
 	}
-	return c.Quit()
+	// Accepted. A QUIT the relay does not answer changes nothing to that.
+	_ = c.Quit()
+	return nil
 }
 
 // Build renders the RFC 5322 message: text/plain alone, or
@@ -219,6 +265,9 @@ func Build(from string, msg Message) []byte {
 	crlf("To: " + strings.Join(msg.To, ", "))
 	crlf("Subject: " + mime.QEncoding.Encode("utf-8", msg.Subject))
 	crlf("Date: " + time.Now().Format(time.RFC1123Z))
+	if msg.MessageID != "" {
+		crlf("Message-ID: <" + msg.MessageID + ">")
+	}
 	crlf("MIME-Version: 1.0")
 	if msg.HTML == "" {
 		crlf(`Content-Type: text/plain; charset="utf-8"`)

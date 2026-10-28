@@ -50,24 +50,30 @@ reach: 5000 unless changed. Above it, publishing is refused.
 
 Root and the application admin follow here what every service sent, newest
 first: the title and its level, the sender, the tenant, how many of its
-recipients read it, and when it was sent. A withdrawn or expired notification
-stays in the list, marked so.
+recipients read it, and when it was sent. A withdrawn, replaced or expired
+notification stays in the list, marked so; an exercise carries the label
+EXERCISE before its title.
 
 ![Data plane, Notifications: the notifications sent, with their sender, tenant and read count, and the Settings, API and Access buttons](img/console/notifications.webp)
 
-A click opens one: its text, its sender and tenant, the address of its detail,
+A click opens one: its text, its sender, its id (the one the sender knows it
+by) and tenant, the address of its detail,
 each action with its method and address, its metadata, when it was sent and
-when it expires, and every recipient with the time they read it. **Withdraw**
-takes a live one back: it disappears at once from every reader's page, and the
-list of who read it is kept.
+when it expires, and every recipient with the time they read it and, when it
+was sent with mail, where their mail stands (to send, accepted by the relay,
+refused with the relay's code, unknown, cancelled, no address). **Withdraw**
+takes a live one back: every reader sees it turn into the placeholder *This
+notification was withdrawn* at once, out of their count, and the list of who
+read it is kept.
 
 Three buttons sit in the header:
 
 - **Settings** - the drawer above.
-- **API** - *Publishing notifications*, for the developer of a service, in six
-  folds: the endpoints and the token, the message field by field, every tenant
-  at once, the responses, finding and withdrawing, and the acknowledgements
-  with the call `onAck` makes.
+- **API** - *Publishing notifications*, for the developer of a service, in
+  seven folds: the endpoints and the token, the message field by field, every
+  tenant at once, the responses, finding and withdrawing, replacing and
+  withdrawing by its id (calls arriving out of order included), and the
+  acknowledgements with the call `onAck` makes.
 - **Access** - [who may publish](#who-may-publish).
 
 ![The API panel, Publishing notifications: the endpoints and the token, then the message field by field](img/console/notifications-api.webp)
@@ -142,7 +148,8 @@ and has two tabs.
 
 - **Audience** - roles and members. Both empty: every member who may open its
   links.
-- **Message** - the level, the title and the text.
+- **Message** - the level, **An exercise** for a message sent to practise
+  (its readers see it labelled EXERCISE), the title and the text.
 - **Detail** - none, a route and a path under it, or an https address. The
   field shows the address the reader will open.
 - **Actions** - up to five buttons: a label, a route and a path or an https
@@ -152,7 +159,8 @@ and has two tabs.
   browser: never put a secret in it.
 - **Acknowledgement** - None, One reader, or Every reader, and the route of
   your service to call at each acknowledgement.
-- **More** - the lifetime, the key, the metadata, and Also send by mail (only
+- **More** - the lifetime, the id (required: a fresh UUID is filled in, and a
+  new one after each send), the metadata, and Also send by mail (only
   when a mail relay is configured).
 
 ![The New notification drawer, Edit tab: a detail on the Billing route, and an action calling it with POST and a JSON body](img/console/notification-compose.webp)
@@ -170,12 +178,19 @@ refusal comes back under the field it concerns, on the Edit tab.
 
 | Action | Written when |
 |---|---|
-| `notification.publish` | an administrator sends one from a tenant's page |
-| `notification.withdraw` | an administrator, or an agent, withdraws one |
+| `notification.publish` | an administrator sends one from a tenant's page, or a service publishes one on the internal plane (the sender is the actor) |
+| `notification.replace` | a service, or an administrator's message, replaces one |
+| `notification.withdraw` | an administrator, an agent or the sender withdraws one |
+| `notification.mail` | a notification's mailing is over: one line per notification with its outcome |
+| `notification.given` | someone was given notifications after their publication, having joined the tenant or been granted a role |
 | `notification.ack` | a reader acknowledges one; the reader is the actor |
 | `settings.notifications` | the switch, a tenant's state or the cap changes, at root's or the application admin's level |
 | `tenant.notifications` | the switch of a tenant's Notifications section changes |
 | `settings.notifications-access` | who may publish changes |
+
+Reading is not on the trail: it stays on each recipient's line, which the
+drawer shows. The list follows live what a service publishes,
+replaces or withdraws, as it follows the console's own sends.
 
 An assistant connected to the gateway can list what was sent and withdraw a
 notification, never publish one: a notification is a service telling its users

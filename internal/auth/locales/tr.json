@@ -354,5 +354,8 @@
   "notifAckedBy": "%s onayladı",
   "notifAckAsked": "Onayınızı bekliyor",
   "notifDeleteOwed": "Silmeden önce onaylayın.",
-  "notifKept": "Onayınızı bekleyen %s bildirim tutuldu."
+  "notifKept": "Onayınızı bekleyen %s bildirim tutuldu.",
+  "notifWithdrawn": "Bu bildirim geri çekildi",
+  "notifExercise": "TATBİKAT",
+  "notifMissed": "Kaçırdığınız bildirimler: %s"
 }

@@ -19,7 +19,9 @@
           </tr>
           <tr>
             <th><code>DELETE /&#123;id&#125;</code></th>
-            <td i18n="@@Notif_ep_delete">Withdraw one. It leaves every reader's page at once.</td>
+            <td i18n="@@Notif_ep_delete">
+              Withdraw one by its id. Its readers see it withdrawn at once.
+            </td>
           </tr>
           <tr>
             <th><code>DELETE /?meta.&lt;key&gt;=...</code></th>
@@ -54,7 +56,9 @@
       <p class="hint" i18n="@@Notif_api_publish_1">
         A person receives it only if they may open where it leads. The readers
         see it on their notifications page, with a count on the user button or
-        the portal bar.
+        the portal bar. The audience you name is kept: someone who joins the
+        tenant, or is given a role, while it is live receives it then, told
+        once for all they missed, with one digest mail.
       </p>
       <app-snippet filename="publish-notification.sh" [content]="publishCmd()" />
       <app-snippet filename="notification.jsonc" [content]="payload" />
@@ -63,6 +67,21 @@
       </p>
       <table class="fields">
         <tbody>
+          <tr>
+            <th><code>id</code></th>
+            <td i18n="@@Notif_field_id">
+              Required, a UUID of your choice: it lets you retry without
+              duplicates, replace or withdraw the notification, and follow its
+              acknowledgements and mails. 200 characters at most,
+              letters, digits and <code>- _ . :</code>. It is scoped by the
+              caller this API recognises (a token's name, a ServiceAccount, the
+              workload behind the address). Sent again under an id you already
+              used, before it expires, even after you withdrew or replaced it:
+              the answer is that notification, nothing is created and nobody
+              is told twice. Your actions and <code>onAck</code> receive this
+              id.
+            </td>
+          </tr>
           <tr>
             <th><code>tenant</code></th>
             <td i18n="@@Notif_field_tenant">
@@ -105,6 +124,14 @@
             </td>
           </tr>
           <tr>
+            <th><code>exercise</code></th>
+            <td i18n="@@Notif_field_exercise">
+              <code>true</code> for a message sent to practise. It keeps its
+              realistic level and audience, and carries the label EXERCISE on
+              the page, the snackbar, the desktop notification and the mail.
+            </td>
+          </tr>
+          <tr>
             <th><code>detail</code></th>
             <td i18n="@@Notif_field_detail">
               Where the notification leads: <code>{{ "{" }}service, path{{ "}" }}</code>,
@@ -143,7 +170,9 @@
             <th><code>mail</code></th>
             <td i18n="@@Notif_field_mail">
               Also send it by mail. Refused when no mail relay is configured.
-              A mail carries no action.
+              A mail carries no action. The mails wait in the database and
+              survive a restart; your list counts them by state in
+              <code>mails</code> (see below).
             </td>
           </tr>
           <tr>
@@ -154,12 +183,11 @@
             </td>
           </tr>
           <tr>
-            <th><code>key</code></th>
-            <td i18n="@@Notif_field_key">
-              200 characters at most. Sent again with the same key while it is
-              live, in the same tenant: the answer is that notification, and
-              nobody is told twice. The same key in two tenants gives two
-              notifications.
+            <th><code>replaces</code></th>
+            <td i18n="@@Notif_field_replaces">
+              The id of an earlier notification of yours. It ends as replaced
+              when this one is published, and leaves its readers' list (see
+              below). The replacement has an id of its own.
             </td>
           </tr>
           <tr>
@@ -199,15 +227,15 @@
     <ng-template matExpansionPanelContent>
       <p class="hint" i18n="@@Notif_api_every_1">
         With <code>"tenant": "*"</code>, each enabled tenant whose
-        notifications are on gets its own copy, with its own id. A tenant where
+        notifications are on gets a copy, all under the one id. A tenant where
         nobody may receive it is left out, and the answer says which and why.
         Named users are taken in the tenants they belong to.
       </p>
       <app-snippet filename="every-tenant.sh" [content]="everyCmd()" />
       <p class="hint" i18n="@@Notif_api_every_2">
         A person in several of these tenants sees one notification and gets
-        one mail. Sent again with the same <code>key</code>, the copies already
-        live are answered and the missing ones published. No tenant received
+        one mail. Sent again with the same <code>id</code>, the copies already
+        published are answered and the missing ones published. No tenant received
         it: <code>422</code>.
       </p>
     </ng-template>
@@ -230,8 +258,9 @@
           <tr>
             <th><code>200</code></th>
             <td i18n="@@Notif_answer_200">
-              Its <code>key</code> is already live: the same notification, with
-              <code>"existing": true</code>. Nobody is told again.
+              Its <code>id</code> is already known: the same notification, with
+              <code>"existing": true</code>, and <code>state</code> when it was
+              withdrawn or replaced. Nobody is told again.
             </td>
           </tr>
           <tr>
@@ -275,9 +304,53 @@
         <code>meta.&lt;key&gt;=&lt;value&gt;</code> matches exactly,
         <code>meta.&lt;key&gt;=~&lt;expression&gt;</code> by regular
         expression; all conditions must match. Withdrawn, a notification
-        leaves every reader's page and asks nobody for anything.
+        stays on its readers' pages as a row saying it was withdrawn, and asks
+        nobody for anything.
       </p>
       <app-snippet filename="find-notifications.sh" [content]="readCmd()" />
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_replace"
+        >Replace and withdraw</mat-panel-title
+      >
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_replace_1">
+        Name an earlier notification of yours by its id. Replaced, it leaves
+        its readers' list and count, the replacement standing in its place, and
+        its mails not sent yet are cancelled. Withdrawn, it stays as a row
+        saying it was withdrawn, with nothing of what it said, and its mails
+        not sent yet are cancelled. An id sent to every tenant names every
+        copy.
+      </p>
+      <app-snippet filename="replace-withdraw.sh" [content]="replaceCmd()" />
+      <p class="hint" i18n="@@Notif_api_replace_2">
+        Your calls may arrive out of order. A replacement or a withdrawal that
+        names an id not received yet is kept as long as a notification lives
+        (30 days by default, 90 at most): when that id arrives, it is stored
+        already ended, and nobody is told or mailed.
+      </p>
+    </ng-template>
+  </mat-expansion-panel>
+
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title i18n="@@Notif_api_mail">Mail</mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <p class="hint" i18n="@@Notif_api_mail_1">
+        One mail per reader with an address, queued in the database and sent
+        one at a time: a gateway that stops or restarts sends the rest later.
+        A temporary refusal (<code>4yz</code>) is tried again for 24 hours, a
+        permanent one (<code>5yz</code>) fails. Accepted means accepted by the
+        relay, never delivered. A connection lost after the message was sent
+        is unknown, and never sent again on its own. Every attempt carries the
+        same <code>Message-ID</code>.
+      </p>
+      <app-snippet filename="mail-outcomes.json" [content]="mails" />
     </ng-template>
   </mat-expansion-panel>
 

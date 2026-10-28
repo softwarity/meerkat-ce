@@ -65,9 +65,11 @@ interface Draft {
   ack: 'none' | NotificationAck;
   onAck: Link;
   expires: string;
-  key: string;
+  id: string;
   meta: { key: string; value: string }[];
   mail: boolean;
+  // Sent to practise: the readers see it labelled EXERCISE.
+  exercise: boolean;
 }
 
 const emptyLink = (kind: LinkKind): Link => ({ kind, route: '', path: '', url: '' });
@@ -158,9 +160,12 @@ export class TenantNotificationComposeComponent {
     ack: 'none',
     onAck: emptyLink('none'),
     expires: '',
-    key: '',
+    // Required: the console is the sender here, and gives a fresh UUID the
+    // administrator may change.
+    id: crypto.randomUUID(),
     meta: [],
     mail: false,
+    exercise: false,
   });
 
   protected readonly f = form(this.draft, (p) => {
@@ -170,7 +175,7 @@ export class TenantNotificationComposeComponent {
     applyEach(p.actions, (a) => {
       maxLength(a.label, 60, { message: $localize`:@@Notify_label_long:60 characters at most.` });
     });
-    maxLength(p.key, 200, { message: $localize`:@@Notify_title_long:200 characters at most.` });
+    maxLength(p.id, 200, { message: $localize`:@@Notify_title_long:200 characters at most.` });
     validate(p.detail.url, ({ value, valueOf }) =>
       valueOf(p.detail.kind) === 'url' && value().trim() && !HTTPS.test(value().trim())
         ? [{ kind: 'https', message: $localize`:@@Notify_https_only:An address outside the gateway starts with https://` }]
@@ -304,6 +309,7 @@ export class TenantNotificationComposeComponent {
     if (d.roles.length) m['roles'] = d.roles;
     if (d.users.length) m['users'] = d.users;
     m['level'] = d.level;
+    if (d.exercise) m['exercise'] = true;
     m['title'] = d.title.trim();
     if (d.body.trim()) m['body'] = d.body.trim();
     const detail = this.target(d.detail);
@@ -326,7 +332,7 @@ export class TenantNotificationComposeComponent {
     }
     if (d.mail) m['mail'] = true;
     if (d.expires) m['expires'] = d.expires;
-    if (d.key.trim()) m['key'] = d.key.trim();
+    if (d.id.trim()) m['id'] = d.id.trim();
     const meta: Record<string, string> = {};
     for (const row of d.meta) {
       if (row.key.trim()) meta[row.key.trim()] = row.value;
@@ -338,7 +344,9 @@ export class TenantNotificationComposeComponent {
   protected readonly json = computed(() => JSON.stringify(this.message(), null, 2));
 
   // A title, and nothing the form already knows the server would refuse.
-  protected readonly ready = computed(() => this.draft().title.trim() !== '' && !this.f().invalid());
+  protected readonly ready = computed(
+    () => this.draft().title.trim() !== '' && this.draft().id.trim() !== '' && !this.f().invalid(),
+  );
 
   // ---- what the server said ----
 
@@ -355,7 +363,7 @@ export class TenantNotificationComposeComponent {
   protected readonly loose = computed(() => {
     const r = this.refusal();
     if (!r) return '';
-    const shown = ['title', 'body', 'level', 'roles', 'users', 'audience', 'detail', 'actions', 'ack', 'onAck', 'expires', 'key', 'mail'];
+    const shown = ['title', 'body', 'level', 'exercise', 'roles', 'users', 'audience', 'detail', 'actions', 'ack', 'onAck', 'expires', 'id', 'mail'];
     return shown.includes(r.field) || /^actions\.\d+(\.(label|method|body))?$/.test(r.field) ? '' : r.message;
   });
 
@@ -366,9 +374,11 @@ export class TenantNotificationComposeComponent {
       next: (p) => {
         this.sending.set(false);
         this.drawer.withdrawn.update((v) => v + 1);
+        // The next one is another notification: another id.
+        if (!p.existing) this.draft.update((d) => ({ ...d, id: crypto.randomUUID() }));
         this.snack.open(
           p.existing
-            ? $localize`:@@Notify_sent_existing:Already sent with this key: nobody was told again`
+            ? $localize`:@@Notify_sent_existing:Already sent with this id: nobody was told again`
             : p.recipients === 1
               ? $localize`:@@Notify_sent_one:Sent to 1 person`
               : $localize`:@@Notify_sent_many:Sent to ${p.recipients}:COUNT: people`,
@@ -382,7 +392,7 @@ export class TenantNotificationComposeComponent {
         const message = typeof e.error?.error === 'string' ? e.error.error : $localize`:@@Request_failed:Request failed`;
         // The server's sentence, shown as one.
         this.refusal.set({ field, message: message.charAt(0).toUpperCase() + message.slice(1) });
-        if (['expires', 'key', 'mail'].includes(field)) this.moreOpen.set(true);
+        if (['expires', 'id', 'mail'].includes(field)) this.moreOpen.set(true);
         // Said where it can be fixed - on the form, whichever tab was on
         // screen - and brought into sight.
         if (!this.loose()) this.tab.set('edit');

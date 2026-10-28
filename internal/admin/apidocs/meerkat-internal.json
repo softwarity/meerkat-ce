@@ -98,7 +98,7 @@
         ],
         "summary": "Publish a notification",
         "operationId": "publishNotification",
-        "description": "Sent to the tenant's enabled members, narrowed to the roles and users named, and to those allowed to open its link. The audience is fixed at publication. With `\"tenant\": \"*\"`, each enabled tenant whose notifications are on gets its own copy, with its own id; a tenant where nobody may receive it is skipped, and the answer says which and why. A person in several of these tenants sees one notification naming them, and gets one mail. With `ack`, readers are asked to acknowledge it, and `onAck` names your service, called at each acknowledgement (a `NotificationAckCall`).",
+        "description": "Sent to the tenant's enabled members, narrowed to the roles and users named, and to those allowed to open its link. The readers are worked out at publication, and the audience named is kept: an account that joins the tenant, or is given a role there, while it is live receives it then, told once for all it missed. With `\"tenant\": \"*\"`, each enabled tenant whose notifications are on gets its own copy, with its own id; a tenant where nobody may receive it is skipped, and the answer says which and why. A person in several of these tenants sees one notification naming them, and gets one mail. With `ack`, readers are asked to acknowledge it, and `onAck` names your service, called at each acknowledgement (a `NotificationAckCall`).",
         "requestBody": {
           "required": true,
           "content": {
@@ -141,7 +141,7 @@
             }
           },
           "422": {
-            "description": "Refused, with the reason (for example notifications off for the tenant, nobody in the audience, or above the cap; sent to every tenant: no tenant received it)",
+            "description": "Refused, with the reason and the field (for example the id missing, notifications off for the tenant, nobody in the audience, or above the cap; sent to every tenant: no tenant received it)",
             "content": {
               "application/json": {
                 "schema": {
@@ -270,7 +270,11 @@
                       "items": {
                         "type": "string"
                       },
-                      "description": "Ids withdrawn."
+                      "description": "The ids of what was withdrawn."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "How many notifications were withdrawn: every copy of one sent to every tenant counts."
                     }
                   },
                   "required": [
@@ -320,18 +324,50 @@
         ],
         "summary": "Withdraw a notification",
         "operationId": "withdrawMyNotification",
-        "description": "It disappears from users' pages at once.",
+        "description": "Withdraws the notification your id names: every copy of one sent to every tenant. Its readers see a row saying it was withdrawn, with nothing of what it said, out of their unread count; its mails not sent yet are cancelled. An id none of your notifications carries yet is kept (202) for the life expires gives (30 days by default, 90 at most): the notification arrives withdrawn, and nobody is told.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/id"
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The notification's id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expires",
+            "in": "query",
+            "required": false,
+            "description": "For a key not received yet: how long it is kept, an ISO 8601 duration or a date. 30 days by default, 90 at most.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": {
-            "description": "Withdrawn"
+          "200": {
+            "description": "Withdrawn now (`withdrawn`), or already ended before (`already`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationWithdrawn"
+                }
+              }
+            }
           },
-          "404": {
-            "description": "No live notification of yours with this id",
+          "202": {
+            "description": "A key not received yet: kept",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationWithdrawn"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An id with a character it may not carry, or expires that is not a duration or a date, or beyond 90 days",
             "content": {
               "application/json": {
                 "schema": {
@@ -2019,7 +2055,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "`ntf_...`"
+            "description": "The id you gave it. The copies of a message sent to every tenant share it, each listed with its tenantId."
           },
           "tenantId": {
             "type": "string",
@@ -2039,10 +2075,6 @@
               "container",
               "unidentified"
             ]
-          },
-          "key": {
-            "type": "string",
-            "description": "Deduplication key."
           },
           "level": {
             "type": "string",
@@ -2102,7 +2134,7 @@
           "withdrawnAt": {
             "type": "integer",
             "format": "int64",
-            "description": "Unix seconds; absent if not withdrawn."
+            "description": "When it was withdrawn or replaced (endedAs says which); absent while it is live."
           },
           "ack": {
             "type": "string",
@@ -2153,6 +2185,43 @@
               }
             ],
             "description": "With `ack` single, once done: who closed it."
+          },
+          "endedAs": {
+            "type": "string",
+            "enum": [
+              "withdrawn",
+              "replaced"
+            ],
+            "description": "How it ended before its time, withdrawnAt being when."
+          },
+          "replacedBy": {
+            "type": "string",
+            "description": "Replaced: the notification that replaced it."
+          },
+          "exercise": {
+            "type": "boolean",
+            "description": "Sent to practise: it keeps its realistic level and its audience, and carries the label EXERCISE on the page, the snackbar, the desktop notification and the mail."
+          },
+          "mails": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "For one sent with mail: its readers' mails counted by state. pending (to send), sending (a node is sending it), accepted (by the relay: the most the gateway knows, never delivered), failed (the relay refused it for good, 5yz, or a temporary refusal, 4yz, lasted past 24 hours), unknown (the connection went after the end of the data, or the node sending it stopped: never sent again on its own), cancelled (the notification was withdrawn, replaced or expired first), noaddress (the reader has no address)."
+          },
+          "audienceRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The roles named at publication, kept: someone given one of them later, while it is live, receives it then."
+          },
+          "audienceUsers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The accounts named at publication, kept."
           }
         },
         "required": [
@@ -2539,6 +2608,12 @@
         "type": "object",
         "description": "64 KiB at most. Unknown fields are refused.",
         "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "description": "Required, a UUID of your choice: it lets you retry without duplicates, replace or withdraw the notification, and follow its acknowledgements and mails. Meerkat never makes one up. Scoped by its source, the caller the internal plane recognises (a token's name, a ServiceAccount, the workload behind the address): published again from the same source under an id already used, before it expires, even after it was withdrawn or replaced, it returns that notification, creates nothing and tells nobody; the content is not compared. Your actions are called with notification=<id>, and onAck receives it."
+          },
           "tenant": {
             "type": "string",
             "description": "Tenant id or name; optional with a single one. Must be enabled, with notifications on. `*` sends a copy to every tenant: named users each tenant has, the others ignored there."
@@ -2548,14 +2623,14 @@
             "items": {
               "type": "string"
             },
-            "description": "Only members holding one of these roles."
+            "description": "Only members holding one of these roles. Kept with the notification: an account that joins the tenant, or is given a role there, while it is live receives it then (one news and one digest mail for all it missed)."
           },
           "users": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Only these members, by username. With roles, either matches."
+            "description": "Only these members, by username. With roles, either matches. Kept with the notification: an account that joins the tenant, or is given a role there, while it is live receives it then (one news and one digest mail for all it missed)."
           },
           "title": {
             "type": "string",
@@ -2592,15 +2667,11 @@
           },
           "mail": {
             "type": "boolean",
-            "description": "Also send by mail; needs a mail relay."
+            "description": "Also send by mail; needs a mail relay. The mails are queued in the database, one per reader with an address, sent one at a time by the nodes: a node that stops leaves the rest to the next. A temporary refusal is tried again for 24 hours, a permanent one fails; the outcomes are counted in mails."
           },
           "expires": {
             "type": "string",
             "description": "ISO 8601 duration (P7D) or RFC 3339 date; default 30 days, 90 at most."
-          },
-          "key": {
-            "type": "string",
-            "description": "Deduplication key, 200 characters: while live, publishing again to the same tenant returns the same notification."
           },
           "meta": {
             "type": "object",
@@ -2626,9 +2697,18 @@
               }
             ],
             "description": "Your service, `{service, path}` only: Meerkat POSTs a `NotificationAckCall` to it through its route at each acknowledgement, as the user `meerkat` in the notification's tenant with no role, retried twice. Needs `ack`."
+          },
+          "replaces": {
+            "type": "string",
+            "description": "The id of an earlier notification of yours: it ends as replaced when this one is published, and leaves its readers' list and count, the replacement standing in its place; its mails not sent yet are cancelled. Sent to every tenant, every copy. An id not received yet is kept as long as this notification lives: arriving later, it is stored already replaced. The replacement has an id of its own."
+          },
+          "exercise": {
+            "type": "boolean",
+            "description": "Sent to practise: it keeps its realistic level and its audience, and carries the label EXERCISE on the page, the snackbar, the desktop notification and the mail."
           }
         },
         "required": [
+          "id",
           "title"
         ]
       },
@@ -2636,7 +2716,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "The id you gave. Sent to every tenant, the id of the whole send."
           },
           "recipients": {
             "type": "integer",
@@ -2644,11 +2725,11 @@
           },
           "existing": {
             "type": "boolean",
-            "description": "Key already used: the earlier notification, nobody notified again. Sent to every tenant: true when every copy was."
+            "description": "The id was already used, before it expired: the earlier notification, nobody notified again. Sent to every tenant: true when every copy was."
           },
           "tenants": {
             "type": "array",
-            "description": "Sent to every tenant: one copy per tenant that received it.",
+            "description": "Sent to every tenant: the tenants that received a copy, under the one id.",
             "items": {
               "type": "object",
               "properties": {
@@ -2660,22 +2741,25 @@
                   "type": "string",
                   "description": "Tenant name."
                 },
-                "id": {
-                  "type": "string",
-                  "description": "This copy's id, to withdraw it."
-                },
                 "recipients": {
                   "type": "integer"
                 },
                 "existing": {
                   "type": "boolean",
                   "description": "Key already used in this tenant."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "withdrawn",
+                    "replaced"
+                  ],
+                  "description": "This copy is not live."
                 }
               },
               "required": [
                 "tenant",
                 "name",
-                "id",
                 "recipients"
               ]
             }
@@ -2704,12 +2788,28 @@
                 "reason"
               ]
             }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "withdrawn",
+              "replaced"
+            ],
+            "description": "The notification answered is not live: its id was withdrawn or replaced before, or named by a withdrawal or a replacement before it arrived. Nobody was told."
+          },
+          "replaced": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "With replaces: the id it ended now."
           }
         },
         "required": [
+          "id",
           "recipients"
         ],
-        "description": "Sent to every tenant, there is no id: `tenants` lists the copies, `skipped` the tenants left out."
+        "description": "The id is the one you gave: replace, withdraw and follow the notification with it. Sent to every tenant, it names the whole send; tenants lists the tenants that received a copy, skipped those left out."
       },
       "NotificationPerson": {
         "type": "object",
@@ -2791,7 +2891,7 @@
         "properties": {
           "notification": {
             "type": "string",
-            "description": "The notification's id."
+            "description": "The id you gave it."
           },
           "tenant": {
             "type": "string",
@@ -2799,10 +2899,6 @@
           },
           "tenantName": {
             "type": "string"
-          },
-          "key": {
-            "type": "string",
-            "description": "Its deduplication key."
           },
           "meta": {
             "type": "object",
@@ -2848,6 +2944,32 @@
           "acknowledged",
           "recipients",
           "complete"
+        ]
+      },
+      "NotificationWithdrawn": {
+        "type": "object",
+        "properties": {
+          "withdrawn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The id, when this call withdrew it."
+          },
+          "already": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The id, when it had ended before: a call sent again changes nothing."
+          },
+          "pending": {
+            "type": "string",
+            "description": "The id, which none of your notifications carries yet: kept, and the notification will be stored withdrawn when it arrives."
+          }
+        },
+        "required": [
+          "withdrawn"
         ]
       }
     },

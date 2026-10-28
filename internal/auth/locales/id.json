@@ -354,5 +354,8 @@
   "notifAckedBy": "Dikonfirmasi oleh %s",
   "notifAckAsked": "Menunggu konfirmasi Anda",
   "notifDeleteOwed": "Konfirmasi dulu sebelum menghapusnya.",
-  "notifKept": "%s disimpan karena menunggu konfirmasi Anda."
+  "notifKept": "%s disimpan karena menunggu konfirmasi Anda.",
+  "notifWithdrawn": "Notifikasi ini telah ditarik",
+  "notifExercise": "LATIHAN",
+  "notifMissed": "Notifikasi yang terlewat: %s"
 }

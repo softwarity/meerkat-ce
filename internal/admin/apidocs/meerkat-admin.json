@@ -9607,9 +9607,9 @@
               "console"
             ]
           },
-          "key": {
+          "ref": {
             "type": "string",
-            "description": "Deduplication key."
+            "description": "The id its sender gave it. id is the gateway's own, for this API; the sender is always kept."
           },
           "level": {
             "type": "string",
@@ -9700,6 +9700,22 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix seconds the request was closed: the first acknowledgement (single), the last reader's (all)."
+          },
+          "endedAs": {
+            "type": "string",
+            "enum": [
+              "withdrawn",
+              "replaced"
+            ],
+            "description": "How it ended before its time, withdrawnAt being when."
+          },
+          "replacedBy": {
+            "type": "string",
+            "description": "Replaced: the id of the notification that replaced it."
+          },
+          "exercise": {
+            "type": "boolean",
+            "description": "Sent to practise: labelled EXERCISE."
           }
         },
         "required": [
@@ -9775,6 +9791,23 @@
             "type": "integer",
             "format": "int64",
             "description": "Acknowledged at (Unix seconds); absent while not."
+          },
+          "mail": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "sending",
+              "accepted",
+              "failed",
+              "unknown",
+              "cancelled",
+              "noaddress"
+            ],
+            "description": "Where this reader's mail stands, when one was asked: accepted means accepted by the relay, never delivered."
+          },
+          "mailCode": {
+            "type": "integer",
+            "description": "The relay's reply code of a failed mail."
           }
         },
         "required": [
@@ -10193,6 +10226,11 @@
         "type": "object",
         "description": "The message a service publishes on the internal plane. 64 KiB at most. Unknown fields are refused.",
         "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Required, a UUID of your choice. Sent again under the same id, nothing is created."
+          },
           "tenant": {
             "type": "string",
             "description": "Optional: the tenant of the path, by id or name."
@@ -10252,10 +10290,6 @@
             "type": "string",
             "description": "ISO 8601 duration (P7D) or RFC 3339 date; default 30 days, 90 at most."
           },
-          "key": {
-            "type": "string",
-            "description": "Deduplication key, 200 characters: while live, publishing again returns the same notification."
-          },
           "meta": {
             "type": "object",
             "additionalProperties": {
@@ -10280,9 +10314,18 @@
               }
             ],
             "description": "Your service, `{service, path}` only: Meerkat POSTs a `NotificationAckCall` to it through its route at each acknowledgement, as the user `meerkat` in the notification's tenant with no role, retried twice. Needs `ack`."
+          },
+          "replaces": {
+            "type": "string",
+            "description": "The id of an earlier notification of the same sender, which ends as replaced."
+          },
+          "exercise": {
+            "type": "boolean",
+            "description": "Sent to practise: labelled EXERCISE wherever it shows."
           }
         },
         "required": [
+          "id",
           "title"
         ]
       },
@@ -10290,7 +10333,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "The id given."
           },
           "recipients": {
             "type": "integer",

@@ -354,5 +354,8 @@
   "notifAckedBy": "Acknowledged by %s",
   "notifAckAsked": "Waiting for your acknowledgement",
   "notifDeleteOwed": "Acknowledge it before deleting it.",
-  "notifKept": "Kept %s waiting for your acknowledgement."
+  "notifKept": "Kept %s waiting for your acknowledgement.",
+  "notifWithdrawn": "This notification was withdrawn",
+  "notifExercise": "EXERCISE",
+  "notifMissed": "Notifications you missed: %s"
 }

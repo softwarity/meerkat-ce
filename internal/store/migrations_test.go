@@ -197,3 +197,37 @@ func TestTheFreeBlocksBecomeTheList(t *testing.T) {
 		t.Errorf("%+v", r.UI)
 	}
 }
+
+// v102: a notification has one id for its sender. The key column becomes
+// ref, and a notification its sender gave no key keeps an empty one.
+func TestANotificationGetsOneID(t *testing.T) {
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+	ctx := context.Background()
+	for _, table := range []string{"notifications", "notification_ends"} {
+		if _, err := st.db.ExecContext(ctx, `ALTER TABLE `+table+` RENAME COLUMN ref TO dedup_key`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, row := range [][3]string{{"ntf_a", "", ""}, {"ntf_b", "kept-1", ""}, {"ntf_c", "", "ntb_x"}} {
+		if _, err := st.db.ExecContext(ctx, `INSERT INTO notifications (id, dedup_key, broadcast_id, sender)
+			VALUES (?, ?, ?, 'svc')`, row[0], row[1], row[2]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.runMigrations([]migration{{Version: schemaVersion, Name: "v102", Up: notificationRefs}}, schemaVersion-1); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"ntf_a": "", "ntf_b": "kept-1", "ntf_c": ""} {
+		var ref string
+		if err := st.db.QueryRowContext(ctx, `SELECT ref FROM notifications WHERE id = ?`, id).Scan(&ref); err != nil || ref != want {
+			t.Errorf("%s: ref %q (%v), want %q", id, ref, err, want)
+		}
+	}
+	if err := st.RememberEnd(ctx, "svc", "late", EndedWithdrawn, "", 1<<40); err != nil {
+		t.Errorf("notification_ends keyed by ref: %v", err)
+	}
+}

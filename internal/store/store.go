@@ -54,6 +54,9 @@ type Store struct {
 	// request behind them (OnOwnAudit). Nil until wired: then straight to
 	// the table.
 	ownAudit atomic.Pointer[func(context.Context, AuditEvent)]
+	// rightsMoved is told that an account joined or left a tenant, or may
+	// hold a role there it did not (OnRightsMoved). Nil until wired.
+	rightsMoved atomic.Pointer[func(tenantID, userID string)]
 }
 
 // OnOwnAudit names the funnel for the events the store raises on its own, a
@@ -79,6 +82,22 @@ func (s *Store) auditOwn(ctx context.Context, ev AuditEvent) {
 // after the write, outside any transaction; a slow listener slows the sign-in,
 // so it must only signal.
 func (s *Store) OnSessionsMoved(f func()) { s.sessionsMoved.Store(&f) }
+
+// OnRightsMoved names who is told that an account joined or left a tenant,
+// or was granted a role there - through a group of roles it was put in, or a
+// group of roles of its given the role: the notifications give such an account what it may now receive. It
+// is called after the write, on the writer's path: it must not block.
+func (s *Store) OnRightsMoved(f func(tenantID, userID string)) { s.rightsMoved.Store(&f) }
+
+func (s *Store) rightsChanged(tenantID string, userIDs ...string) {
+	f := s.rightsMoved.Load()
+	if f == nil {
+		return
+	}
+	for _, u := range userIDs {
+		(*f)(tenantID, u)
+	}
+}
 
 func (s *Store) sessionsChanged() {
 	if f := s.sessionsMoved.Load(); f != nil {
@@ -1274,9 +1293,12 @@ CREATE TABLE IF NOT EXISTS notifications (
   -- own notifications and nobody else's.
   sender       TEXT NOT NULL DEFAULT '',
   sender_via   TEXT NOT NULL DEFAULT '',
-  -- The sender's deduplication key: the same one published again while the
-  -- first is alive answers the first.
-  dedup_key    TEXT NOT NULL DEFAULT '',
+  -- The id its sender gave it (v102): required, a UUID of its choice, never
+  -- made up by the gateway ('' only on what was stored before it was). One id
+  -- per sender: published again under it, the first is answered. The
+  -- copies of a message sent to every tenant share it. The row's own id
+  -- above is the gateway's, for its pages and its console.
+  ref          TEXT NOT NULL DEFAULT '',
   level        TEXT NOT NULL DEFAULT 'info',
   -- Plain text, as a JSON object by language ("" when one string was sent).
   title        TEXT NOT NULL DEFAULT '{}',
@@ -1308,9 +1330,29 @@ CREATE TABLE IF NOT EXISTS notifications (
   ack             TEXT NOT NULL DEFAULT '',
   on_ack          TEXT NOT NULL DEFAULT '',
   ack_complete_at BIGINT NOT NULL DEFAULT 0,
-  ack_by          TEXT NOT NULL DEFAULT ''
+  ack_by          TEXT NOT NULL DEFAULT '',
+  -- How it ended (v98), with withdrawn_at as the instant: 'withdrawn' by its
+  -- sender or an administrator, 'replaced' by a later one of its sender,
+  -- named in replaced_by. '' with withdrawn_at set is a withdrawal written
+  -- before. An ended one stays on its readers' pages, marked, out of the
+  -- unread count, until it expires.
+  ended_as    TEXT NOT NULL DEFAULT '',
+  replaced_by TEXT NOT NULL DEFAULT '',
+  -- An exercise (v99): a realistic message sent to practise, labelled
+  -- EXERCISE wherever it shows. Its audience is worked out as any other's.
+  exercise    BOOLEAN NOT NULL DEFAULT FALSE,
+  -- When its mail outcome was written to the trail (v100): once, by the node
+  -- that settled its last mail.
+  mail_reported_at BIGINT NOT NULL DEFAULT 0,
+  -- The audience its sender named (v101), kept: the roles and the accounts,
+  -- JSON lists, neither meaning the whole tenant. An account that joins the
+  -- tenant or is granted a role afterwards is given it then, when it is still
+  -- live. audience_kept says these were recorded: what was stored before
+  -- named nothing, and is never given to anybody afterwards.
+  audience_roles TEXT NOT NULL DEFAULT '',
+  audience_users TEXT NOT NULL DEFAULT '',
+  audience_kept  BOOLEAN NOT NULL DEFAULT FALSE
 );
-CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, dedup_key);
 CREATE INDEX IF NOT EXISTS idx_notifications_expires ON notifications (expires_at);
 CREATE TABLE IF NOT EXISTS notification_recipients (
   notification_id TEXT NOT NULL,
@@ -1320,9 +1362,44 @@ CREATE TABLE IF NOT EXISTS notification_recipients (
   hidden_at       BIGINT NOT NULL DEFAULT 0,
   -- When this reader acknowledged it (v97), 0 while they have not.
   acked_at        BIGINT NOT NULL DEFAULT 0,
+  -- This reader's mail, a durable queue (v100): '' when none is asked,
+  -- 'pending' to send, 'sending' claimed by a node until mail_claimed_until,
+  -- 'accepted' by the relay (the strongest outcome: never "delivered"),
+  -- 'failed' with the relay's reply in mail_code and mail_error, 'unknown'
+  -- when the connection went after the end of the data (never sent again on
+  -- its own), 'cancelled' when the notification ended first, 'noaddress'
+  -- when the reader has none. mail_next_at is when the next attempt is due,
+  -- mail_deadline the last instant a temporary refusal is tried again, and
+  -- mail_id the Message-ID every attempt carries.
+  mail_state         TEXT NOT NULL DEFAULT '',
+  mail_attempts      BIGINT NOT NULL DEFAULT 0,
+  mail_next_at       BIGINT NOT NULL DEFAULT 0,
+  mail_deadline      BIGINT NOT NULL DEFAULT 0,
+  mail_code          BIGINT NOT NULL DEFAULT 0,
+  mail_error         TEXT NOT NULL DEFAULT '',
+  mail_id            TEXT NOT NULL DEFAULT '',
+  mail_claimed_by    TEXT NOT NULL DEFAULT '',
+  mail_claimed_until BIGINT NOT NULL DEFAULT 0,
+  -- A digest (v101): the mails of the notifications an account was given at
+  -- once, after a change of its rights, go as ONE mail. The row that sends
+  -- it is 'pending', the others 'digest', all with the same mail_digest.
+  mail_digest        TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (notification_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_notification_recipients_user ON notification_recipients (user_id);
+-- A replacement or a withdrawal that named an id its sender has not
+-- published yet (v98): the order of a sender's calls is not the order they
+-- arrive in. When the id arrives, it is stored already ended, and nobody is
+-- told. Kept as long as a notification would live, then purged.
+CREATE TABLE IF NOT EXISTS notification_ends (
+  sender      TEXT NOT NULL,
+  ref         TEXT NOT NULL,
+  ended_as    TEXT NOT NULL DEFAULT '',
+  replaced_by TEXT NOT NULL DEFAULT '',
+  at          BIGINT NOT NULL DEFAULT 0,
+  expires_at  BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (sender, ref)
+);
 -- The SAML assertions already spent (v75, AUTH-19): an assertion is a bearer
 -- credential for its few minutes of validity, so the one this gateway has
 -- accepted is refused a second time - on every node, hence a table and not a
@@ -1346,6 +1423,19 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0
 );`
+
+// lateIndexesSQL are the indexes on columns added to an existing table, made
+// once those columns exist (see migrate).
+//
+// The notifications' mail queue (v100): the node that sends looks for what is
+// due.
+// idx_notifications_sender is here and not in the DDL because v102 renames
+// its column: PostgreSQL resolves an index's columns before IF NOT EXISTS
+// looks at its name, so on a v101 database the DDL failed on "ref" before the
+// step could rename dedup_key.
+const lateIndexesSQL = `CREATE INDEX IF NOT EXISTS idx_notification_recipients_mail
+  ON notification_recipients (mail_state, mail_next_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, ref);`
 
 // schemaVersion is a VERSION, not a count of migrations.
 //
@@ -1392,7 +1482,21 @@ CREATE TABLE IF NOT EXISTS trusted_authorities (
 // 97 carries no step: notifications.ack, on_ack, ack_complete_at, ack_by and
 // notification_recipients.acked_at are filled in by the additive pass, empty
 // - nothing sent before asked to be acknowledged.
-const schemaVersion = 97
+// 98 carries no step: notifications.ended_as and replaced_by are filled in by
+// the additive pass, empty - a withdrawal written before reads as one - and
+// notification_ends is new.
+// 99 carries no step: notifications.exercise is filled in by the additive
+// pass, false - nothing sent before was an exercise.
+// 100 carries no step: the mail columns of notification_recipients and
+// notifications.mail_reported_at are filled in by the additive pass, empty -
+// what was mailed before went through the queue in memory, and is over.
+// 101 carries no step: notifications.audience_roles, audience_users and
+// audience_kept, and notification_recipients.mail_digest, are filled in by
+// the additive pass, empty - what was sent before kept no audience, and is
+// given to nobody after its publication.
+// 102 has a step: a notification has one id for its sender, dedup_key
+// becomes ref.
+const schemaVersion = 102
 
 func (s *Store) migrate() error {
 	v, err := s.db.schemaVersion()
@@ -1440,6 +1544,11 @@ func (s *Store) migrate() error {
 	// IF NOT EXISTS is silent on an existing table, so they are added here.
 	if err := s.addMissingColumns(); err != nil {
 		return err
+	}
+	// The indexes on columns the additive pass may have just added: the DDL
+	// above runs before it, on a table that does not have them yet.
+	if _, err := s.db.Exec(lateIndexesSQL); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
 	}
 	// Two leftovers from the design phase, run unconditionally on every start
 	// because there was nowhere to record that they had already run. They stay

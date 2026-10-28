@@ -354,5 +354,8 @@
   "notifAckedBy": "%s 님이 확인함",
   "notifAckAsked": "확인을 기다리는 중",
   "notifDeleteOwed": "삭제하기 전에 확인하세요.",
-  "notifKept": "확인을 기다리는 %s개는 남겨 두었습니다."
+  "notifKept": "확인을 기다리는 %s개는 남겨 두었습니다.",
+  "notifWithdrawn": "이 알림은 철회되었습니다",
+  "notifExercise": "훈련",
+  "notifMissed": "놓친 알림: %s"
 }

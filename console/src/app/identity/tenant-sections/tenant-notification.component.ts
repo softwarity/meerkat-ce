@@ -6,6 +6,7 @@ import { MeService } from '../../me.service';
 import { DialogsService } from '../../shared/dialogs.service';
 import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
 import { IdentityDrawer } from '../identity-drawer';
+import { mailText } from '../../notifications/notify-levels';
 
 // One notification sent to the tenant, in the tenant page's drawer (NOTIF-05):
 // what it said, who was told and who read it, who acknowledged it when it
@@ -67,6 +68,17 @@ import { IdentityDrawer } from '../identity-drawer';
     .waiting {
       color: var(--mat-sys-primary);
     }
+    .exercise {
+      display: inline-block;
+      margin-inline-end: 6px;
+      padding: 0 6px;
+      border-radius: 4px;
+      font: var(--mat-sys-label-small);
+      letter-spacing: 0.06em;
+      vertical-align: middle;
+      background: var(--mat-sys-tertiary-container);
+      color: var(--mat-sys-on-tertiary-container);
+    }
     .line {
       margin: 0;
     }
@@ -85,7 +97,7 @@ import { IdentityDrawer } from '../identity-drawer';
   `,
   template: `
     <header>
-      <h2>{{ title() }}</h2>
+      <h2>@if (notification().exercise) {<span class="exercise" i18n="@@Notify_exercise_label">EXERCISE</span>}{{ title() }}</h2>
       <span class="grow"></span>
       <button matIconButton (click)="drawer.close()" i18n-aria-label="@@Close" aria-label="Close">
         <mat-icon>close</mat-icon>
@@ -98,6 +110,10 @@ import { IdentityDrawer } from '../identity-drawer';
       <dl>
         <dt i18n="@@Sender">Sender</dt>
         <dd><span class="mono">{{ notification().sender }}</span></dd>
+        @if (notification().ref) {
+          <dt i18n="@@Id">Id</dt>
+          <dd><span class="mono">{{ notification().ref }}</span></dd>
+        }
         <dt i18n="@@Sent">Sent</dt>
         <dd class="nowrap">{{ notification().createdAt | zoned: zone() : "long" }}</dd>
         <dt i18n="@@Expires">Expires</dt>
@@ -178,6 +194,9 @@ import { IdentityDrawer } from '../identity-drawer';
           @for (r of readers(); track r.userId) {
             <li>
               <span>{{ r.username || r.userId }}</span>
+              @if (r.mail) {
+                <span class="muted">{{ mailText(r) }}</span>
+              }
               @if (r.readAt) {
                 <span class="muted nowrap">{{ r.readAt | zoned: zone() }}</span>
               } @else {
@@ -228,6 +247,8 @@ export class TenantNotificationComponent {
   protected nameOf(r: NotificationReader): string {
     return r.fullname ? `${r.fullname} (${r.username || r.userId})` : r.username || r.userId;
   }
+
+  protected readonly mailText = mailText;
 
   protected title(): string {
     const t = this.notification().title;

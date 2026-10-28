@@ -129,6 +129,9 @@
             <mat-button-toggle value="warning"><span class="dot warning"></span><ng-container i18n="@@Notify_level_warning">Warning</ng-container></mat-button-toggle>
             <mat-button-toggle value="error"><span class="dot error"></span><ng-container i18n="@@Notify_level_error">Error</ng-container></mat-button-toggle>
           </mat-button-toggle-group>
+          <p class="exercise">
+            <mat-slide-toggle [formField]="f.exercise" i18n="@@Notify_exercise_toggle">An exercise: labelled EXERCISE for its readers</mat-slide-toggle>
+          </p>
           <app-form-field i18n-label="@@Title" label="Title" [error]="f.title().errors()[0]?.message ?? ''">
             <input matInput [formField]="f.title" />
           </app-form-field>
@@ -137,7 +140,7 @@
             <textarea matInput [formField]="f.body" rows="3"></textarea>
             <mat-hint class="problem">{{ f.body().errors()[0]?.message }}</mat-hint>
           </mat-form-field>
-          @if (errorOn('title') || errorOn('body') || errorOn('level'); as e) {
+          @if (errorOn('title') || errorOn('body') || errorOn('level') || errorOn('exercise'); as e) {
             <p class="problem refusal">{{ e }}</p>
           }
         </section>
@@ -291,16 +294,16 @@
           }
           <p>
             <app-form-field
-              i18n-label="@@Notify_key"
-              label="Deduplication key"
-              i18n-hint="@@Notify_key_hint"
-              hint="Sent again with the same key while live: nobody is told twice."
-              [error]="f.key().errors()[0]?.message ?? ''"
+              i18n-label="@@Notify_id"
+              label="Id"
+              i18n-hint="@@Notify_id_hint"
+              hint="Required, a UUID of your choice. Sent again with the same id: nobody is told twice."
+              [error]="f.id().errors()[0]?.message ?? ''"
             >
-              <input matInput [formField]="f.key" spellcheck="false" />
+              <input matInput [formField]="f.id" spellcheck="false" />
             </app-form-field>
           </p>
-          @if (errorOn('key'); as e) {
+          @if (errorOn('id'); as e) {
             <p class="problem refusal">{{ e }}</p>
           }
           <div class="meta">

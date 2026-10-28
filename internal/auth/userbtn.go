@@ -274,6 +274,12 @@ func userButtonMenuLabels(t map[string]string) map[string]string {
 		// snackbar and the desktop, and the desktop's result.
 		"notifAck":   t["notifAck"],
 		"notifAcked": t["notifAcked"],
+		// A notification sent to practise: its title is preceded by it on
+		// the snackbar and the desktop.
+		"notifExercise": t["notifExercise"],
+		// Notifications given after their publication, once the reader's
+		// rights moved: one news for them all.
+		"notifMissed": t["notifMissed"],
 	}
 	return labels
 }
@@ -543,7 +549,7 @@ const userButtonJS = `(() => {
       page().onEvent('notification-state', recount);
       page().onEvent('notification', (d) => {
         recount();
-        if (!d || d.change !== 'new') return;
+        if (!d || (d.change !== 'new' && d.change !== 'missed')) return;
         // On the notifications page itself, the list shows it already: news
         // leading to where you are says nothing. The page may be the
         // integrator's, routed in its fragment (/app/#/inbox).
@@ -552,6 +558,18 @@ const userButtonJS = `(() => {
           const at = new URL(where(), location.href);
           if (at.pathname === location.pathname && at.hash === location.hash) return;
         } catch (e) {}
+        // Given after their publication, the reader's rights having moved:
+        // one news for them all, leading to the list - never one each.
+        if (d.change === 'missed') {
+          const L = (this.lastData && this.lastData.labels) || {};
+          const it = { id: 'missed-' + Date.now(), level: 'info', title: (L.notifMissed || '%s').replace('%s', d.count || '') };
+          const looking = !document.hidden && document.hasFocus();
+          if (!looking && desktopAllowed()) showOnDesktop(it, () => { location.href = where(); }, '', L, where());
+          const snack = { id: it.id, level: 'info', title: it.title, go: () => { location.href = where(); }, ack: null };
+          if (document.hidden) this.unseen.push(snack);
+          else if (this.shadowRoot) this.snackbar().show(snack);
+          return;
+        }
         // The desktop is for a tab or a window the reader is not looking at.
         // The page says it too, in a snackbar, as soon as it is seen: the
         // system may hold a desktop notification back (the browser not let in
@@ -578,6 +596,12 @@ const userButtonJS = `(() => {
             // leads to the notifications page, where it is read. Sent to
             // several of the reader's tenants, none of them this one: the
             // first two names, and how many more.
+            // An exercise says so first, wherever it shows: the snackbar, the
+            // desktop.
+            if (it.exercise) {
+              const ex = ((this.lastData && this.lastData.labels) || {}).notifExercise || 'EXERCISE';
+              it = Object.assign({}, it, { title: ex + ': ' + it.title });
+            }
             if (it.tenant && it.here === false) {
               const names = ((it.tenants || []).length ? it.tenants : [it.tenant]).map(t => t.name);
               const short = names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');

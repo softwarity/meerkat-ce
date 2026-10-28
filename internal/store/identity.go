@@ -323,6 +323,7 @@ func (s *Store) SaveMembership(ctx context.Context, m Membership) error {
 	if err != nil {
 		return fmt.Errorf("store: save membership %s@%s: %w", m.UserID, m.TenantID, err)
 	}
+	s.rightsChanged(m.TenantID, m.UserID)
 	return nil
 }
 
@@ -335,6 +336,9 @@ func (s *Store) DeleteMembership(ctx context.Context, userID, tenantID string) (
 		return false, fmt.Errorf("store: delete membership %s@%s: %w", userID, tenantID, err)
 	}
 	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.rightsChanged(tenantID, userID)
+	}
 	return n > 0, nil
 }
 

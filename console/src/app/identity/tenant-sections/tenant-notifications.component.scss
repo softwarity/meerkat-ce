@@ -125,3 +125,15 @@
 
 // The console's table look, and a sticky header that rows pass under.
 @include table.banded-rows;
+
+// An exercise: its label before the title, in the tertiary container.
+.exercise {
+  display: inline-block;
+  margin-inline-end: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font: var(--mat-sys-label-small);
+  letter-spacing: 0.06em;
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+}

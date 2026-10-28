@@ -53,23 +53,29 @@ refusée.
 Root et l'administrateur de l'application suivent ici ce que chaque service a
 envoyé, les plus récentes d'abord : le titre et son niveau, l'émetteur, le
 tenant, combien de destinataires l'ont lue, et quand elle est partie. Une
-notification retirée ou expirée reste dans la liste, marquée comme telle.
+notification retirée, remplacée ou expirée reste dans la liste, marquée comme
+telle ; un exercice porte l'étiquette EXERCISE devant son titre.
 
 ![Data plane, Notifications : les notifications envoyées, avec leur émetteur, leur tenant et leurs lectures, et les boutons Settings, API et Access](img/console/notifications.webp)
 
-Un clic en ouvre une : son texte, son émetteur et son tenant, l'adresse de son
+Un clic en ouvre une : son texte, son émetteur, son id (celui que l'émetteur
+connaît) et son tenant, l'adresse de son
 détail, chaque action avec sa méthode et son adresse, ses métadonnées, quand
 elle est partie et quand elle expire, et chaque destinataire avec l'heure de sa
-lecture. **Withdraw** retire une notification active : elle disparaît aussitôt
-de la page de chaque lecteur, et la liste de qui l'a lue est gardée.
+lecture et, quand elle est partie avec mail, où en est son mail (à envoyer,
+accepté par le relais, refusé avec le code du relais, inconnu, annulé, sans
+adresse). **Withdraw** retire une notification active : chaque lecteur la voit
+aussitôt devenir la rangée *Cette notification a été retirée*, hors de son
+compte, et la liste de qui l'a lue est gardée.
 
 Trois boutons occupent l'en-tête :
 
 - **Settings** - le tiroir ci-dessus.
 - **API** - *Publishing notifications*, pour le développeur d'un service, en
-  six volets : les endpoints et le jeton, le message champ par champ, tous les
-  tenants d'un coup, les réponses, retrouver et retirer, et les acquittements
-  avec l'appel que fait `onAck`.
+  sept volets : les endpoints et le jeton, le message champ par champ, tous les
+  tenants d'un coup, les réponses, retrouver et retirer, remplacer et retirer
+  par son id (y compris des appels arrivés dans le désordre), et les
+  acquittements avec l'appel que fait `onAck`.
 - **Access** - [qui peut publier](#qui-peut-publier).
 
 ![Le panneau API, Publishing notifications : les endpoints et le jeton, puis le message champ par champ](img/console/notifications-api.webp)
@@ -149,7 +155,8 @@ des notifications, et a deux onglets.
 
 - **Audience** - des rôles et des membres. Les deux vides : chaque membre qui
   peut ouvrir ses liens.
-- **Message** - le niveau, le titre et le texte.
+- **Message** - le niveau, **An exercise** pour un message envoyé pour
+  s'exercer (ses lecteurs le voient étiqueté EXERCICE), le titre et le texte.
 - **Detail** - aucun, une route et un chemin dessous, ou une adresse https. Le
   champ montre l'adresse que le lecteur ouvrira.
 - **Actions** - jusqu'à cinq boutons : un libellé, une route et un chemin ou une
@@ -159,7 +166,8 @@ des notifications, et a deux onglets.
   au navigateur du lecteur : n'y mettez jamais de secret.
 - **Acknowledgement** - None, One reader ou Every reader, et la route de votre
   service à appeler à chaque acquittement.
-- **More** - la durée de vie, la clé, les métadonnées, et Also send by mail
+- **More** - la durée de vie, l'id (obligatoire : un UUID neuf est proposé, et
+  un autre après chaque envoi), les métadonnées, et Also send by mail
   (seulement quand un relais de messagerie est configuré).
 
 ![Le tiroir New notification, onglet Edit : un détail sur la route Billing, et une action qui l'appelle en POST avec un corps JSON](img/console/notification-compose.webp)
@@ -177,12 +185,19 @@ service, et un refus revient sous le champ concerné, dans l'onglet Edit.
 
 | Action | Écrite quand |
 |---|---|
-| `notification.publish` | un administrateur en envoie une depuis la page d'un tenant |
-| `notification.withdraw` | un administrateur, ou un agent, en retire une |
+| `notification.publish` | un administrateur en envoie une depuis la page d'un tenant, ou un service en publie une sur le plan interne (l'émetteur est l'acteur) |
+| `notification.replace` | un service, ou le message d'un administrateur, en remplace une |
+| `notification.withdraw` | un administrateur, un agent ou l'émetteur en retire une |
+| `notification.mail` | l'envoi des mails d'une notification est terminé : une ligne par notification avec son résultat |
+| `notification.given` | quelqu'un a reçu des notifications après leur publication, ayant rejoint le tenant ou reçu un rôle |
 | `notification.ack` | un lecteur en acquitte une ; le lecteur est l'acteur |
 | `settings.notifications` | l'interrupteur, l'état d'un tenant ou le plafond change, au niveau de root ou de l'administrateur de l'application |
 | `tenant.notifications` | l'interrupteur de la section Notifications d'un tenant change |
 | `settings.notifications-access` | qui peut publier change |
+
+Lire n'est pas dans la piste : la lecture reste sur la ligne de chaque
+destinataire, que montre le tiroir. La liste suit en direct ce qu'un
+service publie, remplace ou retire, comme les envois de la console.
 
 Un assistant connecté à la gateway peut lister ce qui a été envoyé et retirer
 une notification, jamais en publier : une notification, c'est un service qui

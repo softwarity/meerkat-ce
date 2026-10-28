@@ -81,8 +81,9 @@ type Deps struct {
 	// Plane is the data plane's handler: a sender's service is called
 	// through its route when a reader acknowledges (the scheduler's way in).
 	Plane http.Handler
-	// Audit writes an event to the trail and the console's live channel: an
-	// acknowledgement is one.
+	// Audit writes an event to the trail and the console's live channel: a
+	// publication on the internal plane, a replacement, a withdrawal, an
+	// acknowledgement, a notification's mail outcome.
 	Audit func(ctx context.Context, ev store.AuditEvent)
 }
 
@@ -97,27 +98,35 @@ type Badge struct {
 	InBar bool `json:"inBar,omitempty"`
 }
 
-// Published is what a publication answers: the notification, how many
-// people it was given to, and whether its key was already live (then nobody
-// was told again). Sent to every tenant, it has no id of its own: Tenants are
-// the copies, one per tenant that received one, Skipped the tenants that did
-// not and why, Recipients their sum and Existing true when every copy was
-// already live.
+// Published is what a publication answers: the notification's id - the one
+// its sender gave, always: the gateway never makes one up - how many people it was given to, and whether that id was already published
+// (then nothing was created and nobody was told again). Sent to every
+// tenant, the id names the whole send: Tenants are the tenants that received
+// a copy, Skipped those that did not and why, Recipients their sum and
+// Existing true when every copy was already there.
+//
+// State says the notification answered is not live: "withdrawn" or
+// "replaced" - an id published again after its sender ended it, or an id a
+// replacement or a withdrawal named before it arrived. Replaced is the id a
+// publication carrying "replaces" ended.
 type Published struct {
 	ID         string          `json:"id,omitempty"`
 	Recipients int             `json:"recipients"`
 	Existing   bool            `json:"existing,omitempty"`
+	State      string          `json:"state,omitempty"`
+	Replaced   []string        `json:"replaced,omitempty"`
 	Tenants    []PublishedCopy `json:"tenants,omitempty"`
 	Skipped    []SkippedTenant `json:"skipped,omitempty"`
 }
 
-// PublishedCopy is one tenant's copy of a notification sent to every tenant.
+// PublishedCopy is one tenant that received a notification sent to every
+// tenant: under the send's one id.
 type PublishedCopy struct {
 	Tenant     string `json:"tenant"`
 	Name       string `json:"name"`
-	ID         string `json:"id"`
 	Recipients int    `json:"recipients"`
 	Existing   bool   `json:"existing,omitempty"`
+	State      string `json:"state,omitempty"`
 }
 
 // SkippedTenant is a tenant a notification sent to every tenant left out.
@@ -165,6 +174,13 @@ type Notifier interface {
 	MountData(mux Mux)
 	// Receive acts on a signal from another node.
 	Receive(arg string)
+	// Start runs what works in the background until ctx ends: the mail
+	// queue, and the accounts whose rights moved.
+	Start(ctx context.Context)
+	// RightsMoved says an account joined or left a tenant, or was granted a
+	// role there: the notifications it now comes within are given to it, in
+	// the background. It returns at once.
+	RightsMoved(tenantID, userID string)
 	// Badge is the counts for one session, ok false when the feature is off
 	// for its organisation.
 	Badge(ctx context.Context, sess store.Session) (b Badge, ok bool)
@@ -208,9 +224,11 @@ func New(d Deps) Notifier {
 
 type absent struct{}
 
-func (absent) Internal() []Endpoint { return nil }
-func (absent) MountData(Mux)        {}
-func (absent) Receive(string)       {}
+func (absent) Internal() []Endpoint       { return nil }
+func (absent) MountData(Mux)              {}
+func (absent) Receive(string)             {}
+func (absent) Start(context.Context)      {}
+func (absent) RightsMoved(string, string) {}
 func (absent) Badge(context.Context, store.Session) (Badge, bool) {
 	return Badge{}, false
 }

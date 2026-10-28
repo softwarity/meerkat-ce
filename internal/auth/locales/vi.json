@@ -354,5 +354,8 @@
   "notifAckedBy": "%s đã xác nhận",
   "notifAckAsked": "Đang chờ bạn xác nhận",
   "notifDeleteOwed": "Hãy xác nhận trước khi xóa.",
-  "notifKept": "Đã giữ lại %s thông báo đang chờ bạn xác nhận."
+  "notifKept": "Đã giữ lại %s thông báo đang chờ bạn xác nhận.",
+  "notifWithdrawn": "Thông báo này đã bị thu hồi",
+  "notifExercise": "DIỄN TẬP",
+  "notifMissed": "Thông báo bạn đã bỏ lỡ: %s"
 }
