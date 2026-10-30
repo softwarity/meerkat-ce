@@ -10,7 +10,7 @@ type DrawerItem =
   | { kind: 'member'; userId: string }
   | { kind: 'group'; groupId: string }
   | { kind: 'notification'; notification: SentNotification }
-  | { kind: 'compose' };
+  | { kind: 'compose'; replacing?: SentNotification };
 
 // The identity drawer's state, provided by the PAGE that hosts the members or
 // groups matrix: the drawer is drawn at the page's level, over its whole
@@ -34,8 +34,13 @@ export class IdentityDrawer {
     const i = this.item();
     return i?.kind === 'notification' ? i.notification : null;
   });
-  // The notification builder.
+  // The notification builder, and the notification it replaces when it was
+  // opened from one.
   readonly composing = computed(() => this.item()?.kind === 'compose');
+  readonly replacing = computed(() => {
+    const i = this.item();
+    return i?.kind === 'compose' ? (i.replacing ?? null) : null;
+  });
   readonly opened = computed(() => this.item() !== null);
   // Bumped when the drawer withdrew or sent a notification: the list re-reads.
   readonly withdrawn = signal(0);
@@ -53,8 +58,8 @@ export class IdentityDrawer {
     this.item.set({ kind: 'notification', notification });
   }
 
-  openCompose(): void {
-    this.item.set({ kind: 'compose' });
+  openCompose(replacing?: SentNotification): void {
+    this.item.set({ kind: 'compose', replacing });
   }
 
   close(): void {

@@ -89,14 +89,27 @@ If nothing matched at all, the gateway answers 404 and counts it
 gateway-wide - a rising number of unmatched requests is a misconfiguration
 somebody should see.
 
+What that 404 carries depends on who asked. A **browser asking for a page**
+(`GET` or `HEAD`, with `text/html` accepted) gets one of the gateway's own
+pages, in the installation's theme and the visitor's language: it names the
+path asked for and says where to go from there. With the
+[portal](/docs/customise/portal) on, it carries the navigation bar a proxied page
+carries for this visitor and points to its menu. Without it, it lists the
+applications the visitor may open, with their profile when they are signed in
+and the sign-in when they are not. Anything else - an API client, a script
+fetching an asset, a form posted - gets the plain `404 page not found`. Either
+way the status is 404, never a redirect.
+
 ## The catch-all
 
 A catch-all is not a setting: it is an ordinary route whose path predicate is
 `/**`, ordered last. It has no privilege - it just happens to be tried after
 everything else, so it catches whatever was not matched, `/` included.
 
-A fresh installation has none: an unmatched path answers 404. Add one when you
-want those paths to land somewhere - your own landing page, say.
+A fresh installation has none: an unmatched path answers 404 - the page above,
+for a browser. Add one when you want those paths to land somewhere - your own
+landing page, say. It wins over that page: the page only answers what no route
+serves.
 
 > [!TIP]
 > A new route is created with order `0`, which puts it at the **top** of the

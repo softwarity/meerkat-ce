@@ -3,6 +3,32 @@
 ## NEXT RELEASE
 
 - **plug 2.32.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **A page where no route answers.** A browser that asks for a path no route serves, or a
+  disabled route's path, gets a page in the installation's theme, still with a 404: what was
+  asked, and where to go from there. Behind the portal, the page carries the visitor's portal bar
+  and user button; without it, the sign-in page's layout with the applications open to the
+  visitor, or Sign in. An API client, a POST or an asset keeps the plain 404, and a `/**` route
+  still answers first.
+- **A route whose service is not running can still be edited.** With a namespace chosen, the
+  upstream is picked from the services running there; one that is down, scaled to zero or not
+  deployed yet used to empty the field and refuse the save. The route's own upstream now stays,
+  marked as not found, with a warning under the field, its port typed, and the route saves.
+- **Replace or withdraw a notification from the tenant's list.** Each sent notification has
+  Replace, which opens the New notification drawer filled from it with a fresh id and `replaces`
+  set, and Withdraw. Both are off, with the reason, on one that has ended. A tenant's
+  administrator may replace what any sender sent to that tenant, as they may already withdraw it.
+- **The notifications page: filters that stay, unread only, and search.** The search, Unread only
+  and the tenants stay at the top while the list scrolls, and the address keeps them. The search
+  runs on the gateway over the title, the text, the actions' labels and the metadata, which never
+  reach the browser; a word written `key=value` asks for that metadata exactly. Mark all as read
+  and Delete all act on what the list shows.
+- **Compact notification cards.** Each card shows who sent it and its tenant, as a badge, in its
+  top corner, the time it came under them (the day is the group's heading: no age that goes stale,
+  no timer refreshing it), and every row lines up whether it unfolds or not. The sender is named
+  the way a reader recognises it: a service by its short name, an administrator by the name on
+  their account.
+- **The metadata rows of the New notification drawer fit the drawer.** The value and the delete
+  button no longer run past its edge.
 ---
 
 ## 1.20.0

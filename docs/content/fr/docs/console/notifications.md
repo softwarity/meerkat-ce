@@ -142,6 +142,15 @@ et ses membres ADMIN, sur une gateway à plusieurs tenants.
 - Un clic en ouvre une : son texte, son émetteur et ses dates, qui l'a acquittée
   et qui pas encore, chaque destinataire avec l'heure de sa lecture, et
   **Withdraw**.
+- Deux actions de ligne, au bout de chaque ligne : **Replace** ouvre le tiroir
+  New notification rempli depuis cette notification (audience, niveau,
+  exercice, titre, texte, détail, actions, durée de vie, métadonnées, mail,
+  acquittement) sous un nouvel id, son titre disant ce qu'il remplace ;
+  **Send** publie la remplaçante, l'ancienne se termine comme remplacée, et ses
+  lecteurs ne voient plus que la remplaçante. Vous remplacez ce que n'importe
+  quel émetteur a envoyé à ce tenant, comme vous le retirez. **Withdraw**
+  demande d'abord, comme depuis le tiroir. Les deux sont grisées, avec la
+  raison au survol, sur une notification déjà retirée, remplacée ou expirée.
 
 ![Une notification qui demande l'acquittement d'un lecteur : qui l'a close, et chaque destinataire avec l'heure de sa lecture](img/console/tenant-notification-detail.webp)
 

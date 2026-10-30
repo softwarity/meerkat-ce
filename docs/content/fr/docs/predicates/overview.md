@@ -40,7 +40,9 @@ Cette route répond à un `GET` ou à un `POST` sous `/orders`, et à rien d'aut
 
 Les routes sont essayées par **ordre** croissant (à égalité, par nom), et c'est la
 **première** dont tous les prédicats sont satisfaits qui répond. Si aucune ne
-convient, la réponse est un simple `404`.
+convient, la réponse est un `404` : une page qui nomme le chemin pour un
+navigateur, le texte brut pour tout le reste (voir
+[Routes](/docs/concepts/routes)).
 
 La règle d'accès d'une route participe au choix : un appelant que la règle écarte
 passe à la route suivante qui convient, et il n'est refusé par la première route
@@ -53,7 +55,8 @@ Une route désactivée n'est pas chargée : elle n'est donc jamais retenue.
 
 Une route attrape-tout n'est pas un réglage : c'est une route ordinaire dont le
 prédicat de chemin est `/**`, placée en dernier. Elle récupère ce qu'aucune autre
-route n'a pris, et c'est ainsi qu'une installation répond mieux qu'un `404` nu.
+route n'a pris, et c'est ainsi qu'une installation répond par quelque chose à
+elle plutôt que par la page `404` de la gateway.
 
 > [!TIP]
 > Laissez de la marge entre les numéros d'ordre - `100`, `200`, `300` - pour

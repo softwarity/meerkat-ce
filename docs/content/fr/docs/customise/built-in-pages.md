@@ -22,6 +22,7 @@ elles lisent les jetons du thème : elles suivent donc votre palette sans recomp
 | `/refused` | la raison pour laquelle un appelant ne passe pas |
 | `/profile` et ses sous-pages | les pages du compte lui-même : mot de passe, second facteur, passkeys, autorités, historique, jetons |
 | la page d'indisponibilité | une route dont le service est arrêté, ou l'interrupteur global |
+| la page introuvable | un navigateur qui demande une page qu'aucune route ne sert : elle nomme le chemin, avec la barre du portail en mode portail, les applications du visiteur sinon (statut 404) |
 
 ## Un écran, quatre onglets, un aperçu
 

@@ -357,5 +357,17 @@
   "notifKept": "확인을 기다리는 %s개는 남겨 두었습니다.",
   "notifWithdrawn": "이 알림은 철회되었습니다",
   "notifExercise": "훈련",
-  "notifMissed": "놓친 알림: %s"
+  "notifMissed": "놓친 알림: %s",
+  "notifSearch": "알림 검색, 또는 키=값",
+  "notifUnreadOnly": "읽지 않은 알림만",
+  "notifNoMatch": "일치하는 알림이 없습니다",
+  "notifNoMatchHint": "검색어나 필터를 바꿔 보세요.",
+  "notifDeleteAllShown": "표시된 알림을 삭제할까요?",
+  "notifSender": "보낸 곳",
+  "titleNotFound": "페이지를 찾을 수 없음 - Meerkat",
+  "notFoundLead": "이 페이지는 존재하지 않습니다",
+  "notFoundHint": "이 주소에서 응답하는 것이 없습니다. 링크가 오래되었거나 주소를 잘못 입력했을 수 있습니다.",
+  "notFoundMenu": "계속하려면 메뉴에서 애플리케이션을 선택하세요.",
+  "notFoundPick": "계속하려면 애플리케이션을 선택하세요.",
+  "notFoundSignIn": "애플리케이션에 접근하려면 로그인하세요."
 }

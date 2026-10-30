@@ -327,6 +327,9 @@ func run(o options) error {
 	// gets the same one: two ways to turn maintenance on, one page.
 	router.Pages = authHandler.ServeMaintenance
 	router.Stripe = authHandler.MaintenanceStripe
+	// Same wire for the page a browser gets where no route answers: the
+	// gateway decides who gets it, the flow chrome draws it (ROUTE-10).
+	router.NotFound = authHandler.ServeNotFound
 	routing.SetMaintenanceHandler(authHandler.ServeMaintenance)
 
 	served := devtunnel.NewRegistry(authHandler.Events())

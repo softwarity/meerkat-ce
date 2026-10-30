@@ -5,8 +5,10 @@ import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/sl
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RowActionsDirective } from '@softwarity/row-actions';
 import { ApiService, SentNotification, TenantNotify } from '../../api.service';
 import { MeService } from '../../me.service';
+import { DialogsService } from '../../shared/dialogs.service';
 import { LiveChangesService } from '../../shared/live-changes.service';
 import { ZonedDatePipe } from '../../shared/zoned-date.pipe';
 import { offByText } from '../../notifications/notify-levels';
@@ -19,13 +21,22 @@ import { TenantScope } from '../tenant-scope';
 // publish nor the cap: those are the gateway's.
 @Component({
   selector: 'app-tenant-notifications',
-  imports: [MatButtonModule, MatIconModule, MatSlideToggleModule, MatTableModule, MatTooltipModule, ZonedDatePipe],
+  imports: [
+    MatButtonModule,
+    MatIconModule,
+    MatSlideToggleModule,
+    MatTableModule,
+    MatTooltipModule,
+    RowActionsDirective,
+    ZonedDatePipe,
+  ],
   templateUrl: './tenant-notifications.component.html',
   styleUrl: './tenant-notifications.component.scss',
 })
 export class TenantNotificationsComponent {
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialogs = inject(DialogsService);
   protected readonly scope = inject(TenantScope);
   protected readonly drawer = inject(IdentityDrawer);
   private readonly me = inject(MeService);
@@ -112,6 +123,45 @@ export class TenantNotificationsComponent {
       return this.state(n) === 'live' ? { text: $localize`:@@Notify_ack_pending:Pending`, done: false } : null;
     }
     return { text: `${n.acknowledged} / ${n.recipients}`, done: !!n.ackCompleteAt };
+  }
+
+  // Why a notification can no longer be withdrawn or replaced: it ended.
+  protected endedReason(n: SentNotification): string {
+    switch (this.state(n)) {
+      case 'withdrawn':
+        return $localize`:@@Notify_off_withdrawn:Already withdrawn`;
+      case 'replaced':
+        return $localize`:@@Notify_off_replaced:Already replaced`;
+      case 'expired':
+        return $localize`:@@Notify_off_expired:Expired`;
+    }
+    return '';
+  }
+
+  // And a replacement names it by the id its sender gave it.
+  protected replaceOff(n: SentNotification): string {
+    return (
+      this.endedReason(n) ||
+      (n.ref ? '' : $localize`:@@Notify_off_no_id:Sent without an id: nothing names it to replace it`)
+    );
+  }
+
+  // Confirmed, as from its drawer: it leaves every recipient's page and badge
+  // at once.
+  protected async withdraw(n: SentNotification): Promise<void> {
+    const t = this.scope.tenant();
+    if (!t) return;
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Withdraw_notification_TITLE:Withdraw "${this.title(n)}:TITLE:"?`,
+      message: $localize`:@@Withdraw_notification_message:It disappears at once for all its recipients. The list of who read it is kept.`,
+      confirmLabel: $localize`:@@Withdraw:Withdraw`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.api.withdrawTenantNotification(t.id, n.id).subscribe(() => {
+      if (this.drawer.notification()?.id === n.id) this.drawer.close();
+      this.drawer.withdrawn.update((v) => v + 1);
+    });
   }
 
   protected state(n: SentNotification): 'live' | 'expired' | 'withdrawn' | 'replaced' {

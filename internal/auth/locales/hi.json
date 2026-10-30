@@ -357,5 +357,17 @@
   "notifKept": "आपकी पावती की प्रतीक्षा में %s रखी गईं।",
   "notifWithdrawn": "यह सूचना वापस ले ली गई",
   "notifExercise": "अभ्यास",
-  "notifMissed": "आपसे छूटी सूचनाएँ: %s"
+  "notifMissed": "आपसे छूटी सूचनाएँ: %s",
+  "notifSearch": "सूचनाएँ खोजें, या कुंजी=मान",
+  "notifUnreadOnly": "केवल अपठित",
+  "notifNoMatch": "कोई मेल खाती सूचना नहीं",
+  "notifNoMatchHint": "खोज या फ़िल्टर बदलें।",
+  "notifDeleteAllShown": "दिखाई गई सूचनाएँ हटाएँ?",
+  "notifSender": "प्रेषक",
+  "titleNotFound": "पृष्ठ नहीं मिला - Meerkat",
+  "notFoundLead": "यह पृष्ठ मौजूद नहीं है",
+  "notFoundHint": "इस पते पर कुछ भी उत्तर नहीं देता। हो सकता है लिंक पुराना हो या पता गलत लिखा गया हो।",
+  "notFoundMenu": "जारी रखने के लिए मेनू से कोई अनुप्रयोग चुनें।",
+  "notFoundPick": "जारी रखने के लिए कोई अनुप्रयोग चुनें।",
+  "notFoundSignIn": "अपने अनुप्रयोगों तक पहुँचने के लिए साइन इन करें।"
 }

@@ -25,7 +25,14 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ApiService, NotificationAck, NotificationLevel, NotifyCompose, NotifyRoute } from '../../api.service';
+import {
+  ApiService,
+  NotificationAck,
+  NotificationLevel,
+  NotifyCompose,
+  NotifyRoute,
+  SentNotification,
+} from '../../api.service';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { JsonEditorComponent } from '../../shared/json-editor.component';
 import { SnippetComponent } from '../../shared/snippet.component';
@@ -198,9 +205,15 @@ export class TenantNotificationComposeComponent {
   });
 
   constructor() {
+    // Opened from a notification to replace it: once the routes are known,
+    // the form says what it said, under a new id.
     effect(() => {
       const id = this.tenantId();
-      this.api.tenantNotifyCompose(id).subscribe((o) => this.opts.set(o));
+      const from = this.drawer.replacing();
+      this.api.tenantNotifyCompose(id).subscribe((o) => {
+        this.opts.set(o);
+        if (from) untracked(() => this.prefill(from, o));
+      });
     });
     // A refusal speaks of the message it was given: the next edit drops it.
     effect(() => {
@@ -208,6 +221,63 @@ export class TenantNotificationComposeComponent {
       untracked(() => this.refusal.set(null));
     });
   }
+
+  // ---- replacing ----
+
+  // A stored link as the form edits it: a route and the path under its
+  // public base, or an address outside the gateway.
+  private linkOf(url: string | undefined, route: string | undefined, o: NotifyCompose): Link {
+    if (!url) return emptyLink('none');
+    if (!route) return { kind: 'url', route: '', path: '', url };
+    const r = o.routes.find((x) => x.route === route);
+    const base = (r?.public ?? '').replace(/\/+$/, '');
+    const path = base && url.startsWith(base) ? url.slice(base.length) : url;
+    return { kind: 'route', route, path: path.replace(/^\/+/, ''), url: '' };
+  }
+
+  private textOf(l: Record<string, string> | undefined): string {
+    if (!l) return '';
+    return l[''] ?? l['en'] ?? Object.values(l)[0] ?? '';
+  }
+
+  // The lifetime it was given, among the ones offered; the default when it
+  // was none of them.
+  private lifeOf(n: SentNotification): string {
+    const days = Math.round((n.expiresAt - n.createdAt) / 86400);
+    const hours = Math.round((n.expiresAt - n.createdAt) / 3600);
+    if (hours === 1) return 'PT1H';
+    return ({ 1: 'P1D', 7: 'P7D', 90: 'P90D' } as Record<number, string>)[days] ?? '';
+  }
+
+  private prefill(n: SentNotification, o: NotifyCompose): void {
+    this.draft.set({
+      roles: [...(n.audienceRoles ?? [])],
+      users: [...(n.audienceUsers ?? [])],
+      level: n.level,
+      title: this.textOf(n.title),
+      body: this.textOf(n.body),
+      detail: this.linkOf(n.detailUrl, n.detailRoute, o),
+      actions: (n.actions ?? []).map((a) => ({
+        label: this.textOf(a.label),
+        link: this.linkOf(a.url, a.route, o),
+        method: (METHODS as readonly string[]).includes(a.method ?? '') ? (a.method as Method) : 'GET',
+        body: a.body === undefined || a.body === null ? '' : JSON.stringify(a.body, null, 2),
+      })),
+      ack: n.ack ?? 'none',
+      onAck: this.linkOf(n.onAck?.url, n.onAck?.route, o),
+      expires: this.lifeOf(n),
+      id: crypto.randomUUID(),
+      meta: Object.entries(n.meta ?? {}).map(([key, value]) => ({ key, value })),
+      mail: !!n.mail && !!o.mail,
+      exercise: !!n.exercise,
+    });
+    this.moreOpen.set(true);
+  }
+
+  protected readonly replacingTitle = computed(() => {
+    const n = this.drawer.replacing();
+    return n ? this.textOf(n.title) : '';
+  });
 
   // ---- links ----
 
@@ -338,6 +408,9 @@ export class TenantNotificationComposeComponent {
       if (row.key.trim()) meta[row.key.trim()] = row.value;
     }
     if (Object.keys(meta).length) m['meta'] = meta;
+    // Opened from a notification: it ends as replaced when this one is sent.
+    const from = this.drawer.replacing();
+    if (from?.ref) m['replaces'] = from.ref;
     return m;
   });
 
@@ -374,6 +447,11 @@ export class TenantNotificationComposeComponent {
       next: (p) => {
         this.sending.set(false);
         this.drawer.withdrawn.update((v) => v + 1);
+        // A replacement is done once: back to the list, where it shows.
+        if (this.drawer.replacing()) {
+          this.drawer.close();
+          return;
+        }
         // The next one is another notification: another id.
         if (!p.existing) this.draft.update((d) => ({ ...d, id: crypto.randomUUID() }));
         this.snack.open(

@@ -357,5 +357,17 @@
   "notifKept": "Mantidas: %s a aguardar a sua confirmação.",
   "notifWithdrawn": "Esta notificação foi retirada",
   "notifExercise": "EXERCÍCIO",
-  "notifMissed": "Notificações que você perdeu: %s"
+  "notifMissed": "Notificações que você perdeu: %s",
+  "notifSearch": "Pesquisar notificações, ou chave=valor",
+  "notifUnreadOnly": "Apenas não lidas",
+  "notifNoMatch": "Nenhuma notificação corresponde",
+  "notifNoMatchHint": "Altere a pesquisa ou os filtros.",
+  "notifDeleteAllShown": "Excluir as notificações exibidas?",
+  "notifSender": "Remetente",
+  "titleNotFound": "Página não encontrada - Meerkat",
+  "notFoundLead": "Esta página não existe",
+  "notFoundHint": "Nada responde neste endereço. A ligação pode estar desatualizada ou o endereço mal escrito.",
+  "notFoundMenu": "Escolha uma aplicação no menu para continuar.",
+  "notFoundPick": "Escolha uma aplicação para continuar.",
+  "notFoundSignIn": "Inicie sessão para aceder às suas aplicações."
 }

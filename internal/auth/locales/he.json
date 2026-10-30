@@ -357,5 +357,17 @@
   "notifKept": "נשמרו %s שממתינות לאישור שלך.",
   "notifWithdrawn": "התראה זו נמשכה",
   "notifExercise": "תרגיל",
-  "notifMissed": "התראות שפספסת: %s"
+  "notifMissed": "התראות שפספסת: %s",
+  "notifSearch": "חיפוש בהתראות, או מפתח=ערך",
+  "notifUnreadOnly": "שלא נקראו בלבד",
+  "notifNoMatch": "אין התראה תואמת",
+  "notifNoMatchHint": "שנו את החיפוש או את המסננים.",
+  "notifDeleteAllShown": "למחוק את ההתראות המוצגות?",
+  "notifSender": "שולח",
+  "titleNotFound": "הדף לא נמצא - Meerkat",
+  "notFoundLead": "הדף הזה לא קיים",
+  "notFoundHint": "שום דבר לא עונה בכתובת הזו. ייתכן שהקישור ישן או שהכתובת הוקלדה בטעות.",
+  "notFoundMenu": "בחר יישום מהתפריט כדי להמשיך.",
+  "notFoundPick": "בחר יישום כדי להמשיך.",
+  "notFoundSignIn": "התחבר כדי להגיע ליישומים שלך."
 }

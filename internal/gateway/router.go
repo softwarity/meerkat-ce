@@ -92,6 +92,11 @@ type Router struct {
 	// language like every other page it serves; nil falls back to a
 	// self-contained block, which is what the tests run on.
 	Pages func(w http.ResponseWriter, r *http.Request, reason string, until int64, continueURL string)
+	// NotFound draws the page a BROWSER gets when no route serves the
+	// address it asked for: the flow pages' frame, the portal bar when the
+	// installation uses it (ROUTE-10). Wired by main; nil, and for anything
+	// that is not a browser asking for a page, the plain 404 it always was.
+	NotFound func(w http.ResponseWriter, r *http.Request)
 	// Stripe is the reminder injected into every page seen through the
 	// maintenance door, translated like the page it lands on. Wired by main;
 	// nil falls back to the English block below it.
@@ -859,7 +864,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// should see, and it belongs to no route by definition.
 	rt.metrics.Unmatched()
 	ww, start := record(w)
-	http.NotFound(ww, req)
+	rt.notFound(ww, req)
 	writeAccess(req, "", "", ww.status, ww.bytes, time.Since(start))
 	// Not traced: tracing is each route's answer, and no route answered. A
 	// 404 is nobody's journey - an asset a front end asks for at the root, a
@@ -867,6 +872,32 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// traces from routes that had said no. It stays counted (Unmatched) and
 	// logged.
 	dropSpan(req.Context())
+}
+
+// notFound answers a request no route serves. A browser going to a page gets
+// one it can act on - where it is, and the way on - with the status a missing
+// page has; anything else, a fetch, an asset, an API client, a POST, gets the
+// plain 404 every other refusal of a machine gets here (http.Error): there is
+// nobody to read a page at the end of it.
+//
+// Still a 404, never a redirect and never a 200: the address does not exist,
+// and a link checker or a probe has to be told so.
+func (rt *Router) notFound(w http.ResponseWriter, req *http.Request) {
+	if rt.NotFound != nil && wantsPage(req) {
+		rt.NotFound(w, req)
+		return
+	}
+	http.NotFound(w, req)
+}
+
+// wantsPage: a browser asking for a document - GET or HEAD, with text/html
+// among what it accepts. A HEAD gets the page's headers, the server drops the
+// body.
+func wantsPage(req *http.Request) bool {
+	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		return false
+	}
+	return strings.Contains(req.Header.Get("Accept"), "text/html")
 }
 
 func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFile, portalOn bool) (compiledRoute, error) {

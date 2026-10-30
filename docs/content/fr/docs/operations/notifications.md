@@ -36,7 +36,22 @@ utilisateurs. Les écrans de l'administrateur sont décrits dans
   l'application quand l'administrateur en a choisi une. Les plus récentes
   d'abord. Un clic marque une notification comme lue et la déplie quand il y a
   plus à voir (un chevron l'annonce) : le texte entier, **Ouvrir** pour le
-  détail, et vos actions, chacune avec son résultat.
+  détail, et vos actions, chacune avec son résultat. Chaque carte montre en
+  petit, dans son coin haut, qui l'a envoyée et dans quel tenant. L'émetteur
+  est nommé pour le lecteur : un service par son nom court (`station-registry`
+  pour le workload `ns/Deployment/station-registry`), un jeton par son nom, un
+  administrateur qui l'a envoyée depuis la console par le nom qu'affiche son
+  compte.
+- **Les filtres**, dans l'en-tête de la page, qui reste visible pendant que la
+  liste défile : une recherche, **Non lues seulement**, et les tenants quand il
+  y en a plusieurs. Ils se combinent, et l'adresse les garde, si bien qu'un
+  rechargement ou un lien gardent la même liste. La recherche cherche chaque
+  mot tapé, sans casse ni accents, dans le titre, le texte et les métadonnées
+  que vous avez jointes ; elle se fait sur la gateway, donc vos métadonnées
+  n'atteignent jamais le navigateur du lecteur, et une notification retirée ne
+  correspond à rien. Un mot écrit `clé=valeur` demande cette métadonnée
+  exactement : `ticket=ZK-4471` trouve les notifications dont le `ticket` vaut
+  `ZK-4471`, toujours sans casse ni accents, et pas `ZK-44710`.
 - **Un mail**, quand vous le demandez et qu'un relais de messagerie est
   configuré : le texte, et un bouton vers la page des notifications. Jamais
   d'action.
@@ -47,7 +62,9 @@ utilisateurs. Les écrans de l'administrateur sont décrits dans
 
 Sur la page, **Supprimer** retire une notification de la liste du lecteur, pour
 de bon ; l'émetteur et les autres lecteurs gardent la leur. **Tout marquer comme
-lu** et **Tout supprimer** agissent sur ce que montre la liste. Tout suit en
+lu** et **Tout supprimer** agissent sur ce que montre la liste : réduite à un
+tenant, aux non lues ou par une recherche, ils prennent cela et rien d'autre, et
+Tout supprimer demande d'abord, en le disant. Tout suit en
 direct, dans chaque onglet et sur chaque appareil du lecteur.
 
 **Plusieurs tenants.** Un lecteur reçoit les notifications de tous ses tenants.
@@ -539,11 +556,11 @@ session :
 
 | | |
 |---|---|
-| `GET /meerkat/notifications.json` | une page des notifications du lecteur, de tous ses tenants |
+| `GET /meerkat/notifications.json` | une page des notifications du lecteur, de tous ses tenants. `?tenant=`, `?unread=1` et `?q=` la réduisent ; `?q=` cherche dans le titre, le texte et les métadonnées sur le serveur et répond tout ce qui correspond d'un coup, jamais les métadonnées elles-mêmes |
 | `GET /meerkat/notifications/counts` | le nombre de non lues |
-| `POST /meerkat/notifications/{id}/read` | en marquer une comme lue ; `POST /meerkat/notifications/read` les marque toutes |
+| `POST /meerkat/notifications/{id}/read` | en marquer une comme lue ; `POST /meerkat/notifications/read` les marque toutes, ou ce que montrent `?tenant=`, `?unread=1` et `?q=` |
 | `POST /meerkat/notifications/{id}/ack` | en acquitter une |
-| `DELETE /meerkat/notifications/{id}` | en supprimer une pour ce lecteur ; `DELETE /meerkat/notifications` les supprime toutes, sauf ce qui attend un acquittement |
+| `DELETE /meerkat/notifications/{id}` | en supprimer une pour ce lecteur ; `DELETE /meerkat/notifications` les supprime toutes, ou ce que montrent `?tenant=`, `?unread=1` et `?q=`, sauf ce qui attend un acquittement |
 
 Chaque action de la liste arrive avec sa méthode et son corps, prête à envoyer.
 Le contrat complet est dans la référence d'API du plan de données (**Meerkat,

@@ -357,5 +357,17 @@
   "notifKept": "%s disimpan karena menunggu konfirmasi Anda.",
   "notifWithdrawn": "Notifikasi ini telah ditarik",
   "notifExercise": "LATIHAN",
-  "notifMissed": "Notifikasi yang terlewat: %s"
+  "notifMissed": "Notifikasi yang terlewat: %s",
+  "notifSearch": "Cari notifikasi, atau kunci=nilai",
+  "notifUnreadOnly": "Hanya yang belum dibaca",
+  "notifNoMatch": "Tidak ada notifikasi yang cocok",
+  "notifNoMatchHint": "Ubah pencarian atau filter.",
+  "notifDeleteAllShown": "Hapus notifikasi yang ditampilkan?",
+  "notifSender": "Pengirim",
+  "titleNotFound": "Halaman tidak ditemukan - Meerkat",
+  "notFoundLead": "Halaman ini tidak ada",
+  "notFoundHint": "Tidak ada yang menjawab di alamat ini. Tautannya mungkin sudah usang, atau alamatnya salah ketik.",
+  "notFoundMenu": "Pilih aplikasi dari menu untuk melanjutkan.",
+  "notFoundPick": "Pilih aplikasi untuk melanjutkan.",
+  "notFoundSignIn": "Masuk untuk menjangkau aplikasi Anda."
 }

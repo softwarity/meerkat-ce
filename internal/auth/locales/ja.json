@@ -357,5 +357,17 @@
   "notifKept": "確認待ちの %s 件は残しました。",
   "notifWithdrawn": "この通知は取り下げられました",
   "notifExercise": "訓練",
-  "notifMissed": "見逃した通知: %s"
+  "notifMissed": "見逃した通知: %s",
+  "notifSearch": "通知を検索、または キー=値",
+  "notifUnreadOnly": "未読のみ",
+  "notifNoMatch": "一致する通知はありません",
+  "notifNoMatchHint": "検索またはフィルターを変更してください。",
+  "notifDeleteAllShown": "表示されている通知を削除しますか?",
+  "notifSender": "送信元",
+  "titleNotFound": "ページが見つかりません - Meerkat",
+  "notFoundLead": "このページは存在しません",
+  "notFoundHint": "このアドレスでは何も応答しません。リンクが古いか、アドレスの入力が間違っている可能性があります。",
+  "notFoundMenu": "続けるには、メニューからアプリケーションを選択してください。",
+  "notFoundPick": "続けるには、アプリケーションを選択してください。",
+  "notFoundSignIn": "アプリケーションにアクセスするにはサインインしてください。"
 }

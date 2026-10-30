@@ -135,6 +135,15 @@ ADMIN members, on a gateway with several tenants.
   must. It follows live.
 - A click opens one: its text, sender and times, who acknowledged it and who
   has not yet, every recipient with the time they read it, and **Withdraw**.
+- Two row actions, at the end of each line: **Replace** opens the New
+  notification drawer filled from that notification (audience, level,
+  exercise, title, text, detail, actions, lifetime, metadata, mail,
+  acknowledgement) under a new id, its title saying what it replaces; **Send**
+  publishes the replacement, the earlier one ends as replaced, and its readers
+  see only the replacement. You replace what any sender sent to this tenant,
+  as you withdraw it. **Withdraw** asks first, as from the drawer. Both are
+  greyed out, with the reason on hover, on a notification already withdrawn,
+  replaced or expired.
 
 ![A notification that asks one reader to acknowledge it: who closed it, and every recipient with the time they read it](img/console/tenant-notification-detail.webp)
 

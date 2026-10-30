@@ -34,7 +34,20 @@ The screens an administrator uses are on
   own page when the administrator chose one. Newest first. A click marks a
   notification read and unfolds it when there is more to see (a chevron says
   so): the whole text, **Open** for the detail, and your actions, each showing
-  its result.
+  its result. Each card shows small, in its top corner, who sent it and in
+  which tenant. The sender is named for the reader: a service by its short
+  name (`station-registry` for the workload `ns/Deployment/station-registry`),
+  a token by its name, an administrator who sent it from the console by the
+  name their account shows.
+- **The filters**, in the page's header, which stays in sight while the list
+  scrolls: a search, **Unread only**, and the tenants when there are several.
+  They combine, and the address keeps them, so a reload or a link keeps the
+  same list. The search looks for every word typed, without case or accents,
+  in the title, the text, and the metadata you attached; it runs on the
+  gateway, so your metadata never reaches the reader's browser, and a
+  withdrawn notification matches nothing. A word written `key=value` asks for
+  that metadata exactly: `ticket=ZK-4471` finds the notifications whose
+  `ticket` is `ZK-4471`, still without case or accents, and not `ZK-44710`.
 - **A mail**, when you ask for one and a mail relay is configured: the text, and
   a button to the notifications page. Never an action.
 - **The label EXERCISE** before the title, everywhere it shows, on a
@@ -51,7 +64,9 @@ shown at all: the replacement stands in its place.
 
 On the page, **Delete** takes a notification off the reader's list for good;
 the sender and the other readers keep theirs. **Mark all as read** and
-**Delete all** act on what the list shows. Everything follows live, in every
+**Delete all** act on what the list shows: narrowed by a tenant, Unread only
+or a search, they take that and nothing else, and Delete all asks first,
+saying so. Everything follows live, in every
 tab and on every device of the reader.
 
 **Several tenants.** A reader receives the notifications of all their tenants.
@@ -521,11 +536,11 @@ Your page reads the reader's notifications on the data plane, with the session:
 
 | | |
 |---|---|
-| `GET /meerkat/notifications.json` | a page of the reader's notifications, from all their tenants |
+| `GET /meerkat/notifications.json` | a page of the reader's notifications, from all their tenants. `?tenant=`, `?unread=1` and `?q=` narrow it; `?q=` searches the title, the text and the metadata on the server and answers the whole match at once, never the metadata itself |
 | `GET /meerkat/notifications/counts` | the unread count |
-| `POST /meerkat/notifications/{id}/read` | mark one read; `POST /meerkat/notifications/read` marks them all |
+| `POST /meerkat/notifications/{id}/read` | mark one read; `POST /meerkat/notifications/read` marks them all, or what `?tenant=`, `?unread=1` and `?q=` show |
 | `POST /meerkat/notifications/{id}/ack` | acknowledge one |
-| `DELETE /meerkat/notifications/{id}` | delete one for this reader; `DELETE /meerkat/notifications` deletes them all, except what waits for an acknowledgement |
+| `DELETE /meerkat/notifications/{id}` | delete one for this reader; `DELETE /meerkat/notifications` deletes them all, or what `?tenant=`, `?unread=1` and `?q=` show, except what waits for an acknowledgement |
 
 Each action in the list comes with its method and body, ready to send. The
 full contract is in the data plane's API reference (**Meerkat, API reference**

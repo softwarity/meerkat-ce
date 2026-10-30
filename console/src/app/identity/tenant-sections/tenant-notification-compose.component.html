@@ -1,5 +1,9 @@
 <header>
-  <h2 i18n="@@New_notification">New notification</h2>
+  @if (replacingTitle(); as r) {
+    <h2 i18n="@@Notify_replacing_TITLE">Replace "{{ r }}"</h2>
+  } @else {
+    <h2 i18n="@@New_notification">New notification</h2>
+  }
   @if (opts(); as o) {
     <span class="tenant"><mat-icon>domain</mat-icon>{{ o.tenant }}</span>
   }

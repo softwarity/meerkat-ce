@@ -61,7 +61,8 @@ generated, the console asks you for a new one before letting you anywhere else.
 ## Send a first request through
 
 A fresh gateway is **empty**: it has no route, so every address on port 8080
-answers 404. Give it one, pointing at a public test service:
+answers 404 - in a browser, a page that names the address and offers the
+sign-in. Give it one, pointing at a public test service:
 
 1. In the console, open **Infra > Routes** and click **New route**. Name it
    `demo`.

@@ -1572,6 +1572,12 @@ export interface SentNotification {
   title: Record<string, string>;
   body: Record<string, string>;
   detailUrl?: string;
+  detailRoute?: string;
+  // The audience its sender named: roles and members, neither for everyone.
+  audienceRoles?: string[];
+  audienceUsers?: string[];
+  // Where the sender's service is called at each acknowledgement.
+  onAck?: { url: string; route?: string };
   // How the reader's browser calls each action, and the JSON it sends.
   actions?: { label: Record<string, string>; url: string; route?: string; method?: string; body?: unknown }[];
   meta?: Record<string, string>;

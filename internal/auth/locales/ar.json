@@ -357,5 +357,17 @@
   "notifKept": "تم الإبقاء على %s بانتظار تأكيدك.",
   "notifWithdrawn": "تم سحب هذا الإشعار",
   "notifExercise": "تمرين",
-  "notifMissed": "إشعارات فاتتك: %s"
+  "notifMissed": "إشعارات فاتتك: %s",
+  "notifSearch": "البحث في الإشعارات، أو مفتاح=قيمة",
+  "notifUnreadOnly": "غير المقروءة فقط",
+  "notifNoMatch": "لا يوجد إشعار مطابق",
+  "notifNoMatchHint": "غيّر البحث أو المرشحات.",
+  "notifDeleteAllShown": "حذف الإشعارات المعروضة؟",
+  "notifSender": "المرسل",
+  "titleNotFound": "الصفحة غير موجودة - Meerkat",
+  "notFoundLead": "هذه الصفحة غير موجودة",
+  "notFoundHint": "لا شيء يستجيب على هذا العنوان. ربما يكون الرابط قديماً أو العنوان مكتوباً بشكل خاطئ.",
+  "notFoundMenu": "اختر تطبيقاً من القائمة للمتابعة.",
+  "notFoundPick": "اختر تطبيقاً للمتابعة.",
+  "notFoundSignIn": "سجّل الدخول للوصول إلى تطبيقاتك."
 }

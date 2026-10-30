@@ -357,5 +357,17 @@
   "notifKept": "已保留 %s 条等待你确认的通知。",
   "notifWithdrawn": "此通知已撤回",
   "notifExercise": "演练",
-  "notifMissed": "您错过的通知：%s"
+  "notifMissed": "您错过的通知：%s",
+  "notifSearch": "搜索通知，或 键=值",
+  "notifUnreadOnly": "仅未读",
+  "notifNoMatch": "没有匹配的通知",
+  "notifNoMatchHint": "请更改搜索或筛选条件。",
+  "notifDeleteAllShown": "删除显示的通知？",
+  "notifSender": "发送方",
+  "titleNotFound": "找不到页面 - Meerkat",
+  "notFoundLead": "此页面不存在",
+  "notFoundHint": "此地址没有任何内容响应。链接可能已过时，或地址输入有误。",
+  "notFoundMenu": "请从菜单中选择一个应用以继续。",
+  "notFoundPick": "请选择一个应用以继续。",
+  "notFoundSignIn": "登录以访问您的应用。"
 }

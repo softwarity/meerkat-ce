@@ -22,6 +22,7 @@ theme's tokens, so they follow your palette without a rebuild.
 | `/refused` | why a caller may not pass |
 | `/profile` and its sub-pages | the account's own pages: password, second factor, passkeys, authorities, history, tokens |
 | the unavailable page | a route whose service is down, or the global switch |
+| the not-found page | a browser asking for a page no route serves: it names the path, with the portal bar in portal mode, the visitor's applications otherwise (status 404) |
 
 ## One screen, four tabs, one preview
 

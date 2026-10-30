@@ -553,6 +553,19 @@ var PreviewPages = []PreviewPage{
 			Reason:     stack(c, "appRefusedUnknown", "appRefusedReturn", "appRefusedUnavailable", "appRefusedUnreadable"),
 		}
 	}},
+	// As a visitor who is not signed in meets it without the portal: the
+	// list and the sign-in, its busiest shape. The sentence above the list is
+	// one of three, chosen by where the visitor stands, so all three are
+	// stacked: each is a wording a translator has to see somewhere.
+	{"not-found", cRefused, "Not found", "titleNotFound", func(c flowChrome) (*template.Template, any) {
+		return notFoundPage, notFoundData{
+			flowChrome: c,
+			Path:       "/billing/old-invoices",
+			Way:        stack(c, "notFoundPick", "notFoundMenu") + "\n" + c.T["refusedApps"] + " " + c.T["refusedHint"],
+			Apps:       samplePublicLinks(),
+			SignIn:     true,
+		}
+	}},
 }
 
 // loginView is the login page's data, under a name the handler and the

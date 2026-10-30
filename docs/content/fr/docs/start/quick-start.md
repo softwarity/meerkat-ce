@@ -63,8 +63,9 @@ laisser aller plus loin.
 ## Faire passer une première requête
 
 Une gateway neuve est **vide** : elle n'a aucune route, donc toutes les adresses
-du port 8080 répondent 404. Donnez-lui en une, qui pointe vers un service de
-test public :
+du port 8080 répondent 404 - dans un navigateur, une page qui nomme l'adresse et
+propose la connexion. Donnez-lui en une, qui pointe vers un service de test
+public :
 
 1. Dans la console, ouvrez **Infra > Routes** et cliquez sur **New route**.
    Nommez-la `demo`.

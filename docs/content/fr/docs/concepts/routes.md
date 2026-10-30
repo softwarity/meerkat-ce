@@ -96,6 +96,18 @@ Si aucune route n'a reconnu la requête, la gateway répond 404 et le compte à
 l'échelle de la gateway : un nombre croissant de requêtes non reconnues
 trahit une erreur de configuration que quelqu'un doit voir.
 
+Ce que porte ce 404 dépend de qui demande. Un **navigateur qui demande une
+page** (`GET` ou `HEAD`, avec `text/html` accepté) reçoit une page de la gateway
+elle-même, aux couleurs de l'installation et dans la langue du visiteur : elle
+nomme le chemin demandé et dit où aller ensuite. Avec le
+[portail](/docs/customise/portal), elle porte la barre de navigation qu'une page
+proxifiée porte pour ce visiteur et renvoie à son menu. Sans portail, elle
+liste les applications que le visiteur peut ouvrir, avec son profil s'il est
+connecté et la connexion s'il ne l'est pas. Tout le reste - un client d'API, un
+script qui charge une ressource, un formulaire envoyé - reçoit le
+`404 page not found` brut. Dans tous les cas le statut reste 404, jamais une
+redirection.
+
 ## La route attrape-tout
 
 Une route attrape-tout n'est pas un réglage : c'est une route ordinaire dont le
@@ -103,9 +115,10 @@ prédicat de chemin vaut `/**` et qui est placée en dernier. Elle n'a aucun
 privilège : elle se trouve simplement essayée après toutes les autres, et
 récupère donc tout ce qui n'a pas été reconnu, `/` compris.
 
-Une installation neuve n'en a pas : un chemin non reconnu répond 404. Ajoutez-en
-une quand vous voulez que ces chemins mènent quelque part - à votre propre page
-d'accueil, par exemple.
+Une installation neuve n'en a pas : un chemin non reconnu répond 404 - la page
+ci-dessus, pour un navigateur. Ajoutez-en une quand vous voulez que ces chemins
+mènent quelque part - à votre propre page d'accueil, par exemple. Elle passe
+avant cette page : la page ne répond qu'à ce qu'aucune route ne sert.
 
 > [!TIP]
 > Une nouvelle route est créée avec l'ordre `0`, ce qui la place **en tête** de

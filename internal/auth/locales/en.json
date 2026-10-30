@@ -357,5 +357,17 @@
   "notifKept": "Kept %s waiting for your acknowledgement.",
   "notifWithdrawn": "This notification was withdrawn",
   "notifExercise": "EXERCISE",
-  "notifMissed": "Notifications you missed: %s"
+  "notifMissed": "Notifications you missed: %s",
+  "notifSearch": "Search notifications, or key=value",
+  "notifUnreadOnly": "Unread only",
+  "notifNoMatch": "No matching notification",
+  "notifNoMatchHint": "Change the search or the filters.",
+  "notifDeleteAllShown": "Delete the notifications shown?",
+  "notifSender": "Sender",
+  "titleNotFound": "Page not found - Meerkat",
+  "notFoundLead": "This page does not exist",
+  "notFoundHint": "Nothing answers at this address. The link may be out of date, or the address mistyped.",
+  "notFoundMenu": "Choose an application from the menu to carry on.",
+  "notFoundPick": "Choose an application to carry on.",
+  "notFoundSignIn": "Sign in to reach your applications."
 }

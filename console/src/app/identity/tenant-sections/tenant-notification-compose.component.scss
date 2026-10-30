@@ -175,6 +175,13 @@ section p {
   align-items: flex-start;
   gap: 8px;
 }
+// Key and value share the row with the delete button: the 100% width every
+// field gets above would push the value and the button out of the card.
+.meta-row app-form-field {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
 .mail {
   display: flex;
   align-items: center;

@@ -357,5 +357,17 @@
   "notifKept": "Onayınızı bekleyen %s bildirim tutuldu.",
   "notifWithdrawn": "Bu bildirim geri çekildi",
   "notifExercise": "TATBİKAT",
-  "notifMissed": "Kaçırdığınız bildirimler: %s"
+  "notifMissed": "Kaçırdığınız bildirimler: %s",
+  "notifSearch": "Bildirimlerde ara veya anahtar=değer",
+  "notifUnreadOnly": "Yalnızca okunmamışlar",
+  "notifNoMatch": "Eşleşen bildirim yok",
+  "notifNoMatchHint": "Aramayı veya filtreleri değiştirin.",
+  "notifDeleteAllShown": "Gösterilen bildirimler silinsin mi?",
+  "notifSender": "Gönderen",
+  "titleNotFound": "Sayfa bulunamadı - Meerkat",
+  "notFoundLead": "Bu sayfa mevcut değil",
+  "notFoundHint": "Bu adreste yanıt veren bir şey yok. Bağlantı eskimiş ya da adres yanlış yazılmış olabilir.",
+  "notFoundMenu": "Devam etmek için menüden bir uygulama seçin.",
+  "notFoundPick": "Devam etmek için bir uygulama seçin.",
+  "notFoundSignIn": "Uygulamalarınıza ulaşmak için giriş yapın."
 }

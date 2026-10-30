@@ -357,5 +357,17 @@
   "notifKept": "Bewaard: %s wachten op je bevestiging.",
   "notifWithdrawn": "Deze melding is ingetrokken",
   "notifExercise": "OEFENING",
-  "notifMissed": "Gemiste meldingen: %s"
+  "notifMissed": "Gemiste meldingen: %s",
+  "notifSearch": "Meldingen zoeken, of sleutel=waarde",
+  "notifUnreadOnly": "Alleen ongelezen",
+  "notifNoMatch": "Geen overeenkomende melding",
+  "notifNoMatchHint": "Wijzig de zoekopdracht of de filters.",
+  "notifDeleteAllShown": "De getoonde meldingen verwijderen?",
+  "notifSender": "Afzender",
+  "titleNotFound": "Pagina niet gevonden - Meerkat",
+  "notFoundLead": "Deze pagina bestaat niet",
+  "notFoundHint": "Op dit adres antwoordt niets. De link is misschien verouderd, of het adres verkeerd getypt.",
+  "notFoundMenu": "Kies een toepassing in het menu om verder te gaan.",
+  "notFoundPick": "Kies een toepassing om verder te gaan.",
+  "notFoundSignIn": "Meld u aan om uw toepassingen te bereiken."
 }

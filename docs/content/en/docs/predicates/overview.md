@@ -38,8 +38,9 @@ That route answers a `GET` or a `POST` under `/orders`, and nothing else.
 ## Which route answers
 
 Routes are tried in ascending **order** (ties broken by name) and the **first**
-route whose predicates all match answers. Nothing matched at all is a plain
-`404`.
+route whose predicates all match answers. Nothing matched at all is a `404`:
+a page naming the path for a browser, the plain text for everything else (see
+[Routes](/docs/concepts/routes)).
 
 A route's access rule takes part in the choice: a caller the rule turns away
 falls through to the next route that matches, and is refused by the first route
@@ -52,7 +53,7 @@ A disabled route is not loaded, so it never matches.
 
 A catch-all is not a setting: it is an ordinary route whose path predicate is
 `/**`, ordered last. It catches what no other route claimed, which is how an
-installation answers something better than a bare `404`.
+installation answers something of its own instead of the gateway's `404` page.
 
 > [!TIP]
 > Leave a gap in the order numbers - `100`, `200`, `300` - so a route can be

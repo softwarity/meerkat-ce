@@ -357,5 +357,17 @@
   "notifKept": "Behalten: %s warten auf Ihre Bestätigung.",
   "notifWithdrawn": "Diese Benachrichtigung wurde zurückgezogen",
   "notifExercise": "ÜBUNG",
-  "notifMissed": "Verpasste Benachrichtigungen: %s"
+  "notifMissed": "Verpasste Benachrichtigungen: %s",
+  "notifSearch": "Benachrichtigungen durchsuchen oder Schlüssel=Wert",
+  "notifUnreadOnly": "Nur ungelesene",
+  "notifNoMatch": "Keine passende Benachrichtigung",
+  "notifNoMatchHint": "Ändern Sie die Suche oder die Filter.",
+  "notifDeleteAllShown": "Die angezeigten Benachrichtigungen löschen?",
+  "notifSender": "Absender",
+  "titleNotFound": "Seite nicht gefunden - Meerkat",
+  "notFoundLead": "Diese Seite existiert nicht",
+  "notFoundHint": "Unter dieser Adresse antwortet nichts. Der Link ist vielleicht veraltet oder die Adresse falsch eingegeben.",
+  "notFoundMenu": "Wählen Sie im Menü eine Anwendung, um fortzufahren.",
+  "notFoundPick": "Wählen Sie eine Anwendung, um fortzufahren.",
+  "notFoundSignIn": "Melden Sie sich an, um Ihre Anwendungen zu erreichen."
 }

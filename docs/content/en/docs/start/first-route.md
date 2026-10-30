@@ -126,7 +126,8 @@ Then the real thing:
 curl -i http://localhost:8080/billing/invoices
 ```
 
-If nothing matches, the gateway answers 404. If a route matched but its rule
+If nothing matches, the gateway answers 404: plain text for `curl`, a page
+naming the path for a browser. If a route matched but its rule
 turned you away, a UI route lands on a page naming the rule that refused; a
 service route gets a plain 403.
 

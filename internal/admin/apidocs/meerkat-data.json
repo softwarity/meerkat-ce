@@ -1974,7 +1974,7 @@
         ],
         "summary": "Delete all my notifications",
         "operationId": "deleteAllMyNotifications",
-        "description": "Every notification you hold, in all your tenants or in the one `tenant` names, not only the ones a page loaded. For you only and for good: the senders and the other readers keep theirs. Other tabs and devices update at once. What waits for your acknowledgement is kept, and the answer says how many.",
+        "description": "Every notification you hold, in all your tenants or in the one `tenant` names, not only the ones a page loaded. For you only and for good: the senders and the other readers keep theirs. Other tabs and devices update at once. What waits for your acknowledgement is kept, and the answer says how many. With unread or q, it acts on what the list shows with the same parameters, and nothing else.",
         "security": [
           {
             "session": []
@@ -1989,6 +1989,24 @@
             "in": "query",
             "required": false,
             "description": "Tenant id: only what was sent there, a message sent to several tenants in all of them; all tenants without it",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "description": "1 or true: only the unread ones.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search, as for the list: with it, or with unread, only what the list shows is deleted.",
             "schema": {
               "type": "string"
             }
@@ -2084,7 +2102,7 @@
             "name": "unread",
             "in": "query",
             "required": false,
-            "description": "`true` or `1`: unread only",
+            "description": "1 or true: only the unread ones.",
             "schema": {
               "type": "string"
             }
@@ -2149,6 +2167,15 @@
             "in": "query",
             "required": false,
             "description": "Language; default from `Accept-Language`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search: the items whose title, text or metadata hold every word, without case or accents. The search runs on the server; the metadata itself is never sent. A search reads all the reader holds at once (no paging).",
             "schema": {
               "type": "string"
             }
@@ -2267,7 +2294,7 @@
         ],
         "summary": "Mark all my notifications read",
         "operationId": "readAllMyNotifications",
-        "description": "In all your tenants, or in the one `tenant` names. Other tabs and devices update at once.",
+        "description": "In all your tenants, or in the one `tenant` names. Other tabs and devices update at once. With unread or q, it acts on what the list shows with the same parameters, and nothing else.",
         "security": [
           {
             "session": []
@@ -2282,6 +2309,24 @@
             "in": "query",
             "required": false,
             "description": "Tenant id: only what was sent there, a message sent to several tenants in all of them; all tenants without it",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "description": "1 or true: only the unread ones.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search, as for the list: with it, or with unread, only what the list shows is marked read.",
             "schema": {
               "type": "string"
             }

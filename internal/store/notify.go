@@ -729,6 +729,30 @@ func (s *Store) SenderNotifications(ctx context.Context, sender, ref string) ([]
 	return out, rows.Err()
 }
 
+// TenantNotificationsByRef are the notifications of one tenant its senders
+// name by an id, whoever the sender: what an administrator replaces from the
+// tenant's page, as they withdraw any of them from there.
+func (s *Store) TenantNotificationsByRef(ctx context.Context, tenantID, ref string) ([]Notification, error) {
+	if ref == "" {
+		return []Notification{}, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+notificationColumns+` FROM notifications
+		WHERE tenant_id = ? AND ref = ? AND expires_at > ? ORDER BY created_at, id`, tenantID, ref, time.Now().Unix())
+	if err != nil {
+		return nil, fmt.Errorf("store: notifications %q of tenant %q: %w", ref, tenantID, err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := []Notification{}
+	for rows.Next() {
+		n, err := scanNotification(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: notifications %q of tenant %q: %w", ref, tenantID, err)
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
 // EndNotification ends one live notification, as withdrawn or replaced (by
 // the notification named). It answers whether it was live: ending one already
 // ended changes nothing, so a sender retrying is not an error.

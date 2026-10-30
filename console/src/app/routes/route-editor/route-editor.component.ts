@@ -1838,6 +1838,11 @@ export class RouteEditorComponent {
   private outOfNamespace(raw: string): string {
     const ns = this.namespace();
     if (!this.listOnly() || this.loadedNamespace() !== ns) return "";
+    // The upstream the route already has is never refused: a service that is
+    // down, scaled to zero or not deployed yet must not stop anyone from
+    // editing the rest of the route. It is said (missingUpstream), not
+    // blocked.
+    if (this.missingUpstream()) return "";
     return this.matchChoice(raw)
       ? ""
       : $localize`:@@Gap_upstream_not_in_namespace:the upstream is not a service of namespace ${ns}:NS:: pick one from the list, or choose External`;
@@ -1902,14 +1907,25 @@ export class RouteEditorComponent {
     return Number(port) || (this.upstreamScheme() === "https" ? 443 : 80);
   });
   private readonly pickedEntry = computed(() => this.serviceOf(this.draft().upstream));
+  // The route's saved upstream when the chosen namespace's list does not
+  // carry it (the service is down, scaled to zero, renamed or not deployed
+  // yet): its host, kept and shown with a warning, "" otherwise. Only once
+  // that namespace's list has arrived, and only for the upstream the route
+  // already had - a new pick always comes from the list.
+  protected readonly missingUpstream = computed(() => {
+    const raw = this.draft().upstream;
+    if (!this.listOnly() || this.loadedNamespace() !== this.namespace()) return "";
+    if (!raw || raw !== (this.route()?.upstream ?? "") || this.pickedEntry()) return "";
+    return hostAndPort(this.upstreamSplit().host).name;
+  });
   protected readonly pickedService = computed(() => {
     const s = this.pickedEntry();
-    return s ? storedName(s) : "";
+    return s ? storedName(s) : this.missingUpstream();
   });
   // The pick as the list reads it: the short name, whatever the route stores.
   protected readonly pickedLabel = computed(() => {
     const s = this.pickedEntry();
-    return s ? s.names?.[0] || s.name : "";
+    return s ? s.names?.[0] || s.name : this.missingUpstream();
   });
   // The picked service's ports, with the route's own when the list does not
   // carry it: a port nobody listed is shown, not lost. The field is always
@@ -1925,7 +1941,7 @@ export class RouteEditorComponent {
   // declares none): the port is typed.
   protected readonly portUnknown = computed(() => {
     const s = this.pickedEntry();
-    return !!s && !targets(s).length;
+    return (!!s && !targets(s).length) || !!this.missingUpstream();
   });
   // An https upstream spelled with a service's bare name when the platform has
   // a qualified one: a CA constrained to cluster names (svc, cluster.local)
@@ -1992,6 +2008,9 @@ export class RouteEditorComponent {
   // reach - true of every developer instance running outside the cluster, and
   // exactly the moment somebody would trust a name that resolves nowhere.
   protected readonly upstreamHint = computed(() => {
+    const missing = this.missingUpstream();
+    if (missing)
+      return $localize`:@@Upstream_missing:${missing}:HOST: is not running in namespace ${this.namespace()}:NS: right now: the route keeps it, and can be saved`;
     const n = this.upstreamChoices().length;
     if (!n) return "";
     if (!this.reach().length)
@@ -2007,8 +2026,15 @@ export class RouteEditorComponent {
   // Reachable first: an upstream this gateway shares no network with is still
   // shown - it may be one network away from working - but it does not sit
   // above the ones that answer today.
-  protected readonly upstreamChoices = computed<UrlSuggestion[]>(() =>
-    [...this.discovered()]
+  protected readonly upstreamChoices = computed<UrlSuggestion[]>(() => [
+    ...(this.missingUpstream()
+      ? [{
+          value: this.missingUpstream(),
+          hint: $localize`:@@Upstream_not_found:not found in this namespace`,
+          muted: true,
+        }]
+      : []),
+    ...[...this.discovered()]
       .sort(
         (a, b) => Number(b.reachable !== false) - Number(a.reachable !== false),
       )
@@ -2037,7 +2063,7 @@ export class RouteEditorComponent {
           muted: out,
         };
       }),
-  );
+  ]);
   // The same entries for the free field, where a pick is written whole: the
   // host and the service's first port. The port select beside it changes it.
   protected readonly upstreamSuggestions = computed<UrlSuggestion[]>(() => {

@@ -357,5 +357,17 @@
   "notifKept": "Đã giữ lại %s thông báo đang chờ bạn xác nhận.",
   "notifWithdrawn": "Thông báo này đã bị thu hồi",
   "notifExercise": "DIỄN TẬP",
-  "notifMissed": "Thông báo bạn đã bỏ lỡ: %s"
+  "notifMissed": "Thông báo bạn đã bỏ lỡ: %s",
+  "notifSearch": "Tìm kiếm thông báo, hoặc khóa=giá trị",
+  "notifUnreadOnly": "Chỉ chưa đọc",
+  "notifNoMatch": "Không có thông báo phù hợp",
+  "notifNoMatchHint": "Hãy thay đổi tìm kiếm hoặc bộ lọc.",
+  "notifDeleteAllShown": "Xóa các thông báo đang hiển thị?",
+  "notifSender": "Người gửi",
+  "titleNotFound": "Không tìm thấy trang - Meerkat",
+  "notFoundLead": "Trang này không tồn tại",
+  "notFoundHint": "Không có gì phản hồi tại địa chỉ này. Liên kết có thể đã cũ, hoặc địa chỉ bị gõ sai.",
+  "notFoundMenu": "Chọn một ứng dụng trong menu để tiếp tục.",
+  "notFoundPick": "Chọn một ứng dụng để tiếp tục.",
+  "notFoundSignIn": "Đăng nhập để truy cập các ứng dụng của bạn."
 }

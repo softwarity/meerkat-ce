@@ -135,7 +135,8 @@ Puis l'essai en conditions réelles :
 curl -i http://localhost:8080/billing/invoices
 ```
 
-Si aucune route ne reconnaît la requête, la gateway répond 404. Si une route
+Si aucune route ne reconnaît la requête, la gateway répond 404 : du texte brut
+pour `curl`, une page qui nomme le chemin pour un navigateur. Si une route
 l'a reconnue mais que sa règle vous a écarté, une route UI vous conduit sur une
 page qui nomme la règle à l'origine du refus ; une route de service renvoie un
 simple 403.

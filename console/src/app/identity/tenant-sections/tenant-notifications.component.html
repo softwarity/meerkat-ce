@@ -71,7 +71,40 @@
       </ng-container>
       <ng-container matColumnDef="sent">
         <mat-header-cell *matHeaderCellDef i18n="@@Sent">Sent</mat-header-cell>
-        <mat-cell *matCellDef="let n">{{ n.createdAt | zoned: zone() }}</mat-cell>
+        <mat-cell *matCellDef="let n">
+          {{ n.createdAt | zoned: zone() }}
+          <!-- The row's actions live in the LAST existing column. -->
+          <span rowActions="tonal">
+            <span [matTooltip]="replaceOff(n)" [matTooltipDisabled]="!replaceOff(n)">
+              <button
+                matIconButton
+                [disabled]="!!replaceOff(n)"
+                (click)="$event.stopPropagation(); drawer.openCompose(n)"
+                i18n-matTooltip="@@Replace"
+                matTooltip="Replace"
+                [matTooltipDisabled]="!!replaceOff(n)"
+                i18n-aria-label="@@Replace"
+                aria-label="Replace"
+              >
+                <mat-icon>edit_note</mat-icon>
+              </button>
+            </span>
+            <span [matTooltip]="endedReason(n)" [matTooltipDisabled]="!endedReason(n)">
+              <button
+                matIconButton
+                [disabled]="!!endedReason(n)"
+                (click)="$event.stopPropagation(); withdraw(n)"
+                i18n-matTooltip="@@Withdraw"
+                matTooltip="Withdraw"
+                [matTooltipDisabled]="!!endedReason(n)"
+                i18n-aria-label="@@Withdraw"
+                aria-label="Withdraw"
+              >
+                <mat-icon>block</mat-icon>
+              </button>
+            </span>
+          </span>
+        </mat-cell>
       </ng-container>
       <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
       <mat-row
