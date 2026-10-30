@@ -2,7 +2,7 @@
 
 ## NEXT RELEASE
 
-- **plug 2.31.3 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
+- **plug 2.31.4 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 ---
 
 ## 1.20.0
