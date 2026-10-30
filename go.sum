@@ -152,8 +152,8 @@ github.com/skeema/knownhosts v1.3.1 h1:X2osQ+RAjK76shCbvhHHHVl3ZlgDm8apHEHFqRjnB
 github.com/skeema/knownhosts v1.3.1/go.mod h1:r7KTdC8l4uxWRyK2TpQZ/1o5HaSzh06ePQNxPwTcfiY=
 github.com/softwarity/livewire/go v0.4.0 h1:8lZxqA61lC4h2ucTlWNaMcp5QioWq6VvcwHUwBheV64=
 github.com/softwarity/livewire/go v0.4.0/go.mod h1:q1WUH4WvlAbpW4WovD222aaEBYl4kpkq/fIqfFHvsgc=
-github.com/softwarity/plug/agent v0.0.0-20261030053900-1ff848950c44 h1:5+e48/1SluzA5xcrlxugvHN13069zbhh13w8MI8NXTc=
-github.com/softwarity/plug/agent v0.0.0-20261030053900-1ff848950c44/go.mod h1:r/PguTwjyGYHniiRFTCwiaE0mWPBfWsoofAA0MKwgPo=
+github.com/softwarity/plug/agent v0.0.0-20261030104607-8d8bf9bf7d5b h1:pOCaaq+Ic86mrfEk6bAjIJrwQePUqNUFRNxY3XugkYs=
+github.com/softwarity/plug/agent v0.0.0-20261030104607-8d8bf9bf7d5b/go.mod h1:r/PguTwjyGYHniiRFTCwiaE0mWPBfWsoofAA0MKwgPo=
 github.com/softwarity/smbserver v0.1.1 h1:TV8VpKrzyiaZGUl9A6+ES4rdOEY4NMRp+xo9LYojXxY=
 github.com/softwarity/smbserver v0.1.1/go.mod h1:m7KITYuCGkDfxUiBpxLwsXcNQ6aetxOsMJt9/wzDcqA=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
