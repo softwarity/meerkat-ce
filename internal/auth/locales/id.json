@@ -364,6 +364,8 @@
   "notifNoMatchHint": "Ubah pencarian atau filter.",
   "notifDeleteAllShown": "Hapus notifikasi yang ditampilkan?",
   "notifSender": "Pengirim",
+  "notifMoreOptions": "Opsi lainnya",
+  "notifClearSearch": "Hapus pencarian",
   "titleNotFound": "Halaman tidak ditemukan - Meerkat",
   "notFoundLead": "Halaman ini tidak ada",
   "notFoundHint": "Tidak ada yang menjawab di alamat ini. Tautannya mungkin sudah usang, atau alamatnya salah ketik.",

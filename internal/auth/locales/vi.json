@@ -364,6 +364,8 @@
   "notifNoMatchHint": "Hãy thay đổi tìm kiếm hoặc bộ lọc.",
   "notifDeleteAllShown": "Xóa các thông báo đang hiển thị?",
   "notifSender": "Người gửi",
+  "notifMoreOptions": "Tùy chọn khác",
+  "notifClearSearch": "Xóa tìm kiếm",
   "titleNotFound": "Không tìm thấy trang - Meerkat",
   "notFoundLead": "Trang này không tồn tại",
   "notFoundHint": "Không có gì phản hồi tại địa chỉ này. Liên kết có thể đã cũ, hoặc địa chỉ bị gõ sai.",

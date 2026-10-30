@@ -26,21 +26,31 @@ The screens an administrator uses are on
   It goes away after 6 seconds, waits while the pointer or the focus is on it,
   and three stack at most.
 - **A desktop notification** when the tab is not in front of them, once they
-  turned it on with **Show on my desktop** on their notifications page, and only
+  turned it on with **Show on my desktop** (the bell in the top bar of their
+  notifications page), and only
   on a secure address (https, or localhost). Its buttons are **Open**, then your
   actions, run in the background with the result shown on the notification,
   and **Acknowledge** when asked. A click on it opens the notifications page.
 - **The notifications page**, `/meerkat/notifications`, or the application's
-  own page when the administrator chose one. Newest first. A click marks a
-  notification read and unfolds it when there is more to see (a chevron says
-  so): the whole text, **Open** for the detail, and your actions, each showing
-  its result. Each card shows small, in its top corner, who sent it and in
-  which tenant. The sender is named for the reader: a service by its short
+  own page when the administrator chose one. A list, newest first, each day
+  on a card, unread notifications on a tone of their own: each notification
+  shows the icon of its level, its title (bold while unread) and the first two
+  lines of its text, and at the row's end who sent it and in which tenant,
+  with the time it came under them (and a dot while unread); on a phone,
+  these go on one small line under the text. Only the list scrolls: the top
+  bar, the search and the filters stay at the top of the window, the foot of
+  the page at its bottom. A click marks it read and unfolds it when there is more to see (a
+  chevron says so): the whole text, **Open** for the detail, and your actions,
+  each showing its result. The sender is named for the reader: a service by its short
   name (`station-registry` for the workload `ns/Deployment/station-registry`),
   a token by its name, an administrator who sent it from the console by the
   name their account shows.
-- **The filters**, in the page's header, which stays in sight while the list
-  scrolls: a search, **Unread only**, and the tenants when there are several.
+- **The search and the filters**, under the page's top bar, which stays in
+  sight with them while the list scrolls: a search bar, then **Unread only**
+  and the tenants when there are several. **Mark all as read**, **Show on my
+  desktop** and **Delete all** are icons in the top bar, named when the pointer
+  rests on them or the keyboard reaches them; on a phone, Delete all and the
+  desktop move to the bar's menu (the three dots).
   They combine, and the address keeps them, so a reload or a link keeps the
   same list. The search looks for every word typed, without case or accents,
   in the title, the text, and the metadata you attached; it runs on the
@@ -403,7 +413,7 @@ When no tenant received it, the answer is a `422` naming each tenant and why.
 - `all`: each reader acknowledges their own, and it is complete when the last
   one did, as for a safety instruction.
 
-While a reader owes it, the row is framed, carries **Acknowledge**, and cannot
+While a reader owes it, the row has a bar along its edge, carries **Acknowledge**, and cannot
 be deleted; **Delete all** keeps it and says how many it kept, and **Mark all
 as read** never acknowledges. The snackbar and the desktop notification carry
 **Acknowledge** too. Once done, the row says when, and in `single` the other

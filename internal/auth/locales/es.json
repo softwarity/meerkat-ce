@@ -364,6 +364,8 @@
   "notifNoMatchHint": "Cambia la búsqueda o los filtros.",
   "notifDeleteAllShown": "¿Eliminar las notificaciones mostradas?",
   "notifSender": "Remitente",
+  "notifMoreOptions": "Más opciones",
+  "notifClearSearch": "Borrar la búsqueda",
   "titleNotFound": "Página no encontrada - Meerkat",
   "notFoundLead": "Esta página no existe",
   "notFoundHint": "Nada responde en esta dirección. Puede que el enlace esté desactualizado o que la dirección esté mal escrita.",

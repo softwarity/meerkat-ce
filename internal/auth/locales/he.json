@@ -364,6 +364,8 @@
   "notifNoMatchHint": "שנו את החיפוש או את המסננים.",
   "notifDeleteAllShown": "למחוק את ההתראות המוצגות?",
   "notifSender": "שולח",
+  "notifMoreOptions": "אפשרויות נוספות",
+  "notifClearSearch": "ניקוי החיפוש",
   "titleNotFound": "הדף לא נמצא - Meerkat",
   "notFoundLead": "הדף הזה לא קיים",
   "notFoundHint": "שום דבר לא עונה בכתובת הזו. ייתכן שהקישור ישן או שהכתובת הוקלדה בטעות.",

@@ -2,6 +2,20 @@
 
 ## NEXT RELEASE
 
+- **The notifications page follows Material 3.** A top app bar with the page's actions as icon
+  buttons (Mark all as read, desktop notifications, Delete all; on a phone the last two go to a
+  More options menu), a full-width search bar, and filter chips for Unread only and each tenant
+  with its unread count. Each day is a card holding its list: unread rows on a tint of the
+  theme's primary colour, the open row raised above the others, the level as an icon in full
+  colour. The background picture of the sign-in pages is no longer drawn behind it.
+- **Only the list scrolls.** The bar, the search and the filters stay at the top and the page's
+  foot at the bottom, whatever the portal (top bar, rail or none) and with the evaluation notice:
+  nothing is pushed out of sight and no second scroll bar appears.
+- **Sender, tenant and time at the end of the row.** The sender and the tenant badge, then the
+  time with the unread dot under them, sit on the right: a row is back to its list height. A long
+  name is cut and shown whole on hover; on a phone they go on a small line under the text, so the
+  title keeps the width.
+
 ---
 
 ## 1.21.0

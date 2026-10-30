@@ -364,6 +364,8 @@
   "notifNoMatchHint": "غيّر البحث أو المرشحات.",
   "notifDeleteAllShown": "حذف الإشعارات المعروضة؟",
   "notifSender": "المرسل",
+  "notifMoreOptions": "خيارات إضافية",
+  "notifClearSearch": "مسح البحث",
   "titleNotFound": "الصفحة غير موجودة - Meerkat",
   "notFoundLead": "هذه الصفحة غير موجودة",
   "notFoundHint": "لا شيء يستجيب على هذا العنوان. ربما يكون الرابط قديماً أو العنوان مكتوباً بشكل خاطئ.",

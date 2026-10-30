@@ -27,24 +27,34 @@ utilisateurs. Les écrans de l'administrateur sont décrits dans
   elle le demande. Il disparaît au bout de 6 secondes, attend tant que le
   pointeur ou le focus est dessus, et trois s'empilent au plus.
 - **Une notification du bureau** quand l'onglet n'est pas devant eux, une fois
-  qu'ils l'ont activée avec **Afficher sur mon bureau** sur leur page de
-  notifications, et seulement sur une adresse sûre (https, ou localhost). Ses
+  qu'ils l'ont activée avec **Afficher sur mon bureau** (la cloche de la barre
+  du haut de leur page de notifications), et seulement sur une adresse sûre (https, ou localhost). Ses
   boutons sont **Ouvrir**, puis vos actions, exécutées en arrière-plan avec leur
   résultat affiché sur la notification, et **Acquitter** quand c'est demandé.
   Un clic sur elle ouvre la page des notifications.
 - **La page des notifications**, `/meerkat/notifications`, ou la page de
-  l'application quand l'administrateur en a choisi une. Les plus récentes
-  d'abord. Un clic marque une notification comme lue et la déplie quand il y a
-  plus à voir (un chevron l'annonce) : le texte entier, **Ouvrir** pour le
-  détail, et vos actions, chacune avec son résultat. Chaque carte montre en
-  petit, dans son coin haut, qui l'a envoyée et dans quel tenant. L'émetteur
+  l'application quand l'administrateur en a choisi une. Une liste, les plus
+  récentes d'abord, chaque jour sur une carte, les non lues sur un ton à part :
+  chaque notification montre l'icône de son niveau, son titre (en gras tant
+  qu'elle n'est pas lue) et les deux premières lignes de son texte, et au bout
+  de la rangée qui l'a envoyée et dans quel tenant, avec l'heure de son arrivée
+  dessous (et un point tant qu'elle n'est pas lue) ; sur un téléphone, ces
+  indications passent sur une petite ligne sous le texte. Seule la liste
+  défile : la barre du haut, la recherche et les filtres restent en haut de la
+  fenêtre, le pied de page en bas. Un clic la marque comme lue et la déplie quand il y a plus à voir
+  (un chevron l'annonce) : le texte entier, **Ouvrir** pour le détail, et vos
+  actions, chacune avec son résultat. L'émetteur
   est nommé pour le lecteur : un service par son nom court (`station-registry`
   pour le workload `ns/Deployment/station-registry`), un jeton par son nom, un
   administrateur qui l'a envoyée depuis la console par le nom qu'affiche son
   compte.
-- **Les filtres**, dans l'en-tête de la page, qui reste visible pendant que la
-  liste défile : une recherche, **Non lues seulement**, et les tenants quand il
-  y en a plusieurs. Ils se combinent, et l'adresse les garde, si bien qu'un
+- **La recherche et les filtres**, sous la barre du haut de la page, qui reste
+  visible avec eux pendant que la liste défile : une barre de recherche, puis
+  **Non lues seulement** et les tenants quand il y en a plusieurs. **Tout
+  marquer comme lu**, **Afficher sur mon bureau** et **Tout supprimer** sont
+  des icônes de la barre du haut, nommées quand le pointeur s'y arrête ou que
+  le clavier les atteint ; sur un téléphone, Tout supprimer et le bureau
+  passent dans le menu de la barre (les trois points). Ils se combinent, et l'adresse les garde, si bien qu'un
   rechargement ou un lien gardent la même liste. La recherche cherche chaque
   mot tapé, sans casse ni accents, dans le titre, le texte et les métadonnées
   que vous avez jointes ; elle se fait sur la gateway, donc vos métadonnées
@@ -420,7 +430,7 @@ et pourquoi.
 - `all` : chaque lecteur acquitte la sienne, et elle est complète quand le
   dernier l'a fait, comme pour une consigne de sécurité.
 
-Tant qu'un lecteur la doit, la rangée est encadrée, porte **Acquitter**, et ne se
+Tant qu'un lecteur la doit, la rangée porte une barre sur son bord, porte **Acquitter**, et ne se
 supprime pas ; **Tout supprimer** la garde et dit combien il en a gardé, et
 **Tout marquer comme lu** n'acquitte jamais. Le snackbar et la notification du
 bureau portent **Acquitter** aussi. Une fois fait, la rangée dit quand, et en

@@ -364,6 +364,8 @@
   "notifNoMatchHint": "Aramayı veya filtreleri değiştirin.",
   "notifDeleteAllShown": "Gösterilen bildirimler silinsin mi?",
   "notifSender": "Gönderen",
+  "notifMoreOptions": "Diğer seçenekler",
+  "notifClearSearch": "Aramayı temizle",
   "titleNotFound": "Sayfa bulunamadı - Meerkat",
   "notFoundLead": "Bu sayfa mevcut değil",
   "notFoundHint": "Bu adreste yanıt veren bir şey yok. Bağlantı eskimiş ya da adres yanlış yazılmış olabilir.",
