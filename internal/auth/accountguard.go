@@ -123,8 +123,8 @@ func (h *Handler) alertOwner(r *http.Request, u store.User, name string, window 
 
 // signinAttemptsSpec is the notice, written once for the real mail and the
 // relay screen's sample so the two never word it differently. Counts as
-// "label: number" lines rather than sentences: a plural in twenty languages is
-// twenty grammars, and "1 addresses" is the kind of line that makes a security
+// "label: number" lines rather than sentences: a plural in twenty-one languages is
+// twenty-one grammars, and "1 addresses" is the kind of line that makes a security
 // mail read like spam.
 func signinAttemptsSpec(t map[string]string, app string, failures, addrs int, window string) mail.Spec {
 	subject := fmt.Sprintf(t["mailSigninAttemptsSubject"], app)

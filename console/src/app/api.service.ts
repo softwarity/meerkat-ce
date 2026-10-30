@@ -2254,7 +2254,7 @@ export interface ProxyLimits {
 // The switch that closes an installation to its visitors (LIFE-05).
 //
 // The reason is a KEY from a closed list, never free text: the unavailable
-// page is read in twenty languages, and a sentence typed here would be one of
+// page is read in twenty-one languages, and a sentence typed here would be one of
 // them. `until` is optional - zero means "we are not saying when", which the
 // page reads as soon. `since` is stamped by the server when it goes on and
 // kept while it stays on: changing the reason does not restart the clock,

@@ -15,7 +15,13 @@
   time with the unread dot under them, sit on the right: a row is back to its list height. A long
   name is cut and shown whole on hover; on a phone they go on a small line under the text, so the
   title keeps the width.
+- **Romanian is a shipped language.** The built-in pages (sign-in, two-factor, profile,
+  notifications, the not-found page, the user button) and the mails now speak Romanian too,
+  twenty-one languages in all. A route offers it by declaring `ro` among its locales.
 
+- **The portal selects nothing on a page none of its entries covers.** The not-found page, or an
+  application left out of the portal, no longer shows the first entry highlighted with its
+  sub-menu open, as if the visitor were in it.
 ---
 
 ## 1.21.0

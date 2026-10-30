@@ -33,7 +33,7 @@ filters:
 The answer is the installation's unavailable page, in the visitor's language, with
 `503` and `Cache-Control: no-store`.
 
-The reason is a key, not a sentence: the page is read in twenty languages, and a
+The reason is a key, not a sentence: the page is read in twenty-one languages, and a
 sentence typed here would be a sentence in one of them. An empty reason says
 nothing, which is sometimes the honest answer; a value outside the list says
 nothing either.

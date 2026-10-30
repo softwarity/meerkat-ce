@@ -178,7 +178,7 @@ func (h *Handler) passwordPolicy(ctx context.Context) store.PasswordPolicy {
 
 // pwRuleLabels maps a rule to its catalogue key. The label is a category and a
 // number ("Digits: 2") rather than a sentence: a sentence would have to agree
-// with the count, and getting "1 chiffre" and "2 chiffres" right in twenty
+// with the count, and getting "1 chiffre" and "2 chiffres" right in twenty-one
 // languages is a plural table nobody asked for.
 var pwRuleLabels = map[string]string{
 	store.PasswordRuleLength:  "pwRuleLength",
@@ -268,7 +268,7 @@ type flowChrome struct {
 	// also get, is invisible to a person looking at a page.
 	//
 	// No label, and that is deliberate: an identifier needs no translation,
-	// and a word beside it would need twenty-one.
+	// and a word beside it would need twenty-two.
 	TraceID string
 	// List widens the page: a sign-in form is two fields and deserves to be
 	// narrow, a list of browsers is not and does not.
@@ -422,6 +422,7 @@ var langNames = map[string]string{
 	"nl":      "Nederlands",
 	"pl":      "Polski",
 	"pt":      "Português",
+	"ro":      "Română",
 	"ru":      "Русский",
 	"th":      "ไทย",
 	"tr":      "Türkçe",

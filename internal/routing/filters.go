@@ -1008,7 +1008,7 @@ func init() {
 		Details: "Answers the unavailable page without calling the service. The route keeps matching, so no other route takes its traffic while the service is down.",
 		Params: []Param{
 			// A key from a closed list rather than free text: the page is read
-			// in twenty languages, and a sentence typed here is a sentence in
+			// in twenty-one languages, and a sentence typed here is a sentence in
 			// one of them. Empty says nothing, which is allowed.
 			{Name: "reason", Kind: KindString,
 				Doc: `why, from: "" (say nothing), maintenance, upgrade, incident`},

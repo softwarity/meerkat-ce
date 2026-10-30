@@ -114,9 +114,9 @@ it is put back on a browser that has never seen them - exactly like their langua
 
 ![The Locale tab: the texts of the sign-in page in English, each one editable, beside the preview](img/console/built-in-pages-locale.webp)
 
-Twenty catalogues are embedded in the binary, one JSON file per language: Arabic, German, English,
+Twenty-one catalogues are embedded in the binary, one JSON file per language: Arabic, German, English,
 Spanish, French, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese,
-Russian, Thai, Turkish, Ukrainian, Vietnamese and simplified Chinese.
+Romanian, Russian, Thai, Turkish, Ukrainian, Vietnamese and simplified Chinese.
 
 English is the reference: every other catalogue is compared to it at startup, and a key a
 catalogue does not carry falls back to English rather than showing a blank. Backend error messages

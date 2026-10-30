@@ -10,8 +10,8 @@
 // What is kept, and why:
 //   - the variable version of each family, weight axis only: one file covers
 //     every weight the pages use, smaller than five static files;
-//   - only the subsets our twenty languages need: latin, latin-ext (Polish,
-//     Turkish), vietnamese and the two cyrillic ones for a family the
+//   - only the subsets our twenty-one languages need: latin, latin-ext (Polish,
+//     Romanian, Turkish), vietnamese and the two cyrillic ones for a family the
 //     integrator chooses, and the one script of each Noto companion (Arabic,
 //     Hebrew, Devanagari, Thai). Chinese, Japanese and Korean are left to the
 //     system's own fonts, which are excellent on every platform and would

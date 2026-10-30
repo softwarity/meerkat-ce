@@ -36,7 +36,7 @@ func (a *API) lookTools() []mcp.Tool {
 			Name: "list_languages", Allow: administersIdentity, Title: "List the languages", ReadOnly: true,
 			Description: "Every language the built-in pages can be served in - sign-in, profile, the " +
 				"transactional mails - with how many of their strings are still English standing in. " +
-				"Twenty ship with the product; an installation can add any BCP 47 tag on top. " +
+				"Twenty-one ship with the product; an installation can add any BCP 47 tag on top. " +
 				"Start here before read_language.",
 			Schema: noArgs(),
 			Call:   a.toolListLanguages,

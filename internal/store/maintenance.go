@@ -18,7 +18,7 @@ import (
 const SettingMaintenance = "maintenance"
 
 // The reasons an installation can give. A CLOSED list, and that is the whole
-// point: whatever is said here is read by visitors in twenty languages, and a
+// point: whatever is said here is read by visitors in twenty-one languages, and a
 // sentence typed in the console is a sentence in one of them. An operator
 // picks; the product translates.
 //
@@ -72,7 +72,7 @@ type Maintenance struct {
 func SanitizeMaintenance(m *Maintenance, previous Maintenance, now time.Time) error {
 	if !slices.Contains(Reasons, m.Reason) {
 		return fmt.Errorf("reason %q is not one this product can say: allowed are "+
-			"%q (say nothing), %q, %q and %q - the page is read in twenty languages, so the "+
+			"%q (say nothing), %q, %q and %q - the page is read in twenty-one languages, so the "+
 			"wording is the product's and the choice is yours",
 			m.Reason, ReasonNone, ReasonMaintenance, ReasonUpgrade, ReasonIncident)
 	}

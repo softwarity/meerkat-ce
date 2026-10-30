@@ -64,7 +64,7 @@ produit gratuit qu'elles hébergent elles-mêmes, ou un service payant.
 | Besoin | Gratuit, auto-hébergé | Payant ou SaaS | Meerkat |
 | --- | --- | --- | --- |
 | Connexion, second facteur, passkeys | Keycloak, Zitadel, Authentik | Auth0, WorkOS, Clerk, FusionAuth | inclus |
-| Pages à votre marque, 20 langues | un thème à construire | selon l'offre | inclus |
+| Pages à votre marque, 21 langues | un thème à construire | selon l'offre | inclus |
 | SSO des clients : OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, facturé à la connexion | inclus, Enterprise pour SAML et LDAP |
 | Organisations gérées par vos clients | des écrans d'administration à construire | WorkOS, Frontegg | inclus, Enterprise |
 | Authentification unique des outils qui ne parlent qu'OpenID Connect | Keycloak, un realm et un client par outil | Auth0, Okta | inclus, Enterprise |

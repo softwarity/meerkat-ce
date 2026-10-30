@@ -339,7 +339,7 @@ func TestQueryEncodingPreserved(t *testing.T) {
 // The built-in maintenance terminal answers 503 with the gateway page.
 //
 // Its "reason" is a KEY from a closed catalogue, not a sentence: the page is
-// read in twenty languages, and free text would be one of them. The wording
+// read in twenty-one languages, and free text would be one of them. The wording
 // itself lives with the catalogue - this package only carries the fallback,
 // for a gateway wired without the served pages.
 func TestMaintenanceTerminal(t *testing.T) {

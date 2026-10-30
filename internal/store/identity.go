@@ -534,7 +534,7 @@ const (
 
 // SupportedLanguages is every language the flow pages can speak - the
 // catalogue lives in internal/auth; keep both in sync when adding one.
-var SupportedLanguages = []string{"ar", "de", "en", "es", "fr", "he", "hi", "id", "it", "ja", "ko", "nl", "pl", "pt", "ru", "th", "tr", "uk", "vi", "zh-Hans"}
+var SupportedLanguages = []string{"ar", "de", "en", "es", "fr", "he", "hi", "id", "it", "ja", "ko", "nl", "pl", "pt", "ro", "ru", "th", "tr", "uk", "vi", "zh-Hans"}
 
 // defaultBusinessAccess opens every day around the clock - restricting is an
 // explicit admin act, never a default.

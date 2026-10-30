@@ -35,7 +35,7 @@ filters:
 La réponse est la page d'indisponibilité de l'installation, dans la langue du
 visiteur, avec un `503` et `Cache-Control: no-store`.
 
-Le motif est une clé, pas une phrase : la page est lue dans vingt langues, et une
+Le motif est une clé, pas une phrase : la page est lue dans vingt et une langues, et une
 phrase saisie ici n'existerait que dans l'une d'elles. Un motif vide ne dit rien,
 ce qui est parfois la réponse la plus honnête ; une valeur hors de la liste ne dit
 rien non plus.

@@ -137,7 +137,7 @@ func TestTheSignInOfferFollowsTheRoutes(t *testing.T) {
 	}
 
 	// A language no route speaks is not offered, whatever the binary can draw:
-	// Meerkat embeds twenty catalogues and offers none of them on its own.
+	// Meerkat embeds twenty-one catalogues and offers none of them on its own.
 	for _, code := range got {
 		if !IsKnownLanguage(code) {
 			t.Errorf("%s is offered and cannot be rendered", code)

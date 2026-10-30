@@ -26,7 +26,7 @@ What the assembled alternatives cost is in [the case for Meerkat](/product/the-c
 
 ## Sign-in and identity
 
-The ways in, all served by the gateway in your colours, in 20 languages.
+The ways in, all served by the gateway in your colours, in 21 languages.
 
 | Method | Edition |
 |---|---|

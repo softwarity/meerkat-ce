@@ -62,7 +62,7 @@ or a paid service.
 | Need | Free, self-hosted | Paid or SaaS | Meerkat |
 | --- | --- | --- | --- |
 | Sign-in, two-factor, passkeys | Keycloak, Zitadel, Authentik | Auth0, WorkOS, Clerk, FusionAuth | included |
-| Branded pages, 20 languages | a theme to build | depends on the plan | included |
+| Branded pages, 21 languages | a theme to build | depends on the plan | included |
 | Customer SSO: OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, billed per connection | included, Enterprise for SAML and LDAP |
 | Organisations your customers manage | admin screens to build | WorkOS, Frontegg | included, Enterprise |
 | Single sign-on into tools that only speak OpenID Connect | Keycloak, a realm and a client per tool | Auth0, Okta | included, Enterprise |

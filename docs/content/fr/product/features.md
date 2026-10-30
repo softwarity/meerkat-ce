@@ -23,7 +23,7 @@ couleurs.
 
 Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 
-- **Pages de connexion servies par la gateway** : connexion, mot de passe oublié, vérification de l'adresse e-mail, inscription en option, en 20 langues, avec votre thème, votre logo et votre image de fond. Chaque traduction peut être corrigée, ou une langue ajoutée, depuis la console.
+- **Pages de connexion servies par la gateway** : connexion, mot de passe oublié, vérification de l'adresse e-mail, inscription en option, en 21 langues, avec votre thème, votre logo et votre image de fond. Chaque traduction peut être corrigée, ou une langue ajoutée, depuis la console.
 - **D'autres dispositions de page** - split, drawer, banner, bare - et la marque Meerkat retirée des pages que vous servez. **Enterprise**
 - **Des thèmes faits comme dans Material Theme Builder** : six couleurs sources, trois niveaux de contraste, son fichier JSON en entrée comme en sortie, et des polices servies par la gateway elle-même, sans rien chercher sur un CDN.
 - **Mots de passe** avec une politique et un historique configurables, une protection contre la force brute commune à tous les nœuds, et des messages qui ne révèlent jamais si un compte existe.

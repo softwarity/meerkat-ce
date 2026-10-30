@@ -757,7 +757,7 @@ const flowTop = `<!doctype html>
     .prefs button.scheme-cycle { display: inline-flex; align-items: center; justify-content: center;
       width: 28px; height: 28px; padding: 0; }
     .scheme-cycle svg { display: block; width: 17px; height: 17px; }
-    /* Twenty languages is a tall menu, and it opens UPWARDS from a control at
+    /* Twenty-one languages is a tall menu, and it opens UPWARDS from a control at
        the foot of the page: on a short window it ran off the top and the first
        half of the alphabet was unreachable. It is bounded and it scrolls -
        never taller than the window minus a margin - and the script below

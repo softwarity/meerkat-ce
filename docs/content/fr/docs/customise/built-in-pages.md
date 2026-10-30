@@ -123,9 +123,9 @@ derrière la gateway.
 
 ![L'onglet Locale : les textes de la page de connexion en anglais, chacun modifiable, à côté de l'aperçu](img/console/built-in-pages-locale.webp)
 
-Vingt catalogues sont embarqués dans le binaire, à raison d'un fichier JSON par langue :
+Vingt et un catalogues sont embarqués dans le binaire, à raison d'un fichier JSON par langue :
 arabe, allemand, anglais, espagnol, français, hébreu, hindi, indonésien, italien, japonais,
-coréen, néerlandais, polonais, portugais, russe, thaï, turc, ukrainien, vietnamien et chinois
+coréen, néerlandais, polonais, portugais, roumain, russe, thaï, turc, ukrainien, vietnamien et chinois
 simplifié.
 
 L'anglais sert de référence : chaque autre catalogue lui est comparé au démarrage, et une clé

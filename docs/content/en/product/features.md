@@ -22,7 +22,7 @@ The pages your users see, served by the gateway, in your colours.
 
 Read more: [How someone signs in](/docs/auth/overview).
 
-- **Served sign-in pages**: sign-in, forgotten password, email verification, optional sign-up, in 20 languages, with your theme, logo and background. Any translation can be corrected, or a language added, from the console.
+- **Served sign-in pages**: sign-in, forgotten password, email verification, optional sign-up, in 21 languages, with your theme, logo and background. Any translation can be corrected, or a language added, from the console.
 - **More page arrangements** - split, drawer, banner, bare - and the Meerkat mark removed from the pages you serve. **Enterprise**
 - **Themes made the way Material Theme Builder makes them**: six source colours, three contrast levels, its JSON file in and out, and the fonts served by the gateway itself - nothing fetched from a CDN.
 - **Passwords** with a configurable policy and history, brute-force protection shared by every node, and messages that never reveal whether an account exists.

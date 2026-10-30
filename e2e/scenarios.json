@@ -833,8 +833,8 @@
         "fr": "Lire l'interrupteur de maintenance"
       },
       "description": {
-        "en": "The switch that closes an installation to its visitors (LIFE-05) answers 503 for every route at once, without a single route being edited. Why it is closed is picked from a translated list rather than typed, because that page is read in twenty languages. Closing every application is an operator's act: only root and infra admins read or flip it, and whoever administers or develops can still go through to check the fix before reopening.",
-        "fr": "L'interrupteur qui ferme une installation à ses visiteurs (LIFE-05) fait répondre 503 à toutes les routes d'un coup, sans qu'aucune ne soit modifiée. Le motif de la fermeture se choisit dans une liste traduite au lieu d'être saisi, parce que cette page se lit en vingt langues. Fermer toutes les applications est un geste d'exploitant : seuls root et les admins infra lisent ou actionnent l'interrupteur, et quiconque administre ou développe peut encore passer pour vérifier le correctif avant la réouverture."
+        "en": "The switch that closes an installation to its visitors (LIFE-05) answers 503 for every route at once, without a single route being edited. Why it is closed is picked from a translated list rather than typed, because that page is read in twenty-one languages. Closing every application is an operator's act: only root and infra admins read or flip it, and whoever administers or develops can still go through to check the fix before reopening.",
+        "fr": "L'interrupteur qui ferme une installation à ses visiteurs (LIFE-05) fait répondre 503 à toutes les routes d'un coup, sans qu'aucune ne soit modifiée. Le motif de la fermeture se choisit dans une liste traduite au lieu d'être saisi, parce que cette page se lit en vingt et une langues. Fermer toutes les applications est un geste d'exploitant : seuls root et les admins infra lisent ou actionnent l'interrupteur, et quiconque administre ou développe peut encore passer pour vérifier le correctif avant la réouverture."
       }
     },
     {

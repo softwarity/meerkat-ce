@@ -10,7 +10,7 @@ summary: Sign-in, second factor, password change, organisation choice - the page
 Everything a person has to be shown before they reach your application is served
 by the gateway itself: no library in your app, no page to write, no template to
 deploy. They are compiled into the binary, they carry your colours and your logo,
-and they speak twenty languages.
+and they speak twenty-one languages.
 
 They are also all `Cache-Control: no-store`: a page that names a person must
 never sit in a shared cache.
@@ -131,9 +131,9 @@ everyone.
 
 ## Languages
 
-Twenty catalogues are built in: Arabic, German, English, Spanish, French, Hebrew,
-Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian,
-Thai, Turkish, Ukrainian, Vietnamese and Simplified Chinese. English is the
+Twenty-one catalogues are built in: Arabic, German, English, Spanish, French, Hebrew,
+Hindi, Indonesian, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Romanian,
+Russian, Thai, Turkish, Ukrainian, Vietnamese and Simplified Chinese. English is the
 reference: a key missing from another catalogue falls back to the English
 sentence rather than showing blank.
 

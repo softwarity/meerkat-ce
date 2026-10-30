@@ -271,7 +271,7 @@ export class RedirectFilterComponent {
 // The built-in unavailable answer for ONE route: which reason its page gives.
 //
 // A list, not a text field, and for the reason the global switch uses one too:
-// that page is served to visitors in twenty languages, and a sentence typed
+// that page is served to visitors in twenty-one languages, and a sentence typed
 // here would be a sentence in one of them.
 @Component({
   selector: 'app-maintenance-filter',
