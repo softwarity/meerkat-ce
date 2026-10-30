@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.21.1
+
 - **The notifications page follows Material 3.** A top app bar with the page's actions as icon
   buttons (Mark all as read, desktop notifications, Delete all; on a phone the last two go to a
   More options menu), a full-width search bar, and filter chips for Unread only and each tenant
