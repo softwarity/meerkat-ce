@@ -8,8 +8,8 @@ summary: The look of the pages Meerkat serves itself - colours, arrangement and 
 # Built-in pages
 
 **Application > Built-in pages.** The pages the gateway serves in its own name:
-sign-in, sign-up, the second-factor challenge, the unavailable page, the error
-pages.
+sign-in, sign-up, the second-factor challenge, the unavailable page, the page
+where no route serves, the error pages.
 
 One screen, one preview, three tabs on the left: **Theme**, **Layout**,
 **Branding**. They describe the same page, so the preview never moves, and the

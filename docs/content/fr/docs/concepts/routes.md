@@ -89,7 +89,7 @@ fermer un chemin le ferme. Tout autre comportement en ferait une redirection.
 
 Si toutes les routes qui reconnaissent la requête ont écarté l'appelant, c'est
 la **première** d'entre elles qui produit le refus - avec le motif qu'elle
-connaît, et le changement d'organisation qu'elle peut proposer. Un 404 sec
+connaît, et le changement de tenant qu'elle peut proposer. Un 404 sec
 serait ici la seule réponse dont personne ne peut rien faire.
 
 Si aucune route n'a reconnu la requête, la gateway répond 404 et le compte à
@@ -106,7 +106,8 @@ liste les applications que le visiteur peut ouvrir, avec son profil s'il est
 connecté et la connexion s'il ne l'est pas. Tout le reste - un client d'API, un
 script qui charge une ressource, un formulaire envoyé - reçoit le
 `404 page not found` brut. Dans tous les cas le statut reste 404, jamais une
-redirection.
+redirection. Les deux formes de la page sont montrées dans
+[Les pages intégrées](/docs/customise/built-in-pages#la-page-introuvable).
 
 ## La route attrape-tout
 
@@ -141,7 +142,7 @@ Voir [Ce que la gateway injecte](/docs/concepts/data-plane-chrome).
 |---|---|
 | Timeouts | connexion et première réponse, par route, sinon ceux de l'installation, sinon 5 s / 15 s. Le corps n'est jamais borné : un téléchargement ou un websocket qui a commencé dure aussi longtemps que nécessaire |
 | Disjoncteur | désactivé par défaut. Après N échecs consécutifs, la route cesse d'appeler l'upstream et sert la page d'indisponibilité, puis laisse passer une requête une fois le temps de repos écoulé. Un 500 ne compte pas : un service qui répond 500 fonctionne, et il a un bug |
-| Rate limits | plusieurs à la fois, chacun indexé sur un critère différent - la route, un utilisateur, un jeton, une organisation, une adresse. Le premier dépassé répond |
+| Rate limits | plusieurs à la fois, chacun indexé sur un critère différent - la route, un utilisateur, un jeton, un tenant, une adresse. Le premier dépassé répond |
 | Transmission de l'identité | ce que l'upstream apprend de l'appelant - par des en-têtes, ou par un JWT signé ; ou, dans l'autre sens, l'application connecte ses utilisateurs par Meerkat [fournisseur OpenID](/docs/auth/oidc-provider) |
 | Langues | les langues que propose la route, et la manière dont la langue est transmise à l'upstream |
 | Spec OpenAPI | publiée par le service ou déposée ici ; c'est sur elle que se posent les règles par endpoint |

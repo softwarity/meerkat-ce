@@ -67,6 +67,11 @@ Le fond est référencé par une URL et jamais incorporé à la page : c'est le 
 qui puisse peser un mégaoctet, et une data URI le placerait dans chaque page du parcours au
 lieu de le ranger une seule fois dans le cache du navigateur.
 
+Il est dessiné derrière le parcours de connexion et les pages qui partagent son cadre. Une page
+qui se tient là où se tiendrait une application ne le porte pas : la page des notifications, et
+la page introuvable derrière le portail, ne le laisseraient voir qu'entre les interstices d'une
+liste.
+
 ## Un fond différent en clair et en sombre
 
 Une photographie passe souvent bien dans un mode et mal dans l'autre. Le mode sombre dispose

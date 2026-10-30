@@ -8,9 +8,9 @@ summary: Dix jetons de couleur, une palette claire et une palette sombre, et la 
 # Le thème
 
 Un thème est une palette, et rien d'autre. Il colore les pages que la gateway sert
-elle-même - le parcours de connexion, le choix de l'organisation, les pages de mot de passe,
-la page d'indisponibilité - ainsi que les petits éléments qu'elle injecte dans les
-applications placées derrière elle.
+elle-même - le parcours de connexion, le choix du tenant, les pages de mot de passe,
+la page d'indisponibilité, la page introuvable - ainsi que les petits éléments qu'elle
+injecte dans les applications placées derrière elle.
 
 Il se modifie dans **Application > Built-in pages**, onglet **Theme**, avec à côté l'aperçu
 de la page réelle.

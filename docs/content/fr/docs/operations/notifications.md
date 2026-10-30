@@ -68,7 +68,7 @@ utilisateurs. Les écrans de l'administrateur sont décrits dans
 - **L'étiquette EXERCICE** devant le titre, partout où elle paraît, sur une
   notification envoyée [pour s'exercer](#les-exercices).
 
-![La page des notifications d'une lectrice de deux tenants : le filtre par tenant, un message envoyé aux deux sur une seule rangée, une notification qui attend son acquittement, et une autre dépliée avec Ouvrir et son action](img/console/notifications-page.webp)
+![La page des notifications d'une lectrice de deux tenants : la barre du haut et ses actions, la barre de recherche, Non lues seulement et les puces des tenants ; la facture en retard dépliée avec Ouvrir et son action ; un message envoyé aux deux tenants sur une seule rangée, un exercice, une alarme qu'un autre lecteur a acquittée, une notification retirée, et une qui attend son acquittement](img/console/notifications-page.webp)
 
 Sur la page, **Supprimer** retire une notification de la liste du lecteur, pour
 de bon ; l'émetteur et les autres lecteurs gardent la leur. **Tout marquer comme

@@ -18,11 +18,41 @@ elles lisent les jetons du thème : elles suivent donc votre palette sans recomp
 | `/update-password` | un mot de passe que la gateway vous impose de changer |
 | `/forgot-password`, `/reset-password` | la réinitialisation du mot de passe |
 | `/register`, `/confirm`, `/account-pending` | l'auto-inscription et sa confirmation |
-| `/select-tenant`, `/select-group` | le choix de l'organisation ou du groupe au nom duquel agir |
+| `/select-tenant`, `/select-group` | le choix du tenant ou du groupe au nom duquel agir |
 | `/refused` | la raison pour laquelle un appelant ne passe pas |
 | `/profile` et ses sous-pages | les pages du compte lui-même : mot de passe, second facteur, passkeys, autorités, historique, jetons |
 | la page d'indisponibilité | une route dont le service est arrêté, ou l'interrupteur global |
 | la page introuvable | un navigateur qui demande une page qu'aucune route ne sert : elle nomme le chemin, avec la barre du portail en mode portail, les applications du visiteur sinon (statut 404) |
+
+## La page introuvable
+
+Un navigateur qui demande une page qu'aucune route ne sert, ou le chemin d'une
+route désactivée, reçoit cette page au lieu d'une simple ligne de texte, avec
+toujours le statut 404. Elle nomme le chemin demandé et dit où aller ensuite.
+Sa forme suit l'installation, pas un réglage qui lui serait propre :
+
+- **Derrière le portail**, elle se tient là où se tiendrait une application,
+  sous la barre que ce visiteur voit sur chaque application, et renvoie au menu
+  de cette barre. Quand la barre n'a rien à proposer à ce visiteur, la page
+  prend l'autre forme.
+- **Sans portail**, elle reprend la disposition et la marque des pages de
+  connexion, et liste les applications ouvertes au visiteur, avec son profil
+  s'il est connecté et **Se connecter** s'il ne l'est pas.
+
+Quand le visiteur a suivi un lien mort depuis une page de ce site, un lien le
+ramène à cette page.
+
+![La page introuvable derrière le portail : la barre du visiteur en haut, et dessous le chemin demandé, avec la suite par le menu de la barre](img/console/not-found-portal.webp)
+
+![La page introuvable sans portail, pour un visiteur qui ne s'est pas connecté : la marque, le chemin demandé, les deux applications ouvertes à tous, et le bouton de connexion](img/console/not-found.webp)
+
+Seul un navigateur qui demande une page la reçoit (un `GET` ou un `HEAD` qui
+accepte `text/html`) : un client d'API, un script qui charge une ressource ou
+un formulaire envoyé reçoit le `404 page not found` brut. Une route
+attrape-tout (`/**`) répond avant elle : la page ne répond qu'à ce qu'aucune
+route ne sert. L'aperçu de l'éditeur de thème la montre sous le nom
+**Not found**, si bien qu'une palette ou une disposition se juge aussi sur
+elle.
 
 ## Un écran, quatre onglets, un aperçu
 

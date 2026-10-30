@@ -35,7 +35,7 @@ not sorted.
   a disabled one. A second mark appears for a **UI route** (one that serves pages
   in a browser).
 - **The access badges** say what Meerkat itself requires: `AUTH` signed in,
-  `ORG` in an organisation, `ORG-2` in one of two named ones, `DENY` nobody,
+  `ORG` in a tenant, `ORG-2` in one of two named ones, `DENY` nobody,
   a dash for delegated. A badge counting endpoints appears when the route
   refines access per operation, and clicking it opens
   [Endpoint security](/docs/console/endpoints).
@@ -47,7 +47,7 @@ not sorted.
 
 **Duplicate** makes a copy with a fresh identity, **disabled**, placed right
 after the original. That is the intended way to try a variant: another upstream,
-another organisation's access, compared side by side without retyping.
+another tenant's access, compared side by side without retyping.
 
 ### Is the target up?
 
@@ -195,11 +195,16 @@ On a proxy route you also set:
   services - the host is never typed, only the base path beside it
   (`/geoserver`). External is the free field, for a public site, a machine of
   the network or a StatefulSet's pod. A route opens on the namespace its
-  upstream points into: a `name.ns.svc` address is that namespace even when the
-  service is gone (the field then asks for another one), and a short name such
-  as `archi` or `softwarity.dev` stays on a namespace only if that namespace
-  lists it, External otherwise. See
+  upstream points into: a `name.ns.svc` address is that namespace even when its
+  service is not running, and a short name such as `archi` or `softwarity.dev`
+  stays on a namespace only if that namespace lists it, External otherwise. See
   [the other namespaces](/docs/deploy/kubernetes) for the right it takes.
+- **A service that is not running** - down, scaled to zero, renamed or not
+  deployed yet - does not stop anyone from editing the route. The route's own
+  upstream stays in the picker, greyed and marked *not found in this
+  namespace*, a warning under the field says it is not running right now, the
+  port is typed, and the route saves. A new pick still comes from the services
+  running there.
 - **When the service is slow or down** - connect and first-answer timeouts,
   which inherit the Global values unless set here. Past the connect timeout the
   caller gets a 502 (the service cannot be reached), past the first-answer one a
@@ -212,6 +217,11 @@ On a proxy route you also set:
 - **The API contract** - no spec, one published by the service (a URL relative
   to the upstream), or one deposited here as a file. A spec is what unlocks the
   [endpoint screens](/docs/console/endpoints) and the developer swagger.
+
+![The Target section of Orders API while its service is not running: the upstream orders.acme.svc kept in the field, port 9000 typed beside it, and the warning under the field](img/console/route-editor-target-missing.webp)
+
+The same route while `orders` is not running in `acme`: the upstream is kept,
+the port is typed, and the warning says the route can still be saved.
 
 ![The Predicates section: a path predicate, a method predicate and a header predicate with two accepted values](img/console/route-editor-predicates.webp)
 

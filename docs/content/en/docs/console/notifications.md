@@ -125,7 +125,7 @@ three snackbars stacked over it as the account button draws them.
 **Tenants**, a tenant, **Notifications**: for root, the tenant's owner and its
 ADMIN members, on a gateway with several tenants.
 
-![A tenant's Notifications section: the tenant's switch, New notification, and what was sent with who read it and who acknowledged it](img/console/tenant-notifications.webp)
+![A tenant's Notifications section: the tenant's switch, New notification, and what was sent with who read it and who acknowledged it, the pointer on one row showing Replace and Withdraw at its end](img/console/tenant-notifications.webp)
 
 - **Notifications on for this tenant** is the tenant level. It is greyed out,
   with the reason, when root or the application admin turned the tenant off.
@@ -145,7 +145,14 @@ ADMIN members, on a gateway with several tenants.
   greyed out, with the reason on hover, on a notification already withdrawn,
   replaced or expired.
 
-![A notification that asks one reader to acknowledge it: who closed it, and every recipient with the time they read it](img/console/tenant-notification-detail.webp)
+![A notification every reader must acknowledge: who did, who has not yet, and every recipient with the time they read it](img/console/tenant-notification-detail.webp)
+
+![Replace on the overdue invoice: the New notification drawer titled after what it replaces, filled from it, More unfolded on a new id and the metadata it carried](img/console/notification-replace.webp)
+
+**Replace** on the overdue invoice: the drawer of
+[Sending one yourself](#sending-one-yourself), its title naming the
+notification it replaces, every field filled from it, a new id, and its
+metadata kept.
 
 ### Sending one yourself
 

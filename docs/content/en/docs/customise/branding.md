@@ -61,6 +61,10 @@ The background is referenced by URL and never inlined into the page: it is the o
 can weigh a megabyte, and a data URI would put it in every page of the flow instead of once in the
 browser's cache.
 
+It is drawn behind the sign-in flow and the pages that share its frame. A page that stands where
+an application would is not dressed in it: the notifications page, and the not-found page behind
+the portal, would only show it through the gaps of a list.
+
 ## A different background in light and in dark
 
 A photograph often reads in one scheme and not the other. So the dark scheme gets its **own**

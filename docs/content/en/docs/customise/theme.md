@@ -8,8 +8,8 @@ summary: Ten colour tokens, a light palette and a dark one, and how to carry a p
 # The theme
 
 A theme is a palette, and nothing else. It colours the pages the gateway serves itself - the
-sign-in flow, the organisation picker, the password pages, the unavailable page - and the small
-pieces it injects into proxied applications.
+sign-in flow, the tenant picker, the password pages, the unavailable page, the not-found page -
+and the small pieces it injects into proxied applications.
 
 It is edited under **Application > Built-in pages**, on the **Theme** tab, with the real page
 previewed beside it.

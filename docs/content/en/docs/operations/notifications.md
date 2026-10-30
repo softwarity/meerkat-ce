@@ -63,7 +63,7 @@ The screens an administrator uses are on
 - **The label EXERCISE** before the title, everywhere it shows, on a
   notification sent [to practise](#exercises).
 
-![The notifications page of a reader in two tenants: the tenant filter, a message sent to both tenants on one row, one waiting for an acknowledgement, and one unfolded with Open and its action](img/console/notifications-page.webp)
+![The notifications page of a reader in two tenants: the top bar with its actions, the search bar, Unread only and the tenant chips; the overdue invoice unfolded with Open and its action; a message sent to both tenants on one row, an exercise, an alarm another reader acknowledged, a withdrawn notification, and one waiting for her acknowledgement](img/console/notifications-page.webp)
 
 A notification its sender **withdrew** stays in the list the way a deleted
 message does in a chat: a row saying *This notification was withdrawn*, with

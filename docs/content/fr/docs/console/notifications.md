@@ -130,7 +130,7 @@ compte.
 **Tenants**, un tenant, **Notifications** : pour root, le propriétaire du tenant
 et ses membres ADMIN, sur une gateway à plusieurs tenants.
 
-![La section Notifications d'un tenant : l'interrupteur du tenant, New notification, et ce qui a été envoyé, avec qui l'a lu et qui l'a acquitté](img/console/tenant-notifications.webp)
+![La section Notifications d'un tenant : l'interrupteur du tenant, New notification, et ce qui a été envoyé, avec qui l'a lu et qui l'a acquitté, le pointeur sur une ligne qui montre Replace et Withdraw à son bout](img/console/tenant-notifications.webp)
 
 - **Notifications on for this tenant** est le niveau du tenant. Il est grisé,
   avec la raison, quand root ou l'administrateur de l'application a coupé le
@@ -152,7 +152,13 @@ et ses membres ADMIN, sur une gateway à plusieurs tenants.
   demande d'abord, comme depuis le tiroir. Les deux sont grisées, avec la
   raison au survol, sur une notification déjà retirée, remplacée ou expirée.
 
-![Une notification qui demande l'acquittement d'un lecteur : qui l'a close, et chaque destinataire avec l'heure de sa lecture](img/console/tenant-notification-detail.webp)
+![Une notification que chaque lecteur doit acquitter : qui l'a fait, qui pas encore, et chaque destinataire avec l'heure de sa lecture](img/console/tenant-notification-detail.webp)
+
+![Replace sur la facture en retard : le tiroir New notification titré d'après ce qu'il remplace, rempli depuis elle, More déplié sur un nouvel id et les métadonnées qu'elle portait](img/console/notification-replace.webp)
+
+**Replace** sur la facture en retard : le tiroir de **New notification**
+décrit plus bas, son titre nommant la notification qu'il remplace, chaque champ
+rempli depuis elle, un nouvel id, et ses métadonnées gardées.
 
 ### En envoyer une vous-même
 

@@ -559,13 +559,28 @@ const ACME_SERVICES = {
     { name: 'www', full: 'www.acme.svc', ports: [{ target: 80 }], ready: 1, wanted: 1, counted: true },
   ],
 };
+// The services the runtime says are not running right now: left out of its
+// answer, the way a service scaled to zero or not deployed yet is.
+let servicesDown = new Set();
+const picking = new WeakSet();
 async function seedPicker(page) {
+  servicesDown = new Set();
+  if (picking.has(page)) return;
+  picking.add(page);
   await page.route('**/api/services**', (r) =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ACME_SERVICES) }));
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      ...ACME_SERVICES, services: ACME_SERVICES.services.filter((s) => !servicesDown.has(s.name)),
+    }) }));
   // Read back rather than taken from ROUTES: the seed has since given it a
   // spec, which a route written from the fixture alone would drop.
   const orders = await (await page.request.get(`${ADMIN}/api/routes/orders-api`)).json();
   await page.request.put(`${ADMIN}/api/routes/orders-api`, { data: { ...orders, upstream: 'http://orders.acme.svc:9000' } });
+}
+// The same route while its service is down: the namespace lists everything
+// but orders, and the editor keeps the route's upstream with its warning.
+async function seedPickerOrdersDown(page) {
+  await seedPicker(page);
+  servicesDown = new Set(['orders']);
 }
 
 // The notifications (NOTIF-05, Enterprise), laid down once before their
@@ -648,10 +663,6 @@ async function layNotifications(api) {
     await new Promise((res) => setTimeout(res, 1100));
   };
   const logistics = 'Acme Logistics';
-  await publish('invoicing', 'draft', {
-    tenant: logistics, title: 'October price list draft', body: 'A first draft, to be replaced by the final list.',
-    meta: { pricelist: '2026-10' },
-  });
   await publish('warehouse', 'returns', {
     tenant: 'Acme Retail', title: 'Returns are now accepted for 60 days',
     body: 'From November, customers may bring an item back within 60 days with its receipt.',
@@ -661,10 +672,21 @@ async function layNotifications(api) {
     body: 'From Monday the forklift lane moves to aisle 4. Read the new floor plan before your next shift.',
     detail: { service: 'docs', path: '/floor-plan' }, ack: 'all', meta: { site: 'rotterdam' },
   });
+  // Withdrawn below, so the reader's page shows its placeholder among the
+  // others rather than past the bottom of the frame.
+  await publish('invoicing', 'draft', {
+    tenant: logistics, title: 'October price list draft', body: 'A first draft, to be replaced by the final list.',
+    meta: { pricelist: '2026-10' },
+  });
   await publish('warehouse', 'alarm', {
     tenant: logistics, level: 'error', title: NOTE.alarm,
     body: 'Sensor CR3 reads 9.4 C since 06:12. Check the door seal and the compressor.',
     ack: 'single', onAck: { service: 'orders', path: '/orders/alerts/acked' }, id: 'cr3-temperature',
+  });
+  // A drill, sent as the real thing would be: its readers see EXERCISE first.
+  await publish('warehouse', 'drill', {
+    tenant: logistics, level: 'error', exercise: true, title: 'Evacuate hall B by exit 3',
+    body: 'The gas detector of hall B has gone off. Leave by exit 3 and gather at assembly point C.',
   });
   await publish('invoicing', 'saturday', {
     tenant: '*', title: 'Billing is read-only on Saturday night',
@@ -725,12 +747,13 @@ async function layNotifications(api) {
 // nothing of where it was taken. And as a reader who has not answered the
 // desktop question yet: a headless browser answers it "denied" for them, and
 // the page would show the line for a blocked browser instead of its button.
+// `as: 'visitor'` is somebody who has not signed in: no session at all.
 const readers = {};
 async function readerPage(browser, who) {
   if (!readers[who]) {
     const ctx = await browser.newContext({
       viewport: VIEW, colorScheme: 'light', deviceScaleFactor: 1, timezoneId: 'Europe/Amsterdam',
-      storageState: `${tmp}/data-${who}.json`,
+      ...(who === 'visitor' ? {} : { storageState: `${tmp}/data-${who}.json` }),
     });
     await ctx.addInitScript(() => {
       if (window.Notification) Object.defineProperty(Notification, 'permission', { get: () => 'default' });
@@ -780,6 +803,11 @@ const SHOTS = [
   // ── Infra ──
   { file: 'routes-list', path: '/infra/routes' },
   { file: 'route-editor-target', path: '/infra/routes/orders-api/target', prepare: seedPicker, settle: 1600 },
+  // The same route while its service is not running: kept, muted in the
+  // picker, with the warning under the field.
+  {
+    file: 'route-editor-target-missing', path: '/infra/routes/orders-api/target', prepare: seedPickerOrdersDown, settle: 1600,
+  },
   { file: 'route-editor-security', path: '/infra/routes/orders-api/security' },
   { file: 'route-editor-predicates', path: '/infra/routes/orders-api/predicates' },
   { file: 'route-editor-filters', path: '/infra/routes/billing/modin' },
@@ -1016,8 +1044,33 @@ const SHOTS = [
     },
   },
   {
+    // The pointer on the overdue invoice: its row actions, Replace and
+    // Withdraw, show at the line's end.
     file: 'tenant-notifications', path: () => TENANT && `/tenants/${TENANT}/notifications`,
     prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await page.locator('mat-row', { hasText: NOTE.invoice }).first().hover();
+      await page.waitForTimeout(600);
+    },
+  },
+  {
+    // Replace on the same row: the New notification drawer filled from it,
+    // under a new id, its metadata kept, More unfolded to show both.
+    file: 'notification-replace', path: () => TENANT && `/tenants/${TENANT}/notifications`,
+    prepare: seedNotifications, settle: 1600,
+    act: async (page) => {
+      await page.locator('mat-row', { hasText: NOTE.invoice }).first().hover();
+      await page.getByRole('button', { name: 'Replace', exact: true }).first().click();
+      await page.waitForTimeout(1200);
+      const drawer = page.locator('app-tenant-notification-compose');
+      const more = drawer.locator('mat-expansion-panel.more');
+      if ((await more.getAttribute('class'))?.includes('mat-expanded') !== true) {
+        await more.locator('mat-expansion-panel-header').click();
+        await page.waitForTimeout(600);
+      }
+      await more.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+      await page.waitForTimeout(600);
+    },
   },
   {
     // The instruction asked of every reader: bob gave his, alice and carla
@@ -1055,7 +1108,31 @@ const SHOTS = [
       await page.waitForTimeout(900);
     },
   },
+  // The page a browser gets where no route serves - last, since the
+  // catch-all has to go for any path to be unserved, and the portal for the
+  // second shape. Behind the portal, as alice: her bar, and the way on is its
+  // menu.
+  {
+    file: 'not-found-portal', as: 'alice', path: '/reports/2025-q3', prepare: dropCatchAll, settle: 1600,
+  },
+  // Without the portal, as a visitor who has not signed in: the sign-in
+  // pages' frame, the applications open to anybody, and Sign in.
+  {
+    file: 'not-found', as: 'visitor', path: '/reports/2025-q3', settle: 1600,
+    prepare: async (page) => {
+      await dropCatchAll(page);
+      const settings = await (await page.request.get(`${ADMIN}/api/settings`)).json();
+      await page.request.put(`${ADMIN}/api/settings`, { data: { ...settings, portal: { ...settings.portal, mode: 'none' } } });
+    },
+  },
 ];
+
+// The catch-all disabled: a disabled route is not loaded, so the paths it
+// took are served by nobody.
+async function dropCatchAll(page) {
+  const route = await (await page.request.get(`${ADMIN}/api/routes/catch-all`)).json();
+  if (route.enabled) await page.request.put(`${ADMIN}/api/routes/catch-all`, { data: { ...route, enabled: false } });
+}
 
 async function shoot(storageState) {
   const browser = await chromium.launch();

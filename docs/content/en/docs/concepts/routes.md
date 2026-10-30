@@ -82,7 +82,7 @@ for the finance roles sit above a `/reports/**` route for everyone else.
 it. Anything else would turn it into a redirect.
 
 If every matching route turned the caller away, the **first** one that did
-produces the refusal - with the reason it knows, and the organisation switch it
+produces the refusal - with the reason it knows, and the tenant switch it
 can offer. A bare 404 there would be the one answer nobody can act on.
 
 If nothing matched at all, the gateway answers 404 and counts it
@@ -98,7 +98,8 @@ carries for this visitor and points to its menu. Without it, it lists the
 applications the visitor may open, with their profile when they are signed in
 and the sign-in when they are not. Anything else - an API client, a script
 fetching an asset, a form posted - gets the plain `404 page not found`. Either
-way the status is 404, never a redirect.
+way the status is 404, never a redirect. Both shapes of the page are shown on
+[The built-in pages](/docs/customise/built-in-pages#the-not-found-page).
 
 ## The catch-all
 
@@ -132,7 +133,7 @@ See [What the gateway injects](/docs/concepts/data-plane-chrome).
 |---|---|
 | Timeouts | connect and first answer, per route, else the installation, else 5 s / 15 s. The body is never bounded: a download or a websocket that has started runs as long as it needs |
 | Circuit breaker | off by default. After N consecutive failures the route stops calling and serves the unavailable page, letting one request through after the cooldown. A 500 does not count - a service answering 500 is up and has a bug |
-| Rate limits | several at once, each keyed on something different - the route, a user, a token, an organisation, an address. The first one exceeded answers |
+| Rate limits | several at once, each keyed on something different - the route, a user, a token, a tenant, an address. The first one exceeded answers |
 | Identity forwarding | what the upstream is told about the caller - headers, or a signed JWT; or, the other way round, the application signs its users in through Meerkat as an [OpenID provider](/docs/auth/oidc-provider) |
 | Locales | the route's language offer, and how the language travels to the upstream |
 | OpenAPI spec | published by the service or deposited here; it is what per-endpoint rules are posed on |

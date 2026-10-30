@@ -18,11 +18,38 @@ theme's tokens, so they follow your palette without a rebuild.
 | `/update-password` | a password the gateway requires you to change |
 | `/forgot-password`, `/reset-password` | the reset flow |
 | `/register`, `/confirm`, `/account-pending` | self-registration and its confirmation |
-| `/select-tenant`, `/select-group` | picking the organisation or the group to act in |
+| `/select-tenant`, `/select-group` | picking the tenant or the group to act in |
 | `/refused` | why a caller may not pass |
 | `/profile` and its sub-pages | the account's own pages: password, second factor, passkeys, authorities, history, tokens |
 | the unavailable page | a route whose service is down, or the global switch |
 | the not-found page | a browser asking for a page no route serves: it names the path, with the portal bar in portal mode, the visitor's applications otherwise (status 404) |
+
+## The not-found page
+
+A browser that asks for a page no route serves, or for the path of a disabled
+route, gets this page instead of a bare line of text, still with the status
+404. It names the path asked for and says where to go from there. Its shape
+follows the installation, not a setting of its own:
+
+- **Behind the portal**, it stands where an application would, under the bar
+  this visitor sees on every application, and points to that bar's menu. When
+  the bar has nothing to offer this visitor, the page takes the other shape.
+- **Without the portal**, it wears the sign-in pages' layout and brand, and
+  lists the applications open to the visitor, with their profile when they are
+  signed in and **Sign in** when they are not.
+
+When the visitor followed a dead link from a page of this site, a link leads
+back to that page.
+
+![The not-found page behind the portal: the visitor's bar at the top, and under it the path asked for, with the way on through the bar's menu](img/console/not-found-portal.webp)
+
+![The not-found page without the portal, for a visitor who has not signed in: the brand, the path asked for, the two applications open to anybody, and Sign in](img/console/not-found.webp)
+
+Only a browser asking for a page gets it (a `GET` or a `HEAD` that accepts
+`text/html`): an API client, a script fetching an asset or a form posted gets
+the plain `404 page not found`. A catch-all route (`/**`) answers first: the
+page only answers what no route serves. The theme editor's preview shows it as
+**Not found**, so a palette or an arrangement is judged on it too.
 
 ## One screen, four tabs, one preview
 

@@ -38,8 +38,8 @@ qui correspond l'emporte** - et le tableau est donc ordonné, pas trié.
   route qui répond d'elle-même, ni pour une route désactivée. Une seconde marque
   signale une **route UI** (une route qui sert des pages dans un navigateur).
 - **Les badges d'accès** indiquent ce que Meerkat exige lui-même : `AUTH` pour un
-  utilisateur connecté, `ORG` pour un membre d'une organisation, `ORG-2` pour un
-  membre de l'une des deux organisations désignées, `DENY` pour personne, un tiret
+  utilisateur connecté, `ORG` pour un membre d'un tenant, `ORG-2` pour un
+  membre de l'un des deux tenants désignés, `DENY` pour personne, un tiret
   quand l'accès est délégué. Un badge qui compte des endpoints apparaît lorsque la
   route affine l'accès opération par opération ; un clic dessus ouvre
   [Endpoint security](/docs/console/endpoints).
@@ -51,7 +51,7 @@ qui correspond l'emporte** - et le tableau est donc ordonné, pas trié.
 
 **Dupliquer** crée une copie dotée d'une nouvelle identité, **désactivée**, et
 placée juste après l'originale. C'est la manière prévue d'essayer une variante :
-un autre upstream, l'accès d'une autre organisation, à comparer côte à côte sans
+un autre upstream, l'accès d'un autre tenant, à comparer côte à côte sans
 rien ressaisir.
 
 ### La cible est-elle joignable ?
@@ -208,11 +208,16 @@ Sur une route en mode proxy, vous réglez aussi :
   ses services - l'hôte ne se tape jamais, seul le chemin de base se tape à côté
   (`/geoserver`). External est le champ libre, pour un site public, une machine
   du réseau ou le pod d'un StatefulSet. Une route s'ouvre sur le namespace où
-  pointe son upstream : une adresse `nom.ns.svc` désigne ce namespace même si le
-  service a disparu (le champ demande alors d'en choisir un autre), et un nom
-  court comme `archi` ou `softwarity.dev` ne reste sur un namespace que si ce
-  namespace le liste, External sinon. Voir
+  pointe son upstream : une adresse `nom.ns.svc` désigne ce namespace même si
+  son service ne tourne pas, et un nom court comme `archi` ou `softwarity.dev`
+  ne reste sur un namespace que si ce namespace le liste, External sinon. Voir
   [les autres namespaces](/docs/deploy/kubernetes) pour le droit que cela demande.
+- **Un service qui ne tourne pas** - arrêté, ramené à zéro, renommé ou pas
+  encore déployé - n'empêche personne de modifier la route. L'upstream de la
+  route reste dans la liste, grisé et marqué *not found in this namespace*, un
+  avertissement sous le champ dit qu'il ne tourne pas en ce moment, le port se
+  tape, et la route s'enregistre. Un nouveau choix se fait toujours parmi les
+  services qui tournent.
 - **When the service is slow or down** - les timeouts de connexion et de première
   réponse, qui reprennent les valeurs de Global tant qu'ils ne sont pas réglés
   ici. Passé le timeout de connexion, l'appelant reçoit un 502 (le service est
@@ -229,6 +234,12 @@ Sur une route en mode proxy, vous réglez aussi :
   service (une URL relative à l'upstream), ou une spécification déposée ici sous
   forme de fichier. C'est elle qui donne accès aux
   [écrans des endpoints](/docs/console/endpoints) et au swagger développeur.
+
+![La section Target d'Orders API quand son service ne tourne pas : l'upstream orders.acme.svc gardé dans le champ, le port 9000 tapé à côté, et l'avertissement sous le champ](img/console/route-editor-target-missing.webp)
+
+La même route quand `orders` ne tourne pas dans `acme` : l'upstream est gardé,
+le port se tape, et l'avertissement dit que la route peut quand même être
+enregistrée.
 
 ![La section Predicates : un prédicat de chemin, un prédicat de méthode et un prédicat d'en-tête qui accepte deux valeurs](img/console/route-editor-predicates.webp)
 

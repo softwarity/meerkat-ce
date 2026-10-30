@@ -9,7 +9,7 @@ summary: L'apparence des pages que Meerkat sert lui-même - couleurs, dispositio
 
 **Application > Built-in pages.** Les pages que la gateway sert en son nom propre :
 la connexion, l'inscription, la demande du second facteur, la page d'indisponibilité,
-les pages d'erreur.
+la page introuvable, les pages d'erreur.
 
 Un seul écran, un seul aperçu, et trois onglets à gauche : **Theme**, **Layout**,
 **Branding**. Tous trois décrivent la même page : l'aperçu ne bouge donc jamais, et le
