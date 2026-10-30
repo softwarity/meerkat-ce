@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.21.0
+
 - **plug 2.32.0 in the Enterprise image.** The client developers install with `ssh get@<gateway> install`, and the agent built into the gateway.
 - **A page where no route answers.** A browser that asks for a path no route serves, or a
   disabled route's path, gets a page in the installation's theme, still with a 404: what was
