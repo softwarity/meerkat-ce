@@ -535,11 +535,13 @@ func TestUpstreamHangIs504(t *testing.T) {
 }
 
 // A refused connection is the upstream being down, not slow: 502, at once.
+//
+// Port 1 on loopback, not a test server closed on purpose: a closed server's
+// port goes back to the ephemeral pool, and on a busy CI another test's
+// listener picked it up and never answered - a 504, a test failing on luck.
+// Port 1 is never handed out as an ephemeral port and nothing listens there.
 func TestUpstreamRefusingIs502(t *testing.T) {
-	dead := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	deadURL := dead.URL
-	dead.Close()
-	route := pathRoute("r1", "refused", 1, "/**", deadURL)
+	route := pathRoute("r1", "refused", 1, "/**", "http://127.0.0.1:1")
 	route.Timeouts = &store.RouteTimeouts{Response: "PT5S"}
 	rt := newRouter(t, route)
 
