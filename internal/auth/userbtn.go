@@ -675,6 +675,72 @@ const userButtonJS = `(() => {
       this.style.colorScheme = (v === 'light' || v === 'dark') ? v : '';
     }
 
+    // Whether this page offers the switch: a session, a route that takes a
+    // choice, and nobody who settled it for everyone.
+    schemeOffered(data) {
+      return !!data && !!data.authenticated && this.getAttribute('scheme') === 'select' && !data.schemeImposed;
+    }
+
+    // What the switch shows for a choice, and what a click picks next. Two
+    // states or three: an application with no follow-the-system state
+    // (no-auto) cycles light <-> dark, and a choice of auto already made shows
+    // as what the system currently resolves it to.
+    schemeStep(cur) {
+      if (this.hasAttribute('no-auto')) {
+        const shown = cur === 'light' || cur === 'dark' ? cur : (darkMedia.matches ? 'dark' : 'light');
+        return { shown, next: shown === 'dark' ? 'light' : 'dark' };
+      }
+      return { shown: cur || 'auto', next: SCHEME_NEXT[cur] || 'light' };
+    }
+
+    pickScheme(v) {
+      // Through the agent when the route injected one: it owns the page, the
+      // channel to the other tabs and the call that stores the choice on the
+      // account. Alone (the developer bar), the button does the two parts it
+      // can do by itself.
+      if (page() && page().pickScheme) {
+        page().pickScheme(v);
+      } else {
+        setCookie(COOKIE_SCHEME, v);
+        fetch('/meerkat/scheme', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheme: v }),
+          credentials: 'same-origin',
+        }).catch(() => {});
+      }
+      this.wearScheme(v);
+      // Kept, so a redraw (a language picked) shows the choice just made.
+      if (this.lastData) this.lastData.scheme = v;
+      this.paintSchemeSwitch();
+    }
+
+    // The portal bar (PORTAL-01) draws the switch beside this button and hands
+    // it over: its look is the bar's, what it shows and does is decided here,
+    // with the rest of the scheme. Hidden whenever this page offers nothing to
+    // switch: a route with no colour scheme, a scheme settled, nobody signed in.
+    bindSchemeSwitch(el) {
+      this.schemeSwitch = el;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!this.lastData) return;
+        this.pickScheme(this.schemeStep(this.lastData.scheme).next);
+      });
+      this.paintSchemeSwitch();
+    }
+
+    paintSchemeSwitch() {
+      const el = this.schemeSwitch;
+      if (!el) return;
+      const data = this.lastData;
+      el.hidden = !this.schemeOffered(data);
+      if (el.hidden) return;
+      const label = (data.labels || {}).colorScheme || '';
+      el.title = label;
+      el.setAttribute('aria-label', label);
+      el.innerHTML = schemeIcon(this.schemeStep(data.scheme).shown);
+    }
+
     render(data, sim) {
       // Kept so the button can redraw ITSELF without asking the gateway
       // again - after a language change, say.
@@ -746,6 +812,7 @@ const userButtonJS = `(() => {
         this.shadowRoot.getElementById('signin').addEventListener('click', () => {
           location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
         });
+        this.paintSchemeSwitch();
         return;
       }
 
@@ -770,14 +837,12 @@ const userButtonJS = `(() => {
         // (no-auto) must not be offered a switch with a position nothing behind
         // it can hold: the cycle becomes light <-> dark, and a choice of auto
         // already made shows as what the system currently resolves it to.
-        const noAuto = this.hasAttribute('no-auto');
-        const shown = noAuto && data.scheme === 'auto'
-          ? (darkMedia.matches ? 'dark' : 'light')
-          : data.scheme;
-        const next = noAuto
-          ? (shown === 'dark' ? 'light' : 'dark')
-          : (SCHEME_NEXT[data.scheme] || 'light');
-        const schemeBtn = this.getAttribute('scheme') === 'select' && !data.schemeImposed
+        //
+        // Inside the portal bar the switch leaves this line for the bar itself,
+        // beside the button (paintSchemeSwitch): one click instead of two for
+        // the control a visitor reaches for most.
+        const { shown, next } = this.schemeStep(data.scheme);
+        const schemeBtn = this.schemeOffered(data) && !inPortal
           ? '<button class="sw on" data-scheme-cycle="' + next +
             '" title="' + esc(L.colorScheme) + '">' + schemeIcon(shown) + '</button>'
           : '';
@@ -1163,27 +1228,12 @@ const userButtonJS = `(() => {
       const cyc = this.shadowRoot.querySelector('[data-scheme-cycle]');
       if (cyc) cyc.addEventListener('click', () => {
         const v = cyc.dataset.schemeCycle;
-        // Through the agent when the route injected one: it owns the page, the
-        // channel to the other tabs and the call that stores the choice on the
-        // account. Alone (the developer bar), the button does the two parts it
-        // can do by itself.
-        if (page() && page().pickScheme) {
-          page().pickScheme(v);
-        } else {
-          setCookie(COOKIE_SCHEME, v);
-          fetch('/meerkat/scheme', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ scheme: v }),
-            credentials: 'same-origin',
-          }).catch(() => {});
-        }
-        this.wearScheme(v);
-        cyc.innerHTML = schemeIcon(v);
-        cyc.dataset.schemeCycle = this.hasAttribute('no-auto')
-          ? (v === 'dark' ? 'light' : 'dark')
-          : (SCHEME_NEXT[v] || 'light');
+        this.pickScheme(v);
+        const step = this.schemeStep(v);
+        cyc.innerHTML = schemeIcon(step.shown);
+        cyc.dataset.schemeCycle = step.next;
       });
+      this.paintSchemeSwitch();
       const out = this.shadowRoot.getElementById('logout');
       if (out) out.addEventListener('click', () => {
         // Tell the other pages of this browser before leaving: they lose the

@@ -206,7 +206,7 @@ gateway, ou mettez-la en pause depuis la console, avant de les lancer.
 
 ## L'export de configuration
 
-Un seul document, en YAML : les routes, le catalogue des rôles, les organisations et leurs
+Un seul document, en YAML : les routes, le catalogue des rôles, les tenants et leurs
 groupes, les autorités auprès desquelles on se connecte, le relais de messagerie, les thèmes
 et les réglages de la gateway.
 
@@ -228,10 +228,11 @@ La contrepartie est assumée : un document ne suffit pas à démarrer un environ
 références doivent exister dans [le coffre](/docs/operations/vault), qui est un fichier à
 part, avec sa propre vie.
 
-Il existe deux formats, qu'une seule chose distingue : un YAML simple ne contient jamais
-d'image, et il dit ce qu'il a laissé de côté ; un paquet `.zip` contient les logos et les
-spécifications OpenAPI déposées, pour les cas où les images doivent suivre. Un import sans
-image ne touche pas à celles qui sont en place.
+Il existe deux formats, qu'une seule chose distingue : un YAML simple ne contient ni image,
+ni spécification OpenAPI déposée, ni fichier de route ; un paquet `.zip` les place à côté du
+document, pour les cas où ils doivent suivre. La fenêtre qui l'enregistre
+[liste ce que la forme choisie laisse derrière](/docs/console/configuration#que-faire-du-rsultat).
+Un import sans image ne touche pas à celles qui sont en place.
 
 ## Les points de reprise : l'historique
 
@@ -260,7 +261,8 @@ plus utilisé.
 
 ## Les configurations nommées
 
-Plusieurs configurations coexistent, et une seule est active. La console les compare -
-objets ajoutés, supprimés, modifiés - et affiche ce même diff à l'import d'un fichier, avant
-toute écriture. Un agent peut ranger l'état courant sous un nom en un seul appel : c'est ce
-qu'un administrateur prudent demande, en toutes lettres, avant un changement important.
+Plusieurs configurations sont gardées côte à côte, et une seule tourne. La console
+[en compare deux au choix](/docs/console/configuration#compose), jusqu'aux champs, et en
+compose une troisième ; un fichier se lit de la même façon, avant toute écriture. Un agent
+peut ranger l'état courant sous un nom en un seul appel : c'est ce qu'un administrateur
+prudent demande, en toutes lettres, avant un changement important.

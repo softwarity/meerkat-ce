@@ -64,7 +64,7 @@ and Helm are on the
 | **Audit** | Audit trail in the console | Also CSV export and sending to an OpenTelemetry collector |
 | **Scheduled calls** | Recurring and one-off calls, with history and retries | Same |
 | **High availability** | One gateway on embedded storage | Active/active nodes on a shared PostgreSQL |
-| **Configuration** | Saved configurations, export and import | Also configurations kept in a git repository |
+| **Configuration** | Saved configurations compared and composed value by value, export and import | Also configurations kept in a git repository |
 | **Single sign-on for other tools** | - | Meerkat acts as their OpenID Connect provider |
 | **Developer tunnel** | plug runs on its own, beside the gateway | plug's agent built into the gateway |
 | **Image** | `softwarity/meerkat` | Built for you; try it with `softwarity/meerkat:eval` |

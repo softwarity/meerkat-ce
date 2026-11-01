@@ -198,3 +198,42 @@ func TestActivateConfigurationNamesWhatExists(t *testing.T) {
 		t.Errorf("the refusal must list what this gateway holds: %v", err)
 	}
 }
+
+// A name taken is refused with the way out, and replace takes it: an agent
+// refreshing a composed result it pushes keeps one row, as the console does.
+func TestComposeConfigurationReplacesANameWhenAsked(t *testing.T) {
+	f := setupBare(t)
+	ctx := mcpCtx(rootUser(t, f))
+	save := func(role string, replace bool) error {
+		args, _ := json.Marshal(map[string]any{
+			"left":  map[string]string{"source": "file", "document": "version: 1\nroles:\n  - name: " + role + "\n"},
+			"right": map[string]string{"source": "running"},
+			"then":  "save", "name": "composed", "replace": replace,
+		})
+		_, err := f.api.toolComposeConfiguration(ctx, args)
+		return err
+	}
+	if err := save("FIRST", false); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if err := save("SECOND", false); err == nil || !strings.Contains(err.Error(), "replace: true") {
+		t.Fatalf("a name taken must be refused with the way out: %v", err)
+	}
+	if err := save("SECOND", true); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	rows, err := f.api.st.ListConfigurations(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("replacing made %d rows", len(rows))
+	}
+	row, err := f.api.st.GetConfiguration(context.Background(), rows[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(row.Document, "SECOND") || strings.Contains(row.Document, "FIRST") {
+		t.Fatalf("the document was not replaced: %s", row.Document)
+	}
+}

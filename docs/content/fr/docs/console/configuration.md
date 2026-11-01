@@ -10,7 +10,7 @@ summary: Transporter la configuration d'une gateway - configurations nommées, p
 **Meerkat > Configuration**, réservé à root. Trois onglets, parce que trois questions
 différentes se partageaient une seule page.
 
-Ce qu'une configuration emporte : **les routes, les rôles, les organisations et leurs
+Ce qu'une configuration emporte : **les routes, les rôles, les tenants et leurs
 groupes, les autorités, les clients OIDC, le relais de messagerie, les thèmes et les
 réglages de la gateway**. Le secret d'un client OIDC ne voyage que sous forme de son
 sha256 (`secretHash`), jamais en clair : le client importé ailleurs garde le même
@@ -21,108 +21,143 @@ ce n'est pas de la configuration, c'est ce avec quoi vit cette gateway.
 
 | Onglet | Ce à quoi il répond |
 |---|---|
-| **Management** | Ce qui tourne, ce qui est en réserve, et l'entrée et la sortie des fichiers |
+| **Compose** | Ce qui diffère entre deux configurations, et ce que doit être le résultat |
 | **History** | Revenir à n'importe quel moment de la configuration de cette gateway |
 | **Database** | Sauvegarder, restaurer et déplacer la base de données entière |
 
-Chaque onglet est une route à part entière : un favori y ramène donc directement.
+Chaque onglet est une route à part entière : un favori y revient.
 
-![L'écran Configuration sur l'onglet Management : la configuration courante sur la première ligne, et deux configurations enregistrées en dessous](img/console/configuration.webp)
+## Compose
 
-La configuration courante sur la première ligne, signalée comme identique à
-*Known-good baseline*, et deux lignes de la réserve en dessous - dont l'une porte la
-pastille *Current*. *Import a file* fonctionne dans les deux éditions ; *Import from
-git* porte le badge Enterprise.
+![L'onglet Compose : ce qui tourne à gauche, une configuration enregistrée à droite, le résultat entre les deux, chaque différence encadrée de rouge](img/console/configuration.webp)
 
-## Management
+Trois colonnes : **ce dont on part** à gauche, en bleu ; **le résultat** au milieu, en
+vert ; **ce à quoi on le compare** à droite, en orange. Rien ne bouge tant qu'un résultat
+n'est pas appliqué ou enregistré : cet écran est un établi, pas un interrupteur.
 
-**La première ligne est ce que sert cette gateway.** Les lignes du dessous sont des
-copies gardées en réserve. Enregistrer, dupliquer ou supprimer l'une d'elles ne change
-rien à ce qui est servi.
+L'écran s'ouvre avec ce qui tourne des deux côtés, et dit donc que les deux sont
+identiques. Choisissez autre chose dans l'en-tête d'une colonne :
 
-L'icône de la première ligne est une comparaison, et c'est l'élément le plus utile de
-l'écran :
-
-| Icône | Ce qui tourne |
+| Source | Ce que c'est |
 |---|---|
-| verte | est identique à l'octet près à une configuration enregistrée - dont le nom figure à côté |
-| orange | s'est écarté de la configuration sous laquelle il a été enregistré |
-| grise | n'a jamais été enregistré sous aucun nom |
+| **Running** | Ce que cette gateway sert |
+| **Une configuration enregistrée** | Une des copies gardées sur l'étagère |
+| **Un emplacement git** | Le répertoire d'un dépôt, lu à cet instant (*Enterprise*) |
+| **Un fichier** | Un YAML, un JSON ou un paquet (`.zip`) choisi ou déposé sur la page. Il arrive à droite ; il est lu, pas gardé |
 
-La ligne de la réserve dont provient l'état courant porte le même verdict sous forme de
-pastille : *Current*, ou *Current, changed*.
+### Décider
 
-**Les actions.** La ligne courante peut être enregistrée sous un nom et exportée. Une
-ligne de la réserve peut être définie comme courante, dupliquée, exportée ou supprimée.
-Un clic sur n'importe quelle ligne ouvre son fichier dans le tiroir, en
-lecture.
+**Chaque différence est encadrée de rouge**, et le cadre disparaît une fois touchée. Un
+ruban relie ce qui nourrit le résultat à sa place au milieu. Pour décider :
 
-Seule **Set as current** fait passer quelque chose de la réserve à la gateway :
-c'est donc la seule action qui demande confirmation - et elle le fait en présentant
-**la liste de ce qu'elle modifierait**, précédée d'un avertissement quand ce qui tourne
-n'a jamais été enregistré : c'est la seule opération qui ne laisse rien à quoi revenir.
+- **Un objet présent d'un seul côté** a un bouton radio de chaque côté : pris, ou
+  laissé dehors.
+- **Un objet présent des deux côtés qui diffère** s'ouvre en ses champs, jusqu'aux
+  feuilles : `timeouts.response` d'un côté et `upstream` de l'autre donnent un seul
+  résultat. Un bouton radio sur chaque valeur dit laquelle le résultat retient, et le
+  **x** d'une ligne du résultat laisse la valeur vide.
+- **Une liste** se présente en puces : une puce pleine est dans le résultat, une puce
+  pâle en pointillés n'y est pas. Un clic l'ajoute ou la retire, un glisser la réordonne.
+- **Un objet commun aux deux côtés** a *in the result* coché : décochez pour le laisser
+  dehors malgré tout.
 
-Chaque ligne de cette liste peut être **décochée**, et une ligne décochée garde ce que
-la gateway détient pour elle, quoi que dise la ligne : une route que la configuration
-supprimerait reste, un objet qu'elle modifierait garde sa version actuelle, un objet
-qu'elle ajouterait n'est pas créé. La case au-dessus des lignes les coche ou les
-décoche toutes ; **Apply to current** est inactif tant qu'aucune n'est cochée, et ne
-passe au rouge que tant qu'une suppression reste à faire. Le même choix est offert à l'import d'un fichier sur la gateway et à la
-modification du document en cours. Ensuite, la gateway n'est plus exactement la
-configuration enregistrée, et l'écran le dit : elle a changé depuis l'enregistrement de
-cette configuration, et l'enregistrer à nouveau garde ce que vous avez choisi. Une
-ligne dont le reste de la configuration ne peut pas se passer est refusée, avec ce qui
-bloque, et rien n'est appliqué à moitié.
+La double coche dans l'en-tête d'une colonne prend ce côté pour tout ce qui reste à
+décider, et **Reset** à côté du résultat oublie tous les choix. **Only differences**
+masque ce qui est identique, et les puces au-dessus des colonnes filtrent par type
+d'objet.
 
-![Set as current, une route que la configuration supprimerait gardée en décochant sa ligne](img/console/configuration-keep.webp)
+Le *rang* d'une route dans le routage n'est jamais proposé : deux routes au même rang
+rendraient le routage ambigu, le résultat garde donc ce que dit le côté gauche.
 
-### Exporter
+**Les dépendances suivent.** Une route prise à droite emporte les rôles qu'elle nomme,
+depuis le côté qui les a. Laissez un tel rôle dehors et la référence est signalée comme
+manquante ; seuls le parent d'un rôle ou le tenant d'un groupe bloquent l'application,
+car la gateway ne peut pas tenir l'objet sans eux.
 
-La boîte de dialogue indique ce que le fichier contient et ce qu'il ne contient pas,
-puis propose deux formats :
+**Deux objets de même nom sous deux identifiants** sont proposés comme paire, jamais
+appariés d'office. Appariés, le résultat garde l'identifiant de gauche et la gateway met
+l'objet à jour au lieu d'en retirer un et d'en ajouter un autre.
 
-- **Plain YAML** - du texte uniquement. Les images ne sont pas exportées, et un import
-  conserve celles qui sont en place.
-- **Package** - une archive zip : la configuration se lit et se compare comme du texte,
-  et les images l'accompagnent sous forme de fichiers.
+### Le portail, dessiné
 
-### Importer
+![Le réglage du portail : sous ses champs, une miniature de la barre décrite par chaque côté](img/console/configuration-portal.webp)
 
-**Import a file** accepte les fichiers `.yaml`, `.yml`, `.json` ou `.zip`, et demande
-où ranger le contenu :
+Un catalogue se lit mal en liste : sous les champs du réglage du portail, chaque colonne
+montre donc une **miniature de la vraie barre**. Cliquez une entrée dans une miniature
+pour l'ouvrir : un conteneur montre ses modules, et c'est ainsi que les sous-routes se
+comparent.
 
-1. **Save it under a name** - en réserve, sans toucher à rien.
-2. **Replace the current one** - ce qui ne figure pas dans le fichier disparaît.
-3. **Add to the current one** - ce qui figure dans le fichier est ajouté ou mis à jour,
-   et rien n'est supprimé.
+### Ce qui manquerait au résultat
 
-Les deux options qui touchent à la gateway affichent d'abord leur plan, objet par
-objet. Si le fichier fait référence à des entrées du coffre que cette gateway n'a
-pas, une seconde boîte de dialogue les liste pour que vous puissiez les renseigner
-aussitôt.
+Un bandeau au-dessus des colonnes, et un compteur dans l'en-tête du résultat, disent ce
+qui manque **avant** que quoi que ce soit ne soit appliqué :
+
+- les entrées du coffre que le document nomme et que cette gateway ne détient pas
+  (réservées vides à l'application, à remplir sur l'écran du
+  [coffre](/docs/console/vault)) ;
+- les specs et fichiers qu'un fichier simple ne porte pas, quand la source en est un ;
+- ce que cette édition n'applique pas ;
+- les liaisons OIDC en suspens, et les dépendances qu'un choix a laissées dehors.
+
+### Que faire du résultat
+
+![Le menu Save du résultat : l'appliquer, le garder sur l'étagère, l'enregistrer sur le disque](img/console/configuration-save.webp)
+
+**Save** dans l'en-tête du résultat :
+
+| Entrée | Ce qu'elle fait |
+|---|---|
+| **Apply as current** | Demande d'abord, en chiffres et en noms, avec ce qui serait retiré et ce qui manque. La gateway sert ensuite le résultat, et un [point de reprise](#history) garde ce qu'elle servait avant |
+| **On the shelf** | Garde le résultat sous un nom, sans rien appliquer. Un nom qui existe demande à le remplacer |
+| **On the filesystem** | Ouvre une fenêtre pour choisir la forme, et dit ce qu'elle laisse derrière |
+| **Push to...** | Proposé quand un emplacement git est chargé à droite : voir [Dépôt git](#dpt-git) |
+
+Running des deux côtés et **On the shelf** nomment ce qui tourne. Une configuration
+enregistrée à gauche et **On the filesystem** l'exportent.
+
+![Enregistrer sur le disque : un fichier ou un paquet, et ce que la forme choisie laisse derrière](img/console/configuration-file.webp)
+
+La fenêtre propose deux formes, et liste ce que la forme choisie laisse derrière :
+
+- **As a file** - YAML simple, du texte seul. Les images, les specs et les fichiers d'une
+  route restent derrière ; l'importer garde les images en place.
+- **As a package with its assets** - un zip : la configuration se lit et se compare en
+  texte, ses fichiers sont à côté. Proposé d'abord quand il y a quelque chose à emporter,
+  grisé sinon.
+
+Aucune des deux ne porte les valeurs des entrées du coffre qu'elle nomme, ni un secret
+détenu en clair sur cette gateway : la fenêtre les nomme, pour qu'ils puissent être
+déplacés ou copiés avant que le fichier ne parte.
+
+### L'étagère
+
+L'étagère est la liste des configurations enregistrées : des copies, qui ne changent
+rien à ce qui est servi tant qu'aucune n'est appliquée. Pour en charger une, choisissez-la
+dans l'en-tête d'une colonne. Le bouton **More** de cette colonne agit alors dessus :
+
+| Entrée | Ce qu'elle fait |
+|---|---|
+| **Read the file** | L'ouvre dans le tiroir, pour la lire et la corriger. Enregistrer remplace son document et n'applique rien. Sur Running, le fichier se lit mais ne se modifie pas : ce qui tourne change sur cet écran, où un changement montre d'abord ce qu'il fait |
+| **Rename** | Renomme la copie |
+| **Delete** | Supprime la copie ; la colonne revient sur Running |
 
 > [!NOTE]
-> Toutes les actions fonctionnent dans les deux éditions - enregistrer, importer,
-> dupliquer, définir comme courante, exporter. La différence tient à la taille de la
-> réserve : l'édition Community conserve **trois** configurations enregistrées à la
-> fois et indique où vous en êtes à côté du bouton Import (*2 of 3 saved*), avant que
-> le plafond soit atteint ; l'édition Enterprise en conserve autant que vous le
-> souhaitez.
+> Tous les gestes existent dans les deux éditions. Ce qui diffère est la taille de
+> l'étagère : l'édition communautaire garde **trois** configurations enregistrées à la
+> fois et dit où vous en êtes dans le menu Save (*2 of 3 saved*), avant d'atteindre le
+> plafond ; l'Enterprise en garde autant que vous voulez.
 
-### Comparer une configuration
+### Depuis l'API
 
-Chaque ligne enregistrée propose **Compare**, et la boîte de dialogue s'ouvre sur **ce
-que la gateway sert maintenant** : ce que servir cette configuration changerait ici -
-ajouts, mises à jour, suppressions, objet par objet, avec les champs qui ont changé à
-l'intérieur d'une mise à jour - le même plan que *Set as current*, lu sans rien
-appliquer. Ce qui tourne n'a pas besoin d'un nom pour être comparé.
-`GET /api/configurations/{id}/plan`.
+L'écran compose sur le serveur à chaque clic : un agent rejoue donc la même recette.
+`POST /api/configurations/compose` donne l'aperçu, et `/compose/apply`, `/compose/save`,
+`/compose/export` et `/compose/push` agissent sur le résultat. L'outil
+[agent](/docs/agent/overview) est `compose_configuration`.
 
-La liste propose aussi les autres configurations enregistrées : la boîte de dialogue
-liste alors ce qui change quand on passe de la première à la seconde, sans tenir compte
-de ce qui tourne - la question que l'on pose à propos de la configuration d'un client et
-du modèle dont elle est issue, avant de toucher à l'une ou à l'autre.
-`GET /api/configurations/{id}/compare/{other}`.
+Pour un script qui n'a pas besoin de recette, deux appels simples déplacent un document
+entier : `GET /api/config/export` lit ce qui tourne, et `POST /api/config/import` applique
+un fichier (`?prune=true` retire ce qu'il ne porte pas, `?keep=kind:id` garde une ligne
+telle que la gateway la détient). `POST /api/configurations` nomme ce qui tourne.
 
 ## Dépôt git
 
@@ -159,39 +194,30 @@ choisir, ni aucune convention à établir.
 > branches à un changement **proposé** - autrement dit une pull request - et les tags
 > à *ce que faisait tourner Acme le 2 du mois*.
 
-### La boucle : récupérer, lire, activer
+### Récupérer, c'est charger ; pousser, c'est trancher
 
-**Import from git** lit un emplacement et le range dans une configuration enregistrée,
-et **n'applique rien**. La gateway continue de servir ce qu'elle servait ; ce que
-vous obtenez en retour, c'est le plan - ce que l'activation ajouterait, modifierait et
-supprimerait, ainsi que les entrées du coffre que la configuration attend et que cette
-installation n'a pas, chaque ligne pouvant être cochée ou non. Vous lisez ce plan, et
-**Apply to current** dans cette même fenêtre sert la configuration, les lignes décochées
-restant telles que la gateway les détient ; **Close** la garde enregistrée, à servir
-plus tard depuis sa ligne.
+**Pour lire un emplacement**, choisissez-le dans l'en-tête d'une colonne. Il est lu à cet
+instant, rien n'est stocké et **rien n'est appliqué** : la gateway continue de servir ce
+qu'elle servait. À partir de là, c'est un côté comme un autre : composer, appliquer,
+garder sur l'étagère.
 
-Ce fonctionnement est voulu et n'est pas négociable : quiconque peut écrire sur cette
-branche ne doit pas pouvoir reconfigurer une gateway. Il n'y a pas de réconciliation
-continue, et aucune branche n'est surveillée.
+C'est délibéré et ce n'est pas négociable : qui peut écrire sur cette branche ne doit pas
+pouvoir reconfigurer une gateway. Il n'y a pas de réconciliation continue, et aucune
+branche n'est surveillée.
 
-**Export to git** crée un commit de la **copie enregistrée** - et non de l'état
-courant : enregistrez-le d'abord sous un nom si c'est lui que vous voulez pousser - et
-ce commit est **attribué à l'exploitant qui a cliqué**. C'est tout l'intérêt de le faire
-dans le produit plutôt que dans un script : un dépôt dont l'historique affiche
-*meerkat* pour chaque modification n'apprend rien à personne six mois plus tard.
+**Pour écrire un emplacement**, chargez-le **à droite** et tranchez ce qui diffère :
+**Save > Push to...** apparaît alors, nommant cet emplacement et aucun autre. Un push
+remplace ce que contient le répertoire de l'emplacement par le résultat : il ne va donc
+que là où vous venez de regarder, à la révision lue. Si quelqu'un a poussé entre-temps, il
+est refusé et demande de relire le côté droit : il n'y a pas de force. Une fois poussé, le
+côté droit est relu, et les deux se lisent comme le dépôt les tient désormais.
 
-Les deux sens sont simples : **un pull remplace** la configuration enregistrée par ce
-que contient le dépôt, **un push remplace** le contenu du répertoire de l'emplacement
-par la configuration enregistrée - quoi qu'une autre personne y ait déposé. Rien n'est
-perdu : ce qu'un push a remplacé reste le commit précédent de l'historique. Seul le
-répertoire de l'emplacement est écrit ; le répertoire d'une autre plateforme dans le
-même dépôt n'est pas touché. Pour voir la version du dépôt avant de choisir,
-récupérez-la dans une nouvelle configuration (*Import from git*) et comparez.
-
-Chaque ligne indique où elle en est : *synced* avec la date du dernier push ou du
-dernier pull, *changed here since*, ou *never pushed*. "Synced" correspond à ce que
-cette gateway savait lors de son dernier échange - pour savoir si quelqu'un a
-modifié le dépôt depuis, il suffit d'un pull.
+Un push écrit le dépôt et **n'enregistre rien ici**. Le commit est **attribué à
+l'opérateur qui a cliqué**. C'est tout l'intérêt de le faire dans le produit plutôt que
+dans un script : un dépôt dont l'historique dit *meerkat* pour chaque changement ne répond
+à rien six mois plus tard. Rien n'est perdu non plus : ce qu'un push a remplacé est le
+commit précédent de l'historique. Seul le répertoire de l'emplacement est écrit ; celui
+d'une autre plateforme dans le même dépôt reste intact.
 
 ### Le jeton
 
@@ -226,9 +252,12 @@ configure.
 ### Depuis un agent
 
 `list_git_locations`, `save_git_location` (créer ou modifier un emplacement ; le jeton reste une référence du coffre), `pull_configuration` et `push_configuration`
-([agents](/docs/agent/overview)). Un agent qui demande à la gateway de pousser ne
-détient aucun identifiant et n'a besoin d'aucun clone du dépôt : c'est le jeton rangé
-dans le coffre, limité à un seul dépôt, qui fait le travail.
+([agents](/docs/agent/overview)). Un agent travaille sur des configurations enregistrées :
+un pull rafraîchit une copie enregistrée, un push en committe une vers l'emplacement qu'il
+nomme, et la gateway retient quel emplacement et quelle révision pour cette copie. Un agent
+qui demande à la gateway de pousser ne détient aucun identifiant et n'a besoin d'aucun
+clone du dépôt : c'est le jeton rangé dans le coffre, limité à un seul dépôt, qui fait le
+travail.
 
 ## History
 
@@ -298,8 +327,6 @@ quand la gateway tourne sur cette base. Voir
 - **Un export n'emporte pas le coffre.** Prenez aussi le
   [fichier du coffre](/docs/console/vault), sans quoi la seconde gateway démarre
   avec des références qui ne pointent sur rien.
-- **Replace supprime ce qui manque, Add non.** Lisez le plan ; c'est toute la
-  différence entre une fusion et un écrasement.
 - **Une configuration n'est pas une sauvegarde.** Les utilisateurs et les sessions n'en
   font pas partie. C'est à cela que sert l'onglet Database.
 - **L'image Community écarte les parties Enterprise.** Une configuration exportée d'une
@@ -313,9 +340,8 @@ quand la gateway tourne sur cette base. Voir
   configuration exportée avant que les clients voyagent s'active toujours. Une route qui
   nomme un client que ni le document ni la gateway ne déclarent s'importe telle quelle,
   et le plan le dit : déclarez le client sous **OIDC / JWT**.
-- **Un pull depuis git ne change rien.** Il met un document en réserve et vous montre
-  le plan. La gateway bascule quand quelqu'un active la configuration, pas quand le
-  dépôt évolue.
+- **Lire un emplacement git ne change rien.** C'est un côté de l'écran. La gateway
+  bascule quand quelqu'un applique un résultat, pas quand le dépôt évolue.
 - **Un emplacement appartient à cette installation, pas au document.** Il n'est jamais
   exporté : une configuration capable de faire pointer la gateway vers un autre
   dépôt écraserait le répertoire d'un autre client au push suivant.

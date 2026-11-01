@@ -604,15 +604,6 @@ export interface VaultEntry {
 
 // ── the configuration as a file (CFG-01/03/05) ───────────────────────────────
 
-// A secret field that will NOT travel: it holds a literal rather than a $name
-// reference, and an export is public by construction.
-export interface ConfigLiteral {
-  holder: string;
-  id?: string;
-  label: string;
-  field: string;
-}
-
 // One KIND of thing an export carries, and how much of it. Shown before the
 // download: the question is "what nature of information am I handing over",
 // not "which objects" - that is what the file itself answers.
@@ -624,15 +615,6 @@ export interface ConfigSection {
   keys?: string[];
   // Images only: what they weigh. An export is text except for this.
   bytes?: number;
-}
-
-// What an export will contain, what it will NOT contain, and what it expects to
-// find on the other side. Read before downloading, while the admin can still
-// act on it.
-export interface ConfigReport {
-  contents: ConfigSection[];
-  literals: ConfigLiteral[];
-  refs: string[];
 }
 
 // Where an installation keeps its state (STORE-05), for the restore procedure
@@ -768,6 +750,9 @@ export interface ConfigMissingRef {
 export interface ConfigPlan {
   changes: ConfigChange[];
   missing: ConfigMissingRef[];
+  // The media the document names and the import did not receive: a spec or
+  // the files of a route, which a plain YAML never carries.
+  missingFiles?: { kind: string; route: string; name: string }[];
   prune: boolean;
   // What the community image leaves out of the document: its Enterprise parts.
   notApplied?: string[];
@@ -776,6 +761,103 @@ export interface ConfigPlan {
   unbound?: string[];
   // The lines kept out of an apply: what the gateway held stayed for them.
   kept?: ConfigChange[];
+}
+
+// ── composing one configuration from two (CFG-08) ────────────────────────────
+
+// One side of a composition: what runs, a saved configuration, a restore
+// point, a git location, or a file: its text, or a package in base64.
+export interface ComposeSource {
+  source: 'running' | 'configuration' | 'point' | 'remote' | 'file';
+  id?: string;
+  document?: string;
+  package?: string;
+}
+
+// One choice of the recipe. A path is kind:id (the object whole), kind:id/a.b
+// (a field), kind:id/a.b[element] (one element of a list, named by its value
+// or its canonical JSON), setting:key/..., or mailRelay/field.
+export interface ComposePick {
+  path: string;
+  // left, right, none (out of the result) or unset (a field cleared).
+  from?: 'left' | 'right' | 'none' | 'unset';
+  // add or drop, for one element of a list.
+  op?: 'add' | 'drop';
+  // The element keys of a list in the wanted order.
+  order?: string[];
+}
+
+// A right object that IS a left object under another id: the left id is kept.
+export interface ComposePair {
+  kind: string;
+  left: string;
+  right: string;
+}
+
+// The recipe with its two sources: what is sent at each click, and what an
+// agent can replay.
+export interface ComposeBody {
+  left: ComposeSource;
+  right: ComposeSource;
+  pairs?: ComposePair[];
+  picks?: ComposePick[];
+  // What Save and Push call the result; the location Push goes to; 'zip' for
+  // the package.
+  name?: string;
+  remoteId?: string;
+  // The revision the right side was read at: a push names it, and is refused
+  // if the location moved since.
+  remoteRev?: string;
+  format?: 'yaml' | 'zip';
+  // For save: refresh the configuration that already carries the name.
+  replace?: boolean;
+}
+
+export interface ComposeReport {
+  // What the composition added by itself: named by an object in the result
+  // and not in it otherwise, taken from the side that has it.
+  pulled: { kind: string; id: string; by: string[]; from: 'left' | 'right'; hard?: boolean }[];
+  // A reference nothing in the result declares; hard = the store would refuse.
+  missing: { kind: string; key: string; by: string[]; via: string; hard: boolean; leftOut?: boolean }[];
+  // Paths of the recipe that resolve nowhere.
+  unresolved: string[];
+  // A left-only and a right-only object of the same kind and name.
+  pairs: { kind: string; left: string; right: string; label: string }[];
+}
+
+// A document as the compose screen reads it: the sections, each a list of
+// objects (settings a map of them, the relay one object), pictures out,
+// defaults and stamps dropped.
+export type ComposeDocument = Record<string, unknown>;
+
+export interface ComposeLeaves {
+  // The vault entries it names: their values never travel.
+  refs: string[];
+  // The secrets held in clear on this gateway, which a document never carries.
+  literals: { holder: string; id?: string; label: string; field: string }[];
+  // Whether it has images: a plain file loses them, a package carries them.
+  images: boolean;
+}
+
+export interface ComposeAnswer {
+  left: ComposeDocument;
+  right: ComposeDocument;
+  result: ComposeDocument;
+  leftName: string;
+  rightName: string;
+  // The object-level comparison of the two sides.
+  changes: ConfigChange[];
+  report: ComposeReport;
+  // Which routes carry a deposited spec and files, per side and in the
+  // result: they ride beside the document, never in it.
+  media: Record<'left' | 'right' | 'result', Record<string, { spec?: boolean; files?: number }>>;
+  // What the result does not carry once on a filesystem.
+  leaves: ComposeLeaves;
+  // The revision the right side was read at, when it is a git location.
+  rightRev?: string;
+  // What applying the result would do to this gateway, or why it cannot be said.
+  plan?: ConfigPlan;
+  planError?: string;
 }
 
 // What an encrypted vault import did. Names only: this answers about secrets,
@@ -1356,15 +1438,6 @@ export interface ConfigRemoteCheck {
   error?: string;
 }
 
-// What a pull hands back: the row as it now stands, and what activating it
-// would change. The plan rides along because a pull that answered "ok" would
-// leave the operator to click twice for the only thing they wanted to know.
-export interface ConfigPullResult {
-  configuration: SavedConfiguration;
-  plan?: ConfigPlan;
-  planError?: string;
-}
-
 // One moment of the gateway's configuration (CFG-06). Nobody asks for a point
 // and nobody names one - it has an hour, an author, and the words the audit
 // trail used for the change that produced it.
@@ -1387,16 +1460,6 @@ export interface RestorePoint {
   // Going back produces one by definition, and two identical lines with
   // nothing to tell them apart is what makes a tape look broken.
   sameAs?: number;
-}
-
-// The state of the running configuration (CFG-02): its fingerprint, the saved
-// configuration it MATCHES (none when what runs exists nowhere else), and the
-// one holding the current mark - which stays put when the gateway drifts away
-// from it, so the screen can say what it drifted from.
-export interface CurrentConfiguration {
-  digest: string;
-  savedAs?: { id: string; name: string };
-  active?: { id: string; name: string };
 }
 
 // What the edition screen reads, and what the fallback path uses to stamp
@@ -2995,39 +3058,6 @@ export class ApiService {
 
   // ── the configuration as a file ────────────────────────────────────────────
 
-  // The YAML itself, as text: the browser turns it into a download, and the
-  // same URL answers `curl -o` for anyone versioning their exports.
-  exportConfig(): Observable<string> {
-    return this.http.get('/api/config/export', { responseType: 'text' });
-  }
-
-  // The same configuration as a package: the YAML with its images beside it
-  // rather than inline. A Blob, because a zip read as text would be corrupted.
-  exportConfigBundle(): Observable<Blob> {
-    return this.http.get('/api/config/export?format=zip', {
-      responseType: 'blob',
-    });
-  }
-
-  // What that file will NOT carry (literal secrets) and what it expects the
-  // target vault to hold.
-  configReport(): Observable<ConfigReport> {
-    return this.http.get<ConfigReport>('/api/config/report');
-  }
-
-  // What importing this file would do, writing nothing. The file travels as a
-  // Blob whatever it is: a package read as text would be corrupted, and the
-  // server decides the format from the bytes anyway.
-  previewConfig(file: Blob, prune: boolean): Observable<ConfigPlan> {
-    return this.http.post<ConfigPlan>(`/api/config/preview?prune=${prune}`, file);
-  }
-
-  // keep: the lines of the plan kept out ("kind:id"), what the gateway holds
-  // now staying for them.
-  importConfig(file: Blob, prune: boolean, keep: string[] = []): Observable<ConfigPlan> {
-    return this.http.post<ConfigPlan>(`/api/config/import`, file, { params: { prune, keep } });
-  }
-
   // ── several configurations, one active (CFG-01/02) ─────────────────────────
   //
   // Every one of these is a COPY. Only activate() touches what the gateway
@@ -3060,33 +3090,12 @@ export class ApiService {
     );
   }
 
-  // What is running, and whether it is still what was saved. A COMPARISON of
-  // fingerprints, computed server-side: "saved" recorded once would go on
-  // saying so after the next route was added.
-  currentConfiguration(): Observable<CurrentConfiguration> {
-    return this.http.get<CurrentConfiguration>('/api/configurations/current');
-  }
-
   configurations(): Observable<SavedConfiguration[]> {
     return this.http.get<SavedConfiguration[]>('/api/configurations');
   }
 
   configuration(id: string): Observable<SavedConfiguration> {
     return this.http.get<SavedConfiguration>(`/api/configurations/${id}`);
-  }
-
-  // Saves the state the gateway is running RIGHT NOW under a name.
-  captureConfiguration(name: string, description = ''): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>('/api/configurations', {
-      name,
-      description,
-    });
-  }
-
-  // Refreshes an existing one from the running gateway: activate, change
-  // things, save them back into it.
-  recaptureConfiguration(id: string): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/capture`, {});
   }
 
   renameConfiguration(id: string, name: string, description = ''): Observable<SavedConfiguration> {
@@ -3096,39 +3105,8 @@ export class ApiService {
     });
   }
 
-  duplicateConfiguration(id: string, name: string): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/duplicate`, { name });
-  }
-
   deleteConfiguration(id: string): Observable<void> {
     return this.http.delete<void>(`/api/configurations/${id}`);
-  }
-
-  // What switching to it would change, writing nothing.
-  // Two saved configurations against each other, what runs left out (CFG-04).
-  compareConfigurations(id: string, other: string): Observable<ConfigPlan> {
-    return this.http.get<ConfigPlan>(
-      `/api/configurations/${encodeURIComponent(id)}/compare/${encodeURIComponent(other)}`,
-    );
-  }
-
-  configurationPlan(id: string): Observable<ConfigPlan> {
-    return this.http.get<ConfigPlan>(`/api/configurations/${id}/plan`);
-  }
-
-  // The switch itself. Unlike an import, it PRUNES: afterwards the gateway is
-  // that configuration, so what it does not carry goes.
-  activateConfiguration(id: string, keep: string[] = []): Observable<ConfigPlan> {
-    return this.http.post<ConfigPlan>(`/api/configurations/${id}/activate`, {}, { params: { keep } });
-  }
-
-  // Takes a file into the collection without applying it - the difference with
-  // importConfig, which applies.
-  storeConfigurationFile(name: string, file: Blob): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>(
-      `/api/configurations/import?name=${encodeURIComponent(name)}`,
-      file,
-    );
   }
 
   // Replaces one configuration's document with an uploaded file, applying
@@ -3151,17 +3129,37 @@ export class ApiService {
     return this.http.get('/api/config/document', { responseType: 'text' });
   }
 
-  // The same configuration as a package: the YAML with its images beside it.
-  exportConfigurationBundle(id: string): Observable<Blob> {
-    return this.http.get(`/api/configurations/${id}/export?format=zip`, {
-      responseType: 'blob',
-    });
-  }
-
   exportConfiguration(id: string): Observable<string> {
     return this.http.get(`/api/configurations/${id}/export`, {
       responseType: 'text',
     });
+  }
+
+  // ── composing one configuration from two (CFG-08) ──────────────────────────
+
+  // The preview: two documents in, one out, nothing stored.
+  composePreview(body: ComposeBody): Observable<ComposeAnswer> {
+    return this.http.post<ComposeAnswer>('/api/configurations/compose', body);
+  }
+
+  // The result made current: a switch, confirmed line by line first.
+  composeApply(body: ComposeBody): Observable<ConfigPlan> {
+    return this.http.post<ConfigPlan>('/api/configurations/compose/apply', body);
+  }
+
+  // The result on the shelf under a name, applied to nothing.
+  composeSave(body: ComposeBody): Observable<SavedConfiguration> {
+    return this.http.post<SavedConfiguration>('/api/configurations/compose/save', body);
+  }
+
+  // The result as a file: a YAML, or the package with its assets.
+  composeExport(body: ComposeBody): Observable<Blob> {
+    return this.http.post('/api/configurations/compose/export', body, { responseType: 'blob' });
+  }
+
+  // The result committed to the git location read on the right, saved nowhere.
+  composePush(body: ComposeBody): Observable<{ name: string; rev: string; files: number }> {
+    return this.http.post<{ name: string; rev: string; files: number }>('/api/configurations/compose/push', body);
   }
 
   // ── git locations (CFG-07) ─────────────────────────────────────────────────
@@ -3203,26 +3201,6 @@ export class ApiService {
   // nothing - so a wrong token is found on the screen that sets it.
   checkConfigRemote(id: string): Observable<ConfigRemoteCheck> {
     return this.http.post<ConfigRemoteCheck>(`/api/config-remotes/${id}/check`, {});
-  }
-
-  // Reads a location into a NEW saved configuration. Applies nothing.
-  pullNewConfiguration(remoteId: string, name = ''): Observable<ConfigPullResult> {
-    return this.http.post<ConfigPullResult>('/api/configurations/pull', { remoteId, name });
-  }
-
-  // Refreshes a bound one from its own location. Applies nothing.
-  pullConfiguration(id: string): Observable<ConfigPullResult> {
-    return this.http.post<ConfigPullResult>(`/api/configurations/${id}/pull`, {});
-  }
-
-  // Commits the SAVED copy to its location and pushes. A branch that moved is
-  // a 409, never a force.
-  pushConfiguration(id: string): Observable<SavedConfiguration> {
-    return this.http.post<SavedConfiguration>(`/api/configurations/${id}/push`, {});
-  }
-
-  bindConfiguration(id: string, remoteId: string): Observable<SavedConfiguration> {
-    return this.http.put<SavedConfiguration>(`/api/configurations/${id}/remote`, { remoteId });
   }
 
   // ── snapshots (STORE-05) ───────────────────────────────────────────────────

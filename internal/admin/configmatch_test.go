@@ -84,23 +84,8 @@ func TestACaptureMatchesWhatRunsWithALogo(t *testing.T) {
 		}
 	}
 
-	// The console's current card agrees.
-	code, body := f.call(t, "GET", "/api/configurations/current", "", f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("current: %d %s", code, body)
-	}
-	var current struct {
-		SavedAs *struct{ Name string } `json:"savedAs"`
-	}
-	if err := json.Unmarshal([]byte(body), &current); err != nil {
-		t.Fatal(err)
-	}
-	if current.SavedAs == nil {
-		t.Errorf("the current card reads as not saved: %s", body)
-	}
-
 	// And the tape says which name the running point was saved under.
-	code, body = f.call(t, "GET", "/api/config/history", "", f.rootC)
+	code, body := f.call(t, "GET", "/api/config/history", "", f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("history: %d %s", code, body)
 	}

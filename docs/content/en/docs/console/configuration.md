@@ -10,7 +10,7 @@ summary: Moving a gateway's setup around: named configurations, restore points, 
 **Meerkat > Configuration**, root only. Three tabs, because three different
 questions were sharing one page.
 
-What travels in a configuration: **routes, roles, organisations and their groups,
+What travels in a configuration: **routes, roles, tenants and their groups,
 authorities, OIDC clients, mail relay, themes and gateway settings**. An OIDC
 client's secret travels as its sha256 only (`secretHash`), never in clear: the
 client imported elsewhere keeps the same secret, and the application keeps working
@@ -21,104 +21,140 @@ gateway lives with.
 
 | Tab | Answers |
 |---|---|
-| **Management** | What is running, what is on the shelf, and moving files in and out |
+| **Compose** | What differs between two configurations, and what the result should be |
 | **History** | Going back to any moment of this gateway's configuration |
 | **Database** | Backing up, restoring and moving the whole database |
 
 Each tab is a route of its own, so a bookmark comes back to it.
 
-![The Configuration screen on the Management tab: the current configuration on the first row, two saved ones under it](img/console/configuration.webp)
+## Compose
 
-The current configuration on the first row, marked as matching *Known-good
-baseline*, and two shelf rows under it - one of which carries the *Current* chip.
-*Import a file* works in both editions; *Import from git* carries the
-Enterprise mark.
+![The Compose tab: what runs on the left, a saved configuration on the right, the result between them, each difference framed in red](img/console/configuration.webp)
 
-## Management
+Three columns: **what you start from** on the left, in blue; **the result** in the
+middle, in green; **what you compare it with** on the right, in orange. Nothing moves
+until a result is applied or saved: this screen is a workbench, not a switch.
 
-The **first row is what this gateway serves**. The rows under it are copies on a
-shelf. Saving, duplicating or deleting one of those changes nothing about what is
-served.
+The screen opens with what runs on both sides, so it says the two are identical.
+Choose something else in the header of a column:
 
-The icon on the first row is a comparison, and it is the most useful thing on the
-screen:
-
-| Icon | What runs |
+| Source | What it is |
 |---|---|
-| green | is byte for byte a saved configuration - its name is beside it |
-| amber | has drifted from the one it was saved as |
-| grey | was never saved under any name |
+| **Running** | What this gateway serves |
+| **A saved configuration** | One of the copies kept on the shelf |
+| **A git location** | The directory of a repository, read at this moment (*Enterprise*) |
+| **A file** | A YAML, JSON or package (`.zip`) you pick or drop on the page. It lands on the right and is read, not kept |
 
-The shelf row it was set from carries the same verdict as a chip: *Current*, or
-*Current, changed*.
+### Deciding
 
-**Actions.** The current row saves under a name and exports. A shelf row can be
-set as current, duplicated, exported or deleted. Clicking any row opens its file
-in the drawer, to read.
+**Every difference is framed in red**, and the frame goes once you have touched it.
+A ribbon joins what feeds the result to its place in the middle. To decide:
 
-Only **Set as current** crosses from the shelf to the gateway, so it is the only
-action that asks - and it asks with **the list of what it would change**, plus a
-warning first when what is running was never saved: that is the one move with
-nothing to come back to.
+- **An object that exists on one side only** has a radio on each side: taken, or
+  left out.
+- **An object on both sides that differs** opens into its fields, down to the leaves:
+  `timeouts.response` from one side and `upstream` from the other is one result. A
+  radio on each value says which one the result holds, and the **x** on a result line
+  leaves the value unset.
+- **A list** is its elements as chips: a filled chip is in the result, a pale dashed
+  one is out. Click to bring one in or take it out, drag to reorder.
+- **An object the two sides share** has *in the result* ticked: untick it to leave it
+  out anyway.
 
-Each line of that list can be **unticked**, and an unticked line keeps what the
-gateway holds for it, whatever the line said: a route the configuration would
-remove stays, an object it would change keeps its current version, an object it
-would add is not created. The box above the lines ticks or unticks them all;
-**Apply to current** is off while none is ticked, and turns red only while something
-would still be removed.
-The same choice is offered when a file is imported onto the gateway and when the
-running document is edited. Afterwards the gateway is no longer exactly the saved
-configuration, and the screen says so: it has changed since that configuration was
-saved, and saving it again records what you chose. A line the rest of the
-configuration cannot live without is refused with what is in the way, and nothing
-is applied half.
+The double tick in a column's header takes that side for everything still
+undecided, and **Reset** beside the result forgets every choice. **Only differences**
+hides what is the same, and the chips above the columns filter by kind of object.
 
-![Set as current, one route the configuration would remove kept by unticking its line](img/console/configuration-keep.webp)
+An object's *order* in the routing is never offered: two routes on the same rank
+would make routing ambiguous, so the result keeps what the left side says.
 
-### Exporting
+**Dependencies follow.** A route taken from the right brings along the roles it
+names, from the side that has them. Leave such a role out and the reference is said
+to be missing; only a role's parent or a group's tenant blocks applying, since the
+gateway cannot hold the object without them.
 
-The dialog says what the file carries and what it does not, then offers two
-shapes:
+**Two objects with the same name under two ids** are offered as a pair, never
+paired for you. Paired, the result keeps the left id and the gateway updates the
+object instead of removing one and adding the other.
 
-- **Plain YAML** - text only. Images stay behind, and an import keeps whatever is
-  in place.
-- **Package** - a zip: the configuration reads and diffs as text, images sit
-  beside it as files.
+### The portal, drawn
 
-### Importing
+![The portal setting: under its fields, a miniature of the bar each side describes](img/console/configuration-portal.webp)
 
-**Import a file** takes `.yaml`, `.yml`, `.json` or `.zip`, and asks where it
-should land:
+A catalogue reads badly as a list, so under the fields of the portal setting each
+column shows a **miniature of the real bar**. Click an entry in a miniature to open
+it: a container shows its modules, which is how the sub-routes are compared.
 
-1. **Save it under a name** - onto the shelf, touching nothing.
-2. **Replace the current one** - what is not in the file goes away.
-3. **Add to the current one** - what is in the file is added or updated, and
-   nothing is removed.
+### What the result would lack
 
-The two that touch the gateway show their plan first, object by object. If the
-file refers to vault entries this gateway does not have, a second dialog lists
-them so you can fill them in straight away.
+A banner above the columns, and a count in the header of the result, say what is
+missing **before** anything is applied:
+
+- the vault entries the document names and this gateway does not hold (they are
+  reserved empty on applying, to fill in on the [vault](/docs/console/vault) screen);
+- the specs and files a plain file does not carry, when the source is one;
+- what this edition does not apply;
+- the OIDC bindings left in suspense, and the dependencies a choice left out.
+
+### What to do with the result
+
+![The Save menu of the result: apply it as current, keep it on the shelf, save it on the filesystem](img/console/configuration-save.webp)
+
+**Save** in the header of the result:
+
+| Entry | What it does |
+|---|---|
+| **Apply as current** | Asks first, in figures and in names, with what would be removed and what is missing. Then the gateway serves the result, and a [restore point](#history) keeps what it served before |
+| **On the shelf** | Keeps the result under a name, applying nothing. A name that exists asks to replace it |
+| **On the filesystem** | Opens a window to choose the shape, and says what it leaves behind |
+| **Push to...** | Offered when a git location is loaded on the right: see [Git repository](#git-repository) |
+
+Running on both sides and **On the shelf** names what runs. A saved configuration on
+the left and **On the filesystem** exports it.
+
+![Saving on the filesystem: a file or a package, and what the chosen shape leaves behind](img/console/configuration-file.webp)
+
+The window offers two shapes, and lists what the chosen one leaves behind:
+
+- **As a file** - plain YAML, text only. Images, specs and the files of a route stay
+  behind; importing it keeps the images in place.
+- **As a package with its assets** - a zip: the configuration reads and diffs as text,
+  its assets sit beside it as files. Offered first when there is something to carry,
+  and greyed out when there is not.
+
+Neither carries the values of the vault entries it names, nor a secret held in clear on
+this gateway: the window names them, so that they can be moved or copied before the file
+leaves.
+
+### The shelf
+
+The shelf is the list of saved configurations: copies, that change nothing about what
+is served until one is applied. To load one, choose it in the header of a column. The
+**More** button of that column then acts on it:
+
+| Entry | What it does |
+|---|---|
+| **Read the file** | Opens it in the drawer, to read and correct. Saving replaces its document and applies nothing. On Running, the file reads but does not change: what runs changes on this screen, where a change shows what it does first |
+| **Rename** | Renames the copy |
+| **Delete** | Deletes the copy; the column goes back to Running |
 
 > [!NOTE]
-> Every action works in both editions - save, import, duplicate, set as
-> current, export. What differs is the size of the shelf: the community edition
-> keeps **three** saved configurations at a time and says where you are beside
-> the Import button (*2 of 3 saved*), before the cap is reached; Enterprise keeps
-> as many as you like.
+> Every gesture works in both editions. What differs is the size of the shelf: the
+> community edition keeps **three** saved configurations at a time and says where you
+> are in the Save menu (*2 of 3 saved*), before the cap is reached; Enterprise keeps as
+> many as you like.
 
-### Comparing a configuration
+### From the API
 
-Every saved row offers **Compare**, and the dialog opens on **what this gateway
-runs now**: what serving that configuration would change here - added, updated,
-removed, object by object, with the fields that moved inside an update - the same
-plan as *Set as current*, read without applying anything. What runs needs no name
-to be compared. `GET /api/configurations/{id}/plan`.
+The screen composes on the server at each click, so an agent replays the same
+recipe. `POST /api/configurations/compose` previews, and
+`/compose/apply`, `/compose/save`, `/compose/export` and `/compose/push` act on the
+result. The [agent](/docs/agent/overview) tool is `compose_configuration`.
 
-The list also offers the other saved configurations: the dialog then lists what
-changes going from the first to the second, what runs left out - the question
-asked of a customer's configuration and the template it was made from, before
-touching either. `GET /api/configurations/{id}/compare/{other}`.
+For a script that does not need a recipe, two plain calls move a whole document:
+`GET /api/config/export` reads what runs, and `POST /api/config/import` applies a file
+(`?prune=true` removes what it does not carry, `?keep=kind:id` keeps a line as the gateway
+holds it). `POST /api/configurations` names what runs.
 
 ## Git repository
 
@@ -152,36 +188,29 @@ and nothing to agree on.
 > branches, forever. Keep branches for a **proposed** change - that is a pull
 > request - and tags for *what Acme was running on the 2nd*.
 
-### The loop: pull, read, activate
+### Pull is loading, push is resolving
 
-**Import from git** reads a location into a saved configuration and **applies
-nothing**. The gateway goes on serving what it served; the answer is the plan -
-what activating it would add, change and remove, plus the vault entries it
-expects and this installation has not got, each line tickable. You read that,
-and **Apply to current** in that same window serves it, the unticked lines kept as
-the gateway holds them; **Close** keeps it saved to serve later, from its row.
+**To read a location**, choose it in the header of a column. It is read at that
+moment, nothing is stored and **nothing is applied**: the gateway goes on serving what
+it served. From there it is a side like any other: compose, apply, keep on the shelf.
 
-This is deliberate and it is not negotiable: whoever can write to that branch
-must not be able to reconfigure a gateway. There is no continuous
-reconciliation, and no branch is watched.
+This is deliberate and it is not negotiable: whoever can write to that branch must
+not be able to reconfigure a gateway. There is no continuous reconciliation, and no
+branch is watched.
 
-**Export to git** commits the **saved copy** - not the running state, so save it
-under a name first if that is what you want - and the commit is **attributed to
-the operator who clicked**. That is the point of doing this in the product rather
-than in a script: a repository whose history reads *meerkat* for every change
-answers nothing six months later.
+**To write a location**, load it **on the right** and decide what differs: **Save >
+Push to...** then appears, naming that location and no other. A push replaces what the
+location's directory holds with the result, so it goes only where you have just
+looked, at the revision you read. If somebody pushed since, it is refused and asks
+you to read the right side again: there is no force. Once pushed, the right side is
+read again, and the two read as the repository now holds them.
 
-The two directions are plain: **a pull replaces** the saved configuration with what
-the repository holds, **a push replaces** what the location's directory holds with
-the saved configuration - whatever somebody else put there. Nothing is lost: what a
-push replaced is the previous commit of the history. Only the location's directory is
-written; another platform's directory in the same repository is left alone. To see
-the repository's version before choosing, pull it into a new configuration (*Import
-from git*) and compare.
-
-A row says where it stands: *synced* with the date of the last push or pull,
-*changed here since*, or *never pushed*. "Synced" is what this gateway knows at its
-last exchange - whether somebody changed the repository since is a pull away.
+A push writes the repository and **saves nothing here**. The commit is **attributed to
+the operator who clicked**. That is the point of doing this in the product rather than
+in a script: a repository whose history reads *meerkat* for every change answers
+nothing six months later. Nothing is lost either: what a push replaced is the previous
+commit of the history. Only the location's directory is written; another platform's
+directory in the same repository is left alone.
 
 ### The token
 
@@ -212,9 +241,11 @@ exists, and writes nothing - so a wrong token is found on the screen that sets i
 ### From an agent
 
 `list_git_locations`, `save_git_location` (create or change a location; the token stays a vault reference), `pull_configuration` and `push_configuration`
-([agents](/docs/agent/overview)). An agent that asks the gateway to push holds no
-credential and needs no checkout: the token in the vault, scoped to one
-repository, is the one doing the work.
+([agents](/docs/agent/overview)). An agent works on saved configurations: a pull
+refreshes a saved copy, a push commits one to the location it names, and the gateway
+remembers which location and which revision for that copy. An agent that asks the
+gateway to push holds no credential and needs no checkout: the token in the vault,
+scoped to one repository, is the one doing the work.
 
 ## History
 
@@ -279,8 +310,6 @@ gateway runs on that database. See
 - **An export does not carry the vault.** Take the
   [vault file](/docs/console/vault) too, or the second gateway comes up with
   references pointing at nothing.
-- **Replace prunes, Add does not.** Read the plan; it is the difference between a
-  merge and a wipe.
 - **A configuration is not a backup.** Users and sessions are not in it. That is
   what the Database tab is for.
 - **The community image leaves the Enterprise parts out.** A configuration
@@ -294,9 +323,8 @@ gateway runs on that database. See
   so a configuration exported before clients travelled still activates. A route
   naming a client that neither the document nor the gateway declares imports as
   it is, and the plan says so: declare the client under **OIDC / JWT**.
-- **Pulling from git changes nothing.** It shelves a document and shows you the
-  plan. The gateway switches when somebody activates it, not when the repository
-  moves.
+- **Reading a git location changes nothing.** It is one side of the screen. The
+  gateway switches when somebody applies a result, not when the repository moves.
 - **A location belongs to this installation, not to the document.** It is never
   exported: a configuration that could repoint the gateway at another repository
   would overwrite another customer's directory on the next push.

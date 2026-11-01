@@ -202,7 +202,7 @@ gateway, or pause it from the console, first.
 
 ## The configuration export
 
-One document, in YAML: routes, the role catalogue, organisations and their groups,
+One document, in YAML: routes, the role catalogue, tenants and their groups,
 the authorities people sign in through, the mail relay, the themes and the gateway
 settings.
 
@@ -224,10 +224,11 @@ The trade-off is deliberate: a document alone does not start an environment. Its
 references have to exist in [the vault](/docs/operations/vault), which is a
 separate file with a separate life.
 
-Two forms differ by one thing: a plain YAML never carries a picture, and says what
-it left behind; a `.zip` package carries the logos and the deposited OpenAPI specs,
-for when the pictures have to travel. An import carrying no image leaves the ones in
-place alone.
+Two forms differ by one thing: a plain YAML carries no picture, no deposited OpenAPI
+spec and no file of a route; a `.zip` package carries them beside the document, for
+when they have to travel. The window that saves one
+[lists what the chosen form leaves behind](/docs/console/configuration#what-to-do-with-the-result).
+An import carrying no image leaves the ones in place alone.
 
 ## Restore points: the tape
 
@@ -254,8 +255,8 @@ would only make the product riskier where it is used most.
 
 ## Named configurations
 
-Several configurations coexist and exactly one is active. The
-console diffs them - objects added, removed, changed - and shows that same diff when
-a file is imported, before anything is written. An agent can file the current state
-under a name in one call, which is what a careful admin asks for in words before a
-large change.
+Several configurations are kept side by side, and one runs. The console
+[compares any two](/docs/console/configuration#compose), down to the fields, and
+composes a third from them; a file reads the same way, before anything is written. An
+agent can file the current state under a name in one call, which is what a careful
+admin asks for in words before a large change.

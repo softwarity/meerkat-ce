@@ -2,6 +2,44 @@
 
 ## NEXT RELEASE
 
+- **In the portal, the colour scheme switch sits beside the account button.** It leaves the
+  profile line of the menu: above the button in a rail, to its left in a top bar, one click
+  instead of two. It follows the page shown and is not drawn on a route without a colour
+  scheme. Outside the portal, the account button is unchanged.
+- **Compose a configuration from two, value by value.** Configuration opens on the Compose
+  tab: what runs on the left, anything on the right (what runs, a saved configuration, a git
+  location, a YAML file or a package, picked or dropped), the result between them. Every
+  difference is a block to decide with a radio on each side: an object whole, one field (down
+  to `identity.ttl`), one element of a list (a role, a predicate, a TLS name, in or out, dragged
+  into order). A route taken from the right brings the roles it names along; a reference nobody
+  declares is said; only a role's parent or a group's tenant left out blocks applying. The
+  portal setting is drawn, not only listed: under its fields, a miniature of the bar each side
+  describes, a click opening a container on its modules. What the result would lack is said
+  above the columns before anything is applied: a vault entry this gateway does not hold, a spec
+  or files a plain file never carries, parts not applied on this edition, an OIDC binding in
+  suspense. The result is applied as current, saved on the shelf, or pushed; saved on the
+  filesystem, a window offers a file or a package and says what the chosen one leaves behind. The
+  API is `POST /api/configurations/compose` (preview) and `.../compose/apply|save|export|push`,
+  with a recipe an agent replays: `compose_configuration`.
+- **A push goes where you have looked.** From the console, a push writes the git location
+  loaded on the right, at the revision read, and is refused if it moved since; it saves nothing
+  here, and the right side is read again. Nothing has to be bound to a location by hand any
+  more: a location is chosen when it is needed, like a file.
+- **The Management table is gone**; its bookmarks land on Compose. What one does to a saved
+  configuration is in the More button of the column that shows it: read or correct its file,
+  rename, delete. The file of what runs reads there too. Saving under a name that exists asks to
+  replace it, and the Community cap is said in the Save menu. A saved row no longer says whether
+  it is the current one: load it, and the two columns answer.
+- **Control-plane API: the endpoints the Compose tab replaces are removed.** Gone:
+  `GET /api/configurations/current`, `POST /api/configurations/import`, and on a saved
+  configuration `POST .../{id}/activate`, `.../{id}/capture`, `.../{id}/duplicate`,
+  `.../{id}/pull`, `.../{id}/push`, `PUT .../{id}/remote`, `GET .../{id}/plan`,
+  `GET .../{id}/compare/{other}`; also `POST /api/configurations/pull`,
+  `POST /api/config/preview` and `GET /api/config/report`, whose answer is now `leaves` in the
+  preview. Use `POST /api/configurations/compose` and its `apply`, `save`,
+  `export` and `push`; `GET /api/config/export` and `POST /api/config/import` stay. The agent
+  tools do not change, and `compose_configuration` gains `replace`.
+
 ---
 
 ## 1.21.1

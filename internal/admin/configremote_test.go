@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/softwarity/meerkat/internal/config"
 	"github.com/softwarity/meerkat/internal/confrepo"
 	"github.com/softwarity/meerkat/internal/confrepo/confrepotest"
 	"github.com/softwarity/meerkat/internal/store"
@@ -18,9 +17,8 @@ import (
 //
 // What every test here is really about is ONE sentence: a pull applies nothing.
 // The gateway goes on serving what it served, the document lands on the shelf,
-// and a human decides. Everything else - the binding, the revision, the refusal
-// to force - exists to keep that sentence true when two people and a branch are
-// involved.
+// and a human decides. Pull and push of a saved row are an agent's tools; the
+// console reads a location on a side and pushes from there (compose_test.go).
 
 // remoteID reads the id out of a created location.
 func remoteID(t *testing.T, body string) string {
@@ -50,32 +48,26 @@ func TestAPullAppliesNothing(t *testing.T) {
 	}
 	acme := remoteID(t, body)
 
-	code, body = f.call(t, "POST", "/api/configurations/pull",
-		`{"remoteId":"`+acme+`"}`, f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("pull: %d %s", code, body)
-	}
-	var out pullAnswer
-	if err := json.Unmarshal([]byte(body), &out); err != nil {
-		t.Fatalf("not a pull answer: %s", body)
+	ctx := mcpCtx(rootUser(t, f))
+	out, err := f.api.toolPullConfiguration(ctx, json.RawMessage(`{"location":"Acme prod"}`))
+	if err != nil {
+		t.Fatalf("pull: %v", err)
 	}
 	// The row exists, bound, with the revision it was read at.
-	if out.Configuration.Name != "Acme prod" {
-		t.Errorf("the pulled configuration is called %q", out.Configuration.Name)
+	saved := onlyConfiguration(t, f)
+	if saved.Name != "Acme prod" {
+		t.Errorf("the pulled configuration is called %q", saved.Name)
 	}
-	if out.Configuration.RemoteID != acme {
+	if saved.RemoteID != acme {
 		t.Error("a pulled configuration came back unbound")
 	}
-	if out.Configuration.RemoteRev == "" {
+	if saved.RemoteRev == "" {
 		t.Error("a pulled configuration came back with no revision")
 	}
 	// And the plan says what activating it WOULD do, which is the only useful
 	// next question.
-	if out.Plan == nil {
-		t.Fatalf("a pull answered no plan: %s", body)
-	}
-	if !planMentions(out.Plan, "from-git") {
-		t.Errorf("the plan does not mention the role the document carries: %+v", out.Plan.Changes)
+	if a := jsonOf(t, out); !strings.Contains(a, `"applied":false`) || !strings.Contains(a, `"plan"`) {
+		t.Fatalf("a pull must say nothing was applied and what would be: %s", a)
 	}
 
 	// THE SENTENCE: nothing was applied. The role is not in the gateway.
@@ -107,28 +99,18 @@ func TestAPushWritesTheDirectory(t *testing.T) {
 	if code != http.StatusCreated {
 		t.Fatalf("capture: %d %s", code, body)
 	}
-	var saved store.Configuration
-	if err := json.Unmarshal([]byte(body), &saved); err != nil {
-		t.Fatal(err)
-	}
+	ctx := mcpCtx(rootUser(t, f))
 
-	// Unbound, a push refuses with the cure rather than a 404.
-	code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "", f.rootC)
-	if code != http.StatusUnprocessableEntity {
-		t.Fatalf("pushing an unbound configuration: %d %s", code, body)
+	// Unbound and with no location named, a push refuses with the cure.
+	_, err := f.api.toolPushConfiguration(ctx, json.RawMessage(`{"configuration":"Acme"}`))
+	if err == nil || !strings.Contains(err.Error(), "not bound") {
+		t.Fatalf("pushing an unbound configuration: %v", err)
 	}
-	if !strings.Contains(body, "not bound") {
-		t.Errorf("the refusal does not say what is wrong: %s", body)
+	if _, err := f.api.toolPushConfiguration(ctx, json.RawMessage(`{"configuration":"Acme","location":"Acme prod"}`)); err != nil {
+		t.Fatalf("push: %v", err)
 	}
-
-	code, body = f.call(t, "PUT", "/api/configurations/"+saved.ID+"/remote",
-		`{"remoteId":"`+acme+`"}`, f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("bind: %d %s", code, body)
-	}
-	code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "", f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("push: %d %s", code, body)
+	if onlyConfiguration(t, f).RemoteID != acme {
+		t.Error("naming a location must bind the configuration to it")
 	}
 	if repo.Commits != 1 {
 		t.Errorf("the repository took %d commits", repo.Commits)
@@ -155,30 +137,22 @@ func TestAPushReplacesWhatTheRepositoryHolds(t *testing.T) {
 	if code != http.StatusCreated {
 		t.Fatalf("create location: %d %s", code, body)
 	}
-	acme := remoteID(t, body)
 
 	code, body = f.call(t, "POST", "/api/configurations", `{"name":"Acme"}`, f.rootC)
 	if code != http.StatusCreated {
 		t.Fatalf("capture: %d %s", code, body)
 	}
-	var saved store.Configuration
-	if err := json.Unmarshal([]byte(body), &saved); err != nil {
-		t.Fatal(err)
-	}
-	if code, body = f.call(t, "PUT", "/api/configurations/"+saved.ID+"/remote",
-		`{"remoteId":"`+acme+`"}`, f.rootC); code != http.StatusOK {
-		t.Fatalf("bind: %d %s", code, body)
-	}
-	if code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "", f.rootC); code != http.StatusOK {
-		t.Fatalf("first push: %d %s", code, body)
+	ctx := mcpCtx(rootUser(t, f))
+	push := json.RawMessage(`{"configuration":"Acme","location":"Acme"}`)
+	if _, err := f.api.toolPushConfiguration(ctx, push); err != nil {
+		t.Fatalf("first push: %v", err)
 	}
 
 	// Somebody else pushes to the branch.
 	repo.Move()
 
-	code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "", f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("pushing over somebody else's push: %d %s", code, body)
+	if _, err := f.api.toolPushConfiguration(ctx, push); err != nil {
+		t.Fatalf("pushing over somebody else's push: %v", err)
 	}
 	if repo.Commits != 2 {
 		t.Errorf("the push did not commit: %d commits", repo.Commits)
@@ -192,7 +166,8 @@ func TestTwoLocationsOneRepository(t *testing.T) {
 	repo := confrepotest.New()
 	repo.Register(t)
 
-	ids := map[string]string{}
+	ctx := mcpCtx(rootUser(t, f))
+	names := []string{}
 	for name, dir := range map[string]string{"Acme": "platforms/acme", "Foo": "platforms/foo"} {
 		code, body := f.call(t, "POST", "/api/config-remotes",
 			`{"name":"`+name+`","url":"https://example.invalid/all.git","branch":"main","dir":"`+dir+`"}`,
@@ -200,25 +175,17 @@ func TestTwoLocationsOneRepository(t *testing.T) {
 		if code != http.StatusCreated {
 			t.Fatalf("create %s: %d %s", name, code, body)
 		}
-		ids[name] = remoteID(t, body)
+		names = append(names, name)
 	}
 	// One configuration per location, each pushed.
-	for name := range ids {
+	for _, name := range names {
 		code, body := f.call(t, "POST", "/api/configurations", `{"name":"`+name+` config"}`, f.rootC)
 		if code != http.StatusCreated {
 			t.Fatalf("capture %s: %d %s", name, code, body)
 		}
-		var saved store.Configuration
-		if err := json.Unmarshal([]byte(body), &saved); err != nil {
-			t.Fatal(err)
-		}
-		if code, body = f.call(t, "PUT", "/api/configurations/"+saved.ID+"/remote",
-			`{"remoteId":"`+ids[name]+`"}`, f.rootC); code != http.StatusOK {
-			t.Fatalf("bind %s: %d %s", name, code, body)
-		}
-		if code, body = f.call(t, "POST", "/api/configurations/"+saved.ID+"/push", "",
-			f.rootC); code != http.StatusOK {
-			t.Fatalf("push %s: %d %s", name, code, body)
+		push := json.RawMessage(`{"configuration":"` + name + ` config","location":"` + name + `"}`)
+		if _, err := f.api.toolPushConfiguration(ctx, push); err != nil {
+			t.Fatalf("push %s: %v", name, err)
 		}
 	}
 	for _, want := range []string{"platforms/acme/" + confrepo.DocumentName, "platforms/foo/" + confrepo.DocumentName} {
@@ -294,19 +261,15 @@ func TestDeletingALocationKeepsItsConfigurations(t *testing.T) {
 		t.Fatalf("create: %d %s", code, body)
 	}
 	acme := remoteID(t, body)
-	code, body = f.call(t, "POST", "/api/configurations/pull", `{"remoteId":"`+acme+`"}`, f.rootC)
-	if code != http.StatusOK {
-		t.Fatalf("pull: %d %s", code, body)
+	if _, err := f.api.toolPullConfiguration(mcpCtx(rootUser(t, f)), json.RawMessage(`{"location":"Acme"}`)); err != nil {
+		t.Fatalf("pull: %v", err)
 	}
-	var out pullAnswer
-	if err := json.Unmarshal([]byte(body), &out); err != nil {
-		t.Fatal(err)
-	}
+	pulled := onlyConfiguration(t, f)
 
 	if code, body = f.call(t, "DELETE", "/api/config-remotes/"+acme, "", f.rootC); code != http.StatusNoContent {
 		t.Fatalf("delete: %d %s", code, body)
 	}
-	code, body = f.call(t, "GET", "/api/configurations/"+out.Configuration.ID, "", f.rootC)
+	code, body = f.call(t, "GET", "/api/configurations/"+pulled.ID, "", f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("the configuration went with its location: %d %s", code, body)
 	}
@@ -333,22 +296,33 @@ func TestAnEmptyLocationSaysSo(t *testing.T) {
 		t.Fatalf("create: %d %s", code, body)
 	}
 	acme := remoteID(t, body)
-	code, body = f.call(t, "POST", "/api/configurations/pull", `{"remoteId":"`+acme+`"}`, f.rootC)
+	code, body = f.call(t, "POST", "/api/configurations/compose",
+		`{"left":{"source":"running"},"right":{"source":"remote","id":"`+acme+`"}}`, f.rootC)
 	if code != http.StatusNotFound {
-		t.Fatalf("pulling an empty location: %d %s", code, body)
+		t.Fatalf("reading an empty location: %d %s", code, body)
 	}
 	if !strings.Contains(body, "push one there first") {
 		t.Errorf("the message does not say what to do: %s", body)
 	}
 }
 
-func planMentions(plan *config.Plan, label string) bool {
-	for _, c := range plan.Changes {
-		if strings.Contains(c.ID, label) || strings.Contains(c.Label, label) {
-			return true
-		}
+// onlyConfiguration is the one saved row the test has made, as the store holds
+// it: the list does not carry the binding.
+func onlyConfiguration(t *testing.T, f fixture) store.Configuration {
+	t.Helper()
+	ctx := context.Background()
+	rows, err := f.api.st.ListConfigurations(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return false
+	if len(rows) != 1 {
+		t.Fatalf("%d saved configurations, want one", len(rows))
+	}
+	c, err := f.api.st.GetConfiguration(ctx, rows[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }
 
 func repoPaths(repo *confrepotest.Fake) []string {

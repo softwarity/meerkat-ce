@@ -96,7 +96,7 @@ The ways in, all served by the gateway in your colours, in 21 languages.
 
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
-| [Configurations](/docs/console/configuration) | Named versions, comparison, YAML export and import, a restore point on every change; in a git repository with Enterprise. | A GitOps pipeline to set up. | Community, git Enterprise |
+| [Configurations](/docs/console/configuration) | Named versions, compared and composed value by value, YAML export and import, a restore point on every change; in a git repository with Enterprise. | A GitOps pipeline to set up. | Community, git Enterprise |
 | [Audit trail](/docs/operations/audit) | Every admin action with a field-by-field diff, every sign-in and factor change; sent over OTLP with Enterprise. | Retraced or WorkOS Audit Logs, then every tool connected to it. | Community, *partly* |
 | [Traffic and metrics](/docs/operations/traffic) | Traffic, latency and failures per route and per endpoint, nothing to install; metrics over OTLP with Enterprise. | Prometheus and Grafana. | Community |
 | [Logs](/docs/operations/logs) and [traces](/docs/operations/tracing) | Structured logs and an access log, refusals included; a trace identifier on every request, the gateway on the trace with Enterprise. | Each piece instrumented on its own. | Community, *partly* |

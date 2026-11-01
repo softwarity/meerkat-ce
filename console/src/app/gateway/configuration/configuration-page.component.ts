@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,9 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { GitLocationsPanelComponent } from './git-locations-panel.component';
+import { ConfigurationYamlComponent } from './configuration-yaml.component';
+import { ApiService, SavedConfiguration } from '../../api.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 // Configuration - INFRA plane, root only, because everything under it crosses
 // both planes at once: routes belong to infra, authorities and settings to the
@@ -43,6 +46,7 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
     MatTabsModule,
     EeLockComponent,
     GitLocationsPanelComponent,
+    ConfigurationYamlComponent,
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
@@ -50,7 +54,7 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
   styles: [
     `
       /* The screen owns the height: the heading and the tabs stay put, the
-         panel underneath scrolls. That is what lets the Management tab hold a
+         panel underneath scrolls. That is what lets the Compose tab hold a
          drawer at all - a drawer inside a 900px text column is a drawer with
          nowhere to open. The reading width lives on the TABS instead, each
          setting its own. */
@@ -139,12 +143,12 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
     <nav mat-tab-nav-bar [tabPanel]="panel" mat-stretch-tabs="false">
       <a
         mat-tab-link
-        routerLink="management"
+        routerLink="compose"
         routerLinkActive
-        #tMgmt="routerLinkActive"
-        [active]="tMgmt.isActive"
-        i18n="@@Management"
-        >Management</a
+        #tCompose="routerLinkActive"
+        [active]="tCompose.isActive"
+        i18n="@@Compose"
+        >Compose</a
       >
       <a
         mat-tab-link
@@ -170,9 +174,36 @@ import { GitLocationsPanelComponent } from './git-locations-panel.component';
     </mat-tab-nav-panel>
       </mat-drawer-content>
 
-      <mat-drawer position="end" mode="over" [opened]="git()" (closedStart)="closeGit()">
+      <!-- ONE drawer on the right (a container holds one per side), and
+           two things it can show: the git locations, or the file of what a
+           side of the loom holds. -->
+      <mat-drawer position="end" mode="over" [opened]="git() || !!reading() || running()" (closedStart)="closeDrawer()">
         @if (git()) {
           <app-git-locations-panel (closed)="closeGit()" />
+        } @else if (reading(); as c) {
+          <!-- A saved configuration's file, to read and correct: saving
+               replaces its document and applies nothing. -->
+          <app-configuration-yaml
+            [title]="c.name"
+            [subtitle]="c.description ?? ''"
+            [text]="document()"
+            [canEdit]="true"
+            [busy]="busy()"
+            (saved)="saveDocument(c, $event)"
+            (download)="download(c)"
+            (closed)="closeDrawer()"
+          />
+        } @else if (running()) {
+          <!-- What runs is read here and changed on Compose, where a change
+               shows what it does before it does it. -->
+          <app-configuration-yaml
+            title="Running"
+            i18n-title="@@Running"
+            [text]="document()"
+            [canEdit]="false"
+            (download)="downloadRunning()"
+            (closed)="closeDrawer()"
+          />
         }
       </mat-drawer>
     </mat-drawer-container>
@@ -190,6 +221,73 @@ export class ConfigurationPageComponent {
     { initialValue: null },
   );
   protected readonly git = computed(() => this.flag() === '1');
+  // ?read=<id>: a saved configuration's file open in the drawer. The row and
+  // its text are read when the id appears; F5-proof like the rest.
+  private readonly api = inject(ApiService);
+  private readonly snack = inject(MatSnackBar);
+  private readonly readId = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('read'))),
+    { initialValue: null },
+  );
+  protected readonly reading = signal<SavedConfiguration | null>(null);
+  protected readonly running = computed(() => this.readId() === 'running');
+  protected readonly document = signal('');
+  protected readonly busy = signal(false);
+
+  constructor() {
+    effect(() => {
+      const id = this.readId();
+      if (!id) {
+        this.reading.set(null);
+        this.document.set('');
+        return;
+      }
+      if (id === 'running') {
+        this.reading.set(null);
+        this.api.currentDocument().subscribe({ next: (t) => this.document.set(t), error: () => this.closeDrawer() });
+        return;
+      }
+      this.api.configuration(id).subscribe({ next: (c) => this.reading.set(c), error: () => this.closeDrawer() });
+      this.api.configurationDocument(id).subscribe({ next: (t) => this.document.set(t), error: () => this.document.set('') });
+    });
+  }
+
+  protected closeDrawer(): void {
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { git: null, read: null }, queryParamsHandling: 'merge' });
+  }
+
+  protected saveDocument(c: SavedConfiguration, text: string): void {
+    this.busy.set(true);
+    this.api.replaceConfigurationDocument(c.id, new Blob([text], { type: 'application/yaml' })).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.snack.open($localize`:@@Configuration_saved:Configuration saved`, undefined, { duration: 2500 });
+        this.closeDrawer();
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        const e = err as { error?: { error?: string } };
+        this.snack.open(typeof e?.error?.error === 'string' ? e.error.error : $localize`:@@Request_failed:Request failed`, undefined, { duration: 6000 });
+      },
+    });
+  }
+
+  protected download(c: SavedConfiguration): void {
+    this.api.exportConfiguration(c.id).subscribe({ next: (text) => this.save(text, c.name), error: () => undefined });
+  }
+
+  protected downloadRunning(): void {
+    this.save(this.document(), 'running');
+  }
+
+  private save(text: string, name: string): void {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/yaml' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meerkat-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yaml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   protected openGit(): void {
     void this.router.navigate([], {

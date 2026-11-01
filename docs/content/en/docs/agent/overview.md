@@ -60,7 +60,8 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `get_branding`, `save_branding` | The identity the built-in pages wear. |
 | `list_themes` | The colour palettes, and which is active. |
 | `export_configuration` | The whole configuration, as a readable document. |
-| `save_configuration`, `list_configurations` | Named snapshots to come back to; `replace` refreshes one from the running state, before a push. |
+| `save_configuration`, `list_configurations`, `activate_configuration` | Named snapshots to come back to, and the switch to one; `replace` refreshes one from the running state, before a push. |
+| `compose_configuration` | One configuration composed from two, value by value: preview it, apply it, or save it. |
 | `list_oidc_clients`, `save_oidc_client`, `try_oidc_sign_in` | The applications signing in through the gateway, and what one would receive for a given person. |
 | `get_signing_keys`, `set_issuer`, `renew_signing_keys`, `preview_identity` | The issuer and the public keys, and what a draft identity would send. |
 
@@ -74,7 +75,7 @@ calls:
 |---|---|
 | `list_admin_api` | The sections, then the endpoints of one, with a summary when the API's documentation has one. |
 | `read_admin_api` | A GET, as the console would. |
-| `call_admin_api` | Any request: create an organisation, undo a change from the history, compare two configurations, edit a theme or a setting. |
+| `call_admin_api` | Any request: create a tenant, undo a change from the history, edit a theme or a setting. |
 
 They go through the same endpoints as the console, with the agent's own token:
 the endpoint's guard decides, a read-only token stays read-only, and the audit

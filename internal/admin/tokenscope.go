@@ -40,7 +40,6 @@ var readsNothing = map[string]bool{
 	"POST /api/routes/respond-preview":    true,
 	"POST /api/routes/version-preview":    true,
 	"POST /api/identity/preview":          true,
-	"POST /api/config/preview":            true,
 	"POST /api/auth-providers/{id}/check": true,
 	// A sign-in tried on someone's behalf: nothing issued, nothing stored.
 	"POST /api/oidc/clients/{id}/try":    true,
@@ -49,6 +48,10 @@ var readsNothing = map[string]bool{
 	// Proving a git location answers and its credential is accepted (CFG-07):
 	// it reaches a repository and stores not one byte.
 	"POST /api/config-remotes/{id}/check": true,
+	// Composing two documents into one and saying what applying it would do
+	// (CFG-08): two in, one out, nothing stored. Applying, saving, exporting
+	// and pushing the result are their own patterns, and writes.
+	"POST /api/configurations/compose": true,
 	// Asking a PostgreSQL server what it is before a copy: it reads, and
 	// creates not even a schema.
 	"POST /api/backup/check": true,

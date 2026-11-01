@@ -42,10 +42,6 @@ func (a *API) registerConfigRemotes(mux Mux) {
 	mux.Handle("DELETE /api/config-remotes/{id}", a.rootOnly(a.deleteConfigRemote))
 	mux.Handle("POST /api/config-remotes/{id}/check", a.rootOnly(a.checkConfigRemote))
 	// The two acts, on the collection they feed.
-	mux.Handle("POST /api/configurations/pull", a.rootOnly(a.pullNewConfiguration))
-	mux.Handle("POST /api/configurations/{id}/pull", a.rootOnly(a.pullConfiguration))
-	mux.Handle("POST /api/configurations/{id}/push", a.rootOnly(a.pushConfiguration))
-	mux.Handle("PUT /api/configurations/{id}/remote", a.rootOnly(a.bindConfiguration))
 }
 
 // gitAvailable is the one refusal every act here starts with, and it answers in
@@ -305,139 +301,6 @@ func (a *API) checkConfigRemote(w http.ResponseWriter, r *http.Request, _ store.
 
 // ── pull ─────────────────────────────────────────────────────────────────────
 
-// pullNewConfiguration takes a document from a location into the collection
-// under a new name, and APPLIES NOTHING.
-//
-// This is the entry point for a platform this gateway has never held: the row
-// arrives already bound, so the next pull and push need no dialog, and the
-// answer carries the plan - what activating it WOULD change - because the only
-// useful next question is that one.
-func (a *API) pullNewConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := gitAvailable(); err != nil {
-		writeErr(w, http.StatusForbidden, err.Error())
-		return
-	}
-	var body struct {
-		RemoteID string `json:"remoteId"`
-		Name     string `json:"name"`
-	}
-	if err := decodeStrict(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := a.roomForAnother(r.Context()); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	row, ok := a.configRemoteByID(r.Context(), w, body.RemoteID)
-	if !ok {
-		return
-	}
-	// The location's name is the obvious default: it is what the operator named
-	// the platform, and it is already unique.
-	if strings.TrimSpace(body.Name) == "" {
-		body.Name = row.Name
-	}
-	name, ok := a.freeName(w, r, body.Name, "")
-	if !ok {
-		return
-	}
-	file, rev, ok := a.fetchDocument(w, r, row)
-	if !ok {
-		return
-	}
-	c := store.Configuration{ID: newID(), Name: name, Document: file}
-	if err := a.st.SaveConfiguration(r.Context(), &c); err != nil {
-		a.internal(w, err)
-		return
-	}
-	if err := a.st.BindConfiguration(r.Context(), c.ID, row.ID); err != nil {
-		a.internal(w, err)
-		return
-	}
-	if err := a.st.MarkConfigurationSynced(r.Context(), c.ID, rev); err != nil {
-		a.internal(w, err)
-		return
-	}
-	c.RemoteID, c.RemoteRev = row.ID, rev
-	a.auditEvent(r.Context(), actor, "configuration.pull", "configuration", c.ID, c.Name, "",
-		fmt.Sprintf("pulled from %s at %s, %d bytes, applied to nothing", row.Name, rev, len(file)))
-	a.answerPull(w, r, c)
-}
-
-// pullConfiguration refreshes a bound row from its location, and APPLIES
-// NOTHING. What was in the row is replaced; what the gateway serves is not
-// touched until somebody activates it.
-func (a *API) pullConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := gitAvailable(); err != nil {
-		writeErr(w, http.StatusForbidden, err.Error())
-		return
-	}
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	row, ok := a.boundRemote(w, r, c)
-	if !ok {
-		return
-	}
-	file, rev, ok := a.fetchDocument(w, r, row)
-	if !ok {
-		return
-	}
-	was := c.Digest
-	c.Document = file
-	if err := a.st.SaveConfiguration(r.Context(), &c); err != nil {
-		a.internal(w, err)
-		return
-	}
-	if err := a.st.MarkConfigurationSynced(r.Context(), c.ID, rev); err != nil {
-		a.internal(w, err)
-		return
-	}
-	c.RemoteRev = rev
-	detail := fmt.Sprintf("pulled from %s at %s, %d bytes, applied to nothing", row.Name, rev, len(file))
-	if was == c.Digest {
-		detail = "pulled from " + row.Name + " at " + rev + ": the same document, nothing moved"
-	}
-	a.auditEvent(r.Context(), actor, "configuration.pull", "configuration", c.ID, c.Name, "", detail)
-	a.answerPull(w, r, c)
-}
-
-// pullAnswer is what a pull hands back: the row as it now stands, and what
-// activating it would change.
-//
-// The plan rides along because a pull whose answer is "ok" would leave the
-// operator to click twice to learn the only thing they wanted to know. It is
-// the same traversal the import preview and the activation plan use, so what
-// this shows is what a switch would do.
-type pullAnswer struct {
-	Configuration store.Configuration `json:"configuration"`
-	Plan          *config.Plan        `json:"plan,omitempty"`
-	// PlanError says why the plan is missing: a document from a repository can
-	// be one a future Meerkat wrote, and refusing to describe it is not a
-	// reason to lose the pull that already succeeded.
-	PlanError string `json:"planError,omitempty"`
-}
-
-func (a *API) answerPull(w http.ResponseWriter, r *http.Request, c store.Configuration) {
-	out := pullAnswer{Configuration: c}
-	doc, err := config.Unmarshal([]byte(c.Document))
-	if err != nil {
-		out.PlanError = err.Error()
-		writeJSON(w, http.StatusOK, out)
-		return
-	}
-	plan, err := config.PreviewSwitch(r.Context(), a.st, doc)
-	if err != nil {
-		out.PlanError = err.Error()
-		writeJSON(w, http.StatusOK, out)
-		return
-	}
-	out.Plan = plan
-	writeJSON(w, http.StatusOK, out)
-}
-
 // fetchDocument reads a location and turns its files into one document, as the
 // bytes a saved configuration holds.
 func (a *API) fetchDocument(w http.ResponseWriter, r *http.Request, row store.ConfigRemote) (string, string, bool) {
@@ -471,38 +334,20 @@ func (a *API) fetchDocument(w http.ResponseWriter, r *http.Request, row store.Co
 
 // ── push ─────────────────────────────────────────────────────────────────────
 
-// pushConfiguration commits a saved configuration to its location.
-//
-// It pushes the SAVED copy, never the running state: a row is what somebody
-// decided to keep, and "save the running state, then push" are two acts the
-// screen already has. A branch that moved is a refusal, never a force - the
-// console offers a pull, which is a comparison an operator can read.
-func (a *API) pushConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := gitAvailable(); err != nil {
-		writeErr(w, http.StatusForbidden, err.Error())
-		return
-	}
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	row, ok := a.boundRemote(w, r, c)
-	if !ok {
-		return
-	}
+// pushDocument commits one document to a location and answers the revision
+// written and the number of files. Shared by the push of a saved row and by
+// the push of a composed result, which is saved nowhere: a push writes the
+// repository, and that is all it does. `message` writes the commit message
+// once the author is known; `what` names the document in a refusal.
+func (a *API) pushDocument(w http.ResponseWriter, r *http.Request, actor store.User, doc *config.Document, row store.ConfigRemote, message func(who string) string, what string) (string, int, bool) {
 	driver, remote, ok := a.remote(w, r, row)
 	if !ok {
-		return
-	}
-	doc, err := config.Unmarshal([]byte(c.Document))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
+		return "", 0, false
 	}
 	body, assets, err := config.Split(doc)
 	if err != nil {
 		a.internal(w, err)
-		return
+		return "", 0, false
 	}
 	files := map[string][]byte{config.BundleName: body}
 	for name, content := range assets {
@@ -513,8 +358,7 @@ func (a *API) pushConfiguration(w http.ResponseWriter, r *http.Request, actor st
 	// history reads "meerkat" for every change answers no question later.
 	author, email := commitAuthor(row, actor)
 	remote.AuthorName, remote.AuthorEmail = author, email
-	msg := pushMessage(c, author)
-	rev, err := driver.Commit(r.Context(), remote, msg, files)
+	rev, err := driver.Commit(r.Context(), remote, message(author), files)
 	// A push replaces this location's directory, whatever is there. The one
 	// refusal left is somebody pushing at the very same moment, several times
 	// running - and pushing again is the cure. 422, not 409: the console
@@ -522,22 +366,14 @@ func (a *API) pushConfiguration(w http.ResponseWriter, r *http.Request, actor st
 	if errors.Is(err, confrepo.ErrMoved) {
 		writeErr(w, http.StatusUnprocessableEntity, fmt.Sprintf(
 			"Nothing was pushed: %s kept moving while %s was being written - somebody else pushing at the same moment. Push again.",
-			row.Name, c.Name))
-		return
+			row.Name, what))
+		return "", 0, false
 	}
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, row.Name+": "+err.Error())
-		return
+		return "", 0, false
 	}
-	if err := a.st.MarkConfigurationSynced(r.Context(), c.ID, rev); err != nil {
-		a.internal(w, err)
-		return
-	}
-	c.RemoteRev = rev
-	a.auditEvent(r.Context(), actor, "configuration.push", "configuration", c.ID, c.Name, "",
-		fmt.Sprintf("pushed to %s (%s, %s) at %s, %d files", row.Name, row.Branch,
-			confrepo.Join(row.Dir, config.BundleName), rev, len(files)))
-	writeJSON(w, http.StatusOK, c)
+	return rev, len(files), true
 }
 
 // pushMessage is the commit subject: what changed, and who said so.
@@ -588,43 +424,6 @@ func dirOrRoot(dir string) string {
 
 // ── binding ──────────────────────────────────────────────────────────────────
 
-// bindConfiguration points a row at a location, or at none.
-//
-// Changing the destination clears the revision (the store does it), because a
-// revision is a fact about one branch and means nothing on another.
-func (a *API) bindConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := gitAvailable(); err != nil {
-		writeErr(w, http.StatusForbidden, err.Error())
-		return
-	}
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	var body struct {
-		RemoteID string `json:"remoteId"`
-	}
-	if err := decodeStrict(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	detail := "no longer bound to a git location"
-	if body.RemoteID != "" {
-		row, found := a.configRemoteByID(r.Context(), w, body.RemoteID)
-		if !found {
-			return
-		}
-		detail = "bound to " + row.Name
-	}
-	if err := a.st.BindConfiguration(r.Context(), c.ID, body.RemoteID); err != nil {
-		a.internal(w, err)
-		return
-	}
-	c.RemoteID, c.RemoteRev, c.RemoteAt = body.RemoteID, "", 0
-	a.auditEvent(r.Context(), actor, "configuration.bind", "configuration", c.ID, c.Name, "", detail)
-	writeJSON(w, http.StatusOK, c)
-}
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // configRemote resolves the {id} and answers the 404 itself.
@@ -636,27 +435,6 @@ func (a *API) configRemoteByID(ctx context.Context, w http.ResponseWriter, id st
 	row, err := a.st.GetConfigRemote(ctx, id)
 	if errors.Is(err, store.ErrConfigRemoteNotFound) {
 		writeErr(w, http.StatusNotFound, "no such git location")
-		return store.ConfigRemote{}, false
-	}
-	if err != nil {
-		a.internal(w, err)
-		return store.ConfigRemote{}, false
-	}
-	return row, true
-}
-
-// boundRemote resolves the location a configuration points at, refusing the
-// unbound one with the cure rather than a 404: bind it, then pull.
-func (a *API) boundRemote(w http.ResponseWriter, r *http.Request, c store.Configuration) (store.ConfigRemote, bool) {
-	if c.RemoteID == "" {
-		writeErr(w, http.StatusUnprocessableEntity,
-			c.Name+" is not bound to a git location: choose one first")
-		return store.ConfigRemote{}, false
-	}
-	row, err := a.st.GetConfigRemote(r.Context(), c.RemoteID)
-	if errors.Is(err, store.ErrConfigRemoteNotFound) {
-		writeErr(w, http.StatusUnprocessableEntity,
-			c.Name+" points at a git location that no longer exists: choose one again")
 		return store.ConfigRemote{}, false
 	}
 	if err != nil {

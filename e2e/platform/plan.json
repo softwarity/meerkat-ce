@@ -2622,8 +2622,8 @@
     "CE",
     "EE"
    ],
-   "en": "Set as current applies on every node.",
-   "fr": "Set as current s'applique sur tous les nœuds."
+   "en": "Apply as current applies on every node.",
+   "fr": "Apply as current s'applique sur tous les nœuds."
   },
   {
    "id": "CFG-03",
@@ -2651,8 +2651,8 @@
     "CE",
     "EE"
    ],
-   "en": "Compare shows added/removed/changed.",
-   "fr": "La comparaison montre ce qui est ajouté, retiré et modifié."
+   "en": "The Compose screen shows added, removed and changed, down to the fields.",
+   "fr": "L'écran Compose montre ce qui est ajouté, retiré et modifié, jusqu'aux champs."
   },
   {
    "id": "CFG-05",
@@ -2695,6 +2695,21 @@
    ],
    "en": "Git locations against a Gitea on the platform: pull replaces, push replaces only the directory, two platforms share a repo; CE refuses.",
    "fr": "Emplacements git avec un Gitea sur la plateforme : un pull remplace, un push ne remplace que le répertoire, deux plateformes partagent un même dépôt ; CE refuse."
+  },
+  {
+   "id": "CFG-08",
+   "priority": "P1",
+   "feasibility": "medium",
+   "targets": [
+    "C1",
+    "CC"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Compose what runs with a saved configuration value by value: a route taken from the right brings its role along, one field from each side, one element of a list in and the list reordered, a hard dependency left out blocks Apply; the result applied, saved on the shelf, exported, and pushed to the location read on the right (EE: refused if it moved, nothing saved here); a package read on a side, nothing saved; the agent replays the same recipe.",
+   "fr": "Composer ce qui tourne avec une configuration enregistrée valeur par valeur : une route prise à droite emporte son rôle, un champ de chaque côté, un élément d'une liste ajouté et la liste réordonnée, une dépendance dure laissée dehors bloque Apply ; le résultat appliqué, rangé sur l'étagère, exporté, poussé vers l'emplacement lu à droite (EE : refusé s'il a bougé, rien d'enregistré ici) ; un paquet lu sur un côté, rien d'enregistré ; l'agent rejoue la même recette."
   },
   {
    "id": "PAGE-01",

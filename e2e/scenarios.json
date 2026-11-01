@@ -403,54 +403,6 @@
       }
     },
     {
-      "id": "api-config-report",
-      "domain": "gateway",
-      "kind": "api",
-      "probe": {
-        "method": "GET",
-        "path": "/api/config/report"
-      },
-      "allowed": [
-        "root"
-      ],
-      "title": {
-        "en": "What an export will not contain",
-        "fr": "Ce qu'un export ne contiendra pas"
-      },
-      "description": {
-        "en": "Lists the secret fields holding a literal rather than a vault reference: they stay behind, so the console can say so next to the download button, while the admin can still act on it. Lists as well every $name the configuration expects, which is what the target gateway will have to hold in its own vault.",
-        "fr": "Liste les champs secrets qui contiennent une valeur littérale au lieu d'une référence au coffre : ils ne partiront pas, et la console peut ainsi le dire à côté du bouton de téléchargement, tant que l'administrateur peut encore y remédier. Liste aussi tous les $nom que la configuration attend, c'est-à-dire ce que la gateway de destination devra avoir dans son propre coffre."
-      }
-    },
-    {
-      "id": "api-config-preview",
-      "domain": "gateway",
-      "kind": "api",
-      "probe": {
-        "method": "POST",
-        "path": "/api/config/preview",
-        "body": {
-          "version": 1,
-          "roles": [
-            {
-              "name": "E2E preview"
-            }
-          ]
-        }
-      },
-      "allowed": [
-        "root"
-      ],
-      "title": {
-        "en": "Preview what importing a file would do",
-        "fr": "Prévisualiser l'effet de l'import d'un fichier"
-      },
-      "description": {
-        "en": "Reports what an imported file would add, change or remove, and which vault entries it expects that the vault does not hold, without writing anything. That preview is the one moment an admin still knows what a given secret was, which is why the missing ones are asked for right there.",
-        "fr": "Indique, sans rien écrire, ce qu'un fichier importé ajouterait, modifierait ou supprimerait, et quelles entrées de coffre il attend alors que le coffre ne les contient pas. Cet aperçu est le seul moment où un administrateur sait encore à quoi correspondait tel secret : c'est pourquoi les entrées manquantes sont demandées à cet endroit précis."
-      }
-    },
-    {
       "id": "api-config-collection",
       "domain": "gateway",
       "kind": "api",
@@ -513,54 +465,6 @@
       "description": {
         "en": "Proves the repository answers, the credential is accepted and the branch exists, and writes nothing - so a wrong token is found on the screen that sets it rather than during the first push of a real change. A refused credential comes back with what that forge actually wants, because every forge reports a missing permission and a wrong basic-auth username as the same sentence. The probe names a location that does not exist, so a 404 proves the barrier without a fixture.",
         "fr": "Prouve que le dépôt répond, que l'identifiant est accepté et que la branche existe, sans rien écrire - un mauvais jeton se découvre ainsi sur l'écran où on le saisit, et non lors du premier push d'un vrai changement. Un identifiant refusé revient accompagné de ce que cette forge attend réellement, car toutes les forges signalent une permission manquante et un mauvais nom d'utilisateur basic-auth par la même phrase. La sonde désigne un emplacement qui n'existe pas : un 404 prouve donc la barrière sans donnée de test."
-      }
-    },
-    {
-      "id": "api-config-pull",
-      "domain": "gateway",
-      "kind": "api",
-      "edition": "ee",
-      "probe": {
-        "method": "POST",
-        "path": "/api/configurations/no-such/pull",
-        "allowedStatus": [
-          404
-        ]
-      },
-      "allowed": [
-        "root"
-      ],
-      "title": {
-        "en": "Pull a configuration from git, applying nothing",
-        "fr": "Tirer une configuration depuis git, sans rien appliquer"
-      },
-      "description": {
-        "en": "Reads a configuration out of its git location and SHELVES it: the document lands as a saved copy and the gateway goes on serving what it serves. The answer carries the plan - what activating it would add, change and remove - because the loop is pull, read, activate, read again. Whoever can write to the branch must not be able to reconfigure the gateway, which is why nothing here applies.",
-        "fr": "Lit une configuration dans son emplacement git et la MET DE CÔTÉ : le document arrive comme une copie enregistrée, et la gateway continue de servir ce qu'elle servait. La réponse contient le plan - ce que l'activation ajouterait, modifierait et retirerait - car la boucle est : tirer, lire, activer, relire. Quiconque peut écrire sur la branche ne doit pas pouvoir reconfigurer la gateway ; c'est pourquoi rien n'est appliqué ici."
-      }
-    },
-    {
-      "id": "api-config-push",
-      "domain": "gateway",
-      "kind": "api",
-      "edition": "ee",
-      "probe": {
-        "method": "POST",
-        "path": "/api/configurations/no-such/push",
-        "allowedStatus": [
-          404
-        ]
-      },
-      "allowed": [
-        "root"
-      ],
-      "title": {
-        "en": "Push a saved configuration to git",
-        "fr": "Pousser une configuration enregistrée vers git"
-      },
-      "description": {
-        "en": "Commits the SAVED copy to its git location, attributed to the operator who clicked - which is what links the audit trail to the repository's history. A push replaces the location's directory, whatever is there, and never rewrites history: what it replaced stays in the repository's log. The one refusal left is somebody else pushing at the very same moment, and the cure is to push again.",
-        "fr": "Committe la copie ENREGISTRÉE dans son emplacement git, au nom de l'opérateur qui a cliqué - c'est ce qui relie le journal d'audit à l'historique du dépôt. Un push remplace le répertoire de l'emplacement, quel que soit son contenu, et ne réécrit jamais l'historique : ce qu'il a remplacé reste dans le journal du dépôt. Le seul refus restant est celui d'un autre push qui arrive au même moment, et le remède consiste à pousser de nouveau."
       }
     },
     {
@@ -2097,29 +2001,6 @@
       "description": {
         "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
         "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet de sa propre initiative. La clé HMAC du compte externe suit la règle du coffre : une valeur littérale ne revient jamais vers l'appelant."
-      }
-    },
-    {
-      "id": "api-gw-configuration-compare",
-      "domain": "gateway",
-      "kind": "api",
-      "probe": {
-        "method": "GET",
-        "path": "/api/configurations/no-such/compare/other",
-        "allowedStatus": [
-          404
-        ]
-      },
-      "allowed": [
-        "root"
-      ],
-      "title": {
-        "en": "Compare two saved configurations",
-        "fr": "Comparer deux configurations enregistrées"
-      },
-      "description": {
-        "en": "What changes going from one saved configuration to another, object by object, without looking at what runs (CFG-04): the question asked of a customer's configuration and the template it was made from, before touching either. Root only, like every configuration.",
-        "fr": "Ce qui change quand on passe d'une configuration enregistrée à une autre, objet par objet, sans regarder ce qui est en service (CFG-04) : c'est la question que l'on pose à la configuration d'un client et au modèle dont elle est issue, avant de toucher à l'une ou à l'autre. Réservé à root, comme tout ce qui touche aux configurations."
       }
     }
   ]

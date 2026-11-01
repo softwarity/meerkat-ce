@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -57,22 +58,39 @@ func TestConfigExportImportRoundTrip(t *testing.T) {
 
 // TestConfigPreviewWritesNothing: the preview is what an admin looks at before
 // deciding, so it must be exactly as informative and exactly as harmless.
+// previewFile asks what a file would do to this gateway, the console's way: the
+// file on the left, where the result starts, what runs on the right.
+func previewFile(t *testing.T, f fixture, file string) (int, string) {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"left": map[string]string{"source": "file", "document": file}, "right": map[string]string{"source": "running"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f.call(t, "POST", "/api/configurations/compose", string(body), f.rootC)
+}
+
 func TestConfigPreviewWritesNothing(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 
 	file := "version: 1\nroles:\n  - name: ops\n"
-	code, out := f.call(t, "POST", "/api/config/preview", file, f.rootC)
+	code, out := previewFile(t, f, file)
 	if code != http.StatusOK {
 		t.Fatalf("preview: %d %s", code, out)
 	}
-	var plan struct {
-		Changes []struct{ Kind, ID, Action string }
+	var answer struct {
+		Plan struct {
+			Changes []struct{ Kind, ID, Action string }
+		}
 	}
-	if err := json.Unmarshal([]byte(out), &plan); err != nil {
+	if err := json.Unmarshal([]byte(out), &answer); err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Changes) != 1 || plan.Changes[0].Action != "add" || plan.Changes[0].ID != "ops" {
+	if !slices.ContainsFunc(answer.Plan.Changes, func(c struct{ Kind, ID, Action string }) bool {
+		return c.Action == "add" && c.ID == "ops"
+	}) {
 		t.Fatalf("plan = %s", out)
 	}
 	roles, err := f.api.st.ListRoles(ctx)
@@ -112,24 +130,26 @@ routes:
           patterns:
             - /api/**
 `
-	code, out := f.call(t, "POST", "/api/config/preview", file, f.rootC)
+	code, out := previewFile(t, f, file)
 	if code != http.StatusOK {
 		t.Fatalf("preview: %d %s", code, out)
 	}
-	var plan struct {
-		Missing []struct {
-			Name, Kind string
-			Used       []string
+	var answer struct {
+		Plan struct {
+			Missing []struct {
+				Name, Kind string
+				Used       []string
+			}
 		}
 	}
-	if err := json.Unmarshal([]byte(out), &plan); err != nil {
+	if err := json.Unmarshal([]byte(out), &answer); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]string{"corp-secret": vault.KindSecret, "api-host": vault.KindValue}
-	if len(plan.Missing) != 2 {
+	if len(answer.Plan.Missing) != 2 {
 		t.Fatalf("missing = %s", out)
 	}
-	for _, m := range plan.Missing {
+	for _, m := range answer.Plan.Missing {
 		if want[m.Name] != m.Kind {
 			t.Fatalf("%s should be a %s: %s", m.Name, want[m.Name], out)
 		}
@@ -171,13 +191,14 @@ func TestConfigNeverExportsALiteral(t *testing.T) {
 	if strings.Contains(file, "hunter2") {
 		t.Fatalf("a literal secret reached the export:\n%s", file)
 	}
-	// And the report says so, so the admin is not left guessing why the relay
-	// will not authenticate wherever this file lands.
-	code, report := f.call(t, "GET", "/api/config/report", "", f.rootC)
+	// And the compose preview says so, so the admin is not left guessing why
+	// the relay will not authenticate wherever this file lands.
+	code, report := f.call(t, "POST", "/api/configurations/compose",
+		`{"left":{"source":"running"},"right":{"source":"running"}}`, f.rootC)
 	if code != http.StatusOK {
-		t.Fatalf("report: %d %s", code, report)
+		t.Fatalf("preview: %d %s", code, report)
 	}
-	if !strings.Contains(report, "mailrelay") || !strings.Contains(report, "password") {
+	if !strings.Contains(report, `"leaves":{"refs":[`) || !strings.Contains(report, `"holder":"mailrelay"`) {
 		t.Fatalf("the left-behind secret must be named: %s", report)
 	}
 }
@@ -195,8 +216,7 @@ func TestConfigIsRootOnly(t *testing.T) {
 	}
 	for _, call := range []struct{ method, path, body string }{
 		{"GET", "/api/config/export", ""},
-		{"GET", "/api/config/report", ""},
-		{"POST", "/api/config/preview", "version: 1\nroles: []\n"},
+		{"POST", "/api/configurations/compose", `{"left":{"source":"running"},"right":{"source":"running"}}`},
 		{"POST", "/api/config/import", "version: 1\nroles: []\n"},
 	} {
 		if code, _ := f.call(t, call.method, call.path, call.body, f.plainC); code != http.StatusForbidden {

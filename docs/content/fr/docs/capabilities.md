@@ -97,7 +97,7 @@ Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 21 langu
 
 | Capacité | Ce que fait Meerkat | Sans Meerkat | Édition |
 |---|---|---|---|
-| [Les configurations](/docs/console/configuration) | Versions nommées, comparaison, export et import YAML, un point de reprise à chaque changement ; dans un dépôt git avec Enterprise. | Une chaîne GitOps à mettre en place. | Community, git Enterprise |
+| [Les configurations](/docs/console/configuration) | Versions nommées, comparées et composées valeur par valeur, export et import YAML, un point de reprise à chaque changement ; dans un dépôt git avec Enterprise. | Une chaîne GitOps à mettre en place. | Community, git Enterprise |
 | [La piste d'audit](/docs/operations/audit) | Chaque action d'administration avec le détail champ par champ, chaque connexion et chaque changement de facteur ; envoyée en OTLP avec Enterprise. | Retraced ou WorkOS Audit Logs, puis chaque outil à y brancher. | Community, *en partie* |
 | [Trafic et métriques](/docs/operations/traffic) | Trafic, latence et échecs par route et par endpoint, rien à installer ; métriques en OTLP avec Enterprise. | Prometheus et Grafana. | Community |
 | [Journaux](/docs/operations/logs) et [traces](/docs/operations/tracing) | Journaux structurés et journal d'accès, refus compris ; un identifiant de trace sur chaque requête, la gateway dans la trace avec Enterprise. | Chaque pièce instrumentée séparément. | Community, *en partie* |

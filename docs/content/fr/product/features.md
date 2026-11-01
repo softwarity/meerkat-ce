@@ -132,10 +132,10 @@ Une console qui remplace les fichiers YAML et les pipelines de configuration.
 
 Pour en savoir plus : [Exploitation](/docs/operations/overview).
 
-- **Configurations versionnées** : versions nommées, une seule active, comparaison, export et import en YAML, point de reprise automatique à chaque changement. Trois à la fois en Community, autant que vous voulez en **Enterprise**.
+- **Configurations versionnées** : versions nommées, deux côte à côte et une troisième composée valeur par valeur, jusqu'à un champ ou un rôle d'une liste, export et import en YAML, point de reprise automatique à chaque changement. Trois à la fois en Community, autant que vous voulez en **Enterprise**.
 - **Aucune modification perdue** : deux administrateurs qui modifient la même chose en même temps en sont avertis, au lieu que l'un efface l'autre sans le savoir.
 - **Console vivante** : une modification faite par un administrateur apparaît sur les écrans des autres sans rechargement. *en partie*
-- **Configurations dans un dépôt git** : un répertoire par plateforme dans un dépôt partagé ; un pull range la configuration sans rien appliquer tant que vous ne l'activez pas, un push la committe au nom de l'exploitant qui a cliqué. GitHub, GitLab, Bitbucket, Azure DevOps, Gitea ou votre propre serveur, avec un jeton rangé dans le coffre. **Enterprise**
+- **Configurations dans un dépôt git** : un répertoire par plateforme dans un dépôt partagé ; un emplacement se lit à côté de ce qui tourne sans rien appliquer tant que vous ne décidez pas, un push committe le résultat vers l'emplacement que vous venez de lire, au nom de l'exploitant qui a cliqué. GitHub, GitLab, Bitbucket, Azure DevOps, Gitea ou votre propre serveur, avec un jeton rangé dans le coffre. **Enterprise**
 - **Journal d'audit** de chaque action d'administration, avec les différences champ par champ, et de la sécurité des comptes - chaque connexion, chaque connexion refusée avec sa raison réelle et son adresse, chaque facteur, passkey, mot de passe ou jeton modifié par son propriétaire. En ajout seul, consultable dans la console, conservé de trois mois à cinq ans selon votre choix. *en partie*
 - **Audit envoyé au collecteur** en OTLP : les événements de sécurité du plan de données, ainsi que les changements faits dans la console. **Enterprise**
 - **Audit des endpoints** : un interrupteur par opération de la spécification OpenAPI d'une route, et chaque appel devient un événement d'audit. **Enterprise** *en partie*

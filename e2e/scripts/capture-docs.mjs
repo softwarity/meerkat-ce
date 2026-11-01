@@ -193,6 +193,48 @@ const ROUTES = [
 let TENANT = '';
 let RULE = '';
 
+// The loom needs a side that differs from what runs: Staging, moved a little
+// the way a real one drifts - an upstream, a predicate, a limit, a portal
+// entry renamed and a module more, a route of its own. Laid down once.
+let composePath = '';
+async function seedCompose(page) {
+  if (composePath) return;
+  const api = page.request;
+  const list = await (await api.get(`${ADMIN}/api/configurations`)).json();
+  const staging = list.find((c) => c.name === 'Staging');
+  const running = { source: 'running' };
+  const read = await api.post(`${ADMIN}/api/configurations/compose`, { data: { left: running, right: running } });
+  const doc = (await read.json()).left;
+  const route = (id) => doc.routes.find((r) => r.id === id);
+  const orders = route('orders-api');
+  orders.upstream = 'http://orders.staging.acme.internal:9000';
+  orders.timeouts.response = 'PT45S';
+  orders.predicates[1].args.methods = ['GET', 'POST', 'PATCH'];
+  orders.limits[0].requests = 1200;
+  route('billing').upstream = 'http://billing.staging.acme.internal:8080';
+  doc.routes.push({
+    id: 'reports', name: 'Reports', order: 6, enabled: true,
+    upstream: 'http://reports.staging.acme.internal:8080',
+    access: { level: 'auth' },
+    predicates: [{ type: 'path', args: { patterns: ['/reports/**'] } }],
+  });
+  const portal = doc.settings.portal;
+  portal.entries[0].label = 'Finance';
+  portal.entries[0].children.push({ routeId: 'reports', label: 'Reports', icon: 'description' });
+  portal.entries.splice(1, 1);
+  const put = await api.put(`${ADMIN}/api/configurations/${staging.id}/document`, {
+    data: JSON.stringify(doc), headers: { 'Content-Type': 'application/yaml' },
+  });
+  if (!put.ok()) throw new Error(`Staging: ${put.status()} ${await put.text()}`);
+  composePath = `/system/configuration/compose?right=configuration:${staging.id}`;
+}
+
+async function onlyDifferences(page) {
+  await page.getByRole('option', { name: 'Only differences' }).click();
+  await page.locator('fieldset.block').first().waitFor();
+  await page.waitForTimeout(800);
+}
+
 // The catalogue the Portal screen shows: a bar with a container of modules and
 // two modules of their own (PORTAL-01, PORTAL-03).
 const PORTAL = {
@@ -983,31 +1025,35 @@ const SHOTS = [
       await page.waitForTimeout(600);
     },
   },
-  { file: 'configuration', path: '/system/configuration' },
-  // Making a saved configuration current, one line kept out: a route added
-  // since it was saved, which the switch would remove, unticked.
+  // The loom, what runs against a configuration that differs from it, on its
+  // differences: the screen, the portal drawn, and where a result goes.
+  { file: 'configuration', path: () => composePath, prepare: seedCompose, settle: 1800, act: onlyDifferences },
   {
-    file: 'configuration-keep',
-    path: '/system/configuration',
+    file: 'configuration-portal', path: () => composePath, prepare: seedCompose, settle: 1800,
     act: async (page) => {
-      await page.request.put(`${ADMIN}/api/routes/legacy`, {
-        data: {
-          id: 'legacy', name: 'Legacy portal', order: 20, enabled: true,
-          upstream: 'http://legacy.svc.acme.internal:80',
-          predicates: [{ type: 'path', args: { patterns: ['/legacy/**'] } }],
-        },
-      });
-      await page.reload();
+      await onlyDifferences(page);
+      const block = page.locator('fieldset.block', { has: page.locator('legend', { hasText: /^portal$/ }) });
+      await block.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(1200);
-      const row = page.getByRole('row', { name: /Before the SAML switch/ }).first();
-      await row.hover();
-      await page.locator('button[aria-label="Set as current"]:visible').first().click();
-      const go = page.getByRole('button', { name: 'Continue' });
-      // "What is running is not saved" comes first when it has drifted.
-      await go.waitFor({ timeout: 4000 }).then(() => go.click(), () => {});
-      const dialog = page.locator('app-apply-plan-dialog');
-      await dialog.waitFor();
-      await dialog.locator('tr', { hasText: 'Legacy portal' }).locator('mat-checkbox input').uncheck();
+    },
+  },
+  {
+    file: 'configuration-save', path: () => composePath, prepare: seedCompose, settle: 1800,
+    act: async (page) => {
+      await onlyDifferences(page);
+      await page.getByRole('button', { name: 'Save' }).click();
+      await page.waitForTimeout(500);
+    },
+  },
+  {
+    file: 'configuration-file', path: () => composePath, prepare: seedCompose, settle: 1800,
+    act: async (page) => {
+      await page.getByRole('button', { name: 'Save' }).click();
+      await page.getByRole('menuitem', { name: 'On the filesystem' }).click();
+      await page.locator('app-save-file-dialog').waitFor();
+      // A plain file: what it leaves behind is the point of the picture.
+      await page.getByRole('radio', { name: 'As a file' }).check();
+      await page.locator('app-save-file-dialog li', { hasText: 'API specs' }).waitFor();
       await page.waitForTimeout(500);
     },
   },

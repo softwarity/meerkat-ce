@@ -63,7 +63,7 @@ navigation come from the console.
 ![The audit trail](img/showcase/audit.webp) Every administrative change, with its author and a field-level diff.
 ![The vault](img/showcase/vault.webp) Secrets sealed at rest and plain values, both referenced by name.
 ![Domains & TLS](img/showcase/tls.webp) Certificates, their names and their expiry, issued or uploaded.
-![Configuration](img/showcase/configuration.webp) The whole installation as one document, to export and replay elsewhere.
+![Configuration](img/showcase/configuration.webp) The whole installation as one document: two of them side by side, composed value by value, exported and replayed elsewhere.
 :::
 
 ## Making it yours

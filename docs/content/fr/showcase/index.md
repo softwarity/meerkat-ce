@@ -64,7 +64,7 @@ logo et la navigation viennent de la console.
 ![Le journal d'audit](img/showcase/audit.webp) Chaque changement d'administration, avec son auteur et les différences champ par champ.
 ![Le coffre](img/showcase/vault.webp) Des secrets scellés au repos et des valeurs en clair, tous référencés par leur nom.
 ![Domains & TLS](img/showcase/tls.webp) Les certificats, leurs noms et leur date d'expiration, qu'ils soient émis ou importés.
-![La configuration](img/showcase/configuration.webp) Toute l'installation en un seul document, à exporter et à rejouer ailleurs.
+![La configuration](img/showcase/configuration.webp) Toute l'installation en un seul document : deux côte à côte, composés valeur par valeur, exportés et rejoués ailleurs.
 :::
 
 ## Vous l'approprier

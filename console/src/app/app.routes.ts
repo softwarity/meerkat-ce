@@ -80,16 +80,6 @@ function rolesMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   return { consumed: segments, posParams };
 }
 
-// management, and management/<id> when a configuration's file is open in the
-// drawer - "current" being the id of what the gateway serves.
-function managementMatcher(segments: UrlSegment[]): UrlMatchResult | null {
-  if (!segments.length || segments[0].path !== 'management') return null;
-  if (segments.length > 2) return null;
-  const posParams: Record<string, UrlSegment> = {};
-  if (segments.length === 2) posParams['id'] = segments[1];
-  return { consumed: segments, posParams };
-}
-
 // history, and history/<id> when a point's document is open in the drawer.
 function historyMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   if (!segments.length || segments[0].path !== 'history') return null;
@@ -521,15 +511,26 @@ export const routes: Routes = [
             (m) => m.ConfigurationPageComponent,
           ),
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'management' },
-          // The Import/export tab is gone: its export report, its plan and its
-          // vault entries live in the dialogs of Management now. The path stays
-          // as a redirect - the bookmarks people already have must land
-          // somewhere that makes sense, not on a 404.
-          { path: 'import-export', redirectTo: 'management' },
+          { path: '', pathMatch: 'full', redirectTo: 'compose' },
+          // The table screen and the Import/export tab are gone (CFG-08): the
+          // paths stay as redirects - the bookmarks people already have must
+          // land somewhere that makes sense, not on a 404.
+          { path: 'management', redirectTo: 'compose' },
+          { path: 'management/:id', redirectTo: 'compose' },
+          { path: 'import-export', redirectTo: 'compose' },
           // The tab was Snapshot until it also restored and moved the
           // database: the old path stays, for the bookmarks that name it.
           { path: 'snapshot', redirectTo: 'database' },
+          {
+            // One configuration composed from two (CFG-08): a page of its
+            // own under the tabs, because three columns of cards do not fit
+            // in a drawer.
+            path: 'compose',
+            loadComponent: () =>
+              import('./gateway/configuration/compose/compose-page.component').then(
+                (m) => m.ComposePageComponent,
+              ),
+          },
           {
             path: 'database',
             loadComponent: () =>
@@ -544,16 +545,6 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./gateway/configuration/history-tab.component').then(
                 (m) => m.ConfigurationHistoryComponent,
-              ),
-          },
-          {
-            // management and management/:id share ONE component instance (the
-            // same trick as routes and roles): opening the drawer changes a
-            // param, it does not re-create the screen nor re-fetch the list.
-            matcher: managementMatcher,
-            loadComponent: () =>
-              import('./gateway/configuration/management-tab.component').then(
-                (m) => m.ConfigurationManagementComponent,
               ),
           },
         ],

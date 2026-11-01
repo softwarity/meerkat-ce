@@ -228,13 +228,6 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
         flex-direction: column;
         min-width: 0;
       }
-      .used {
-        font-size: 0.75rem;
-        color: var(--mat-sys-on-surface-variant);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       .empty {
         margin: 8px 0 0;
         font-size: 0.85rem;
@@ -482,14 +475,7 @@ import { SecretFieldComponent } from '../../shared/secret-field.component';
             <ng-container matColumnDef="name">
               <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
               <mat-cell *matCellDef="let r">
-                <span class="who">
-                  <span>{{ r.name }}</span>
-                  <!-- What uses it, in words. It was a tooltip repeating the
-                       cell beside it and a "(1)" nobody could read. -->
-                  @if (r.bound?.length) {
-                    <span class="used" i18n="@@Used_by">used by {{ r.bound.join(', ') }}</span>
-                  }
-                </span>
+                <span class="who">{{ r.name }}</span>
               </mat-cell>
             </ng-container>
 
@@ -794,9 +780,7 @@ export class GitLocationsPanelComponent {
   protected async remove(r: ConfigRemote): Promise<void> {
     const ok = await this.dialogs.confirm({
       title: $localize`:@@Delete_git_location:Delete ${r.name}:name:?`,
-      message: r.bound?.length
-        ? $localize`:@@Delete_git_location_bound:${r.bound.join(', ')}:bound: stay as saved copies, no longer linked to a location. Nothing is removed from the repository.`
-        : $localize`:@@Delete_git_location_message:Nothing is removed from the repository; only this location is forgotten.`,
+      message: $localize`:@@Delete_git_location_message:Nothing is removed from the repository; only this location is forgotten.`,
       confirmLabel: $localize`:@@Delete:Delete`,
       danger: true,
     });

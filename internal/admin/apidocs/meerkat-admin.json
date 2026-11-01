@@ -8142,37 +8142,6 @@
           "field"
         ]
       },
-      "ConfigExportReport": {
-        "type": "object",
-        "properties": {
-          "contents": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigSection"
-            },
-            "description": "What the export contains"
-          },
-          "literals": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigLiteral"
-            },
-            "description": "Secrets saved as literals, not exported"
-          },
-          "refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Vault names referenced"
-          }
-        },
-        "required": [
-          "contents",
-          "literals",
-          "refs"
-        ]
-      },
       "ConfigChange": {
         "type": "object",
         "description": "A plan line: an object and what happens to it.",
@@ -8272,6 +8241,303 @@
           "route",
           "name"
         ]
+      },
+      "ComposeSource": {
+        "type": "object",
+        "description": "One side of a composition.",
+        "required": [
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "running",
+              "configuration",
+              "point",
+              "remote",
+              "file"
+            ],
+            "description": "What runs, a saved configuration, a restore point, a git location (Enterprise), or a file's text"
+          },
+          "id": {
+            "type": "string",
+            "description": "The configuration's, restore point's or git location's id"
+          },
+          "package": {
+            "type": "string",
+            "description": "With source file: a package (ZIP) in base64, instead of `document`. Read on the side, saved nowhere."
+          },
+          "document": {
+            "type": "string",
+            "description": "The file, as YAML or JSON, when source is file"
+          }
+        }
+      },
+      "ComposePick": {
+        "type": "object",
+        "description": "One choice of the recipe, at a path: kind:id, kind:id/field.path, kind:id/field.path[element], setting:key/..., mailRelay/field.",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "none",
+              "unset"
+            ],
+            "description": "For an object (left, right, none) or a field (left, right, unset)"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "add",
+              "drop"
+            ],
+            "description": "For one element of a list"
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For a list: its element keys in the wanted order"
+          }
+        }
+      },
+      "ComposeBody": {
+        "type": "object",
+        "description": "The recipe with its two sources: what the console sends at each click, and what an agent replays.",
+        "required": [
+          "left",
+          "right"
+        ],
+        "properties": {
+          "left": {
+            "$ref": "#/components/schemas/ComposeSource"
+          },
+          "right": {
+            "$ref": "#/components/schemas/ComposeSource"
+          },
+          "pairs": {
+            "type": "array",
+            "description": "Right objects that ARE left objects under another id; the left id is kept",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "left",
+                "right"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "left": {
+                  "type": "string"
+                },
+                "right": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "picks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComposePick"
+            }
+          },
+          "name": {
+            "type": "string",
+            "description": "What save and push call the result"
+          },
+          "remoteId": {
+            "type": "string",
+            "description": "For push: the git location, which must be the right side's"
+          },
+          "remoteRev": {
+            "type": "string",
+            "description": "For push: the revision the right side was read at (rightRev of the preview); refused if the location moved since"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "yaml",
+              "zip"
+            ],
+            "description": "For export: the package with its assets, else a YAML"
+          },
+          "replace": {
+            "type": "boolean",
+            "description": "For save: refresh the configuration that already carries the name instead of refusing it"
+          }
+        }
+      },
+      "ComposePushAnswer": {
+        "type": "object",
+        "description": "What a push of the loom's result wrote: the location, the revision committed, the number of files. Nothing is saved on the shelf.",
+        "properties": {
+          "name": { "type": "string", "description": "The git location's name." },
+          "rev": { "type": "string", "description": "The revision committed." },
+          "files": { "type": "integer", "description": "Files written: the bundle and the route assets." }
+        }
+      },
+      "ComposeAnswer": {
+        "type": "object",
+        "description": "The preview of a composition.",
+        "properties": {
+          "leaves": {
+            "type": "object",
+            "description": "What the result does not carry once on a filesystem: the vault entries it names (their values never travel), the secrets held in clear here, and whether it has images, which a plain file loses and a package carries.",
+            "properties": {
+              "refs": { "type": "array", "items": { "type": "string" } },
+              "literals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "holder": { "type": "string" },
+                    "id": { "type": "string" },
+                    "label": { "type": "string" },
+                    "field": { "type": "string" }
+                  }
+                }
+              },
+              "images": { "type": "boolean" }
+            }
+          },
+          "left": {
+            "type": "object",
+            "description": "The left document as the screen reads it: pictures out, defaults and stamps dropped"
+          },
+          "right": {
+            "type": "object"
+          },
+          "result": {
+            "type": "object"
+          },
+          "leftName": {
+            "type": "string"
+          },
+          "rightName": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "description": "The object-level comparison of the two sides",
+            "items": {
+              "$ref": "#/components/schemas/ConfigChange"
+            }
+          },
+          "report": {
+            "type": "object",
+            "properties": {
+              "pulled": {
+                "type": "array",
+                "description": "Objects the composition added by itself: named by an object in the result and not in it otherwise",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "by": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "hard": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "missing": {
+                "type": "array",
+                "description": "References nothing in the result declares; hard = the store would refuse the object",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "by": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "via": {
+                      "type": "string"
+                    },
+                    "hard": {
+                      "type": "boolean"
+                    },
+                    "leftOut": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "unresolved": {
+                "type": "array",
+                "description": "Paths of the recipe that resolve nowhere",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pairs": {
+                "type": "array",
+                "description": "A left-only and a right-only object of the same kind and name: proposed, never paired by itself",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "left": {
+                      "type": "string"
+                    },
+                    "right": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "rightRev": {
+            "type": "string",
+            "description": "The revision the right side was read at, when it is a git location: what a push must name"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ConfigPlan"
+          },
+          "planError": {
+            "type": "string",
+            "description": "Why the result could not be planned against the gateway"
+          }
+        }
       },
       "ConfigPlan": {
         "type": "object",
@@ -8409,50 +8675,6 @@
               }
             }
           }
-        ]
-      },
-      "ConfigurationRef": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "ConfigurationState": {
-        "type": "object",
-        "description": "The running state compared with saved configurations.",
-        "properties": {
-          "digest": {
-            "type": "string",
-            "description": "SHA-256 of the running document, hex"
-          },
-          "savedAs": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ConfigurationRef"
-              }
-            ],
-            "description": "Saved configuration matching it (active first); absent if none"
-          },
-          "active": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ConfigurationRef"
-              }
-            ],
-            "description": "Configuration marked active. Without savedAs: changed since activated"
-          }
-        },
-        "required": [
-          "digest"
         ]
       },
       "ConfigPoint": {
@@ -8745,25 +8967,6 @@
         },
         "required": [
           "ok"
-        ]
-      },
-      "PullResult": {
-        "type": "object",
-        "description": "A pulled configuration, and what activating it would change.",
-        "properties": {
-          "configuration": {
-            "$ref": "#/components/schemas/Configuration"
-          },
-          "plan": {
-            "$ref": "#/components/schemas/ConfigPlan"
-          },
-          "planError": {
-            "type": "string",
-            "description": "Why there is no plan (the pull succeeded)"
-          }
-        },
-        "required": [
-          "configuration"
         ]
       },
       "DeploymentPlatform": {
@@ -14312,155 +14515,6 @@
         }
       }
     },
-    "/api/config/preview": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Preview an import",
-        "operationId": "previewConfig",
-        "description": "Changes nothing.",
-        "parameters": [
-          {
-            "name": "prune",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "true"
-              ]
-            },
-            "description": "`true` also removes what the file does not mention, in its sections. Absent: a merge, which deletes nothing."
-          },
-          {
-            "name": "keep",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "description": "Plan line to skip, as `kind:id` (repeatable): the current object is kept. Kinds: route, role, group, authProvider, oidcClient, theme, tenant, mailRelay (no id), setting.",
-            "style": "form",
-            "explode": true
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "YAML, JSON, or a zip with its pictures, detected from the content. 8 MB at most.",
-          "content": {
-            "application/yaml": {
-              "schema": {
-                "type": "string"
-              }
-            },
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "The same document as JSON"
-              }
-            },
-            "application/zip": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "What the import would do",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigPlan"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unreadable body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Over 8 MB",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Not a configuration, malformed `keep`, or refused, with the reason",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/config/report": {
-      "get": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Report what an export leaves out",
-        "operationId": "getExportReport",
-        "description": "Contents, literal secrets an export leaves out, and vault names referenced.",
-        "responses": {
-          "200": {
-            "description": "The report",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigExportReport"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/configurations": {
       "get": {
         "tags": [
@@ -14574,261 +14628,6 @@
           },
           "422": {
             "description": "No name, a name over 120 characters, or the Community edition's limit of 3",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/current": {
-      "get": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Compare the running state",
-        "operationId": "getCurrentConfiguration",
-        "description": "Whether it is saved, and whether it changed since the last activation.",
-        "responses": {
-          "200": {
-            "description": "The running state",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigurationState"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/import": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Save a configuration file",
-        "operationId": "storeConfigurationFile",
-        "description": "Applies nothing (unlike /api/config/import). Community edition: 3 saved configurations at most.",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 120
-            },
-            "description": "Configuration name",
-            "required": true
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "YAML, JSON, or a zip with its pictures, detected from the content. 8 MB at most.",
-          "content": {
-            "application/yaml": {
-              "schema": {
-                "type": "string"
-              }
-            },
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "The same document as JSON"
-              }
-            },
-            "application/zip": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The configuration, document included",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Configuration"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unreadable body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Name already used",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Over 8 MB",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Not a configuration, no name, or the Community edition's limit of 3",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/pull": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Pull from a git location",
-        "operationId": "pullNewConfiguration",
-        "description": "Reads meerkat.yaml and its pictures into a new linked configuration, with what activating it would change. Applies nothing. Enterprise edition.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "remoteId": {
-                    "type": "string",
-                    "description": "Git location id"
-                  },
-                  "name": {
-                    "type": "string",
-                    "maxLength": 120,
-                    "description": "Empty: the location's name"
-                  }
-                },
-                "required": [
-                  "remoteId"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The new configuration and its plan",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PullResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed body, or unknown field",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or Community edition (git needs the Enterprise edition)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown git location, or no configuration there",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Name already used",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Name over 120 characters, the Community edition's limit of 3, token vault entry missing, or not a configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Repository unreachable or refused (its message)",
             "content": {
               "application/json": {
                 "schema": {
@@ -15050,41 +14849,71 @@
         }
       }
     },
-    "/api/configurations/{id}/activate": {
+    "/api/configurations/compose": {
       "post": {
         "tags": [
           "Configuration"
         ],
-        "summary": "Activate a saved configuration",
-        "operationId": "activateConfiguration",
-        "description": "Applies its document as the whole configuration: what it lacks is removed (never themes). Accounts, sessions, tokens, vault and audit are kept, so activating the previous one rolls back.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          },
-          {
-            "name": "keep",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
+        "summary": "Compose one configuration from two (preview)",
+        "operationId": "composePreview",
+        "description": "Two documents in, one out, nothing stored. The left side is where the result starts (what runs, usually), the right side is what it is compared with. A recipe of picks says what the result takes from where: an object whole (kind:id, from left|right|none), a field (kind:id/a.b, from left|right|unset, nested keys with dots), one element of a list (kind:id/a.b[element], op add|drop; an object element is named by its canonical JSON), the order of a list (order: the element keys). What the result names and does not hold is pulled from the side that has it and reported; a reference nobody declares is reported as missing; a path that resolves nowhere is listed. The answer carries both sides and the result as the console reads them, the object-level comparison of the sides, the report, and the plan of applying the result to this gateway.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeBody"
               }
-            },
-            "description": "Plan line to skip, as `kind:id` (repeatable): the current object is kept. Kinds: route, role, group, authProvider, oidcClient, theme, tenant, mailRelay (no id), setting.",
-            "style": "form",
-            "explode": true
+            }
           }
-        ],
+        },
         "responses": {
           "200": {
-            "description": "What the switch did",
+            "description": "The composition and what applying it would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComposeAnswer"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "A side names a configuration, a restore point or a git location that does not exist"
+          },
+          "422": {
+            "description": "A side names no source, a document does not read, or the composed document is not a configuration"
+          }
+        }
+      }
+    },
+    "/api/configurations/compose/apply": {
+      "post": {
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Apply the composed configuration",
+        "operationId": "composeApply",
+        "description": "The same body as the preview; the result becomes the running configuration, as activating a saved one does (a switch: what it does not carry goes). Refused when a hard dependency (a role's parent, a group's tenant) was left out.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was applied",
             "content": {
               "application/json": {
                 "schema": {
@@ -15097,70 +14926,35 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Forbidden"
           },
           "422": {
-            "description": "Unreadable document, malformed `keep`, or refused",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Activated, but routes not reloaded: the previous ones keep serving",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Blocked by a hard dependency left out, or refused by the document's checks"
           }
         }
       }
     },
-    "/api/configurations/{id}/capture": {
+    "/api/configurations/compose/save": {
       "post": {
         "tags": [
           "Configuration"
         ],
-        "summary": "Update from the running state",
-        "operationId": "recaptureConfiguration",
-        "description": "Replaces its document with the running state and makes it current. Applies nothing.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
+        "summary": "Save the composed configuration on the shelf",
+        "operationId": "composeSave",
+        "description": "The same body as the preview, with `name`; applies nothing. Community edition: 3 saved configurations at most.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeBody"
+              }
+            }
           }
-        ],
+        },
         "responses": {
-          "200": {
-            "description": "The configuration, document included",
+          "201": {
+            "description": "The saved configuration",
             "content": {
               "application/json": {
                 "schema": {
@@ -15173,63 +14967,48 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Forbidden"
           },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+          "409": {
+            "description": "A configuration of that name exists"
+          },
+          "422": {
+            "description": "No room on the shelf, or an invalid name"
           }
         }
       }
     },
-    "/api/configurations/{id}/compare/{other}": {
-      "get": {
+    "/api/configurations/compose/export": {
+      "post": {
         "tags": [
           "Configuration"
         ],
-        "summary": "Compare two saved configurations",
-        "operationId": "compareConfigurations",
-        "description": "Changes from {id} to {other}, as a plan.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          },
-          {
-            "name": "other",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Configuration to compare with"
+        "summary": "Download the composed configuration",
+        "operationId": "composeExport",
+        "description": "The same body as the preview; `format: zip` for the package with its assets, else a YAML without pictures. Applies nothing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeBody"
+              }
+            }
           }
-        ],
+        },
         "responses": {
           "200": {
-            "description": "The differences",
+            "description": "The file",
             "content": {
-              "application/json": {
+              "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConfigPlan"
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -15238,34 +15017,51 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "Not root, or a read-only token",
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/configurations/compose/push": {
+      "post": {
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Push the composed configuration to a git location",
+        "operationId": "composePush",
+        "description": "Enterprise. The same body as the preview, with `remoteRev` (the preview's rightRev): the result is committed to the location, and saved nowhere here. Only to the git location read on the right side, and only if it has not moved since: what is pushed replaces the directory there, and nobody replaces what they have not looked at. Applies nothing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved configuration, with the revision pushed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ComposePushAnswer"
                 }
               }
             }
           },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Community edition, or not root"
           },
           "422": {
-            "description": "Unreadable document (named)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "No location named, no room on the shelf, or the location moved while it was written"
+          },
+          "502": {
+            "description": "The repository did not answer"
           }
         }
       }
@@ -15443,110 +15239,6 @@
         }
       }
     },
-    "/api/configurations/{id}/duplicate": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Duplicate a saved configuration",
-        "operationId": "duplicateConfiguration",
-        "description": "Applies nothing. Community edition: 3 saved configurations at most.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "maxLength": 120,
-                    "description": "Empty: \"<name> (copy)\""
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The copy, document included",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Configuration"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed body, or unknown field",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Name already used",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Name over 120 characters, or the Community edition's limit of 3",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/configurations/{id}/export": {
       "get": {
         "tags": [
@@ -15627,320 +15319,6 @@
           },
           "422": {
             "description": "Saved document unreadable, or zip requested with no pictures",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/{id}/plan": {
-      "get": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Preview an activation",
-        "operationId": "planConfiguration",
-        "description": "Changes nothing.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          },
-          {
-            "name": "keep",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "description": "Plan line to skip, as `kind:id` (repeatable): the current object is kept. Kinds: route, role, group, authProvider, oidcClient, theme, tenant, mailRelay (no id), setting.",
-            "style": "form",
-            "explode": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "What the switch would do",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigPlan"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or a read-only token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unreadable document, malformed `keep`, or refused",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/{id}/pull": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Pull from its git location",
-        "operationId": "pullConfiguration",
-        "description": "Replaces its document with the location's content, with what activating it would change. Applies nothing. Enterprise edition.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The configuration and its plan",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PullResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or Community edition (git needs the Enterprise edition)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration, or nothing at its location",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Not linked, token vault entry missing, or not a configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Repository unreachable or refused (its message)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/{id}/push": {
-      "post": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Push to its git location",
-        "operationId": "pushConfiguration",
-        "description": "Commits the saved copy (not the running state), replacing the directory's content. Enterprise edition.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The configuration, new revision and document",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Configuration"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or Community edition (git needs the Enterprise edition)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Not linked, token vault entry missing, unreadable document, or the branch kept moving (push again)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Repository unreachable or refused (its message)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/configurations/{id}/remote": {
-      "put": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Link to a git location",
-        "operationId": "bindConfiguration",
-        "description": "An empty remoteId unlinks. Clears the recorded revision. Enterprise edition.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Saved configuration id"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "remoteId": {
-                    "type": "string",
-                    "description": "Git location id; empty unlinks"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The configuration, document included",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Configuration"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed body, or unknown field",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "description": "Not root, or Community edition (git needs the Enterprise edition)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown configuration or git location",
             "content": {
               "application/json": {
                 "schema": {

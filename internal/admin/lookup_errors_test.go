@@ -27,7 +27,7 @@ func TestALookupThatFailsIsNotANotFound(t *testing.T) {
 	}
 	calls := []call{
 		{"withdraw a notification", f.api.withdrawNotification, "DELETE", map[string]string{"id": "n1"}, ""},
-		{"compare configurations", f.api.compareConfigurations, "GET", map[string]string{"id": "c1", "other": "c2"}, ""},
+		{"read a configuration", f.api.getConfiguration, "GET", map[string]string{"id": "c1"}, ""},
 		{"read an issue", f.api.getIssue, "GET", map[string]string{"id": "i1"}, ""},
 		{"move a secret in", f.api.stashSecret, "POST", nil,
 			`{"holder":"authprovider","id":"p1","field":"clientSecret","name":"idp-secret"}`},

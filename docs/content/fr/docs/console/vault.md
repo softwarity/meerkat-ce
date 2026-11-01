@@ -89,8 +89,9 @@ L'écran est ouvert à quiconque administre un plan qui contient des entrées.
   toute la raison d'être du coffre.
 - **Un secret ne peut pas être relu**, ni par vous ni par l'API. Si vous le perdez, il
   faut le remplacer à la source.
-- **Un import de configuration peut laisser des manques** : des entrées auxquelles le
-  fichier fait référence et que cette gateway n'a pas. L'import en dresse la liste
-  pour que vous puissiez les renseigner immédiatement.
+- **Appliquer une configuration peut laisser des manques** : des entrées auxquelles
+  elle fait référence et que cette gateway n'a pas. L'écran
+  [Compose](/docs/console/configuration#compose) les nomme avant toute application ;
+  elles sont réservées vides, à renseigner ici.
 - **Supprimer une entrée utilisée** casse tout ce qui pointait dessus. Consultez
   d'abord la colonne *Used by*.

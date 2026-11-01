@@ -94,8 +94,8 @@ func (a *API) writeTools() []mcp.Tool {
 				"This is what to do when someone says 'save the current configuration before you start': " +
 				"it gives a named point to come back to, on top of the automatic restore points. " +
 				"A name already taken is refused, unless replace is true: that configuration is then " +
-				"refreshed from the running state, as the console's Capture does - the way to bring a " +
-				"saved configuration up to date before push_configuration.",
+				"refreshed from the running state - the way to bring a saved configuration up to date " +
+				"before push_configuration.",
 			Schema: object(map[string]any{
 				"name":        str("What to call it, e.g. 'before the billing route'."),
 				"description": str("Optional: a line about why it was taken."),
@@ -150,7 +150,180 @@ func (a *API) writeTools() []mcp.Tool {
 			}, "document"),
 			Call: a.toolImportConfiguration,
 		},
+		{
+			Name: "compose_configuration", Allow: isRoot, Title: "Compose one configuration from two",
+			Description: "Build one configuration out of two documents and a recipe of choices, then " +
+				"preview it, apply it or save it. The LEFT side is where the result starts (usually " +
+				"what runs); the RIGHT side is what it is compared with (a saved configuration, a restore " +
+				"point, a file). Nothing moves without a pick: a right-only object is in the result only " +
+				"when picked, an object on both sides keeps the left's fields unless a pick says otherwise. " +
+				"\n\nA pick names a path and what to do at it: `route:r-x` with from left|right|none (the " +
+				"object whole, or out of the result); `route:r-x/upstream` with from left|right|unset (one " +
+				"field, nested keys with dots); `route:r-x/access.roles[ROLE_Y]` with op add|drop (one " +
+				"element of a list; an object element is named by its canonical JSON); `route:r-x/predicates` " +
+				"with order (the element keys in the wanted order). A setting is `setting:tls/names[...]`, " +
+				"the relay is `mailRelay/host`, a role is `role:ROLE_X`. A pair says that right object " +
+				"`r-9f0` IS left object `r-123` under another id: the result keeps the left id. " +
+				"\n\nWhat the result names and does not hold is PULLED from the side that has it (a route " +
+				"taken from the right brings its roles) and reported in `pulled`; a reference nobody " +
+				"declares is reported in `missing`, and only a hard one (a role's parent, a group's tenant) " +
+				"blocks applying. Paths that resolve nowhere are listed in `unresolved`, never passed " +
+				"under silence. Start with then: preview - it answers the object-level comparison of the " +
+				"sides, the report, and the plan of applying the result to this gateway, and changes " +
+				"nothing. A git location is not a source here: pull_configuration keeps it as a saved " +
+				"configuration, which is then a side like any other; to send a result to git, then: save " +
+				"and push_configuration.",
+			Schema: object(map[string]any{
+				"left":  composeSourceSchema("The side the result starts from."),
+				"right": composeSourceSchema("The side it is compared with."),
+				"pairs": map[string]any{"type": "array", "description": "Right objects that ARE left objects under another id.",
+					"items": object(map[string]any{
+						"kind":  str("route, tenant, group, authProvider or theme."),
+						"left":  str("The left object's id, kept in the result."),
+						"right": str("The right object's id."),
+					}, "kind", "left", "right")},
+				"picks": map[string]any{"type": "array", "description": "The choices, path by path.",
+					"items": object(map[string]any{
+						"path": str("kind:id, kind:id/field.path, kind:id/field.path[element] or mailRelay/field."),
+						"from": str("left, right, none or unset - for an object or a field."),
+						"op":   str("add or drop - for one element of a list."),
+						"order": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
+							"description": "The element keys of a list, in the wanted order."},
+					}, "path")},
+				"then": str("preview (default: say what it would do, change nothing), apply (make the result " +
+					"the running configuration, a switch), or save (keep it under `name`, applied to nothing)."),
+				"name": str("What to call the result when then is save."),
+				"replace": map[string]any{"type": "boolean",
+					"description": "With then: save, true to replace the document of the configuration of that " +
+						"name; refused otherwise when the name is taken. Its git binding is kept."},
+			}, "left", "right"),
+			Call: a.toolComposeConfiguration,
+		},
 	}
+}
+
+// composeSourceSchema describes one side of a composition to a model.
+func composeSourceSchema(desc string) map[string]any {
+	s := object(map[string]any{
+		"source":   str("running (what the gateway serves), configuration (a saved one, by id), point (a restore point, by id), or file (the document itself)."),
+		"id":       str("The configuration's or the restore point's id."),
+		"document": str("The file, as YAML or JSON, when source is file."),
+		"package":  str("Instead of document: a package (ZIP), in base64, when source is file."),
+	}, "source")
+	s["description"] = desc
+	return s
+}
+
+// toolComposeConfiguration composes two documents and previews, applies or
+// saves the result: the console's compose endpoints, for an agent.
+func (a *API) toolComposeConfiguration(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Left  composeSource `json:"left"`
+		Right composeSource `json:"right"`
+		config.Recipe
+		Then    string `json:"then"`
+		Name    string `json:"name"`
+		Replace bool   `json:"replace"`
+	}
+	if err := decode(args, &in); err != nil {
+		return nil, err
+	}
+	if in.Left.Source == "remote" || in.Right.Source == "remote" {
+		return nil, fmt.Errorf("a git location is not a source here: pull_configuration puts it on the shelf, " +
+			"then name that configuration")
+	}
+	left, lname, _, err := a.sideDocument(ctx, in.Left, "left")
+	if err != nil {
+		return nil, err
+	}
+	right, rname, _, err := a.sideDocument(ctx, in.Right, "right")
+	if err != nil {
+		return nil, err
+	}
+	result, report, err := config.Compose(left, right, in.Recipe)
+	if err != nil {
+		return nil, err
+	}
+	c := &composed{left: left, right: right, lname: lname, rname: rname, result: result, report: report}
+	c.body.Recipe, c.body.Name = in.Recipe, in.Name
+	out := map[string]any{
+		"changes": config.Compare(left, right),
+		"report":  report,
+	}
+	switch in.Then {
+	case "", "preview":
+		if plan, err := config.PreviewSwitch(ctx, a.st, result); err != nil {
+			out["planError"] = err.Error()
+		} else {
+			out["plan"] = plan
+		}
+		out["note"] = "Nothing was applied: this is what the result would do to this gateway."
+		return out, nil
+	case "apply":
+		if err := report.Blocked(); err != nil {
+			return nil, err
+		}
+		preview, err := config.PreviewSwitch(ctx, a.st, result)
+		if err != nil {
+			return nil, err
+		}
+		if err := a.agentMayApply(preview); err != nil {
+			return nil, err
+		}
+		plan, err := config.Switch(ctx, a.st, result)
+		if err != nil {
+			return nil, err
+		}
+		a.sm.TokenChanged("*")
+		a.auditEvent(ctx, mcpActor(ctx), "configuration.compose", "config", "", "", "",
+			c.describe()+"; "+summarise(plan))
+		if err := a.reloadRouting(ctx); err != nil {
+			return nil, fmt.Errorf("applied, but the routing table could not be reloaded: %w", err)
+		}
+		out["plan"] = plan
+		out["note"] = "This gateway now serves the composed configuration. It is applied, not staged."
+		return out, nil
+	case "save":
+		if err := a.roomForAnother(ctx); err != nil {
+			return nil, err
+		}
+		name, err := store.SanitizeConfigurationName(in.Name)
+		if err != nil {
+			return nil, err
+		}
+		taken, err := a.st.ConfigurationNameTaken(ctx, name, "")
+		if err != nil {
+			return nil, err
+		}
+		if taken && !in.Replace {
+			return nil, fmt.Errorf("a configuration called %s already exists: pass replace: true to "+
+				"replace its document", name)
+		}
+		file, err := config.Marshal(result)
+		if err != nil {
+			return nil, err
+		}
+		saved := store.Configuration{ID: newID(), Name: name}
+		if taken {
+			named, err := a.configurationByName(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			if saved, err = a.st.GetConfiguration(ctx, named.ID); err != nil {
+				return nil, err
+			}
+		}
+		saved.Document = string(file)
+		if err := a.st.SaveConfiguration(ctx, &saved); err != nil {
+			return nil, err
+		}
+		a.auditEvent(ctx, mcpActor(ctx), "configuration.create", "configuration", saved.ID, saved.Name, "",
+			fmt.Sprintf("%s, %d bytes, applied to nothing", c.describe(), len(file)))
+		out["saved"] = saved.Name
+		out["note"] = "Saved on the shelf, applied to nothing: activate_configuration makes it current."
+		return out, nil
+	}
+	return nil, fmt.Errorf("then is one of preview, apply or save, not %q", in.Then)
 }
 
 // routeSchema describes a route to a model. Deliberately not exhaustive: the

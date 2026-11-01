@@ -486,6 +486,19 @@ async function seed() {
   ]) {
     await ok(await api.post('/api/configurations', { data: c }), `configuration ${c.name}`);
   }
+  // Before the portal says what it is: the loom has something to show.
+  const saved = await ok(await api.get('/api/configurations'), 'configurations');
+  const before = saved.find((c) => c.name === 'Before the portal');
+  const running = { source: 'running' };
+  const read = await ok(await api.post('/api/configurations/compose', { data: { left: running, right: running } }), 'running document');
+  const doc = read.left;
+  delete doc.settings.portal;
+  const older = doc.routes.find((r) => r.id === 'orders-api');
+  older.upstream = 'http://orders-api-v1:8080';
+  older.limits = (older.limits ?? []).slice(1);
+  await ok(await api.put(`/api/configurations/${before.id}/document`, {
+    data: JSON.stringify(doc), headers: { 'Content-Type': 'application/yaml' },
+  }), 'Before the portal');
   log('2 saved configurations');
 
   await saveSessions(accounts);

@@ -295,16 +295,6 @@
     "guard": "rootOnly"
   },
   {
-    "method": "POST",
-    "path": "/api/config/preview",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "GET",
-    "path": "/api/config/report",
-    "guard": "rootOnly"
-  },
-  {
     "method": "GET",
     "path": "/api/configurations",
     "guard": "rootOnly"
@@ -315,18 +305,28 @@
     "guard": "rootOnly"
   },
   {
-    "method": "GET",
-    "path": "/api/configurations/current",
+    "method": "POST",
+    "path": "/api/configurations/compose",
     "guard": "rootOnly"
   },
   {
     "method": "POST",
-    "path": "/api/configurations/import",
+    "path": "/api/configurations/compose/apply",
     "guard": "rootOnly"
   },
   {
     "method": "POST",
-    "path": "/api/configurations/pull",
+    "path": "/api/configurations/compose/export",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/compose/push",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "POST",
+    "path": "/api/configurations/compose/save",
     "guard": "rootOnly"
   },
   {
@@ -345,21 +345,6 @@
     "guard": "rootOnly"
   },
   {
-    "method": "POST",
-    "path": "/api/configurations/{id}/activate",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "POST",
-    "path": "/api/configurations/{id}/capture",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "GET",
-    "path": "/api/configurations/{id}/compare/{other}",
-    "guard": "rootOnly"
-  },
-  {
     "method": "GET",
     "path": "/api/configurations/{id}/document",
     "guard": "rootOnly"
@@ -367,36 +352,11 @@
   {
     "method": "PUT",
     "path": "/api/configurations/{id}/document",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "POST",
-    "path": "/api/configurations/{id}/duplicate",
     "guard": "rootOnly"
   },
   {
     "method": "GET",
     "path": "/api/configurations/{id}/export",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "GET",
-    "path": "/api/configurations/{id}/plan",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "POST",
-    "path": "/api/configurations/{id}/pull",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "POST",
-    "path": "/api/configurations/{id}/push",
-    "guard": "rootOnly"
-  },
-  {
-    "method": "PUT",
-    "path": "/api/configurations/{id}/remote",
     "guard": "rootOnly"
   },
   {

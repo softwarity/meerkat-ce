@@ -71,6 +71,10 @@ func HasImage(doc *Document) bool {
 	return imageBytes(doc) > 0 || len(doc.Specs) > 0 || len(doc.Files) > 0
 }
 
+// HasPicture says whether the branding carries a picture: what a plain file
+// leaves behind, where HasImage also counts the specs and files of the routes.
+func HasPicture(doc *Document) bool { return imageBytes(doc) > 0 }
+
 // fileDir holds the files uploaded on routes (ROUTE-22), one directory per
 // route id, each file under the name it is served by.
 const fileDir = "assets/files"

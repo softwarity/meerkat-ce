@@ -26,9 +26,7 @@ const maxConfigBytes = 8 << 20
 
 func (a *API) registerConfig(mux Mux) {
 	mux.Handle("GET /api/config/export", a.rootOnly(a.exportConfig))
-	mux.Handle("GET /api/config/report", a.rootOnly(a.exportReport))
 	mux.Handle("GET /api/config/document", a.rootOnly(a.currentDocument))
-	mux.Handle("POST /api/config/preview", a.rootOnly(a.previewConfig))
 	mux.Handle("POST /api/config/import", a.rootOnly(a.importConfig))
 }
 
@@ -94,59 +92,6 @@ func (a *API) currentDocument(w http.ResponseWriter, r *http.Request, _ store.Us
 		return
 	}
 	writeDocumentText(w, a, file)
-}
-
-// exportReport says what an export will NOT contain, before it is downloaded:
-// the secrets that are literals here and therefore stay behind. The console
-// shows it next to the download, which is the moment the admin can still act
-// on it (VAULT-05 moves a literal into the vault in one click).
-func (a *API) exportReport(w http.ResponseWriter, r *http.Request, _ store.User) {
-	doc, literals, err := config.Export(r.Context(), a.st)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	refs, err := config.Refs(doc)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	if literals == nil {
-		literals = []config.Literal{}
-	}
-	if refs == nil {
-		refs = []string{}
-	}
-	contents := config.Inventory(doc)
-	if contents == nil {
-		contents = []config.Section{}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"contents": contents,
-		"literals": literals,
-		"refs":     refs,
-	})
-}
-
-// previewConfig reports what importing the posted file would do, and changes
-// nothing. It is the screen where the missing secrets are asked for: an admin
-// has the context now, and will not in a week.
-func (a *API) previewConfig(w http.ResponseWriter, r *http.Request, _ store.User) {
-	doc, ok := a.readDocument(w, r)
-	if !ok {
-		return
-	}
-	doc, keep, ok := a.keepOut(w, r, doc)
-	if !ok {
-		return
-	}
-	plan, err := config.Preview(r.Context(), a.st, doc, prune(r))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	markKept(plan, keep)
-	writeJSON(w, http.StatusOK, plan)
 }
 
 // keepOut reads the lines of the plan the operator keeps out

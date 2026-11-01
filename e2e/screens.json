@@ -541,8 +541,8 @@
       ]
     },
     {
-      "path": "/system/configuration/management",
-      "module": "./gateway/configuration/management-tab.component",
+      "path": "/system/configuration/compose",
+      "module": "./gateway/configuration/compose/compose-page.component",
       "title": "Configuration",
       "allowed": [
         "root"

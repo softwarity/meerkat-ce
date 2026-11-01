@@ -30,20 +30,14 @@ import (
 func (a *API) registerConfigurations(mux Mux) {
 	mux.Handle("GET /api/configurations", a.rootOnly(a.listConfigurations))
 	mux.Handle("POST /api/configurations", a.rootOnly(a.captureConfiguration))
-	mux.Handle("POST /api/configurations/import", a.rootOnly(a.storeConfigurationFile))
-	mux.Handle("GET /api/configurations/current", a.rootOnly(a.currentConfiguration))
 	mux.Handle("GET /api/configurations/{id}", a.rootOnly(a.getConfiguration))
 	mux.Handle("PUT /api/configurations/{id}", a.rootOnly(a.renameConfiguration))
 	mux.Handle("DELETE /api/configurations/{id}", a.rootOnly(a.deleteConfiguration))
-	mux.Handle("POST /api/configurations/{id}/duplicate", a.rootOnly(a.duplicateConfiguration))
-	mux.Handle("POST /api/configurations/{id}/capture", a.rootOnly(a.recaptureConfiguration))
 	mux.Handle("PUT /api/configurations/{id}/document", a.rootOnly(a.replaceConfigurationDocument))
-	mux.Handle("POST /api/configurations/{id}/activate", a.rootOnly(a.activateConfiguration))
-	mux.Handle("GET /api/configurations/{id}/plan", a.rootOnly(a.configurationPlan))
-	// Two saved configurations against each other, what runs left out (CFG-04).
-	mux.Handle("GET /api/configurations/{id}/compare/{other}", a.rootOnly(a.compareConfigurations))
 	mux.Handle("GET /api/configurations/{id}/export", a.rootOnly(a.exportConfiguration))
 	mux.Handle("GET /api/configurations/{id}/document", a.rootOnly(a.readConfigurationDocument))
+	// One configuration composed from two (CFG-08): compose.go.
+	a.registerCompose(mux)
 }
 
 // FreeConfigurations is how many the community image holds at once.
@@ -91,64 +85,6 @@ type configurationView struct {
 	// thing that makes it heavy and unreadable - and the reason the export
 	// offers a package.
 	HasImage bool `json:"hasImage,omitempty"`
-}
-
-// currentState is what the first row of the management screen needs, and the
-// question it answers is a COMPARISON, not a flag.
-//
-// "Saved" cannot be a fact recorded once: save a configuration, add a route,
-// and the running state is no longer the one that was saved - a screen still
-// saying "saved as Acme" would be lying, and the operator would find out by
-// switching away and losing an afternoon. So the running document is
-// fingerprinted on every read and matched against the saved digests.
-type currentState struct {
-	Digest string `json:"digest"`
-	// SavedAs names the saved configuration this state MATCHES, when one does.
-	// Nil means what is running exists nowhere else.
-	SavedAs *configurationRef `json:"savedAs,omitempty"`
-	// Active is the one holding the mark, matching or not. When it is set and
-	// SavedAs is nil, the state has DRIFTED from it - which is the case the
-	// warning is for, and the only one where the name is worth showing beside
-	// it ("modified since Acme was saved").
-	Active *configurationRef `json:"active,omitempty"`
-}
-
-type configurationRef struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func (a *API) currentConfiguration(w http.ResponseWriter, r *http.Request, _ store.User) {
-	running, _, err := a.runningDocument(r.Context())
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	digest, err := config.Fingerprint(running)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	out := currentState{Digest: digest}
-	matching, list, err := a.matchesRunning(r.Context(), running)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	for _, c := range list {
-		ref := &configurationRef{ID: c.ID, Name: c.Name}
-		if c.Active {
-			out.Active = ref
-		}
-		// The ACTIVE one wins when several hold the same document: it is the
-		// one the screen is about. Any other match still counts as saved -
-		// what matters to an operator is whether this state exists somewhere,
-		// not which row the mark happens to sit on.
-		if matching[c.ID] && (out.SavedAs == nil || c.Active) {
-			out.SavedAs = ref
-		}
-	}
-	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *API) listConfigurations(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -217,21 +153,6 @@ func (a *API) captureConfiguration(w http.ResponseWriter, r *http.Request, actor
 	writeJSON(w, http.StatusCreated, c)
 }
 
-// recaptureConfiguration refreshes an existing one from the running gateway:
-// the loop is activate, change things in the console, save them back.
-func (a *API) recaptureConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	c, err := a.recapture(r.Context(), actor, c)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, c)
-}
-
 // recapture refreshes a saved configuration from the running gateway and
 // names it the current one. Shared by the endpoint and the agent's tool.
 func (a *API) recapture(ctx context.Context, actor store.User, c store.Configuration) (store.Configuration, error) {
@@ -292,73 +213,6 @@ func (a *API) replaceConfigurationDocument(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, c)
 }
 
-// storeConfigurationFile takes an uploaded document into the collection
-// WITHOUT applying it - the difference with /api/config/import, which applies.
-// A file that lands unapplied can be inspected, planned and compared first,
-// which is the whole point of holding several.
-func (a *API) storeConfigurationFile(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := a.roomForAnother(r.Context()); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	doc, ok := a.readDocument(w, r)
-	if !ok {
-		return
-	}
-	name, ok := a.freeName(w, r, r.URL.Query().Get("name"), "")
-	if !ok {
-		return
-	}
-	file, err := config.Marshal(doc)
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	c := store.Configuration{ID: newID(), Name: name, Document: string(file)}
-	if err := a.st.SaveConfiguration(r.Context(), &c); err != nil {
-		a.internal(w, err)
-		return
-	}
-	a.auditEvent(r.Context(), actor, "configuration.create", "configuration", c.ID, c.Name, "",
-		fmt.Sprintf("imported from a file, %d bytes, applied to nothing", len(file)))
-	writeJSON(w, http.StatusCreated, c)
-}
-
-func (a *API) duplicateConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	source, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	var body struct {
-		Name string `json:"name"`
-	}
-	if err := decodeStrict(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := a.roomForAnother(r.Context()); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	if strings.TrimSpace(body.Name) == "" {
-		body.Name = source.Name + " (copy)"
-	}
-	name, ok := a.freeName(w, r, body.Name, "")
-	if !ok {
-		return
-	}
-	copied := store.Configuration{
-		ID: newID(), Name: name, Description: source.Description, Document: source.Document,
-	}
-	if err := a.st.SaveConfiguration(r.Context(), &copied); err != nil {
-		a.internal(w, err)
-		return
-	}
-	a.auditEvent(r.Context(), actor, "configuration.duplicate", "configuration", copied.ID, copied.Name, "",
-		"copied from "+source.Name)
-	writeJSON(w, http.StatusCreated, copied)
-}
-
 func (a *API) renameConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
 	c, ok := a.configuration(w, r)
 	if !ok {
@@ -406,120 +260,6 @@ func (a *API) deleteConfiguration(w http.ResponseWriter, r *http.Request, actor 
 	}
 	a.auditEvent(r.Context(), actor, "configuration.delete", "configuration", c.ID, c.Name, "", detail)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// configurationPlan answers what activating this one would change, and changes
-// nothing (CFG-04). It is the same traversal the import preview uses, so what
-// the screen shows before a switch is what the switch does.
-func (a *API) configurationPlan(w http.ResponseWriter, r *http.Request, _ store.User) {
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	doc, err := config.Unmarshal([]byte(c.Document))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	doc, keep, ok := a.keepOut(w, r, doc)
-	if !ok {
-		return
-	}
-	plan, err := config.PreviewSwitch(r.Context(), a.st, doc)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	markKept(plan, keep)
-	writeJSON(w, http.StatusOK, plan)
-}
-
-// compareConfigurations says what changes going from {id} to {other}, object
-// by object, without looking at what runs (CFG-04). The answer has the shape
-// of a plan, so the console reads it with the same table as an import.
-func (a *API) compareConfigurations(w http.ResponseWriter, r *http.Request, _ store.User) {
-	from, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	to, err := a.st.GetConfiguration(r.Context(), r.PathValue("other"))
-	if errors.Is(err, store.ErrConfigurationNotFound) {
-		writeErr(w, http.StatusNotFound, "the configuration to compare with was not found")
-		return
-	}
-	if err != nil {
-		a.internal(w, err)
-		return
-	}
-	a1, err := config.Unmarshal([]byte(from.Document))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, from.Name+": "+err.Error())
-		return
-	}
-	b1, err := config.Unmarshal([]byte(to.Document))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, to.Name+": "+err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, config.Plan{
-		Changes: config.Compare(a1, b1), Missing: []config.MissingRef{}, MissingFiles: []config.MissingFile{},
-	})
-}
-
-// activateConfiguration switches to it: apply the document, move the mark,
-// reload.
-//
-// PRUNE, unlike an ordinary import. Importing a file is a merge because the
-// file may legitimately be a fragment; switching to a saved configuration is
-// the opposite promise - after it, the gateway IS that configuration, so what
-// the document does not carry goes. Only in the sections the document has, as
-// everywhere else: a configuration without themes does not wipe the themes.
-//
-// What survives regardless: every living object (accounts, memberships,
-// sessions, tokens, the vault, the audit trail). That is the CFG-01 line, and
-// it is what makes re-activating the previous configuration a real rollback
-// rather than a restore.
-func (a *API) activateConfiguration(w http.ResponseWriter, r *http.Request, actor store.User) {
-	c, ok := a.configuration(w, r)
-	if !ok {
-		return
-	}
-	doc, err := config.Unmarshal([]byte(c.Document))
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	doc, keep, ok := a.keepOut(w, r, doc)
-	if !ok {
-		return
-	}
-	if err := a.agentMayApplyDoc(r.Context(), doc, true, true); err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	plan, err := config.Switch(r.Context(), a.st, doc)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	markKept(plan, keep)
-	// A configuration carries the gateway-wide token policy: every cached
-	// token decision is read again.
-	a.sm.TokenChanged("*")
-	if err := a.st.MarkConfigurationActive(r.Context(), c.ID); err != nil {
-		a.internal(w, err)
-		return
-	}
-	a.auditEvent(r.Context(), actor, "configuration.activate", "configuration", c.ID, c.Name, "",
-		summarise(plan))
-	// Saving IS applying. A reload that fails means a route in this
-	// configuration no longer compiles: say so rather than report a clean
-	// switch - the previous snapshot keeps serving in the meantime.
-	if err := a.reloadRouting(r.Context()); err != nil {
-		a.internal(w, fmt.Errorf("activated, but the routing table could not be reloaded: %w", err))
-		return
-	}
-	writeJSON(w, http.StatusOK, plan)
 }
 
 // exportConfiguration downloads a SAVED one - the plain file, byte for byte

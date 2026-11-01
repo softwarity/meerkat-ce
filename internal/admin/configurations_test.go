@@ -69,64 +69,53 @@ func TestSeveralConfigurations(t *testing.T) {
 		t.Fatalf("capturing the running state did not name it: %s", list)
 	}
 
-	// "Saved" is a comparison, not a flag. This is the assertion that stops the
-	// screen from telling a comfortable lie: save, change one thing, and the
+	ctx := mcpCtx(rootUser(t, f))
+	// By name, the agent's way: the console applies a result, and only this
+	// marks a saved configuration as the one that runs.
+	activate := func(name string) error {
+		args, _ := json.Marshal(map[string]string{"name": name})
+		_, err := f.api.toolActivateConfiguration(ctx, args)
+		return err
+	}
+	// Taken in as the console does: a file on a side, saved under a name.
+	keepFile := func(name, file string) (int, string) {
+		body, _ := json.Marshal(map[string]any{
+			"left": map[string]string{"source": "file", "document": file}, "right": map[string]string{"source": "running"},
+			"name": name,
+		})
+		return f.call(t, "POST", "/api/configurations/compose/save", string(body), f.rootC)
+	}
+
+	// "Saved" is a comparison, not a flag: save, change one thing, and the
 	// running state is no longer the one that was saved.
 	t.Run("saved is a comparison, and drift shows", func(t *testing.T) {
-		type ref struct{ Name string }
-		type currentState struct {
-			Digest  string `json:"digest"`
-			SavedAs *ref   `json:"savedAs"`
-			Active  *ref   `json:"active"`
-		}
-		// A FRESH value every time: json.Unmarshal leaves fields the payload
-		// does not mention untouched, so a reused struct would keep a savedAs
-		// the server has just stopped sending - which is the very thing being
-		// tested, and it passed for the wrong reason once already.
-		read := func() currentState {
+		matches := func() bool {
 			t.Helper()
-			code, body := f.call(t, "GET", "/api/configurations/current", "", f.rootC)
-			if code != http.StatusOK {
-				t.Fatalf("current: %d %s", code, body)
-			}
-			var out currentState
-			if err := json.Unmarshal([]byte(body), &out); err != nil {
+			out, err := f.api.toolListConfigurations(ctx, nil)
+			if err != nil {
 				t.Fatal(err)
 			}
-			return out
+			return strings.Contains(jsonOf(t, out), `"matchesRunning":true`)
 		}
-
-		saved := read()
-		if saved.Digest == "" || saved.SavedAs == nil || saved.SavedAs.Name != "Acme" {
-			t.Fatalf("right after capturing, the running state must read as saved: %+v", saved)
+		if !matches() {
+			t.Fatal("right after capturing, the running state must match what was saved")
 		}
-
-		// One route more, and it is not that configuration any anymore - while
-		// the mark has not moved, which is exactly the state to warn about.
 		drift := strings.Replace(validRoute, "%s", upstream.URL, 1)
 		drift = strings.Replace(drift, `"name": "api"`, `"name": "drifted"`, 1)
 		drift = strings.Replace(drift, "/api/**", "/drift/**", 1)
 		if code, out := f.call(t, "PUT", "/api/routes/drift", drift, f.rootC); code != http.StatusOK {
 			t.Fatalf("put route: %d %s", code, out)
 		}
-		drifted := read()
-		if drifted.SavedAs != nil {
-			t.Fatalf("a changed gateway still claimed to be saved: %+v", drifted)
+		if matches() {
+			t.Fatal("a changed gateway still claimed to match what was saved")
 		}
-		if drifted.Active == nil || drifted.Active.Name != "Acme" {
-			t.Fatalf("the mark must stay put so the screen can say what it drifted from: %+v", drifted)
-		}
-		if drifted.Digest == saved.Digest {
-			t.Fatal("the fingerprint did not move with the configuration")
-		}
-
-		// And back to the saved shape, it reads as saved again: the comparison
-		// has no memory of having disagreed.
+		// And back to the saved shape, it matches again: the comparison has no
+		// memory of having disagreed.
 		if code, _ := f.call(t, "DELETE", "/api/routes/drift", "", f.rootC); code != http.StatusNoContent {
 			t.Fatal("clean up the drift")
 		}
-		if back := read(); back.SavedAs == nil {
-			t.Fatalf("undoing the change must read as saved again: %+v", back)
+		if !matches() {
+			t.Fatal("undoing the change must match again")
 		}
 	})
 
@@ -147,10 +136,10 @@ func TestSeveralConfigurations(t *testing.T) {
 	if code != http.StatusCreated {
 		t.Fatalf("capture second: %d %s", code, body)
 	}
-	empty := id(body)
 
 	t.Run("the plan says what a switch would do, and does nothing", func(t *testing.T) {
-		code, plan := f.call(t, "GET", "/api/configurations/"+acme+"/plan", "", f.rootC)
+		code, plan := f.call(t, "POST", "/api/configurations/compose",
+			`{"left":{"source":"configuration","id":"`+acme+`"},"right":{"source":"running"}}`, f.rootC)
 		if code != http.StatusOK {
 			t.Fatalf("plan: %d %s", code, plan)
 		}
@@ -163,8 +152,8 @@ func TestSeveralConfigurations(t *testing.T) {
 	})
 
 	t.Run("activating switches, and switching back is the rollback", func(t *testing.T) {
-		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate", "", f.rootC); code != http.StatusOK {
-			t.Fatalf("activate: %d %s", code, out)
+		if err := activate("Acme"); err != nil {
+			t.Fatalf("activate: %v", err)
 		}
 		if s := serves("/api/x"); s != http.StatusOK {
 			t.Fatalf("the route did not come back: %d", s)
@@ -177,8 +166,8 @@ func TestSeveralConfigurations(t *testing.T) {
 		}
 		// And back. Activating prunes what the document does not carry, which
 		// is what makes this a switch rather than a merge.
-		if code, out := f.call(t, "POST", "/api/configurations/"+empty+"/activate", "", f.rootC); code != http.StatusOK {
-			t.Fatalf("activate back: %d %s", code, out)
+		if err := activate("Empty"); err != nil {
+			t.Fatalf("activate back: %v", err)
 		}
 		if s := serves("/api/x"); s != http.StatusNotFound {
 			t.Fatalf("switching away left the route behind: %d", s)
@@ -186,31 +175,32 @@ func TestSeveralConfigurations(t *testing.T) {
 	})
 
 	t.Run("a line kept out stays as the gateway holds it", func(t *testing.T) {
-		// Running Empty (no route), activating Acme adds r1 - unless that
-		// line is kept out. The plan says which lines were, before and after.
-		code, plan := f.call(t, "GET", "/api/configurations/"+acme+"/plan?keep=route:r1", "", f.rootC)
-		if code != http.StatusOK || !strings.Contains(plan, `"kept":[{"kind":"route","id":"r1"`) || strings.Contains(plan, `"action":"add"`) {
-			t.Fatalf("plan keeping r1 out: %d %s", code, plan)
+		// Running Empty (no route), importing Acme adds r1 - unless that line
+		// is kept out. The answer says which lines were.
+		code, file := f.call(t, "GET", "/api/configurations/"+acme+"/document", "", f.rootC)
+		if code != http.StatusOK {
+			t.Fatalf("document: %d %s", code, file)
 		}
-		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate?keep=route:r1", "", f.rootC); code != http.StatusOK {
-			t.Fatalf("activate keeping r1 out: %d %s", code, out)
+		code, plan := f.call(t, "POST", "/api/config/import?prune=true&keep=route:r1", file, f.rootC)
+		if code != http.StatusOK || !strings.Contains(plan, `"kept":[{"kind":"route","id":"r1"`) {
+			t.Fatalf("import keeping r1 out: %d %s", code, plan)
 		}
 		if s := serves("/api/x"); s != http.StatusNotFound {
 			t.Fatalf("a route kept out of the switch was created: %d", s)
 		}
-		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate?keep=user:alice", "", f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "kind:id") {
+		if code, out := f.call(t, "POST", "/api/config/import?prune=true&keep=user:alice", file, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "kind:id") {
 			t.Fatalf("not a line: %d %s", code, out)
 		}
 		// Back to Empty for the steps that follow.
-		if code, out := f.call(t, "POST", "/api/configurations/"+empty+"/activate", "", f.rootC); code != http.StatusOK {
-			t.Fatalf("activate back: %d %s", code, out)
+		if err := activate("Empty"); err != nil {
+			t.Fatalf("activate back: %v", err)
 		}
 	})
 
-	t.Run("duplicating, renaming, exporting", func(t *testing.T) {
-		code, body := f.call(t, "POST", "/api/configurations/"+acme+"/duplicate", `{"name":"Acme staging"}`, f.rootC)
+	t.Run("renaming, exporting", func(t *testing.T) {
+		code, body := f.call(t, "POST", "/api/configurations", `{"name":"Acme staging"}`, f.rootC)
 		if code != http.StatusCreated {
-			t.Fatalf("duplicate: %d %s", code, body)
+			t.Fatalf("capture: %d %s", code, body)
 		}
 		copyID := id(body)
 		if code, out := f.call(t, "PUT", "/api/configurations/"+copyID,
@@ -223,7 +213,7 @@ func TestSeveralConfigurations(t *testing.T) {
 		if code != http.StatusOK || !strings.Contains(file, "version: 1") {
 			t.Fatalf("export: %d %s", code, file)
 		}
-		_, source := f.call(t, "GET", "/api/configurations/"+acme, "", f.rootC)
+		_, source := f.call(t, "GET", "/api/configurations/"+copyID, "", f.rootC)
 		var got struct {
 			Document string `json:"document"`
 		}
@@ -231,13 +221,13 @@ func TestSeveralConfigurations(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got.Document != file {
-			t.Fatal("a duplicate's export differs from what it was copied from")
+			t.Fatal("an export differs from the document it was asked of")
 		}
 	})
 
 	t.Run("a file can be taken in without being applied", func(t *testing.T) {
 		file := "version: 1\nroles:\n  - name: taken\n"
-		code, body := f.call(t, "POST", "/api/configurations/import?name=From%20a%20file", file, f.rootC)
+		code, body := keepFile("From a file", file)
 		if code != http.StatusCreated {
 			t.Fatalf("import: %d %s", code, body)
 		}
@@ -246,18 +236,16 @@ func TestSeveralConfigurations(t *testing.T) {
 		}
 	})
 
-	// Importing under a name that is taken is an OVERWRITE, and a different
-	// call from creating: the console asks first, and the audit trail says
-	// which of the two happened.
+	// Saving under a name that is taken is an OVERWRITE, and a different call
+	// from creating: the console asks first, and the audit trail says which of
+	// the two happened.
 	t.Run("a file can replace what a name already holds", func(t *testing.T) {
-		code, body := f.call(t, "POST", "/api/configurations/import?name=Replaceable",
-			"version: 1\nroles:\n  - name: first\n", f.rootC)
+		code, body := keepFile("Replaceable", "version: 1\nroles:\n  - name: first\n")
 		if code != http.StatusCreated {
 			t.Fatalf("import: %d %s", code, body)
 		}
 		target := id(body)
-		if code, body := f.call(t, "POST", "/api/configurations/import?name=Replaceable",
-			"version: 1\nroles: []\n", f.rootC); code != http.StatusConflict {
+		if code, body := keepFile("Replaceable", "version: 1\nroles: []\n"); code != http.StatusConflict {
 			t.Fatalf("re-importing under the same name = %d %s, want 409", code, body)
 		}
 		if code, body := f.call(t, "PUT", "/api/configurations/"+target+"/document",
@@ -314,8 +302,8 @@ func TestSeveralConfigurations(t *testing.T) {
 	})
 
 	t.Run("deleting removes the copy, never the running state", func(t *testing.T) {
-		if code, out := f.call(t, "POST", "/api/configurations/"+acme+"/activate", "", f.rootC); code != http.StatusOK {
-			t.Fatalf("activate: %d %s", code, out)
+		if err := activate("Acme"); err != nil {
+			t.Fatalf("activate: %v", err)
 		}
 		if code, _ := f.call(t, "DELETE", "/api/configurations/"+acme, "", f.rootC); code != http.StatusNoContent {
 			t.Fatal("delete the active one")
@@ -360,13 +348,15 @@ func TestTheCommunityShelfHoldsThree(t *testing.T) {
 		t.Fatal(err)
 	}
 	first = all[0]
-	if code, out := f.call(t, "POST", "/api/configurations/"+first.ID+"/activate", "", f.rootC); code != http.StatusOK {
-		t.Fatalf("set as current on the community image: %d %s", code, out)
+	if code, out := f.call(t, "POST", "/api/configurations/compose/apply",
+		`{"left":{"source":"configuration","id":"`+first.ID+`"},"right":{"source":"running"}}`, f.rootC); code != http.StatusOK {
+		t.Fatalf("apply on the community image: %d %s", code, out)
 	}
 	if code, out := f.call(t, "GET", "/api/configurations/"+first.ID+"/export", "", f.rootC); code != http.StatusOK {
 		t.Fatalf("export: %d %s", code, out)
 	}
-	if code, out := f.call(t, "POST", "/api/configurations/"+first.ID+"/capture", "", f.rootC); code != http.StatusOK {
+	if code, out := f.call(t, "POST", "/api/configurations/compose/save",
+		`{"left":{"source":"running"},"right":{"source":"running"},"name":"`+first.Name+`","replace":true}`, f.rootC); code != http.StatusOK && code != http.StatusCreated {
 		t.Fatalf("save the running state into it: %d %s", code, out)
 	}
 
@@ -400,7 +390,10 @@ func TestTheCommunityImageImportsAFile(t *testing.T) {
 		"settings":{"branding":{"appName":"Acme","hideMark":true}},
 		"roles":[{"name":"FROM_A_FILE"}]}`
 
-	code, body := f.call(t, "POST", "/api/config/preview", file, f.rootC)
+	compose, _ := json.Marshal(map[string]any{
+		"left": map[string]string{"source": "file", "document": file}, "right": map[string]string{"source": "running"},
+	})
+	code, body := f.call(t, "POST", "/api/configurations/compose", string(compose), f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("preview on the community image: %d %s", code, body)
 	}
@@ -425,7 +418,11 @@ func TestTheCommunityImageImportsAFile(t *testing.T) {
 		t.Fatalf("the plan must name the Enterprise part it left out: %q", plan.NotApplied)
 	}
 
-	if code, body := f.call(t, "POST", "/api/configurations/import?name=From%20a%20file", file, f.rootC); code != http.StatusCreated {
+	shelve, _ := json.Marshal(map[string]any{
+		"left": map[string]string{"source": "file", "document": file}, "right": map[string]string{"source": "running"},
+		"name": "From a file",
+	})
+	if code, body := f.call(t, "POST", "/api/configurations/compose/save", string(shelve), f.rootC); code != http.StatusCreated {
 		t.Fatalf("shelve a file on the community image: %d %s", code, body)
 	}
 }

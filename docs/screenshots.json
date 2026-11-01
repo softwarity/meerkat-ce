@@ -200,7 +200,16 @@
     {
       "file": "img/showcase/configuration.webp",
       "plane": "admin",
-      "path": "/infra/configuration",
+      "path": "/system/configuration/compose",
+      "steps": [
+        { "waitFor": "mat-select.srcsel >> nth=1" },
+        { "wait": 800 },
+        { "click": "mat-select.srcsel >> nth=1" },
+        { "click": "mat-option:has-text(\"Before the portal\")" },
+        { "wait": 1200 },
+        { "click": "mat-chip-option:has-text(\"Only differences\")" },
+        { "wait": 800 }
+      ],
       "viewport": [
         1600,
         1000

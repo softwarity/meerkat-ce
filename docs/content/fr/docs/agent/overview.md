@@ -61,7 +61,8 @@ assistant plutôt qu'en cliquant.
 | `get_branding`, `save_branding` | L'identité que portent les pages intégrées. |
 | `list_themes` | Les palettes de couleurs, et celle qui est active. |
 | `export_configuration` | Toute la configuration, sous la forme d'un document lisible. |
-| `save_configuration`, `list_configurations` | Des snapshots nommés, auxquels revenir ; `replace` en rafraîchit un depuis l'état courant, avant un push. |
+| `save_configuration`, `list_configurations`, `activate_configuration` | Des snapshots nommés, auxquels revenir ; `replace` en rafraîchit un depuis l'état courant, avant un push. |
+| `compose_configuration` | Une configuration composée de deux, valeur par valeur : l'aperçu, l'application ou l'enregistrement. |
 | `list_oidc_clients`, `save_oidc_client`, `try_oidc_sign_in` | Les applications qui se connectent par la gateway, et ce qu'une personne donnée y recevrait. |
 | `get_signing_keys`, `set_issuer`, `renew_signing_keys`, `preview_identity` | L'émetteur et les clés publiques, et ce qu'enverrait une identité en brouillon. |
 
@@ -75,7 +76,7 @@ appelle elle-même :
 |---|---|
 | `list_admin_api` | Les sections, puis les endpoints de l'une d'elles, avec un résumé quand la documentation de l'API en a un. |
 | `read_admin_api` | Un GET, comme le ferait la console. |
-| `call_admin_api` | N'importe quelle requête : créer une organisation, annuler un changement depuis l'historique, comparer deux configurations, modifier un thème ou un réglage. |
+| `call_admin_api` | N'importe quelle requête : créer un tenant, annuler un changement depuis l'historique, modifier un thème ou un réglage. |
 
 Ils passent par les mêmes endpoints que la console, avec le jeton de l'agent :
 la garde de l'endpoint décide, un jeton en lecture seule le reste, et le journal

@@ -56,7 +56,7 @@ var agentCovers = map[string][]string{
 	// never a string.
 	"locales": {"list_languages", "read_language", "write_language"},
 	"configurations": {"list_configurations", "save_configuration", "activate_configuration",
-		"pull_configuration", "push_configuration"},
+		"pull_configuration", "push_configuration", "compose_configuration"},
 	// The git locations themselves (CFG-07): an agent lists them, because
 	// pulling needs to name one, and creates or changes one, root's like the
 	// screen. The credential stays a vault reference, typed by a person: an
@@ -213,6 +213,10 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// Certificate created in the cluster.
 		"POST /api/certificates/cert-manager": true,
 		"POST /api/acme/authorities":          true, "PUT /api/acme/authorities/{id}": true,
+		// The composed document (CFG-08) made current, put on the shelf,
+		// downloaded (a trail line) or pushed; the preview is a read.
+		"POST /api/configurations/compose/apply": true, "POST /api/configurations/compose/save": true,
+		"POST /api/configurations/compose/export": true, "POST /api/configurations/compose/push": true,
 		"POST /api/trusted-authorities": true, "PUT /api/trusted-authorities/{id}": true,
 		"DELETE /api/trusted-authorities/{id}": true,
 		// An authority the platform publishes, taken: an entry created, and
@@ -240,15 +244,11 @@ func TestEveryWriteVerbIsClassified(t *testing.T) {
 		// Who may call the scheduler on the internal plane: the mode and the
 		// list, stored.
 		"PUT /api/settings/internal-access": true,
-		"POST /api/configurations":          true, "POST /api/configurations/import": true,
-		// A pull SHELVES a document and applies nothing - but it writes the
+		"POST /api/configurations":          true, // A pull SHELVES a document and applies nothing - but it writes the
 		// row it shelved it in, which is what this list is about.
-		"POST /api/configurations/pull": true, "POST /api/configurations/{id}/pull": true,
-		"POST /api/configurations/{id}/push": true, "PUT /api/configurations/{id}/remote": true,
 		"POST /api/config-remotes": true, "PUT /api/config-remotes/{id}": true,
-		"DELETE /api/config-remotes/{id}":        true,
-		"POST /api/configurations/{id}/activate": true, "POST /api/configurations/{id}/capture": true,
-		"POST /api/configurations/{id}/duplicate": true, "PUT /api/configurations/{id}": true,
+		"DELETE /api/config-remotes/{id}":       true,
+		"PUT /api/configurations/{id}":          true,
 		"PUT /api/configurations/{id}/document": true, "DELETE /api/configurations/{id}": true,
 		"PUT /api/auth-providers/{id}": true, "DELETE /api/auth-providers/{id}": true,
 		"POST /api/identity/signing-keys/renew": true,
@@ -360,7 +360,7 @@ func TestTheToolSetIsWhatWeThinkItIs(t *testing.T) {
 		"activate_configuration",
 		"call_admin_api",
 		"call_route",
-		"cancel_schedule_run",
+		"cancel_schedule_run", "compose_configuration",
 		"delete_group",
 		"delete_oidc_client",
 		"delete_role",

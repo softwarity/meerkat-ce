@@ -130,10 +130,10 @@ A console that replaces YAML files and configuration pipelines.
 
 Read more: [Operations](/docs/operations/overview).
 
-- **Versioned configurations**: named versions, one active, comparison, YAML export and import, automatic restore point on every change. Three at a time in Community, as many as you like in **Enterprise**.
+- **Versioned configurations**: named versions, two of them side by side and a third composed value by value, down to one field or one role in a list, YAML export and import, automatic restore point on every change. Three at a time in Community, as many as you like in **Enterprise**.
 - **No lost update**: two administrators editing the same thing at once are told, instead of one silently erasing the other.
 - **Live console**: a change made by one administrator shows on the others' screens without a reload. *partly*
-- **Configurations in a git repository**: one directory per platform in a shared repository; a pull files the configuration and applies nothing until you activate it, a push commits it under the name of the operator who clicked. GitHub, GitLab, Bitbucket, Azure DevOps, Gitea or your own server, with a token kept in the vault. **Enterprise**
+- **Configurations in a git repository**: one directory per platform in a shared repository; a location is read beside what runs and applies nothing until you decide, a push commits the result to the location you have just read, under the name of the operator who clicked. GitHub, GitLab, Bitbucket, Azure DevOps, Gitea or your own server, with a token kept in the vault. **Enterprise**
 - **Audit log** of every administrative action, with a field-by-field diff, and of the security of the accounts - every sign-in, every refused one with its real reason and address, every factor, passkey, password or token changed by its owner. Append-only, browsable in the console, kept from three months to five years as you choose. *partly*
 - **Audit sent to the collector** over OTLP: the data plane's security events, and the console's changes too. **Enterprise**
 - **Endpoint audit**: one switch per operation of a route's OpenAPI spec, and each call becomes an audit event. **Enterprise** *partly*

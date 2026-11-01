@@ -234,8 +234,8 @@ func (a *API) toolPullConfiguration(ctx context.Context, args json.RawMessage) (
 			return nil, err
 		}
 		if c.RemoteID == "" {
-			return nil, fmt.Errorf("%s is not bound to a git location: push_configuration takes one, "+
-				"or bind it in the console", c.Name)
+			return nil, fmt.Errorf("%s is not bound to a git location: push_configuration binds one, "+
+				"or pull_configuration reads a location into a new configuration", c.Name)
 		}
 		remote, err := a.st.GetConfigRemote(ctx, c.RemoteID)
 		if err != nil {
@@ -497,7 +497,7 @@ func (a *API) configRemoteByName(ctx context.Context, name string) (store.Config
 	}
 	if len(names) == 0 {
 		return store.ConfigRemote{}, errors.New(
-			"this gateway has no git location: one is set up in the console, under the configurations")
+			"this gateway has no git location: save_git_location creates one")
 	}
 	return store.ConfigRemote{}, fmt.Errorf("no git location called %q. There is: %s",
 		name, strings.Join(names, ", "))

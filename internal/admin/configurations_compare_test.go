@@ -21,7 +21,8 @@ func TestComparingTwoEmptyConfigurationsAnswersAnEmptyList(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, body := f.call(t, "GET", "/api/configurations/c1/compare/c2", "", f.rootC)
+	code, body := f.call(t, "POST", "/api/configurations/compose",
+		`{"left":{"source":"configuration","id":"c1"},"right":{"source":"configuration","id":"c2"}}`, f.rootC)
 	if code != http.StatusOK {
 		t.Fatalf("compare: %d %s", code, body)
 	}

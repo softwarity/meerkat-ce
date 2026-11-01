@@ -85,8 +85,8 @@ that holds entries.
   vault exists.
 - **A secret cannot be read back**, by you or by the API. Losing it means
   replacing it at the source.
-- **A configuration import can leave holes**: entries the file refers to and this
-  gateway does not have. The import lists them so you can fill them in straight
-  away.
+- **Applying a configuration can leave holes**: entries it refers to and this gateway
+  does not have. The [Compose](/docs/console/configuration#compose) screen names them
+  before anything is applied; they are reserved empty, to fill in here.
 - **Deleting an entry that is used** breaks whatever pointed at it. Read the
   *Used by* column first.
