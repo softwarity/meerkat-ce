@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.22.0
+
 - **In the portal, the colour scheme switch sits beside the account button.** It leaves the
   profile line of the menu: above the button in a rail, to its left in a top bar, one click
   instead of two. It follows the page shown and is not drawn on a route without a colour
