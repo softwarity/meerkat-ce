@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/softwarity/meerkat/internal/edition"
+	"github.com/softwarity/meerkat/internal/license"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -114,5 +115,52 @@ func TestAnEmptyACMEPartIsNotReported(t *testing.T) {
 	}
 	if len(plan.NotApplied) != 0 {
 		t.Fatalf("nothing was left out, got %q", plan.NotApplied)
+	}
+}
+
+// A Team license holds one tenant, and a document cannot bring a second: it is
+// refused by name, and nothing of it is applied. A tenant already there stays
+// updatable, and with no license there is no ceiling.
+func TestADocumentCannotBringATenantPastTheLicense(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	t.Cleanup(func() { license.Apply(nil) })
+	primary, err := st.PrimaryTenant(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	license.Apply(&license.License{Edition: license.EditionTeam, Tenants: 1, Instances: 1})
+
+	doc, err := Unmarshal([]byte(`{"version":1,"roles":[{"name":"Brought"}],
+		"tenants":[{"id":"second","name":"Second","ownerId":"nobody"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Apply(ctx, st, doc, false)
+	if err == nil || !strings.Contains(err.Error(), `"Second"`) || !strings.Contains(err.Error(), "Team license covers 1") {
+		t.Fatalf("a second tenant through a document: %v", err)
+	}
+	if n, _ := st.CountTenants(ctx); n != 1 {
+		t.Fatalf("%d tenants after a refused document", n)
+	}
+	roles, err := st.ListRoles(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range roles {
+		if r.Name == "Brought" {
+			t.Fatal("a refused document was applied in part")
+		}
+	}
+
+	primary.Description = "changed"
+	same := &Document{Version: 1, Tenants: []store.Tenant{primary}}
+	if _, err := Apply(ctx, st, same, false); err != nil {
+		t.Fatalf("the tenant already there: %v", err)
+	}
+
+	license.Apply(nil)
+	if _, err := Apply(ctx, st, doc, false); err != nil {
+		t.Fatalf("no license, no ceiling: %v", err)
 	}
 }

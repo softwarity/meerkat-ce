@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -8,6 +9,7 @@ import { RouterLink } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, Edition } from '../api.service';
 import { MeService } from '../me.service';
+import { DialogsService } from '../shared/dialogs.service';
 import { EE_FEATURES } from './ee-features';
 
 // What this installation IS, in one place - and the only screen that talks
@@ -15,7 +17,7 @@ import { EE_FEATURES } from './ee-features';
 // its [Enterprise] cap and links here; repeating the pitch on ten screens
 // would turn the console into an advert.
 //
-// Read-only but for one thing: the license, which root pastes here. The mode
+// Read-only but for one thing: the license, which root pastes or removes here. The mode
 // is not switched from here: it is switched where organisations are
 // administered, because that is where someone can see what it costs them.
 interface FeatureRow {
@@ -31,6 +33,7 @@ interface FeatureRow {
 @Component({
   selector: 'app-license-page',
   imports: [
+    DatePipe,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -52,7 +55,11 @@ interface FeatureRow {
             <mat-icon>{{ e.enterprise ? 'workspace_premium' : 'public' }}</mat-icon>
             <div class="grow">
               <div class="title">
-                @if (e.notice) {
+                @if (e.license?.plan === 'team') {
+                  <ng-container i18n="@@Team_edition">Team edition</ng-container>
+                } @else if (e.license) {
+                  <ng-container i18n="@@Enterprise_edition">Enterprise edition</ng-container>
+                } @else if (e.notice) {
                   <ng-container i18n="@@Evaluation_edition">Evaluation edition</ng-container>
                 } @else if (e.enterprise) {
                   <ng-container i18n="@@Enterprise_edition">Enterprise edition</ng-container>
@@ -80,9 +87,13 @@ interface FeatureRow {
                     <dt i18n="@@License_id">License</dt>
                     <dd>{{ l.id }}</dd>
                   }
-                  <dt i18n="@@Updates_until">Updates until</dt>
+                  @if (l.tenants && l.instances) {
+                    <dt i18n="@@License_covers">Covers</dt>
+                    <dd i18n="@@License_covers_value">{{ l.tenants }} tenant(s), {{ l.instances }} instance(s)</dd>
+                  }
+                  <dt i18n="@@Updates_support_until">Updates and support until</dt>
                   <dd>
-                    <span class="nowrap">{{ l.updatesUntil }}</span>
+                    <span class="nowrap">{{ l.updatesUntil | date: 'longDate' }}</span>
                     @if (l.covered === false) {
                       <span class="late" i18n="@@Build_not_covered">this version was released after that date</span>
                     }
@@ -92,20 +103,28 @@ interface FeatureRow {
               @if (e.licenseProblem) {
                 <p class="problem">{{ e.licenseProblem }}</p>
               }
+              @for (over of e.licenseOver; track over) {
+                <p class="problem">{{ over }}</p>
+              }
             </div>
             <!-- Root's, and only on the image a license applies to. A license
                  the deployment mounts is changed where it is mounted. -->
             @if (e.enterprise && me.isRoot()) {
-              <button
-                matButton="tonal"
-                type="button"
-                [disabled]="e.licenseSource === 'file'"
-                [matTooltip]="e.licenseSource === 'file' ? fromFile : ''"
-                (click)="change()"
-                i18n="@@Change_license"
-              >
-                Change license
-              </button>
+              <div class="actions">
+                <button
+                  matButton="tonal"
+                  type="button"
+                  [disabled]="e.licenseSource === 'file'"
+                  [matTooltip]="e.licenseSource === 'file' ? fromFile : ''"
+                  (click)="change()"
+                  i18n="@@Change_license"
+                >
+                  Change license
+                </button>
+                @if (e.licenseSource === 'console') {
+                  <button matButton type="button" (click)="remove()" i18n="@@Remove_license">Remove license</button>
+                }
+              </div>
             }
           </div>
         </mat-card>
@@ -210,6 +229,12 @@ interface FeatureRow {
       }
       .edition .line > mat-icon {
         color: var(--mat-sys-tertiary);
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        gap: 8px;
       }
       .warn {
         border-color: var(--mat-sys-error);
@@ -331,6 +356,7 @@ interface FeatureRow {
 export class LicensePageComponent {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly dialogs = inject(DialogsService);
   protected readonly me = inject(MeService);
 
   protected readonly fromFile = $localize`:@@License_from_file:Set by the deployment (MEERKAT_LICENSE_FILE). Change it there.`;
@@ -379,8 +405,27 @@ export class LicensePageComponent {
       .open(LicenseDialogComponent, { width: '640px' })
       .afterClosed()
       .subscribe((e: Edition | undefined) => {
-        if (e) this.edition.set(e);
+        if (e) this.show(e);
       });
+  }
+
+  // Asked first: every user of the gateway sees the result.
+  protected async remove(): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@Remove_this_license:Remove this license?`,
+      message: $localize`:@@Remove_license_message:The evaluation notice comes back for everyone, on every instance. Traffic and configuration are not touched, and saving the license file again undoes it.`,
+      confirmLabel: $localize`:@@Remove_license:Remove license`,
+      danger: true,
+    });
+    if (!ok) return;
+    this.api.deleteLicense().subscribe((e) => this.show(e));
+  }
+
+  private show(e: Edition): void {
+    // The watermark is part of the page the console was loaded with.
+    const watermarkMoved = !this.edition()?.notice !== !e.notice;
+    this.edition.set(e);
+    if (watermarkMoved) location.reload();
   }
 
   constructor() {

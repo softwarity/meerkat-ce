@@ -16098,6 +16098,49 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Remove the license",
+        "operationId": "deleteLicense",
+        "description": "Forgets the license saved here: an evaluation image shows its notice again, on every instance. Traffic and configuration are not touched. None saved is not an error. Root only. Enterprise edition.",
+        "responses": {
+          "200": {
+            "description": "The edition, without a license",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditionInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not root, or Community edition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Read from MEERKAT_LICENSE_FILE: remove that file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/live": {

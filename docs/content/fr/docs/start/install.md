@@ -19,7 +19,7 @@ sont le **registre** et le tag qui indiquent l'édition.
 | Image | Édition |
 |---|---|
 | `docker.io/softwarity/meerkat:latest` | Community, publique |
-| `docker.io/softwarity/meerkat:eval` | évaluation, publique : tout ce que fait Enterprise, avec une mention d'évaluation - pas pour la production |
+| `docker.io/softwarity/meerkat:eval` | évaluation, publique : tout ce que fait Enterprise, avec une mention d'évaluation - pas pour la production tant qu'une licence n'en fait pas une Team ou une Enterprise |
 | `ghcr.io/softwarity/meerkat:latest` | Enterprise, registre privé |
 
 ```yaml

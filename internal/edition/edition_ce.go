@@ -14,10 +14,9 @@ package edition
 // Name is what the startup line reports.
 const Name = "ce"
 
-// Enterprise is the ONE question the product asks about editions, answered at
-// COMPILE time. There is no per-feature key any more and no licence to read:
-// Meerkat is priced per production instance, so having the Enterprise image is
-// having bought it, and the private registry is what hands it over.
+// Enterprise is the ONE question the product asks about the image, answered at
+// COMPILE time. There is no per-feature key. What separates Team from
+// Enterprise, on the image that holds both, is a license (internal/license).
 //
 // Most Enterprise code is simply absent here (ee/directories, ee/layouts), and
 // absent code refuses by itself. This constant exists for the handful of

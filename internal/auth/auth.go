@@ -2214,7 +2214,7 @@ func previewChrome(t store.Theme, b store.Branding, scheme string, l store.PageL
 		// changing a class - see allLayoutsCSS.
 		LayoutCSS: template.CSS(allLayoutsCSS()), //nolint:gosec // built-in blocks
 		//nolint:gosec // a constant from ee/eval, never anyone's input
-		EvalBanner: template.HTML(evalmark.FlowBanner),
+		EvalBanner: template.HTML(evalmark.Shown(evalmark.FlowBanner)),
 		Preview:    true,
 		// The arrangements the live listener may switch between - a name from
 		// a message becomes a class only if it is one of these.

@@ -28,7 +28,7 @@ import (
 // file, so there is nobody to tell.
 
 // The topics a node re-reads. Closed on purpose: a topic is something a node
-// KEEPS IN MEMORY and would otherwise serve stale, and there are four of those.
+// KEEPS IN MEMORY and would otherwise serve stale.
 // Anything read from the database on every request needs no bus.
 const (
 	// TopicRouting is the compiled route plan: routes, their deposited specs,
@@ -39,6 +39,9 @@ const (
 	// TopicTelemetry is the exporters a node runs towards a collector
 	// (OBS-04, OBS-06): the spans and the pushed counters.
 	TopicTelemetry = "telemetry"
+	// TopicLicense is the license a node honours: pasted on one node, it takes
+	// the evaluation notice off the pages of all of them.
+	TopicLicense = "license"
 )
 
 // The signals, which are the other kind of message on the same channel.

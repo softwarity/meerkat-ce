@@ -67,7 +67,7 @@ Write to us: [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%20
 | | Community | Evaluation | Team | Enterprise |
 | --- | --- | --- | --- | --- |
 | **Price per year** (updates and support) | Free | Free | EUR 4,000 excl. VAT | EUR 24,000 excl. VAT |
-| **Licence** | - | - | Perpetual | Perpetual |
+| **Licence** | - | - | Perpetual fallback | Perpetual fallback |
 | **Where it comes from** | Docker Hub | Docker Hub | The evaluation image and a licence | The evaluation image and a licence |
 | **Production use** | Yes | No | Yes | Yes |
 | **The Enterprise capabilities** | - | Yes | Yes | Yes |
@@ -109,13 +109,15 @@ instance reads it from there.
 - **Checked offline.** The licence is signed by Softwarity and the gateway
   verifies the signature itself. No activation server to reach: the gateway
   never calls us, and there is no usage report anywhere in it.
-- **Perpetual.** A licence does not expire. Its date says how far the covered
+- **Perpetual fallback.** A licence does not expire. Its date says how far the covered
   updates go: a version released after it is outside the agreement, and the
   console says so, but nothing switches off.
 - **Nothing stops in the middle of a night.** A licence never cuts traffic.
   What goes past its ceilings is refused when it is created, with a sentence
   saying so: a second organisation on a Team licence is not created, and
-  everything already in place keeps being served.
+  everything already in place keeps being served. That does not make it covered:
+  while a gateway serves more organisations than its licence covers, the
+  evaluation notice stays.
 - **One licence per company, as many installations as you like.** The same
   licence is pasted into each of them at no extra cost: a Team installation
   keeps its ceilings, one organisation and one instance, but nothing limits how

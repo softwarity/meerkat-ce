@@ -19,6 +19,7 @@ import (
 	"github.com/softwarity/meerkat/internal/auth"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/jsonbody"
+	"github.com/softwarity/meerkat/internal/license"
 	"github.com/softwarity/meerkat/internal/notifier"
 	"github.com/softwarity/meerkat/internal/store"
 )
@@ -876,6 +877,10 @@ func (a *API) createTenant(w http.ResponseWriter, r *http.Request, actor store.U
 	// owns one from its first boot, and single-tenant mode never names it.
 	if n, err := a.st.CountTenants(r.Context()); err == nil && n >= 1 {
 		if err := edition.Require("more than one tenant"); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err := license.TenantRefusal(n); err != nil {
 			writeErr(w, http.StatusForbidden, err.Error())
 			return
 		}

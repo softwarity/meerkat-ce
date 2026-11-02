@@ -25,22 +25,29 @@ import (
 // undone by the next restart of a pod nobody looked at. Without the file, the
 // license is the one pasted in the console, stored for every node.
 //
-// Nothing is switched on or off by it yet: the image is still what decides
-// the edition. It is read, verified and shown, so that the day it removes the
-// evaluation notice, the customers already hold it in the right place.
+// What it switches is held in internal/license, and put there from here: at
+// start, on every look, on a save, and when another node saved one.
+
+// watchInterval is how often WatchLicense looks. A mounted Secret has nobody to
+// announce it, and the instances running are only known by counting them.
+const watchInterval = 30 * time.Second
 
 // licenseInfo is what the screen shows of a verified license. Never the file:
 // it holds nothing secret, but there is no reason to send it back either.
 type licenseInfo struct {
-	ID           string    `json:"id,omitempty"`
-	Licensee     string    `json:"licensee"`
-	Plan         string    `json:"plan,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Licensee string `json:"licensee"`
+	Plan     string `json:"plan,omitempty"`
+	// Tenants and Instances are its ceilings, absent for none.
+	Tenants      int       `json:"tenants,omitempty"`
+	Instances    int       `json:"instances,omitempty"`
 	IssuedAt     time.Time `json:"issuedAt"`
 	UpdatesUntil time.Time `json:"updatesUntil"`
 	// Covered says whether THIS build was released within the updates the
 	// license paid for. Absent when the build carries no date (a dev build).
 	// False switches nothing off: it is said, and that is all.
 	Covered *bool `json:"covered,omitempty"`
+	lic     *license.License
 }
 
 // licenseFileVar names the variable in what the console and the log say.
@@ -65,13 +72,15 @@ func (a *API) verifyLicense(data []byte) (*licenseInfo, error) {
 	case errors.Is(err, license.ErrSignature):
 		return nil, errors.New("its signature is not Softwarity's: the file was changed after it was issued, " +
 			"or it is not a Meerkat license")
+	case errors.Is(err, license.ErrProduct):
+		return nil, errors.New("it was issued for another product")
 	case errors.Is(err, license.ErrNotYet):
 		return nil, errors.New("it is not valid yet: its issue date is in the future")
 	case err != nil:
 		return nil, fmt.Errorf("it is not a license file (%s)", strings.TrimPrefix(err.Error(), "license: "))
 	}
-	info := &licenseInfo{ID: lic.ID, Licensee: lic.Licensee, Plan: lic.Plan,
-		IssuedAt: lic.IssuedAt, UpdatesUntil: lic.ExpiresAt}
+	info := &licenseInfo{ID: lic.ID, Licensee: lic.Licensee, Plan: lic.Edition, Tenants: lic.Tenants,
+		Instances: lic.Instances, IssuedAt: lic.IssuedAt, UpdatesUntil: lic.ExpiresAt, lic: lic}
 	if built, err := time.Parse(time.RFC3339, version.Date); err == nil {
 		covered := lic.Covered(built)
 		info.Covered = &covered
@@ -105,13 +114,74 @@ func (a *API) currentLicense(ctx context.Context) (info *licenseInfo, source, pr
 	return info, "console", ""
 }
 
-// LogLicense says at start what license this node holds, or why the one it was
-// given is refused. A refused license stops nothing: it is a line to read.
+// ReloadLicense puts the license this node holds in force: read again, verified
+// again. A refused one brings the evaluation notice back and stops nothing.
+func (a *API) ReloadLicense(ctx context.Context) error {
+	if !edition.Enterprise {
+		return nil
+	}
+	info, _, _ := a.currentLicense(ctx)
+	a.observeTenants(ctx)
+	apply(info)
+	return nil
+}
+
+// observeTenants tells the license how many tenants are served. Single-tenant
+// mode serves the first and holds the others back, which is what a license for
+// one tenant covers: it is the way down that deletes nothing.
+func (a *API) observeTenants(ctx context.Context) {
+	if a.st.Tenancy(ctx) != store.TenancyMulti {
+		license.ObserveTenants(1)
+		return
+	}
+	if n, err := a.st.CountTenants(ctx); err == nil {
+		license.ObserveTenants(n)
+	}
+}
+
+func apply(info *licenseInfo) {
+	if info == nil {
+		license.Apply(nil)
+		return
+	}
+	// Applying again what is in force would restart the count of an overrun.
+	if held := license.Current(); held == nil || *held != *info.lic {
+		license.Apply(info.lic)
+	}
+}
+
+// WatchLicense follows what no announcement reaches: a Secret updated in place,
+// how many instances are running, and how many tenants are served.
+func (a *API) WatchLicense(ctx context.Context, running func() int) {
+	if !edition.Enterprise {
+		return
+	}
+	t := time.NewTicker(watchInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			if a.LicenseFile != "" {
+				_ = a.ReloadLicense(ctx)
+			}
+			a.observeTenants(ctx)
+			license.Observe(running(), now)
+		}
+	}
+}
+
+// LogLicense puts the license in force at start and says what it is, or why
+// the one this node was given is refused. A refused license stops nothing: it
+// is a line to read.
 func (a *API) LogLicense(ctx context.Context) {
 	if !edition.Enterprise {
 		return
 	}
 	info, source, problem := a.currentLicense(ctx)
+	a.observeTenants(ctx)
+	apply(info)
 	switch {
 	case problem != "":
 		slog.Warn("license", "problem", problem)
@@ -177,5 +247,36 @@ func (a *API) putLicense(w http.ResponseWriter, r *http.Request, actor store.Use
 	}
 	a.auditUpdate(r.Context(), actor, "license.update", "license", info.ID, info.Licensee, "",
 		auditOfLicense(before), auditOfLicense(info))
+	a.announce(r.Context(), store.TopicLicense)
+	a.getEdition(w, r, actor)
+}
+
+// deleteLicense takes the pasted license away, which is all it does: the image
+// goes back to what it is without one, its notice included, and what the license
+// allowed stays where it is. A license refused on reading can be taken away too:
+// it is the one a person most wants gone. Root's, like the paste.
+func (a *API) deleteLicense(w http.ResponseWriter, r *http.Request, actor store.User) {
+	if err := edition.Require("a license"); err != nil {
+		writeErr(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if a.LicenseFile != "" {
+		writeErr(w, http.StatusConflict, fmt.Sprintf("this gateway reads its license from %s (%s): "+
+			"remove that file (its Secret) from the deployment, there is nothing to remove here",
+			licenseFileVar, a.LicenseFile))
+		return
+	}
+	before, source, _ := a.currentLicense(r.Context())
+	if source == "" {
+		a.getEdition(w, r, actor)
+		return
+	}
+	if err := a.st.DeleteLicense(r.Context()); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	held := auditOfLicense(before)
+	a.auditEvent(r.Context(), actor, "license.delete", "license", held.ID, held.Licensee, "", "")
+	a.announce(r.Context(), store.TopicLicense)
 	a.getEdition(w, r, actor)
 }

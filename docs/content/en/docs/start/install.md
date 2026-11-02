@@ -19,7 +19,7 @@ Three images, built from the same commit and carrying the same name: the
 | Image | Edition |
 |---|---|
 | `docker.io/softwarity/meerkat:latest` | community, public |
-| `docker.io/softwarity/meerkat:eval` | evaluation, public: everything Enterprise does, with an evaluation notice - not for production |
+| `docker.io/softwarity/meerkat:eval` | evaluation, public: everything Enterprise does, with an evaluation notice - not for production until a license makes it Team or Enterprise |
 | `ghcr.io/softwarity/meerkat:latest` | Enterprise, private registry |
 
 ```yaml

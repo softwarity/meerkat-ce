@@ -71,7 +71,7 @@ Nous écrire : [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%
 | | Community | Évaluation | Team | Enterprise |
 | --- | --- | --- | --- | --- |
 | **Prix par an** (mises à jour et support) | Gratuite | Gratuite | 4 000 € HT | 24 000 € HT |
-| **Licence** | - | - | Perpétuelle | Perpétuelle |
+| **Licence** | - | - | Perpétuelle, avec repli (*perpetual fallback*) | Perpétuelle, avec repli (*perpetual fallback*) |
 | **D'où elle vient** | Docker Hub | Docker Hub | L'image d'évaluation et une licence | L'image d'évaluation et une licence |
 | **Usage en production** | Oui | Non | Oui | Oui |
 | **Les capacités Enterprise** | - | Oui | Oui | Oui |
@@ -113,13 +113,15 @@ aussi la monter depuis un secret, où chaque instance la lit.
 - **Vérifiée hors ligne.** La licence est signée par Softwarity et la gateway
   en contrôle la signature elle-même. Pas de serveur d'activation à joindre :
   la gateway ne nous appelle jamais, et elle ne contient aucun rapport d'usage.
-- **Perpétuelle.** Une licence n'expire pas. Sa date dit jusqu'où vont les
+- **Perpétuelle, avec repli (*perpetual fallback*).** Une licence n'expire pas. Sa date dit jusqu'où vont les
   mises à jour couvertes : une version publiée après est hors de l'accord, et
   la console le dit, mais rien ne s'éteint.
 - **Rien ne s'arrête au milieu de la nuit.** Une licence ne coupe jamais le
   trafic. Ce qui dépasse ses plafonds est refusé à la création, par une phrase
   qui le dit : une deuxième organisation sur une licence Team ne se crée pas,
-  mais tout ce qui est déjà en place continue d'être servi.
+  mais tout ce qui est déjà en place continue d'être servi. Une licence ne couvre
+  pas pour autant ce qui la dépasse : tant qu'une gateway sert plus d'organisations
+  que sa licence n'en couvre, la mention d'évaluation reste.
 - **Une licence par entreprise, autant d'installations que vous voulez.** La
   même licence se colle dans chacune, sans surcoût : une installation Team
   garde ses plafonds, une organisation et une instance, mais rien ne limite

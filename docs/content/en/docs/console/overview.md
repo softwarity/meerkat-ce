@@ -125,7 +125,12 @@ Learn these five and the console stops surprising you.
   screen that talks about editions: everywhere else a locked control carries its
   badge and links here. On the Enterprise image, root changes the license there:
   **Change license** takes the file pasted, dropped or chosen, and it is checked
-  before it is kept. A license mounted by the deployment (`MEERKAT_LICENSE_FILE`)
+  before it is kept. On the evaluation image, a valid license makes it Team or
+  Enterprise: the evaluation notice goes with no restart, and the screen shows
+  the licensee, what the license covers and what goes past it. While the gateway
+  serves more tenants than the license covers, the notice stays: going back to a
+  single tenant ends that and deletes nothing. **Remove license**
+  goes back to evaluation: the notice returns, and nothing else moves. A license mounted by the deployment (`MEERKAT_LICENSE_FILE`)
   is shown instead, and changed where it is mounted.
 
 ![The License screen: the edition, then every Enterprise feature with how far it is built and the screen it lives on](img/console/license.webp)

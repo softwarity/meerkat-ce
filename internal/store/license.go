@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // SettingLicense is the license a person pasted in the console, kept as the
@@ -28,4 +29,12 @@ func (s *Store) License(ctx context.Context) (string, error) {
 // SetLicense stores a license file. The caller has verified it.
 func (s *Store) SetLicense(ctx context.Context, text string) error {
 	return s.SetSetting(ctx, SettingLicense, text)
+}
+
+// DeleteLicense forgets the stored license file. None stored is not an error.
+func (s *Store) DeleteLicense(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM settings WHERE key = ?`, SettingLicense); err != nil {
+		return fmt.Errorf("store: delete setting %q: %w", SettingLicense, err)
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/evalmark"
+	"github.com/softwarity/meerkat/internal/license"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -22,6 +23,7 @@ func (a *API) registerEdition(mux Mux) {
 	mux.Handle("PUT /api/settings/tenancy", a.appAdmin(a.putTenancy))
 	// Root: the license is the installation owner's contract.
 	mux.Handle("PUT /api/license", a.rootOnly(a.putLicense))
+	mux.Handle("DELETE /api/license", a.rootOnly(a.deleteLicense))
 }
 
 // editionInfo is what the console needs to know before drawing anything.
@@ -68,19 +70,21 @@ type editionInfo struct {
 	// Features are the Enterprise rows of FEATURES.md, as the binary carries
 	// it (CONSOLE-14): the License screen names each and says where it lives.
 	Features []EditionFeature `json:"features"`
-	// Notice is the evaluation image's sentence, empty in both shipped images.
-	// It is not a flag and nothing reads it as one: it is the text itself,
-	// filled by ee/eval the same way the pages and the console's watermark are
-	// (EVAL-01), and the License screen shows it INSTEAD of the perpetual
-	// licence wording - which would be a lie on a build that is licensed for
-	// evaluation only.
+	// Notice is the evaluation image's sentence, empty in the other images and
+	// under a license. It is not a flag and nothing reads it as one: it is the
+	// text itself, filled by ee/eval the same way the pages and the console's
+	// watermark are (EVAL-01), and the License screen shows it INSTEAD of the
+	// perpetual licence wording - which would be a lie on a build that is
+	// licensed for evaluation only.
 	Notice string `json:"notice,omitempty"`
 	// License is the verified license in force, LicenseSource where it comes
 	// from ("file" when MEERKAT_LICENSE_FILE is set, "console" when pasted),
-	// and LicenseProblem why the one held is refused. See license.go.
+	// LicenseProblem why the one held is refused, and LicenseOver what goes
+	// past its ceilings. See license.go.
 	License        *licenseInfo `json:"license,omitempty"`
 	LicenseSource  string       `json:"licenseSource,omitempty"`
 	LicenseProblem string       `json:"licenseProblem,omitempty"`
+	LicenseOver    []string     `json:"licenseOver,omitempty"`
 	// MailReady says an administrator can mail a person their way in - an
 	// invitation, a reset link (AUTH-25) - and MailWhy, when not, why: the
 	// sentence beside the option the console greys out.
@@ -104,11 +108,13 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		DataOrigin:   a.dataOrigin(r),
 		InternalPort: portOf(a.InternalAddr),
 		Features:     a.EnterpriseFeatures,
-		Notice:       evalmark.MailNote,
 	}
 	if edition.Enterprise {
 		info.License, info.LicenseSource, info.LicenseProblem = a.currentLicense(ctx)
+		a.observeTenants(ctx)
+		apply(info.License)
 	}
+	info.Notice = evalmark.Shown(evalmark.MailNote)
 	_, info.MailWhy = a.accessMailOrigin(ctx)
 	info.MailReady = info.MailWhy == ""
 	in := a.internalOf(ctx)
@@ -122,14 +128,29 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if primary, err := a.st.PrimaryTenant(ctx); err == nil {
 		info.PrimaryTenant = primary.ID
 	}
-	if n, err := a.st.CountTenants(ctx); err == nil && info.Tenancy == store.TenancySingle && n > 1 {
-		info.HiddenTenants = n - 1
+	tenants, err := a.st.CountTenants(ctx)
+	if err == nil && info.Tenancy == store.TenancySingle && tenants > 1 {
+		info.HiddenTenants = tenants - 1
 	}
-	if err := edition.Require("more than one tenant"); err != nil {
-		info.TenancyLocked = true
+	if err := multiTenantRefusal(); err != nil {
+		info.TenancyLocked = info.Tenancy == store.TenancySingle
 		info.TenancyLockWhy = err.Error()
 	}
+	for _, over := range []string{license.TenantOverrun(), license.Overrun()} {
+		if over != "" {
+			info.LicenseOver = append(info.LicenseOver, over)
+		}
+	}
 	writeJSON(w, http.StatusOK, info)
+}
+
+// multiTenantRefusal says why this installation cannot serve several tenants,
+// nil when it can.
+func multiTenantRefusal() error {
+	if err := edition.Require("more than one tenant"); err != nil {
+		return err
+	}
+	return license.TenantRefusal(1)
 }
 
 type tenancyPayload struct {
@@ -150,8 +171,8 @@ func (a *API) putTenancy(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusBadRequest, "malformed setting: "+err.Error())
 		return
 	}
-	if body.Tenancy == store.TenancyMulti {
-		if err := edition.Require("more than one tenant"); err != nil {
+	if body.Tenancy == store.TenancyMulti && a.st.Tenancy(r.Context()) != store.TenancyMulti {
+		if err := multiTenantRefusal(); err != nil {
 			writeErr(w, http.StatusForbidden, err.Error())
 			return
 		}

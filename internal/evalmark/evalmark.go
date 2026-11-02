@@ -1,24 +1,42 @@
 // Package evalmark holds the marks the evaluation image puts on what it
-// serves. It is a LEAF: it imports nothing, it decides nothing, and it asks no
-// question about editions.
+// serves. It is a LEAF: it decides nothing and asks no question about editions.
 //
-// There is no boolean here, and none anywhere else either. These strings are
-// empty, and they stay empty unless something fills them. The only thing that
-// ever does is ee/eval, from its init(), and ee/eval reaches the binary only
-// through cmd/meerkat/link_eval.go, which the `eval` build tag compiles. So
-// the community and Enterprise images do not carry an evaluation mark that a
-// flag turns off: the code that would draw one is not in them at all, exactly
-// as ee/layouts is absent from the community image.
+// These strings are empty, and they stay empty unless something fills them.
+// The only thing that ever does is ee/eval, from its init(), and ee/eval
+// reaches the binary only through cmd/meerkat/link_eval.go, which the `eval`
+// build tag compiles. So the community and Enterprise images do not carry an
+// evaluation mark at all, exactly as ee/layouts is absent from the community
+// image.
 //
-// Which also answers the question the marks exist for. Nothing in the console,
-// no environment variable and no configuration can empty these: filling them
-// is a compile-time act, and emptying them again means building another
-// binary.
+// On the evaluation image, one thing takes them away: a license whose
+// signature checks, through Waive. Nothing in the console, no environment
+// variable and no configuration can do it otherwise. Every reader goes through
+// Shown, so that a license pasted at noon takes the marks off without a
+// restart.
 package evalmark
+
+import "sync/atomic"
+
+// waived is true while a license takes the marks away.
+var waived atomic.Bool
+
+// Waive takes the marks away, or brings them back. Only internal/license calls
+// it, and only for a license it has verified.
+func Waive(on bool) { waived.Store(on) }
+
+// Shown is a mark as it is drawn right now: the mark, or "" while a license
+// takes it away.
+func Shown(mark string) string {
+	if waived.Load() {
+		return ""
+	}
+	return mark
+}
 
 // The marks, written once from ee/eval's init() - before any server starts, so
 // nothing reads them while they are being set - and read-only from then on.
-// An empty one is drawn nowhere, which is what every other build gets.
+// An empty one is drawn nowhere, which is what every other build gets. Read
+// them through Shown.
 var (
 	// FlowCSS styles the banner on the pages the gateway serves itself. It is
 	// appended last to those pages' stylesheet.

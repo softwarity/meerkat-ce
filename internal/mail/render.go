@@ -216,7 +216,7 @@ func renderHTML(brand Brand, palette map[string]string, spec Spec) string {
 	}{
 		Spec:     spec,
 		AppName:  brand.AppName,
-		EvalNote: evalmark.MailNote,
+		EvalNote: evalmark.Shown(evalmark.MailNote),
 		// The page's own layering: the ground is the surface, the card a
 		// container on it - the other way round put a beige ground around a
 		// white card, which no page of the flow ever shows.

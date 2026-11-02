@@ -130,7 +130,13 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
   peut donc pas s'en écarter. C'est le seul écran qui parle d'éditions : partout
   ailleurs, un contrôle verrouillé porte son badge et renvoie ici. Sur l'image
   Enterprise, root y change la licence : **Change license** prend le fichier
-  collé, déposé ou choisi, et le vérifie avant de le garder. Une licence montée
+  collé, déposé ou choisi, et le vérifie avant de le garder. Sur l'image
+  d'évaluation, une licence valide en fait une Team ou une Enterprise : la mention
+  d'évaluation disparaît sans redémarrage, et l'écran montre le titulaire, ce que
+  la licence couvre et ce qui le dépasse. Tant que la gateway sert plus de tenants
+  que la licence n'en couvre, la mention reste : repasser en un seul tenant y met
+  fin sans rien supprimer. **Remove license** revient à
+  l'évaluation : la mention revient, et rien d'autre ne bouge. Une licence montée
   par le déploiement (`MEERKAT_LICENSE_FILE`) y est affichée à la place, et se
   change là où elle est montée.
 

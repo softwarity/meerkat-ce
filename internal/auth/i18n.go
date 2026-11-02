@@ -318,8 +318,8 @@ func (h *Handler) flowData(r *http.Request, titleKey string) flowChrome {
 		TraceID:      tracing.ID(r.Context()),
 		ThemeCSS:     css,
 		Layout:       layout,
-		LayoutCSS:    template.CSS(layoutCSS(layout)),    //nolint:gosec // a closed catalogue of built-in blocks
-		EvalBanner:   template.HTML(evalmark.FlowBanner), //nolint:gosec // a constant from ee/eval, never anyone's input
+		LayoutCSS:    template.CSS(layoutCSS(layout)),                    //nolint:gosec // a closed catalogue of built-in blocks
+		EvalBanner:   template.HTML(evalmark.Shown(evalmark.FlowBanner)), //nolint:gosec // a constant from ee/eval, never anyone's input
 		Brand:        brand,
 		Title:        t[titleKey],
 		Lang:         p.Lang,

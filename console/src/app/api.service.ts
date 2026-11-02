@@ -1535,6 +1535,8 @@ export interface Edition {
   license?: License;
   licenseSource?: 'file' | 'console';
   licenseProblem?: string;
+  // What goes past the license's ceilings, each said in a sentence.
+  licenseOver?: string[];
   // An administrator can mail a person their way in - an invitation, a reset
   // link (AUTH-25) - and, when not, why.
   mailReady?: boolean;
@@ -1721,6 +1723,9 @@ export interface License {
   id?: string;
   licensee: string;
   plan?: string;
+  // Its ceilings, absent for none.
+  tenants?: number;
+  instances?: number;
   issuedAt: string;
   updatesUntil: string;
   // Whether this build falls within the updates paid for; absent on a build
@@ -3340,6 +3345,11 @@ export class ApiService {
   // Root: verified by the server before it is kept; answers the edition.
   putLicense(license: string): Observable<Edition> {
     return this.http.put<Edition>('/api/license', { license });
+  }
+
+  // Root: back to what the image is without one; answers the edition.
+  deleteLicense(): Observable<Edition> {
+    return this.http.delete<Edition>('/api/license');
   }
 
   setTenancy(tenancy: 'single' | 'multi'): Observable<Edition> {

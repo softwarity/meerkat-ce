@@ -15,6 +15,7 @@ import (
 
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/idp"
+	"github.com/softwarity/meerkat/internal/license"
 	"github.com/softwarity/meerkat/internal/routing"
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
@@ -198,6 +199,9 @@ func run(ctx context.Context, st *store.Store, doc *Document, prune, commit, who
 			"(no routes, roles, authorities, OIDC clients, mail relay, themes or settings)")
 	}
 	if err := check(doc); err != nil {
+		return nil, err
+	}
+	if err := tenantsCovered(ctx, st, doc); err != nil {
 		return nil, err
 	}
 	plan := &Plan{Prune: prune, NotApplied: notOnCommunity(doc)}
@@ -428,6 +432,34 @@ func oidcBindings(ctx context.Context, st *store.Store, doc *Document, prune boo
 		}
 	}
 	return keep, notes, nil
+}
+
+// tenantsCovered refuses a document that brings a tenant past the license,
+// before anything is written: writes follow one another without a transaction,
+// and a preview must say it too. Compose can leave the tenant out.
+func tenantsCovered(ctx context.Context, st *store.Store, doc *Document) error {
+	if len(doc.Tenants) == 0 {
+		return nil
+	}
+	existing, err := st.ListTenants(ctx)
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, t := range existing {
+		known[t.ID] = true
+	}
+	held := len(existing)
+	for _, t := range doc.Tenants {
+		if known[t.ID] {
+			continue
+		}
+		if err := license.TenantRefusal(held); err != nil {
+			return fmt.Errorf("config: tenant %q: %w", t.Name, err)
+		}
+		held++
+	}
+	return nil
 }
 
 // importTenants writes the organisations a document carries.

@@ -425,6 +425,11 @@
     "guard": "authed"
   },
   {
+    "method": "DELETE",
+    "path": "/api/license",
+    "guard": "rootOnly"
+  },
+  {
     "method": "PUT",
     "path": "/api/license",
     "guard": "rootOnly"

@@ -134,8 +134,9 @@ editions, and the edition is the image:
   the access you were given, named in `image.pullSecrets`. The `values-ee-*`
   files set both; that is the whole difference at install time.
 - **Evaluation**: `docker.io/softwarity/meerkat:eval`, public - everything
-  Enterprise does, with an evaluation notice, not for production. The
-  `values-eval-*` files set it, with no pull secret.
+  Enterprise does, with an evaluation notice, not for production until you give
+  it a license, which makes it Team or Enterprise. The `values-eval-*` files set
+  it, with no pull secret.
 
 Every file is commented line by line: what a variable does, and what it costs
 to forget it. The detail of each variable is on

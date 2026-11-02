@@ -106,7 +106,7 @@ func containsFold(list []string, v string) bool {
 // userButtonScript is the button's script with the evaluation's menu entry
 // and its rules in place (empty in the other editions).
 func userButtonScript() string {
-	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.MenuCSS, "__MK_EVAL__", evalmark.MenuEntry,
+	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.Shown(evalmark.MenuCSS), "__MK_EVAL__", evalmark.Shown(evalmark.MenuEntry),
 		"__MK_SNACKBAR__", snackbarJS,
 		"__MK_NOTIFY_SW_SCOPE__", NotificationsWorkerScope, "__MK_NOTIFY_SW__", NotificationsWorkerPath).Replace(userButtonJS)
 }

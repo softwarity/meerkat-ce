@@ -162,7 +162,7 @@ func serveStampedIndex(w http.ResponseWriter, r *http.Request, fsys fs.FS, name 
 	// same in all three images, and what differs is the binary that serves it.
 	// Empty in the two shipped images, where the string it comes from was
 	// never filled, and then there is nothing to rewrite at all.
-	if attrs == "" && evalmark.ConsoleCSS == "" {
+	if attrs == "" && evalmark.Shown(evalmark.ConsoleCSS) == "" {
 		http.ServeFileFS(w, r, fsys, name)
 		return
 	}
@@ -175,7 +175,7 @@ func serveStampedIndex(w http.ResponseWriter, r *http.Request, fsys fs.FS, name 
 	if attrs != "" {
 		stamped = bytes.Replace(stamped, []byte("<body"), []byte("<body "+attrs), 1)
 	}
-	if css := evalmark.ConsoleCSS; css != "" {
+	if css := evalmark.Shown(evalmark.ConsoleCSS); css != "" {
 		stamped = bytes.Replace(stamped, []byte("</head>"), []byte("<style>"+css+"</style></head>"), 1)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

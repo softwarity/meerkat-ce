@@ -238,7 +238,7 @@ func run(o options) error {
 	switch {
 	case evalmark.StartupNote != "":
 		slog.Info("Meerkat Enterprise edition, "+evalmark.StartupNote+" build",
-			"version", version.Version, "note", "not licensed for production use")
+			"version", version.Version, "note", "not licensed for production use without a license")
 	case edition.Enterprise:
 		slog.Info("Meerkat Enterprise edition", "version", version.Version)
 	default:
@@ -493,6 +493,7 @@ func run(o options) error {
 	//
 	// A single-node installation takes exactly the same path with one member.
 	fleet := metrics.NewFleet()
+	go adminAPI.WatchLicense(ctx, fleet.Nodes)
 	window := metrics.NewWindow(metrics.DefaultWindow)
 	var lastSent map[string]metrics.RouteSnapshot
 	go metrics.Run(ctx, router.Metrics(), fleet, window, bus.Node(), metrics.DefaultInterval,
@@ -974,6 +975,7 @@ func run(o options) error {
 	// every start - an operator who switched something on in the console
 	// finds it on again after a restart - and on every node when it changes.
 	adminAPI.ApplyTelemetry(ctx)
+	bus.Register(store.TopicLicense, adminAPI.ReloadLicense)
 	bus.Register(store.TopicTelemetry, func(ctx context.Context) error {
 		adminAPI.ApplyTelemetry(ctx)
 		return nil

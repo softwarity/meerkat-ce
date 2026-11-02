@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
+import { firstValueFrom } from 'rxjs';
 import { ApiService, BusinessAccess, Settings } from '../api.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -114,8 +115,12 @@ export class GeneralPageComponent {
       if (!ok) return;
     }
     this.switching.set(true);
+    // Under a license for one tenant the mode decides the watermark, which is
+    // part of the page the console was loaded with.
+    const before = await firstValueFrom(this.api.edition());
     this.api.setTenancy(multi ? 'multi' : 'single').subscribe({
-      next: () => {
+      next: (e) => {
+        if (!e.notice !== !before.notice) location.reload();
         void this.me.refreshEdition().then(() => this.switching.set(false));
         this.snack.open($localize`:@@Saved:Saved`, undefined, { duration: 2000 });
       },

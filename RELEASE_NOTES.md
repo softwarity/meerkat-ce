@@ -2,6 +2,21 @@
 
 ## NEXT RELEASE
 
+- **A license turns the evaluation image into Team or Enterprise.** Paste, drop or mount the
+  license file: it is checked offline against the key in the binary, and the evaluation notice
+  goes from the pages, the mails and the console with no restart, on every instance. Nothing
+  calls home.
+- **Team covers one tenant and one instance per installation; Enterprise has no ceiling.** A
+  second tenant is refused with a sentence, when it is created, when a configuration would bring
+  it, or when turning on several tenants. Tenants already there keep being served, but the
+  evaluation notice stays while more are served than the license covers: turning off Several
+  tenants ends it and deletes nothing. More instances than covered for over 15 minutes bring the
+  notice back, and traffic is never touched.
+- **A license is a perpetual fallback.** Past its date, updates and support stop. Nothing else does.
+- **Remove license goes back to evaluation.** On the License screen, root takes a pasted license
+  away: the notice returns on every instance, and traffic and configuration stay as they are. A
+  license mounted by the deployment is removed from the deployment.
+
 ---
 
 ## 1.22.0

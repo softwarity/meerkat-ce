@@ -285,7 +285,7 @@ func WriteFlow(w http.ResponseWriter, page *template.Template, data any, status 
 func AppPage(c FlowChrome) FlowChrome {
 	c.App = true
 	c.Layout = store.PageLayout{Name: store.LayoutCentered}
-	c.LayoutCSS = template.CSS(evalmark.FlowCSS) //nolint:gosec // a constant from ee/eval, never anyone's input
+	c.LayoutCSS = template.CSS(evalmark.Shown(evalmark.FlowCSS)) //nolint:gosec // a constant from ee/eval, never anyone's input
 	return c
 }
 
