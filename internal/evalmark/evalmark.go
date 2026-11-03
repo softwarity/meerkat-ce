@@ -3,12 +3,11 @@
 //
 // These strings are empty, and they stay empty unless something fills them.
 // The only thing that ever does is ee/eval, from its init(), and ee/eval
-// reaches the binary only through cmd/meerkat/link_eval.go, which the `eval`
-// build tag compiles. So the community and Enterprise images do not carry an
-// evaluation mark at all, exactly as ee/layouts is absent from the community
-// image.
+// reaches the binary only through cmd/meerkat/link_eval.go, which every build
+// with the `ee` tag compiles. So the community image carries no evaluation
+// mark at all, exactly as ee/layouts is absent from it.
 //
-// On the evaluation image, one thing takes them away: a license whose
+// On softwarity/meerkat, one thing takes them away: a license whose
 // signature checks, through Waive. Nothing in the console, no environment
 // variable and no configuration can do it otherwise. Every reader goes through
 // Shown, so that a license pasted at noon takes the marks off without a

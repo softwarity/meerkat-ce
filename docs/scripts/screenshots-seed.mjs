@@ -19,7 +19,8 @@
 // which is why screenshots.mjs starts a --traffic-only run of its own while it
 // shoots the shots that need one.
 import { readFile, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -287,6 +288,22 @@ async function seed() {
 
   const edition = await ok(await api.get('/api/edition'), 'edition');
   if (!edition.enterprise) throw new Error('this is not the Enterprise image: build with -tags ee');
+
+  // softwarity/meerkat is an evaluation until it holds a license, and the
+  // showcase shows the product, not the notice. The license is read from this
+  // machine, never from the repository: the repository is mirrored in public,
+  // and a license file that leaks cannot be revoked.
+  const licenses = process.env.MEERKAT_DOC_LICENSE
+    ? [process.env.MEERKAT_DOC_LICENSE]
+    : (() => {
+        const dir = join(homedir(), '.config/softwarity/licenses');
+        return existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.lic') && f.includes('enterprise')).map((f) => join(dir, f)) : [];
+      })();
+  if (!licenses.length) {
+    throw new Error('no Enterprise license to give the instance: set MEERKAT_DOC_LICENSE to a license file, or the captures carry the evaluation notice');
+  }
+  await ok(await api.put('/api/license', { data: { license: readFileSync(licenses[0], 'utf8') } }), 'license');
+  log('licensed, from', licenses[0]);
   const tenant = edition.primaryTenant;
 
   if ((await ok(await api.get('/api/routes'), 'routes')).length) {

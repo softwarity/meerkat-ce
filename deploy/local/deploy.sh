@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Builds the images from this tree and installs them side by side in one
 # namespace of the cluster kubectl points at - the loop for looking at a change
-# in the three shapes it ships in:
+# in the two images it ships as:
 #
-#   ee     the Enterprise image          release meerkat
-#   ce     the community image           release meerkat-ce
-#   eval   the evaluation image          release meerkat-eval
+#   ee     softwarity/meerkat: an evaluation until a license is given  release meerkat
+#   ce     the community image                                         release meerkat-ce
 #
-#   deploy/local/deploy.sh             all three
-#   deploy/local/deploy.sh ee eval     only those
+#   deploy/local/deploy.sh             both
+#   deploy/local/deploy.sh ee          only that one
 #
 # NAMESPACE says where; it is read from deploy/local/env.local when that file
 # exists (untracked: it names your cluster, not the project).
@@ -31,7 +30,7 @@ cd "$(dirname "$0")/../.."
 NAMESPACE=${NAMESPACE:?set NAMESPACE, or write NAMESPACE=... in deploy/local/env.local}
 
 editions=("$@")
-[ ${#editions[@]} -gt 0 ] || editions=(ee ce eval)
+[ ${#editions[@]} -gt 0 ] || editions=(ee ce)
 
 stamp=$(date +%m%d-%H%M%S)
 rev=$(git rev-parse --short HEAD)
@@ -40,8 +39,8 @@ for edition in "${editions[@]}"; do
   case "$edition" in
     ee)   release=meerkat;      tags="ee";      flavour=ee; ports=(8080 8443 19090 19443); plug=22222; says="Enterprise edition" ;;
     ce)   release=meerkat-ce;   tags="";        flavour=ce; ports=(8081 8444 19091 19444); plug="";    says="Community edition" ;;
-    eval) release=meerkat-eval; tags="ee eval"; flavour=ee; ports=(8083 8446 19093 19446); plug=22223; says="Enterprise edition" ;;
-    *) echo "unknown edition '$edition': ee, ce or eval" >&2; exit 2 ;;
+    eval) echo "there is no evaluation build any more: the ee image IS the evaluation until a license is given" >&2; exit 2 ;;
+    *) echo "unknown edition '$edition': ee or ce" >&2; exit 2 ;;
   esac
   tag="$edition-$stamp"
   echo "== $edition: building meerkat:$tag"

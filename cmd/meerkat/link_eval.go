@@ -1,13 +1,14 @@
-//go:build eval
+//go:build ee
 
 package main
 
-// The evaluation image, in one import. THIS FILE is the whole difference
-// between what a customer runs and what an evaluator runs: ee/eval's init()
-// fills internal/evalmark, and every surface that draws a mark draws it
-// because the string is no longer empty.
+// The evaluation notice, in one import. ee/eval's init() fills
+// internal/evalmark, and every surface that draws a mark draws it because the
+// string is no longer empty.
 //
-// Neither of the two shipped images compiles this file, so neither carries the
-// marks nor a flag that hides them. Building without `eval` is what removes
-// them, which is the only thing that can.
+// It is part of every Enterprise build: there are two images, the community
+// one, which has neither the Enterprise code nor this, and softwarity/meerkat,
+// which has both. That one is an evaluation until a license says it is Team
+// or Enterprise (EVAL-06); nothing else takes the notice away, and no build
+// exists without it.
 import _ "github.com/softwarity/meerkat/ee/eval"

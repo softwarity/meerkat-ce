@@ -742,8 +742,8 @@ jobs:
             echo "rev=${SHA::7}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
-      # THE IMAGE: softwarity/meerkat on Docker Hub. The Enterprise build plus
-      # ee/eval: every feature, and the evaluation notice on each surface
+      # THE IMAGE: softwarity/meerkat on Docker Hub. The Enterprise build, which
+      # links ee/eval: every feature, and the evaluation notice on each surface
       # someone reads until a license is given (EVAL-06). A Team or Enterprise
       # customer runs this very image with their license; there is no other.
       # Publishing it in the open is safe because the mirror strips ee/ from
@@ -778,7 +778,7 @@ jobs:
             VERSION=dev
             GIT_REV=${{ steps.meta.outputs.rev }}
             BUILD_DATE=${{ steps.meta.outputs.date }}
-            GO_TAGS=ee eval
+            GO_TAGS=ee
             EDITION=ee
       - run: echo "published docker.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: sigstore/cosign-installer@v4.1.2
