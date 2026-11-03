@@ -26,6 +26,13 @@ on:
         description: Copy and retag for real. Off, it only prints the plan.
         type: boolean
         default: false
+      only:
+        description: >-
+          Retag only these, as "tag=sha256:..." separated by spaces, without
+          reading the whole repository again: Docker Hub counts every read, and
+          the full plan alone spends most of an hour's allowance.
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -62,6 +69,7 @@ jobs:
             | grep -i '^ratelimit\|^docker-ratelimit-source' || echo "no limit reported: not counted"
 
       - name: Plan
+        if: inputs.only == ''
         run: |
           set -euo pipefail
           dg() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
@@ -108,7 +116,7 @@ jobs:
           column -t -s $'\t' plan.tsv
 
       - name: Copy to meerkat-ce, with the signatures
-        if: inputs.apply
+        if: inputs.apply && inputs.only == ''
         run: |
           set -euo pipefail
           token=$(curl -fsS "https://auth.docker.io/token?service=registry.docker.io&scope=repository:softwarity/meerkat:pull" | jq -r .token)
@@ -129,6 +137,20 @@ jobs:
             crane tag "$CE@$d" "$tag"
             echo "copied   meerkat:$tag -> meerkat-ce:$tag ($d)"
           done < plan.tsv
+
+      - name: The given tags only
+        if: inputs.only != ''
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          set -euo pipefail
+          : > plan.tsv
+          for pair in $ONLY; do
+            tag=${pair%%=*} d=${pair#*=}
+            [[ "$tag" =~ ^[0-9]+(\.[0-9]+){0,2}$ && "$d" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::not tag=sha256:...: $pair"; exit 1; }
+            printf 'retag\t%s\t(given)\t%s\n' "$tag" "$d" >> plan.tsv
+          done
+          column -t -s $'\t' plan.tsv
 
       - name: Retag meerkat on the evaluation builds
         if: inputs.apply
