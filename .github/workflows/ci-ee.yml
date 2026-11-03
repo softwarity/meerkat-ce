@@ -10,7 +10,7 @@ name: CI - Enterprise
 # it is told about, and runs on it what the community pipeline (ci.yml) cannot:
 # everything built with the ee tag, the suite on PostgreSQL, the two
 # directories only the Enterprise driver talks to, the integration suite
-# driving the multi-organisation product, and the Enterprise image.
+# driving the multi-organisation product, and the image, softwarity/meerkat.
 #
 # WHAT A PUBLIC RUNNER MAKES PUBLIC, and what this file does about each:
 #
@@ -47,8 +47,8 @@ name: CI - Enterprise
 #
 # A RELEASE IS AN APPROVAL. Every run on main ends on a job that waits on the
 # `release` environment, where a reviewer is required. Approving it releases
-# the build that just went green: the Enterprise image this very run pushed is
-# re-tagged BY DIGEST under its semver - nothing is rebuilt, what ships is what
+# the build that just went green: the image this very run pushed is stamped
+# from its digest under its semver - nothing is rebuilt, what ships is what
 # was tested - the community image follows, and release-flow cuts the version
 # on the private repository (notes, commit, tag, GitHub Release). The bump
 # rides in the approval's comment: empty is a patch, `minor` or `major` say
@@ -649,19 +649,19 @@ jobs:
           docker service ls || true
           docker service ps tunnel_checkout --no-trunc || true
 
-  # The Enterprise image, once everything is green. It is the artifact that IS
-  # the licence: what separates it from the community one is the code the
-  # linker put in it, not a flag it reads.
+  # The image, once everything is green: softwarity/meerkat, which a license
+  # turns into Team or Enterprise. What separates it from the community one,
+  # softwarity/meerkat-ce, is the code the linker put in it, not a flag it reads.
   #
   # Written out rather than calling _docker.yml: a reusable workflow checks
   # out the repository that CALLS it, and the sources are in another one; and
   # its jobs would need the environment, which a called workflow cannot be
   # handed reliably. Both architectures, from one build (see the Dockerfile).
   #
-  # Every run publishes `latest`; the semver tags are added to this very image,
-  # by digest, by the release job below once it is approved. A tag is a
-  # pointer: what removes the manifests it stops naming is the weekly prune on
-  # the private side (prune-packages.yml), not the push.
+  # Every run publishes `latest`; the semver tags are stamped from this very
+  # image, by digest, by the release job below once it is approved. A tag is a
+  # pointer: pushing `latest` again leaves the manifest it named stored,
+  # untagged.
   #
   # THE GATE: everything it needs has PASSED.
   # The Enterprise image on a real OpenShift (okd.yml), at the commit under
@@ -677,7 +677,7 @@ jobs:
     secrets: inherit
 
   image:
-    name: Build & publish the Enterprise image
+    name: Build & publish the image
     needs: [source, lint, unit, postgres, directories, e2e, tunnel, okd]
     if: >-
       !cancelled()
@@ -696,10 +696,10 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      # What was pushed, exactly: the release re-tags this and nothing else.
+      # What was pushed, exactly: the release stamps this and nothing else.
       digest: ${{ steps.build.outputs.digest }}
-      # Same, for the evaluation image (EVAL-01).
-      eval-digest: ${{ steps.build-eval.outputs.digest }}
+      # When it was built, as the binaries say it: what a license is compared with.
+      built: ${{ steps.meta.outputs.date }}
     steps:
       - id: token
         uses: actions/create-github-app-token@v3
@@ -729,14 +729,11 @@ jobs:
           buildkitd-config-inline: |
             [registry."docker.io"]
               mirrors = ["mirror.gcr.io"]
-      # A classic token with write:packages. This repository's own GITHUB_TOKEN
-      # cannot push to a package that belongs to another repository, and GH
-      # Packages does not document accepting an App's token.
-      - uses: docker/login-action@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_WRITE_PACKAGE }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
       - id: meta
         env:
           SHA: ${{ needs.source.outputs.sha }}
@@ -745,12 +742,23 @@ jobs:
             echo "rev=${SHA::7}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
+      # THE IMAGE: softwarity/meerkat on Docker Hub. The Enterprise build plus
+      # ee/eval: every feature, and the evaluation notice on each surface
+      # someone reads until a license is given (EVAL-06). A Team or Enterprise
+      # customer runs this very image with their license; there is no other.
+      # Publishing it in the open is safe because the mirror strips ee/ from
+      # the public tree (mirror-ce), so the sources that would rebuild it
+      # without its notice are not out there. The community edition is
+      # softwarity/meerkat-ce, built by the mirror (ci.yml).
+      #
+      # `latest` follows main: every push that passed the tests above. The
+      # release job adds X.Y.Z, X.Y and X.
+      #
       # No layer cache: on a public repository it is readable from a fork's
       # pull request, and the build stage COPYs the sources into a layer.
       #
       # The labels name the PRIVATE repository, by hand: derived from this
-      # run they would name the mirror, and the source label is also what GH
-      # Packages reads to connect a package to a repository.
+      # run they would name the mirror.
       #
       # VERSION is `dev`: the version is not known when the image is built,
       # it is chosen when the image is approved, and this image is never
@@ -762,7 +770,7 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/softwarity/meerkat:latest
+          tags: docker.io/softwarity/meerkat:latest
           labels: |
             org.opencontainers.image.source=https://github.com/softwarity/meerkat
             org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
@@ -770,9 +778,9 @@ jobs:
             VERSION=dev
             GIT_REV=${{ steps.meta.outputs.rev }}
             BUILD_DATE=${{ steps.meta.outputs.date }}
-            GO_TAGS=ee
+            GO_TAGS=ee eval
             EDITION=ee
-      - run: echo "published ghcr.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: echo "published docker.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: sigstore/cosign-installer@v4.1.2
       # Signed BY DIGEST: a signature attached to a tag would drift the day
       # somebody moved the tag. This signs `latest`, and what a release stamps
@@ -787,61 +795,10 @@ jobs:
       #
       # The registry credentials are the ones docker/login-action put in place
       # above: cosign pushes the signature as an OCI artifact beside the image,
-      # in the same package, and needs nothing of its own.
+      # in the same repository, and needs nothing of its own.
       - name: Sign the image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${DIGEST}"
-          .github/scripts/signatures.sh verify "ghcr.io/softwarity/meerkat@${DIGEST}"
-
-      # THE EVALUATION IMAGE (EVAL-01). The Enterprise build plus ee/eval, and
-      # nothing else: every feature, no time limit, no counter, no switch that
-      # stops the data plane. What it adds is a notice on each surface someone
-      # reads, which is what makes it unusable in front of a production
-      # without taking anything away from an evaluation.
-      #
-      # On DOCKER HUB, beside the community image, and not on GH Packages
-      # where the Enterprise one lives: an image nobody outside the org can
-      # pull is an image nobody can evaluate. Publishing it in the open is
-      # safe because the mirror strips ee/ from the public tree (mirror-ce),
-      # so the sources that would rebuild it without its marks are not out
-      # there.
-      #
-      # `eval` is to this image what `latest` is to the other two. The release
-      # job adds X.Y.Z-eval, and only the full version: `1.2-eval` and
-      # `1-eval` would be floating tags on a build whose whole point is to be
-      # identifiable.
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_RW }}
-      - id: build-eval
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: docker.io/softwarity/meerkat:eval
-          labels: |
-            org.opencontainers.image.source=https://github.com/softwarity/meerkat
-            org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
-          build-args: |
-            VERSION=dev
-            GIT_REV=${{ steps.meta.outputs.rev }}
-            BUILD_DATE=${{ steps.meta.outputs.date }}
-            GO_TAGS=ee eval
-            EDITION=ee
-      - run: echo "published docker.io/softwarity/meerkat:eval @ ${{ steps.build-eval.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
-      # Signed by digest like the other two (DEPLOY-08): an evaluation image is
-      # the one most likely to be pulled by somebody who has never met us, and
-      # the signature is what says it came from this workflow rather than from
-      # whoever re-published it with the notices taken out.
-      - name: Sign the evaluation image
-        env:
-          DIGEST: ${{ steps.build-eval.outputs.digest }}
         run: |
           cosign sign --yes --recursive "docker.io/softwarity/meerkat@${DIGEST}"
           .github/scripts/signatures.sh verify "docker.io/softwarity/meerkat@${DIGEST}"
@@ -869,8 +826,8 @@ jobs:
   # environment variable. A new manifest is also an UNSIGNED one: the job
   # signs each stamp itself, then verifies every tag it pushed.
   #
-  # The community image is the mirror's (ci.yml, Docker Hub, from the public
-  # tree). Its `latest` is stamped the same way when its revision label names
+  # The community image is the mirror's (ci.yml, softwarity/meerkat-ce on
+  # Docker Hub, from the public tree). Its `latest` is stamped the same way when its revision label names
   # the mirror commit of this very source commit; when the mirror's pipeline
   # has not finished yet, or `latest` has moved on, it is built here instead,
   # from the private tree without the ee tag - the same bytes, four minutes.
@@ -972,23 +929,18 @@ jobs:
           buildkitd-config-inline: |
             [registry."docker.io"]
               mirrors = ["mirror.gcr.io"]
-      - name: Log in to GH Packages
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_WRITE_PACKAGE }}
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_RW }}
 
-      # The Enterprise image: the digest the image job pushed, nothing else.
-      # The digest names an index, and the stamp is built for each platform in
-      # it from that platform's own image.
-      - name: Stamp and tag the Enterprise image
-        id: ee
+      # The image: the digest the image job pushed, nothing else. The digest
+      # names an index, and the stamp is built for each platform in it from
+      # that platform's own image. `latest` already points at that digest, or
+      # at a later push: it is not moved here.
+      - name: Stamp and tag the image
+        id: meerkat
         uses: docker/build-push-action@v7
         with:
           context: docker
@@ -996,29 +948,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            BASE=ghcr.io/softwarity/meerkat@${{ needs.image.outputs.digest }}
+            BASE=docker.io/softwarity/meerkat@${{ needs.image.outputs.digest }}
             VERSION=${{ steps.next.outputs.version }}
           tags: |
-            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.version }}
-            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
-            ghcr.io/softwarity/meerkat:${{ steps.next.outputs.major }}
-
-      # The evaluation image: the digest the image job pushed, stamped with the
-      # version the same way, and tagged X.Y.Z-eval. The floating `eval` tag
-      # already points at this digest - it was pushed as `eval` - so there is
-      # nothing to move here.
-      - name: Stamp and tag the evaluation image
-        id: eval
-        uses: docker/build-push-action@v7
-        with:
-          context: docker
-          file: docker/Dockerfile.stamp
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            BASE=docker.io/softwarity/meerkat@${{ needs.image.outputs.eval-digest }}
-            VERSION=${{ steps.next.outputs.version }}
-          tags: docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}-eval
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
+            docker.io/softwarity/meerkat:${{ steps.next.outputs.major }}
 
       # The community image: is Docker Hub's `latest` the mirror's build of
       # this very commit? The mirror commit names the private one in its
@@ -1039,10 +974,10 @@ jobs:
           # /dev/null, read as "not this commit" on every release up to 1.6.0:
           # each one rebuilt the community image instead of stamping the one
           # the mirror had tested. Both platforms carry the same labels.
-          built=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest \
+          built=$(docker buildx imagetools inspect docker.io/softwarity/meerkat-ce:latest \
             --format '{{index (index .Image "linux/amd64").Config.Labels "org.opencontainers.image.revision"}}')
           if [ -n "$mirrored" ] && [ "$mirrored" = "$built" ]; then
-            digest=$(docker buildx imagetools inspect docker.io/softwarity/meerkat:latest --format '{{.Manifest.Digest}}')
+            digest=$(docker buildx imagetools inspect docker.io/softwarity/meerkat-ce:latest --format '{{.Manifest.Digest}}')
             echo "stamp=true" >> "$GITHUB_OUTPUT"
             echo "digest=$digest" >> "$GITHUB_OUTPUT"
             echo "Docker Hub's latest is the mirror's ${mirrored::7}, built from this commit: stamped, not rebuilt"
@@ -1060,12 +995,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            BASE=docker.io/softwarity/meerkat@${{ steps.community.outputs.digest }}
+            BASE=docker.io/softwarity/meerkat-ce@${{ steps.community.outputs.digest }}
             VERSION=${{ steps.next.outputs.version }}
           tags: |
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.major }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.version }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.minor }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.major }}
       # The fallback: the same bytes the mirror would build, with the version
       # linked in since it is known here. No layer cache, for the reason the
       # image job gives: the build stage holds the whole private tree.
@@ -1079,9 +1014,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.version }}
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.minor }}
-            docker.io/softwarity/meerkat:${{ steps.next.outputs.major }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.version }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.minor }}
+            docker.io/softwarity/meerkat-ce:${{ steps.next.outputs.major }}
           labels: |
             org.opencontainers.image.source=https://github.com/softwarity/meerkat-ce
             org.opencontainers.image.revision=${{ needs.source.outputs.sha }}
@@ -1102,14 +1037,12 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Sign what was pushed
         env:
-          EE: ${{ steps.ee.outputs.digest }}
-          EVAL: ${{ steps.eval.outputs.digest }}
+          MEERKAT: ${{ steps.meerkat.outputs.digest }}
           CE: ${{ steps.ce-stamp.outputs.digest || steps.ce-build.outputs.digest }}
         run: |
           set -e
-          cosign sign --yes --recursive "ghcr.io/softwarity/meerkat@${EE}"
-          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${EVAL}"
-          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${CE}"
+          cosign sign --yes --recursive "docker.io/softwarity/meerkat@${MEERKAT}"
+          cosign sign --yes --recursive "docker.io/softwarity/meerkat-ce@${CE}"
       - name: Every tag pushed is signed
         env:
           V: ${{ steps.next.outputs.version }}
@@ -1117,10 +1050,18 @@ jobs:
           MAJOR: ${{ steps.next.outputs.major }}
         run: |
           .github/scripts/signatures.sh verify \
-            "ghcr.io/softwarity/meerkat:${V}" "ghcr.io/softwarity/meerkat:${MINOR}" "ghcr.io/softwarity/meerkat:${MAJOR}" \
-            "docker.io/softwarity/meerkat:${V}-eval" \
             "docker.io/softwarity/meerkat:${V}" "docker.io/softwarity/meerkat:${MINOR}" "docker.io/softwarity/meerkat:${MAJOR}" \
+            "docker.io/softwarity/meerkat-ce:${V}" "docker.io/softwarity/meerkat-ce:${MINOR}" "docker.io/softwarity/meerkat-ce:${MAJOR}" \
             | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # What only a release knows, written where release-flow reads its notes.
+      # The image is built before its version is chosen, so the date has to come
+      # from that run, and a schema that moved has to be said by something that
+      # cannot forget. The site's list of releases reads both from there.
+      - name: The notes say when this was built and what it does to the database
+        env:
+          BUILT: ${{ needs.image.outputs.built }}
+        run: .github/scripts/release-facts.sh "$BUILT"
 
       # Last, because its push starts the next run: the notes, the commit, the
       # tag and the GitHub Release, on the private repository. gh resolves the

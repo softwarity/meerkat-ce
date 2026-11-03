@@ -12,12 +12,35 @@
   evaluation notice stays while more are served than the license covers: turning off Several
   tenants ends it and deletes nothing. More instances than covered for over 15 minutes bring the
   notice back, and traffic is never touched.
-- **A license is a perpetual fallback.** Past its date, updates and support stop. Nothing else does.
+- **A license is a perpetual fallback.** Past its date, updates and support stop, and the versions
+  built until then stay yours. A version built after that date runs as an evaluation, the
+  notice included and traffic untouched, until a version from the term runs or the license is
+  renewed. The license counts to the end of its last day.
+- **A version past the license does not migrate the database on its own.** Running it can be
+  undone, a migration cannot: an earlier version no longer opens the database. So it stops before
+  migrating, writes nothing and says why in its log; the version you ran before starts again as it
+  was. Renew the license, or take a backup and set `MEERKAT_MIGRATE_PAST_LICENSE=true` to migrate
+  and run as an evaluation, which the audit trail records.
 - **Remove license goes back to evaluation.** On the License screen, root takes a pasted license
   away: the notice returns on every instance, and traffic and configuration stay as they are. A
   license mounted by the deployment is removed from the deployment.
+- **The console can say a newer version is out, and what installing it would do.** Off by default:
+  root turns on Check for updates on the Release notes screen, and the gateway then reads a public
+  file once a day, sending nothing about itself. A newer version lights the Meerkat entry of the
+  rail and Release notes, and its notes open the screen, marked Not installed, saying whether it
+  falls outside the license and whether it migrates the database. Nothing is installed from there.
+  `MEERKAT_UPDATE_FEED` points the check at your own copy of the file.
+- **Release notes say when a version migrates the database.** The line is written by the release
+  itself, so it cannot be forgotten: an older version no longer opens the database afterwards.
 
 ---
+- **The images change names. If you run the community edition from `softwarity/meerkat`, move to
+  `softwarity/meerkat-ce`.** `softwarity/meerkat` is now the image a license turns into Team or
+  Enterprise, and without one it runs as an evaluation, with a notice on its pages. Every community
+  version is on `softwarity/meerkat-ce` under the same numbers, with `latest`, `X.Y` and `X`. The
+  `eval` and `X.Y.Z-eval` tags stay as they are and get no new version; nothing is published on
+  ghcr.io any more. The Helm chart's default image is `softwarity/meerkat`: the community edition
+  is `--set image.repository=docker.io/softwarity/meerkat-ce`, or `values-ce-one-node.yaml`.
 
 ## 1.22.0
 

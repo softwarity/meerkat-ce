@@ -19,10 +19,10 @@ affichée, gratuite, pour tout essayer d'abord.
 
 | Édition | Ce qu'elle est | Comment l'obtenir |
 | --- | --- | --- |
-| **Community** (CE) | Toute la gateway gratuite, production comprise | `softwarity/meerkat` sur Docker Hub |
-| **Évaluation** (Eval) | Tout Enterprise, avec une mention d'évaluation ; pas pour la production | `softwarity/meerkat:eval` sur Docker Hub |
-| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour une organisation sur une instance | L'image d'évaluation et une licence - [parlons-en](/pricing/index) |
-| **Enterprise** (EE) | Tout ce qu'ajoute Enterprise, sans plafond | L'image d'évaluation et une licence - [parlons-en](/pricing/index) |
+| **Community** (CE) | Toute la gateway gratuite, production comprise | `softwarity/meerkat-ce` sur Docker Hub |
+| **Évaluation** (Eval) | Tout Enterprise, avec une mention d'évaluation ; pas pour la production | `softwarity/meerkat` sur Docker Hub, sans licence |
+| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour une organisation sur une instance | `softwarity/meerkat` et une licence - [parlons-en](/pricing/index) |
+| **Enterprise** (EE) | Tout ce qu'ajoute Enterprise, sans plafond | `softwarity/meerkat` et une licence - [parlons-en](/pricing/index) |
 
 ::: lead
 La ligne que nous tenons, et celle qui compte au moment de comparer : **la
@@ -81,7 +81,7 @@ est chacun.
 
 ## Essayer Enterprise d'abord
 
-L'édition d'évaluation est l'image Enterprise à laquelle rien n'a été retiré :
+L'édition d'évaluation est l'image `softwarity/meerkat` sans licence, à laquelle rien n'a été retiré :
 aucune limite de durée, aucun compteur, aucune capacité désactivée. Elle
 ajoute en revanche une mention - *Meerkat evaluation version. Not licensed for
 production use.* - sur les pages que sert la gateway, dans le bouton
@@ -91,7 +91,7 @@ collée dans la console, la fait disparaître.
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat:eval
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
 Passer plus tard à une édition sous licence conserve tout : même image, même
@@ -118,7 +118,9 @@ Community. Team et Enterprise, elles, sont l'image d'évaluation à laquelle vou
 donnez une licence : collée dans la console, vérifiée sur place par sa
 signature, elle retire la mention d'évaluation sans redémarrage. Pas de serveur
 d'activation à joindre, rien qui expire au milieu de la nuit : la gateway ne
-nous appelle jamais et n'envoie aucun rapport d'usage.
+nous appelle jamais et n'envoie aucun rapport d'usage. La
+[vérification des mises à jour](/docs/operations/updates), coupée tant que vous ne
+l'activez pas, lit un fichier public et n'envoie rien sur vous.
 
 Une licence ne coupe jamais le trafic. Ce qui dépasse ses plafonds est refusé
 à la création, par une phrase qui le dit. La même licence vaut pour toutes

@@ -113,7 +113,9 @@ docker run -p 8080:8080 -p 9090:9090 \
   -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
-8080 is what your users reach, 9090 is the admin console. From there,
+8080 is what your users reach, 9090 is the admin console. Without a license it
+runs as an evaluation: everything, with a notice on its pages. The community
+edition is `softwarity/meerkat-ce`. From there,
 [Quick start](/docs/start/quick-start) puts one of your own services behind it
 in about five minutes.
 

@@ -310,7 +310,7 @@ func (d *database) columnsOf(table string) ([]column, error) {
 // both sides, which is what the boolean pass bought. What differs is answered
 // by the dialect - placeholders, the schema version, introspection - and
 // nothing else had to be written twice.
-func openPostgres(dataDir, url string) (*Store, error) {
+func openPostgres(dataDir, url string, check MigrationCheck) (*Store, error) {
 	if dialExternal == nil {
 		return nil, ErrExternalDatabase
 	}
@@ -330,7 +330,7 @@ func openPostgres(dataDir, url string) (*Store, error) {
 		_ = raw.Close()
 		return nil, err
 	}
-	if err := s.migrate(); err != nil {
+	if err := s.migrate(check); err != nil {
 		_ = raw.Close()
 		return nil, err
 	}

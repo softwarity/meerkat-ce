@@ -790,6 +790,48 @@
       }
     },
     {
+      "id": "api-console-updates-read",
+      "domain": "console",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/updates"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the update check",
+        "fr": "Lire la vérification des mises à jour"
+      },
+      "description": {
+        "en": "Whether the check is on and the releases newer than this gateway: what lights the console's indicator. It answers who can act on an update.",
+        "fr": "Si la vérification est active et quelles versions sont plus récentes que cette gateway : c'est ce qui allume le voyant de la console. Elle répond à ceux qui peuvent agir sur une mise à jour."
+      }
+    },
+    {
+      "id": "api-console-updates-switch",
+      "domain": "console",
+      "kind": "api",
+      "probe": {
+        "method": "PUT",
+        "path": "/api/updates",
+        "body": "{\"enabled\":false}"
+      },
+      "allowed": [
+        "root"
+      ],
+      "title": {
+        "en": "Turn the update check on or off",
+        "fr": "Activer ou couper la vérification des mises à jour"
+      },
+      "description": {
+        "en": "Whether this gateway reaches out at all is the owner's decision, so it is root's. Off is the default, and the probe leaves it off.",
+        "fr": "Que cette gateway sorte sur internet est une décision du propriétaire, donc de root. Coupée par défaut, et la sonde la laisse coupée."
+      }
+    },
+    {
       "id": "api-console-release-notes",
       "domain": "console",
       "kind": "api",

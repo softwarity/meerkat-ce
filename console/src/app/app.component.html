@@ -54,7 +54,7 @@
     >
       <mat-icon>apps</mat-icon>
     </rail-nav-item>
-    <rail-nav-item label="Meerkat" routerLink="/system" [active]="inSystem()">
+    <rail-nav-item label="Meerkat" routerLink="/system" [active]="inSystem()" [badge]="updates.count() > 0">
       <mat-icon svgIcon="meerkat" />
     </rail-nav-item>
     <rail-nav-spacer />

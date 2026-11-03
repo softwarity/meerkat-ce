@@ -41,6 +41,11 @@ docker run -p 8080:8080 -p 9090:9090 \
 - **http://localhost:8080** is what your users reach. A fresh gateway has no
   route, so it answers 404 until you add one.
 
+`softwarity/meerkat` is everything Meerkat does: without a license it runs as an
+evaluation, with a notice on its pages, and a license makes it Team or
+Enterprise. The community edition, built from this repository, is
+`softwarity/meerkat-ce`.
+
 <!-- Screenshot of the administration console goes here:
      docs/public/img/readme/console.webp, referenced as
      ![The Meerkat administration console](docs/public/img/readme/console.webp) -->
@@ -67,11 +72,11 @@ and Helm are on the
 | **Configuration** | Saved configurations compared and composed value by value, export and import | Also configurations kept in a git repository |
 | **Single sign-on for other tools** | - | Meerkat acts as their OpenID Connect provider |
 | **Developer tunnel** | plug runs on its own, beside the gateway | plug's agent built into the gateway |
-| **Image** | `softwarity/meerkat` | Built for you; try it with `softwarity/meerkat:eval` |
+| **Image** | `softwarity/meerkat-ce` | `softwarity/meerkat` with a license; without one it is an evaluation |
 
 The `ee` build tag decides what the binary contains: the Community image does
-not carry the Enterprise code. The evaluation image is the Enterprise image
-with a notice on its pages, and is not for production. The
+not carry the Enterprise code. Without a license, `softwarity/meerkat` is an
+evaluation, with a notice on its pages, and is not for production. The
 [editions page](https://meerkat.softwarity.dev/product/editions/) details each
 line and [pricing](https://meerkat.softwarity.dev/pricing/) gives the terms.
 

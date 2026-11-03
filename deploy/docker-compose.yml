@@ -13,8 +13,9 @@
 services:
   meerkat:
     # MEERKAT_IMAGE picks another edition or a pinned version without editing
-    # this file: softwarity/meerkat:eval, or the image built for your licence.
-    image: ${MEERKAT_IMAGE:-docker.io/softwarity/meerkat:latest}
+    # this file: softwarity/meerkat for the image a license turns into Team or
+    # Enterprise, or a release such as softwarity/meerkat-ce:1.23.0.
+    image: ${MEERKAT_IMAGE:-docker.io/softwarity/meerkat-ce:latest}
     ports:
       - "8080:8080" # application plane
       - "9090:9090" # control plane (admin console) - keep this one internal

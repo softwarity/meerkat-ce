@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/evalmark"
@@ -79,8 +80,9 @@ type editionInfo struct {
 	Notice string `json:"notice,omitempty"`
 	// License is the verified license in force, LicenseSource where it comes
 	// from ("file" when MEERKAT_LICENSE_FILE is set, "console" when pasted),
-	// LicenseProblem why the one held is refused, and LicenseOver what goes
-	// past its ceilings. See license.go.
+	// LicenseProblem why the one held is refused, and LicenseOver why the one
+	// held does not count: past its ceilings, or this build past its date. See
+	// license.go.
 	License        *licenseInfo `json:"license,omitempty"`
 	LicenseSource  string       `json:"licenseSource,omitempty"`
 	LicenseProblem string       `json:"licenseProblem,omitempty"`
@@ -136,7 +138,12 @@ func (a *API) getEdition(w http.ResponseWriter, r *http.Request, _ store.User) {
 		info.TenancyLocked = info.Tenancy == store.TenancySingle
 		info.TenancyLockWhy = err.Error()
 	}
-	for _, over := range []string{license.TenantOverrun(), license.Overrun()} {
+	lapse := ""
+	if info.License != nil {
+		lapse = info.License.lapse(time.Now())
+		info.License.Lapsed = lapse != ""
+	}
+	for _, over := range []string{lapse, license.TenantOverrun(), license.Overrun()} {
 		if over != "" {
 			info.LicenseOver = append(info.LicenseOver, over)
 		}

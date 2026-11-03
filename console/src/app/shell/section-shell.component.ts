@@ -1,6 +1,8 @@
 import { Component, inject } from '@angular/core';
+import { MatBadgeModule } from '@angular/material/badge';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { UpdatesService } from '../shared/updates.service';
 
 // One section entry in a plane's left nav. The path is RELATIVE to the plane,
 // so /infra/routes and /application/users need no repetition here.
@@ -18,6 +20,8 @@ interface SectionLink {
   // plugOnly: shown while the developer tunnel is open (Enterprise image, the
   // `plug-open` class stamped by the gateway) - see _modes.scss.
   plugOnly?: boolean;
+  // updates: carries how many releases are ahead of this gateway.
+  updates?: boolean;
 }
 
 const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
@@ -158,7 +162,7 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         roles: 'root infra-admin app-admin',
         bottom: true,
       },
-      { path: 'release-notes', label: $localize`:@@Release_notes:Release notes`, icon: 'new_releases' },
+      { path: 'release-notes', label: $localize`:@@Release_notes:Release notes`, icon: 'new_releases', updates: true },
       { path: 'license', label: $localize`:@@License:License`, icon: 'workspace_premium' },
     ],
   },
@@ -175,7 +179,7 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
 // So does a tenant, which brings its own nav.
 @Component({
   selector: 'app-section-shell',
-  imports: [MatIconModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [MatBadgeModule, MatIconModule, RouterLink, RouterLinkActive, RouterOutlet],
   styleUrl: './section-shell.component.scss',
   templateUrl: './section-shell.component.html',
 })
@@ -184,4 +188,5 @@ export class SectionShellComponent {
 
   protected readonly sections: SectionLink[] = PLANES[this.plane]?.links ?? [];
   protected readonly title = PLANES[this.plane]?.title ?? '';
+  protected readonly updates = inject(UpdatesService);
 }

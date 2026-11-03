@@ -401,4 +401,4 @@ jobs:
     secrets: inherit
     uses: ./.github/workflows/_docker.yml
     with:
-      image: docker.io/softwarity/meerkat
+      image: docker.io/softwarity/meerkat-ce

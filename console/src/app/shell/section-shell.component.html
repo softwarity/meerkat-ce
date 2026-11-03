@@ -13,7 +13,12 @@
         [attr.single-tenant-only]="s.singleOnly ? '' : null"
         [attr.plug-open-only]="s.plugOnly ? '' : null"
       >
-        <mat-icon>{{ s.icon }}</mat-icon>
+        <mat-icon
+          matBadgeSize="small"
+          [matBadge]="s.updates ? updates.count() : 0"
+          [matBadgeHidden]="!s.updates || updates.count() === 0"
+          >{{ s.icon }}</mat-icon
+        >
         <span>{{ s.label }}</span>
       </a>
     }

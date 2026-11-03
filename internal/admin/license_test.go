@@ -16,6 +16,7 @@ import (
 	"github.com/softwarity/meerkat/internal/evalmark"
 	"github.com/softwarity/meerkat/internal/license"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/version"
 )
 
 func signedLicense(t *testing.T, key ed25519.PrivateKey, licensee string) string {
@@ -223,6 +224,70 @@ func TestATeamLicenseDoesNotCoverTheTenantsOfAnEvaluation(t *testing.T) {
 // Removing the license is the way back to evaluation: root's, on every read at
 // once, the notice returns, the ceilings go with it, and the trail keeps who and
 // which.
+// A version built after the updates ended is an evaluation again, ceilings
+// included, and going back to one from the term puts the license back: nothing
+// was written down, so there is nothing to undo.
+func TestABuildPastTheUpdatesIsAnEvaluationForAsLongAsItRuns(t *testing.T) {
+	f := setupEE(t)
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	f.api.LicenseKeys = []ed25519.PublicKey{pub}
+	dated := version.Date
+	t.Cleanup(func() { version.Date = dated })
+
+	team := signedEdition(t, priv, license.License{ID: "LIC-T", Licensee: "Small Co",
+		Edition: license.EditionTeam, Tenants: 1, Instances: 1})
+	version.Date = time.Now().UTC().Format(time.RFC3339)
+	if code, out := f.call(t, "PUT", "/api/license", licenseBody(t, team), f.rootC); code != http.StatusOK {
+		t.Fatalf("team license: %d %s", code, out)
+	}
+	if license.Current() == nil || evalmark.Shown("mark") != "" {
+		t.Fatal("a build from the term must honour the license")
+	}
+
+	version.Date = time.Now().UTC().AddDate(2, 0, 0).Format(time.RFC3339)
+	code, out := f.call(t, "GET", "/api/edition", "", f.rootC)
+	if code != http.StatusOK || !strings.Contains(out, "built after the updates") || !strings.Contains(out, "Small Co") ||
+		!strings.Contains(out, `"lapsed":true`) {
+		t.Fatalf("the screen must keep the license and say why it does not count: %d %s", code, out)
+	}
+	if license.Current() != nil || evalmark.Shown("mark") != "mark" {
+		t.Fatal("a build past the updates must be an evaluation")
+	}
+	if code, out := f.call(t, "POST", "/api/tenants", `{"name": "Second"}`, f.rootC); code == http.StatusForbidden {
+		t.Fatalf("an evaluation has no ceiling: %d %s", code, out)
+	}
+
+	version.Date = time.Now().UTC().Format(time.RFC3339)
+	code, out = f.call(t, "GET", "/api/edition", "", f.rootC)
+	if code != http.StatusOK || strings.Contains(out, "built after the updates") {
+		t.Fatalf("going back to a build from the term must clear it: %d %s", code, out)
+	}
+	if held := license.Current(); held == nil || held.ID != "LIC-T" {
+		t.Fatal("going back to a build from the term must put the license back")
+	}
+}
+
+// A test license ends at its date, for good, whatever the build: read again by
+// every node, it is an evaluation from then on. Nothing else stops.
+func TestATestLicenseStopsCountingAtItsDate(t *testing.T) {
+	f := setupEE(t)
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	f.api.LicenseKeys = []ed25519.PublicKey{pub}
+	file, err := license.Sign(license.License{ID: "LIC-X", Licensee: "CI", Edition: license.EditionEnterprise,
+		IssuedAt: time.Now().AddDate(0, 0, -3), ExpiresAt: time.Now().AddDate(0, 0, -2), Expires: license.ExpiresHard}, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { license.Apply(nil) })
+	code, out := f.call(t, "PUT", "/api/license", licenseBody(t, string(file)), f.rootC)
+	if code != http.StatusOK || !strings.Contains(out, "this test license ended on") || !strings.Contains(out, `"ends":true`) {
+		t.Fatalf("an ended test license: %d %s", code, out)
+	}
+	if license.Current() != nil || evalmark.Shown("mark") != "mark" {
+		t.Fatal("an ended test license must not take the notice away")
+	}
+}
+
 func TestRemovingTheLicenseGoesBackToEvaluation(t *testing.T) {
 	f := setupEE(t)
 	ctx := context.Background()

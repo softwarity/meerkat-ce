@@ -7,13 +7,14 @@
 # This IS the default shape, written out so it can be read: one pod, the
 # embedded store on a ReadWriteOnce volume, no database to run beside it. It
 # carries a whole application - routing, accounts, roles, the built-in pages,
-# TLS, the vault, the audit trail - for one organisation.
+# TLS, the vault, the audit trail - for one tenant.
 #
 # What it does not do is survive the loss of its node, because a volume does
 # not follow a pod from one machine to another. When that matters, go to
 # values-ee-cluster.yaml.
 image:
-  repository: docker.io/softwarity/meerkat
+  # The community edition: softwarity/meerkat-ce.
+  repository: docker.io/softwarity/meerkat-ce
   # Pin a release rather than following latest on what holds your front door.
   tag: ""
 

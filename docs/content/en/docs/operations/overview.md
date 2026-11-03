@@ -27,6 +27,7 @@ changed something. Each has one screen, and this page says which.
 | Is this node ready for traffic | [Health probes](/docs/operations/health) |
 | When does that certificate expire | [TLS and certificates](/docs/operations/tls) |
 | What is actually in a backup | [Backup and restore](/docs/operations/backup-restore) |
+| Is a newer version out, and what would it do | [Update check](/docs/operations/updates), off until root turns it on |
 | Where does this password live | [The vault](/docs/operations/vault) |
 
 ## What the gateway records, and for how long

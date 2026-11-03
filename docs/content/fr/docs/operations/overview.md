@@ -27,6 +27,7 @@ chose. À chacune correspond un écran, et cette page vous dit lequel.
 | Ce nœud est-il prêt à recevoir du trafic | [Les health checks](/docs/operations/health) |
 | Quand ce certificat expire-t-il | [TLS et certificats](/docs/operations/tls) |
 | Que contient réellement une sauvegarde | [Sauvegarde et restauration](/docs/operations/backup-restore) |
+| Une version plus récente existe-t-elle, et que ferait-elle | [La vérification des mises à jour](/docs/operations/updates), coupée tant que root ne l'active pas |
 | Où ce mot de passe est-il rangé | [Le coffre](/docs/operations/vault) |
 
 ## Ce que la gateway enregistre, et pour combien de temps

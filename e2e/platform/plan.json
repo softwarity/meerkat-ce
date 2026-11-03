@@ -2336,6 +2336,20 @@
    "fr": "La version et les notes de version correspondent à la version inscrite dans l'image."
   },
   {
+   "id": "CONSOLE-16",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "C1"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "Off, the gateway calls nothing. On, it reads the list once, and a newer version lights the indicator on open consoles with what installing it would do to the license and the database.",
+   "fr": "Coupée, la gateway n'appelle rien. Activée, elle lit la liste une fois, et une version plus récente allume le voyant des consoles ouvertes avec ce que son installation ferait à la licence et à la base."
+  },
+  {
    "id": "LIFE-01",
    "priority": "P0",
    "feasibility": "easy",
@@ -3822,8 +3836,8 @@
     "EVAL",
     "EE"
    ],
-   "en": "A license pasted on the License screen is verified before it is kept, refused with its reason otherwise; a license mounted through MEERKAT_LICENSE_FILE is shown, read again after the secret changes, and the screen neither takes another nor removes it; removing a pasted license brings the evaluation notice back on every node and moves nothing else; a valid license takes the evaluation notice off every surface with no restart and on every node, a broken one brings it back, a Team license refuses a second tenant by creation, by import and by switching mode, and on a gateway already serving several it leaves them served and keeps the notice until only one is served, more instances than covered bring the notice back after 15 minutes and never touch traffic, and a license past its date stays in force.",
-   "fr": "Une licence collée sur l'écran License est vérifiée avant d'être gardée, refusée avec sa raison sinon ; une licence montée par MEERKAT_LICENSE_FILE est affichée, relue après un changement du secret, et l'écran n'en prend pas d'autre et ne la retire pas ; retirer une licence collée ramène la mention d'évaluation sur tous les nœuds et ne change rien d'autre ; une licence valide retire la mention d'évaluation de toutes les surfaces sans redémarrage et sur tous les nœuds, une licence cassée la ramène, une licence Team refuse un deuxième tenant à la création, à l'import et au changement de mode, et sur une gateway qui en sert déjà plusieurs elle les laisse servis et garde la mention jusqu'à ce qu'un seul le soit, plus d'instances que couvert ramènent la mention après 15 minutes sans jamais toucher au trafic, et une licence passée sa date reste en vigueur."
+   "en": "A license pasted on the License screen is verified before it is kept, refused with its reason otherwise; a license mounted through MEERKAT_LICENSE_FILE is shown, read again after the secret changes, and the screen neither takes another nor removes it; removing a pasted license brings the evaluation notice back on every node and moves nothing else; a valid license takes the evaluation notice off every surface with no restart and on every node, a broken one brings it back, a Team license refuses a second tenant by creation, by import and by switching mode, and on a gateway already serving several it leaves them served and keeps the notice until only one is served, more instances than covered bring the notice back after 15 minutes and never touch traffic, a license past its date stays in force on a version built by then, a version built after that date is an evaluation for as long as it runs and going back to one from the term restores the license, a test license ends at the end of its day whatever the version, and a version past the term that would migrate the database stops before it, writing nothing, with the reason and the variable that overrides it, which migrates, runs as an evaluation and leaves an audit line.",
+   "fr": "Une licence collée sur l'écran License est vérifiée avant d'être gardée, refusée avec sa raison sinon ; une licence montée par MEERKAT_LICENSE_FILE est affichée, relue après un changement du secret, et l'écran n'en prend pas d'autre et ne la retire pas ; retirer une licence collée ramène la mention d'évaluation sur tous les nœuds et ne change rien d'autre ; une licence valide retire la mention d'évaluation de toutes les surfaces sans redémarrage et sur tous les nœuds, une licence cassée la ramène, une licence Team refuse un deuxième tenant à la création, à l'import et au changement de mode, et sur une gateway qui en sert déjà plusieurs elle les laisse servis et garde la mention jusqu'à ce qu'un seul le soit, plus d'instances que couvert ramènent la mention après 15 minutes sans jamais toucher au trafic, une licence passée sa date reste en vigueur sur une version construite avant, une version construite après cette date redevient une évaluation tant qu'elle tourne et le retour à une version de la période rétablit la licence, une licence de test se termine à la fin de son jour quelle que soit la version, et une version hors période qui devrait migrer la base s'arrête avant, sans rien écrire, avec la raison et la variable qui permet de passer outre, qui migre, tourne en évaluation et laisse une ligne d'audit."
   }
  ],
  "platform": [

@@ -46,19 +46,18 @@ peuvent l'atteindre et nulle part ailleurs. Il ne parle pas HTTP mais SSH, et
 la gateway y vérifie la clé publique que chaque développeur a déposée sur
 son compte. Voir [Mode développement](/product/dev-mode).
 
-L'image Enterprise est hébergée sur un registre privé, d'où un secret d'accès
-au registre :
+L'image est publique ; ce qui en fait une Team ou une Enterprise, c'est la
+licence, depuis un Secret :
 
 ```bash
-kubectl create secret docker-registry ghcr \
-  --docker-server=ghcr.io --docker-username=YOU --docker-password=TOKEN
+kubectl create secret generic meerkat-license --from-file=license=<le fichier envoyé par Softwarity>
 
 helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-one-node.yaml \
-  --set admin.password='choose-one'
+  --set admin.password='choose-one' --set license.existingSecret=meerkat-license
 ```
 
-Pour l'essayer d'abord, l'image d'évaluation installe la même architecture sans
-secret d'accès : `-f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml`.
+Pour l'essayer d'abord, la même architecture sans licence, en évaluation :
+`-f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml`.
 
 ## Trois gateways, Enterprise
 
@@ -78,12 +77,15 @@ kubectl create secret generic meerkat-state \
   --from-literal=database-url='postgres://meerkat:PASSWORD@postgres:5432/meerkat?sslmode=require' \
   --from-literal=vault-key="$(openssl rand -hex 32)"
 
+kubectl create secret generic meerkat-license --from-file=license=<le fichier envoyé par Softwarity>
+
 helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-cluster.yaml \
-  --set admin.password='choose-one'
+  --set admin.password='choose-one' --set license.existingSecret=meerkat-license
 ```
 
-Le même cluster sur l'image d'évaluation, pour l'essayer avant de l'acheter :
-`-f https://meerkat.softwarity.dev/deploy/values-eval-cluster.yaml`, avec le même Secret.
+Le même cluster sans licence, pour l'essayer avant de l'acheter :
+`-f https://meerkat.softwarity.dev/deploy/values-eval-cluster.yaml`, avec le même
+Secret `meerkat-state`.
 
 Sur Swarm, la même architecture se déploie avec la stack ci-dessous. Swarm
 interpole les trois valeurs au moment du déploiement, à partir du shell qui
@@ -121,8 +123,8 @@ site : ce que vous téléchargez est ce que déploie la version publiée.
 | [values-ce-one-node.yaml](/deploy/values-ce-one-node.yaml) | Une gateway Community sur son volume |
 | [values-ee-one-node.yaml](/deploy/values-ee-one-node.yaml) | Une gateway Enterprise, tunnel développeur ouvert |
 | [values-ee-cluster.yaml](/deploy/values-ee-cluster.yaml) | Trois gateways Enterprise sur un PostgreSQL partagé |
-| [values-eval-one-node.yaml](/deploy/values-eval-one-node.yaml) | Une gateway sur l'image d'évaluation, tunnel développeur ouvert |
-| [values-eval-cluster.yaml](/deploy/values-eval-cluster.yaml) | Trois gateways sur l'image d'évaluation, sur un PostgreSQL partagé |
+| [values-eval-one-node.yaml](/deploy/values-eval-one-node.yaml) | Une gateway sans licence (évaluation), tunnel développeur ouvert |
+| [values-eval-cluster.yaml](/deploy/values-eval-cluster.yaml) | Trois gateways sans licence (évaluation), sur un PostgreSQL partagé |
 | [docker-compose.yml](/deploy/docker-compose.yml) | Une gateway Community, en une commande |
 | [docker-compose.ee.yml](/deploy/docker-compose.ee.yml) | Une gateway Enterprise avec le tunnel |
 | [stack.swarm.yml](/deploy/stack.swarm.yml) | Trois gateways sur Docker Swarm |
@@ -131,16 +133,15 @@ Le dépôt distribue le **chart**, pas les images : le cluster les télécharge
 lui-même, depuis le registre que désignent les valeurs. Il n'y a qu'un chart
 pour les deux éditions, et l'édition, c'est l'image :
 
-- **Community** : `docker.io/softwarity/meerkat`, publique - c'est la valeur
-  par défaut du chart, il n'y a rien à ajouter.
-- **Enterprise** : `ghcr.io/softwarity/meerkat`, privée - un secret d'accès au
-  registre, qui contient l'accès qui vous a été remis, est nommé dans
-  `image.pullSecrets`. Les fichiers `values-ee-*` définissent les deux ; c'est
-  toute la différence au moment de l'installation.
-- **Évaluation** : `docker.io/softwarity/meerkat:eval`, publique - tout ce que fait
-  Enterprise, avec une mention d'évaluation, pas pour la production tant que vous
-  ne lui donnez pas de licence, qui en fait une Team ou une Enterprise. Les
-  fichiers `values-eval-*` la définissent, sans secret d'accès.
+- **Team et Enterprise** : `docker.io/softwarity/meerkat`, publique - c'est la
+  valeur par défaut du chart, avec la licence dans un Secret nommé par
+  `license.existingSecret`. Les fichiers `values-ee-*` le disent ; c'est toute
+  la différence au moment de l'installation.
+- **Évaluation** : la même image sans licence - tout ce que fait Enterprise,
+  avec une mention d'évaluation, pas pour la production. Ce sont les fichiers
+  `values-eval-*`.
+- **Community** : `docker.io/softwarity/meerkat-ce`, publique, donnée dans
+  `image.repository`. Le fichier `values-ce-*` la définit.
 
 Chaque fichier est commenté ligne par ligne : ce que fait une variable, et ce
 qu'il en coûte de l'oublier. Le détail de chaque variable se trouve sur la page

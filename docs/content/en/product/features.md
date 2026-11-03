@@ -122,7 +122,7 @@ Read more: [The vault](/docs/operations/vault).
 - **Built-in vault**: secrets encrypted with AES-256-GCM, referenced by name from the configuration, encrypted export, reminder before expiry. The same key seals TLS keys and TOTP secrets, and rotates with a restart.
 - **HTTPS redirect and security headers**: plain HTTP sent to HTTPS, HSTS, CSP, X-Frame-Options, Referrer-Policy, and CSRF protection for the console.
 - **Console on a separate port** from application traffic: administration is never exposed alongside the application.
-- **Runs without internet**: no resource loaded from outside, suited to air-gapped environments.
+- **Runs without internet**: no resource loaded from outside, suited to air-gapped environments. The [update check](/docs/operations/updates) is off until you turn it on.
 
 ## Operations
 

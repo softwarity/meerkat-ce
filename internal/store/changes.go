@@ -105,6 +105,9 @@ const (
 	// a node it stops hearing from expires. That is what makes a node that
 	// starts late correct within one interval, with nothing to reconcile.
 	TopicServed = "served"
+	// TopicUpdates says the update check moved (CONSOLE-16), for the consoles
+	// the OTHER nodes hold. No argument: the setting is the truth.
+	TopicUpdates = "updates"
 	// TopicPlugSessions carries the plug runs a node's agent holds a part of
 	// (DEV-13), the same way: one node's whole list, as JSON, replaced on
 	// receipt and expired by silence.

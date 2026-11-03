@@ -4,16 +4,16 @@
 #   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml \
 #     --set admin.password='choose-one'
 #
-# The Enterprise image with nothing taken out, public, and with an evaluation
-# notice on its pages and in its console: everything Enterprise does, to try
-# before talking to anyone - not licensed for production. The shape is
-# values-ee-one-node.yaml's; only the image differs.
+# The image without a license: everything Enterprise does, with an evaluation
+# notice on its pages and in its console, to try before talking to anyone -
+# not licensed for production. The shape is values-ee-one-node.yaml's; a
+# license given in the console, or mounted, makes it that.
 image:
   repository: docker.io/softwarity/meerkat
-  # The evaluation build: `eval` follows the latest release, `X.Y.Z-eval`
-  # pins one - pin it for anything that has to stay put.
-  tag: eval
-  # Public, on Docker Hub: no pull secret.
+  # The chart's version when empty; `latest` follows main, the build of the
+  # day. The same image a license turns into Team or Enterprise.
+  tag: ""
+  # Public, on Docker Hub: nothing to log in to.
   pullSecrets: []
 
 replicaCount: 1

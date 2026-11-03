@@ -2,8 +2,9 @@
 
 // Package edition is the ONE place the two artifacts differ.
 //
-// Meerkat ships as two images built from the same commit: the community one
-// (Docker Hub, public) and the Enterprise one (GH Packages, private). What
+// Meerkat ships as two images built from the same commit, both on Docker Hub:
+// softwarity/meerkat-ce, the community one, and softwarity/meerkat, which a
+// license turns into Team or Enterprise. What
 // separates them is not a flag read at runtime - it is what the linker put in
 // the binary, decided by the `ee` build tag.
 //

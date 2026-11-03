@@ -13,19 +13,27 @@ externe est une option, pas un prérequis.
 
 ## Image Docker
 
-Trois images, construites à partir du même commit et portant le même nom : ce
-sont le **registre** et le tag qui indiquent l'édition.
+Deux images, construites à partir du même commit, toutes deux publiques sur
+Docker Hub :
 
 | Image | Édition |
 |---|---|
-| `docker.io/softwarity/meerkat:latest` | Community, publique |
-| `docker.io/softwarity/meerkat:eval` | évaluation, publique : tout ce que fait Enterprise, avec une mention d'évaluation - pas pour la production tant qu'une licence n'en fait pas une Team ou une Enterprise |
-| `ghcr.io/softwarity/meerkat:latest` | Enterprise, registre privé |
+| `docker.io/softwarity/meerkat` | tout ce que fait Enterprise. Sans licence c'est une évaluation, avec une mention sur ses pages et pas pour la production ; une licence en fait une Team ou une Enterprise, sans redémarrage |
+| `docker.io/softwarity/meerkat-ce` | Community |
+
+Elles portent les mêmes tags : `X.Y.Z` pour une version, `X.Y` et `X` pour la
+dernière d'une branche, et `latest` pour la construction du jour sur `main`.
+Épinglez une version sur tout ce qui tient votre porte d'entrée.
+
+Jusqu'à 1.22, l'édition Community était publiée sous `softwarity/meerkat`, et
+l'évaluation sous `softwarity/meerkat:eval` et `X.Y.Z-eval`. Toutes les
+versions Community sont désormais sur `softwarity/meerkat-ce`, sous les mêmes
+numéros ; les tags `eval` restent tels quels et ne reçoivent plus de version.
 
 ```yaml
 services:
   meerkat:
-    image: docker.io/softwarity/meerkat:latest
+    image: docker.io/softwarity/meerkat-ce:latest
     ports:
       - "8080:8080" # plan de données
       - "9090:9090" # plan de contrôle - à garder en interne
@@ -48,7 +56,7 @@ rien à ouvrir, et un healthcheck lance `/meerkat health`
 
 ## Vérifier la signature
 
-Les trois images sont signées au moment de leur construction, avec
+Les deux images sont signées au moment de leur construction, avec
 [cosign](https://docs.sigstore.dev/) et sans clé. Il n'y a donc aucune clé
 publique à récupérer : la signature porte l'identité du workflow GitHub Actions
 qui a produit l'image, et c'est cette identité que vous vérifiez.
@@ -60,15 +68,13 @@ cosign verify \
   docker.io/softwarity/meerkat:latest
 ```
 
-La même commande vérifie l'image d'évaluation,
-`docker.io/softwarity/meerkat:eval`, ainsi que l'image Enterprise sur
-`ghcr.io/softwarity/meerkat` une fois que vous êtes authentifié auprès de ce
-registre. Les trois sont construites par des workflows hébergés dans le miroir
+La même commande vérifie `docker.io/softwarity/meerkat-ce`. Les deux sont
+construites par des workflows hébergés dans le miroir
 public, `softwarity/meerkat-ce`, et c'est ce dépôt que nomme l'identité : les
 sources Enterprise sont privées, la chaîne qui les construit ne l'est pas.
 L'identité nomme deux fichiers de ce dépôt, sur `main` et nulle part ailleurs :
-`_docker.yml` construit le `latest` communautaire, `ci-ee.yml` les images
-Enterprise et d'évaluation ainsi que chaque tag de version. Un workflow d'une
+`_docker.yml` construit le `latest` communautaire, `ci-ee.yml` l'autre image
+ainsi que chaque tag de version. Un workflow d'une
 autre branche, ou un autre fichier, ne passe pas. Les versions jusqu'à 1.6.0
 ne portent pas de signature : seuls `latest` et `eval` étaient signés alors.
 
@@ -101,7 +107,6 @@ spec:
       verifyImages:
         - imageReferences:
             - "docker.io/softwarity/meerkat*"
-            - "ghcr.io/softwarity/meerkat*"
           attestors:
             - entries:
                 - keyless:
@@ -200,6 +205,8 @@ et le journal le dit aussi.
 |---|---|---|
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | adresse d'écoute du tunnel développeur, `:22222` par défaut, Enterprise uniquement |
 | `-license` | `MEERKAT_LICENSE_FILE` | le fichier de licence envoyé par Softwarity, monté depuis un secret (`license.existingSecret` dans le chart Helm). Lu au démarrage puis à chaque consultation : un secret mis à jour sur place ne demande aucun redémarrage ; l'écran License l'affiche alors et n'en accepte pas d'autre. Image Enterprise uniquement |
+| `-migrate-past-license` | `MEERKAT_MIGRATE_PAST_LICENSE` | `true` laisse une version construite après la fin des mises à jour de la licence migrer la base. Sans elle, une telle version s'arrête avant de migrer et dit pourquoi ([Vérification des mises à jour](/docs/operations/updates)). Faites d'abord une sauvegarde : la version tourne ensuite en évaluation, et une version plus ancienne n'ouvre plus la base. Image Enterprise uniquement |
+| `-update-feed` | `MEERKAT_UPDATE_FEED` | où la vérification des mises à jour lit la liste des versions, le fichier public de Softwarity par défaut. La vérification reste coupée tant que root ne l'active pas ([Vérification des mises à jour](/docs/operations/updates)) |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | pour le développement : relaie la console vers un serveur de développement front |
 | `-version` | - | affiche la version et quitte |
 

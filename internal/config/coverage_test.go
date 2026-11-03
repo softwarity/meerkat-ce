@@ -45,6 +45,7 @@ var staysHome = map[string]string{
 	"SettingAuditRetention":        "how long THIS installation keeps its trail: a compliance decision of this place, root's alone, and not something a configuration imported by someone else should be able to shorten",
 	"SettingEndpointCallRetention": "how long THIS installation keeps the audited calls of its data plane: the same compliance decision as the trail's own retention, for the part of it whose volume follows the traffic",
 	"SettingPlug":                  "the tunnel's switch and the address developers type: a port into THIS cluster, published by THIS platform - a reproduced installation decides its own",
+	"SettingUpdateCheck":           "whether THIS gateway reaches out to the internet, and what it found there: a decision about this deployment's exposure, and a state, not a configuration",
 	"SettingAgentEnabled":          "whether the agent endpoint is open on THIS gateway, which is a decision about this deployment's exposure",
 	"SettingEmailSignin":           "depends on SMTP being configured here, and SMTP does not travel",
 

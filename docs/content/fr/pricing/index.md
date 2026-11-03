@@ -88,10 +88,10 @@ La page [Éditions](/product/editions) détaille, ligne par ligne, ce que sont
 ## Le support
 
 Le prix annuel inclut un an de mises à jour et un niveau de support. Sans
-renouvellement, la licence reste valable : toute version publiée pendant la
+renouvellement, la licence reste valable : toute version construite pendant la
 période payée reste à vous, à installer et à faire tourner aussi longtemps que
-vous voulez. Seules les versions publiées ensuite ne sont plus couvertes. Un
-support au-delà de celui compris se commande à part.
+vous voulez. Une version construite ensuite redevient une évaluation, mention
+comprise, tant qu'elle tourne. Un support au-delà de celui compris se commande à part.
 
 | | Ce que c'est | Pour qui |
 | --- | --- | --- |
@@ -113,9 +113,17 @@ aussi la monter depuis un secret, où chaque instance la lit.
 - **Vérifiée hors ligne.** La licence est signée par Softwarity et la gateway
   en contrôle la signature elle-même. Pas de serveur d'activation à joindre :
   la gateway ne nous appelle jamais, et elle ne contient aucun rapport d'usage.
+  Seule exception, la [vérification des mises à jour](/docs/operations/updates),
+  coupée tant que vous ne l'activez pas, qui lit un fichier public et n'envoie
+  rien sur vous.
 - **Perpétuelle, avec repli (*perpetual fallback*).** Une licence n'expire pas. Sa date dit jusqu'où vont les
-  mises à jour couvertes : une version publiée après est hors de l'accord, et
-  la console le dit, mais rien ne s'éteint.
+  mises à jour couvertes. Une version construite après est une évaluation : la
+  mention revient et la console dit pourquoi, le trafic n'est pas touché, et
+  revenir à une version de la période ou renouveler rétablit la licence. Une
+  version qui devrait aussi migrer la base, qu'aucune version antérieure
+  n'ouvrirait plus, s'arrête avant de le faire et dit pourquoi : vous renouvelez,
+  ou vous faites une sauvegarde et la laissez migrer en évaluation
+  ([comment](/docs/operations/updates)).
 - **Rien ne s'arrête au milieu de la nuit.** Une licence ne coupe jamais le
   trafic. Ce qui dépasse ses plafonds est refusé à la création, par une phrase
   qui le dit : une deuxième organisation sur une licence Team ne se crée pas,
@@ -172,9 +180,9 @@ cluster Enterprise apporte.
 
 **Que devient une installation si on ne renouvelle pas ?** Elle continue de
 tourner, sous licence : la licence est perpétuelle. Ce qui s'arrête, ce sont
-les mises à jour et le support. Vous gardez les versions publiées pendant la
-période payée ; les suivantes ne sont plus couvertes, et le renouvellement
-les rouvre.
+les mises à jour et le support. Vous gardez les versions construites pendant la
+période payée ; les suivantes tournent en évaluation, mention comprise, et le
+renouvellement les rouvre.
 
 **Vendez-vous du support pour l'édition gratuite ?** Demandez-nous. Le support
 de l'image Community passe par le dépôt : un ticket ouvert sur

@@ -1,21 +1,18 @@
 # Meerkat, Enterprise edition, one gateway, with the developer tunnel open.
 #
-#   kubectl create secret docker-registry ghcr \
-#     --docker-server=ghcr.io --docker-username=USER --docker-password=TOKEN
+#   kubectl create secret generic meerkat-license --from-file=license=<the file Softwarity sent>
 #   helm repo add meerkat https://meerkat.softwarity.dev/deploy
 #   helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/values-ee-one-node.yaml \
-#     --set admin.password='choose-one'
+#     --set admin.password='choose-one' --set license.existingSecret=meerkat-license
 #
 # Same shape as the community one - a single pod on its volume - with the
-# Enterprise image: several organisations, the directories, and the tunnel
-# that plugs a developer's machine into this cluster.
+# image a license turns into Enterprise: several tenants, the directories,
+# and the tunnel that plugs a developer's machine into this cluster.
 image:
-  repository: ghcr.io/softwarity/meerkat
+  repository: docker.io/softwarity/meerkat
   tag: ""
-  # The Enterprise image is on a private registry: name the pull secret you
-  # created for it.
-  pullSecrets:
-    - ghcr
+  # Public, on Docker Hub: nothing to log in to.
+  pullSecrets: []
 
 replicaCount: 1
 

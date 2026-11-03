@@ -103,6 +103,10 @@ func main() {
 		"encrypted vault file to ingest once (passphrase in MEERKAT_VAULT_PASSPHRASE or _FILE)")
 	licenseFile := flag.String("license", envOr("MEERKAT_LICENSE_FILE", ""),
 		"license file Softwarity issued, mounted from a secret; the console then shows it and takes no other")
+	updateFeed := flag.String("update-feed", envOr("MEERKAT_UPDATE_FEED", ""),
+		"where the update check reads the list of releases, Softwarity's public file when empty; the check itself is off until root turns it on")
+	migratePastLicense := flag.Bool("migrate-past-license", envOr(admin.MigratePastLicenseVar, "") == "true",
+		"migrate the database even though the license does not cover this version, which then runs as an evaluation; take a backup first")
 	// Two ports per plane, and they have different jobs: one serves, the other
 	// tells the caller where to go (SSL-02). A port whose protocol cannot be
 	// named is a port nobody can write a firewall rule or a runbook against.
@@ -158,7 +162,7 @@ func main() {
 		tlsAddr: *tlsAddr, adminTLSAddr: *adminTLSAddr,
 		consoleURL: *consoleURL, dataDir: *dataDir, configFile: *configFile,
 		vaultFile: *vaultFile, tenancy: *tenancy, plugAddr: *plugAddr, databaseURL: *databaseURL,
-		licenseFile: *licenseFile,
+		licenseFile: *licenseFile, updateFeed: *updateFeed, migratePastLicense: *migratePastLicense,
 	}); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -179,6 +183,8 @@ type options struct {
 	plugAddr              string
 	databaseURL           string
 	licenseFile           string
+	updateFeed            string
+	migratePastLicense    bool
 }
 
 func run(o options) error {
@@ -203,10 +209,14 @@ func run(o options) error {
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
-	st, err := store.OpenAt(dataDir, o.databaseURL)
+	// A migration a build past the license would make is asked about first: the
+	// database would no longer open with the version that honours it.
+	guard := &admin.MigrationGuard{LicenseFile: o.licenseFile, Built: version.Date, Force: o.migratePastLicense}
+	st, err := store.OpenChecked(dataDir, o.databaseURL, guard.Check)
 	if err != nil {
 		return err
 	}
+	guard.Audit(context.Background(), st)
 	if o.databaseURL != "" {
 		// Said out loud, because it changes where everything this gateway
 		// knows actually lives - and because a URL in an environment is easy
@@ -365,6 +375,7 @@ func run(o options) error {
 	adminAPI.Callers = discovery.NewCallers()
 	adminAPI.ReleaseNotes = meerkat.ReleaseNotes
 	adminAPI.LicenseFile = o.licenseFile
+	adminAPI.UpdateFeed = o.updateFeed
 	adminAPI.LogLicense(ctx)
 	// The Enterprise rows of the contract, for the License screen (CONSOLE-14).
 	for _, f := range meerkat.EnterpriseFeatures() {
@@ -494,6 +505,7 @@ func run(o options) error {
 	// A single-node installation takes exactly the same path with one member.
 	fleet := metrics.NewFleet()
 	go adminAPI.WatchLicense(ctx, fleet.Nodes)
+	go adminAPI.WatchUpdates(ctx)
 	window := metrics.NewWindow(metrics.DefaultWindow)
 	var lastSent map[string]metrics.RouteSnapshot
 	go metrics.Run(ctx, router.Metrics(), fleet, window, bus.Node(), metrics.DefaultInterval,
@@ -670,6 +682,11 @@ func run(o options) error {
 		st.Pause(arg == "on")
 		paused.Moved()
 	})
+	// The update check (CONSOLE-16): one node reads the list, every console
+	// hears of it. Told by the API, relayed here to the others.
+	updatesMoved := live.NewCounter(live.UpdatesTopic)
+	adminAPI.UpdatesMoved = updatesMoved.Moved
+	bus.OnSignal(store.TopicUpdates, func(string) { updatesMoved.Moved() })
 	// The runtime, watched (discovery.Watcher): its events, not a timer, are
 	// what say a target lost a replica or changed image.
 	runtime := discovery.NewWatcher()
@@ -693,6 +710,9 @@ func run(o options) error {
 			// And that this node wrote a line, for the Logs screen (OBS-03),
 			// read through GET /api/logs, which answers the same readers.
 			sources[live.LogsTopic] = logs
+			// And that a newer release was found: GET /api/updates answers the
+			// same readers.
+			sources[live.UpdatesTopic] = updatesMoved
 		}
 		if p.Schedules {
 			// The scheduler screen watches a run start, advance and finish

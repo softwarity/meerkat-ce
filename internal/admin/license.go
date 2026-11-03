@@ -45,9 +45,28 @@ type licenseInfo struct {
 	UpdatesUntil time.Time `json:"updatesUntil"`
 	// Covered says whether THIS build was released within the updates the
 	// license paid for. Absent when the build carries no date (a dev build).
-	// False switches nothing off: it is said, and that is all.
+	// False makes this build an evaluation again: see lapse.
 	Covered *bool `json:"covered,omitempty"`
-	lic     *license.License
+	// Ends says UpdatesUntil is a real end: a test license.
+	Ends bool `json:"ends,omitempty"`
+	// Lapsed says this gateway does not honour it, for the reason in lapse.
+	Lapsed bool `json:"lapsed,omitempty"`
+	lic    *license.License
+}
+
+// lapse says in a sentence why this build does not honour a license that
+// verifies, "" while it does. It is worked out on every look and written
+// nowhere: a build from the term, or a renewal, puts the license back by itself.
+func (i *licenseInfo) lapse(now time.Time) string {
+	until := i.UpdatesUntil.Format(time.DateOnly)
+	switch {
+	case i.lic.Ended(now):
+		return fmt.Sprintf("this test license ended on %s: this gateway is an evaluation again until it is replaced", until)
+	case i.Covered != nil && !*i.Covered:
+		return fmt.Sprintf("this version was built after the updates of this license ended on %s: "+
+			"this gateway is an evaluation again until it runs a version built by then, or the license is renewed", until)
+	}
+	return ""
 }
 
 // licenseFileVar names the variable in what the console and the log say.
@@ -80,7 +99,7 @@ func (a *API) verifyLicense(data []byte) (*licenseInfo, error) {
 		return nil, fmt.Errorf("it is not a license file (%s)", strings.TrimPrefix(err.Error(), "license: "))
 	}
 	info := &licenseInfo{ID: lic.ID, Licensee: lic.Licensee, Plan: lic.Edition, Tenants: lic.Tenants,
-		Instances: lic.Instances, IssuedAt: lic.IssuedAt, UpdatesUntil: lic.ExpiresAt, lic: lic}
+		Instances: lic.Instances, IssuedAt: lic.IssuedAt, UpdatesUntil: lic.ExpiresAt, Ends: lic.Hard(), lic: lic}
 	if built, err := time.Parse(time.RFC3339, version.Date); err == nil {
 		covered := lic.Covered(built)
 		info.Covered = &covered
@@ -115,7 +134,8 @@ func (a *API) currentLicense(ctx context.Context) (info *licenseInfo, source, pr
 }
 
 // ReloadLicense puts the license this node holds in force: read again, verified
-// again. A refused one brings the evaluation notice back and stops nothing.
+// again. A refused one, or one this build does not honour, brings the evaluation
+// notice back and stops nothing.
 func (a *API) ReloadLicense(ctx context.Context) error {
 	if !edition.Enterprise {
 		return nil
@@ -140,7 +160,7 @@ func (a *API) observeTenants(ctx context.Context) {
 }
 
 func apply(info *licenseInfo) {
-	if info == nil {
+	if info == nil || info.lapse(time.Now()) != "" {
 		license.Apply(nil)
 		return
 	}
@@ -151,7 +171,8 @@ func apply(info *licenseInfo) {
 }
 
 // WatchLicense follows what no announcement reaches: a Secret updated in place,
-// how many instances are running, and how many tenants are served.
+// the end of a test license, how many instances are running, and how many
+// tenants are served.
 func (a *API) WatchLicense(ctx context.Context, running func() int) {
 	if !edition.Enterprise {
 		return
@@ -163,10 +184,7 @@ func (a *API) WatchLicense(ctx context.Context, running func() int) {
 		case <-ctx.Done():
 			return
 		case now := <-t.C:
-			if a.LicenseFile != "" {
-				_ = a.ReloadLicense(ctx)
-			}
-			a.observeTenants(ctx)
+			_ = a.ReloadLicense(ctx)
 			license.Observe(running(), now)
 		}
 	}
@@ -188,6 +206,9 @@ func (a *API) LogLicense(ctx context.Context) {
 	case info != nil:
 		slog.Info("license", "licensee", info.Licensee, "id", info.ID, "from", source,
 			"updatesUntil", info.UpdatesUntil.Format(time.DateOnly))
+		if lapse := info.lapse(time.Now()); lapse != "" {
+			slog.Warn("license", "problem", lapse)
+		}
 	}
 }
 

@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/admin"
 	"github.com/softwarity/meerkat/internal/store"
+	"github.com/softwarity/meerkat/internal/version"
 )
 
 // meerkat db: the database moves of Configuration > Database, for a script or
@@ -44,12 +46,17 @@ func runDB(args []string) int {
 		return 2
 	}
 	ctx := context.Background()
-	src, err := store.OpenAt(*dataDir, *sourceURL)
+	// Opening the source migrates it, as the gateway would: the same question
+	// first.
+	guard := &admin.MigrationGuard{LicenseFile: envOr("MEERKAT_LICENSE_FILE", ""), Built: version.Date,
+		Force: envOr(admin.MigratePastLicenseVar, "") == "true"}
+	src, err := store.OpenChecked(*dataDir, *sourceURL, guard.Check)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "meerkat db: open the source:", err)
 		return 1
 	}
 	defer func() { _ = src.Close() }()
+	guard.Audit(ctx, src)
 	switch verb {
 	case "dump":
 		err = dumpDB(ctx, src, *format, *out)

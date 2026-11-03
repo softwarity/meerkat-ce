@@ -25,6 +25,7 @@ function run(command, args) {
 }
 
 run('node', ['scripts/gen-version.mjs']);
+run('node', ['scripts/gen-releases.mjs']);
 run('node', ['scripts/gen-tests.mjs']);
 run('node', ['scripts/gen-rights.mjs']);
 run('node', ['scripts/gen-test-plan.mjs']);

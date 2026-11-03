@@ -123,13 +123,29 @@ func Open(dataDir string) (*Store, error) {
 // re-read what changed, and advisory locks, which is the one exclusion the
 // product needs. No Redis, no message bus.
 func OpenAt(dataDir, url string) (*Store, error) {
-	if strings.TrimSpace(url) != "" {
-		return openPostgres(dataDir, url)
-	}
-	return openEmbedded(dataDir)
+	return OpenChecked(dataDir, url, nil)
 }
 
-func openEmbedded(dataDir string) (*Store, error) {
+// MigrationCheck is asked before a database is moved to this build's schema,
+// and an error leaves it as it was. from and to are the schema versions; st
+// can be read, and only read: nothing has been migrated yet.
+//
+// It is what keeps a step nobody can take back from being taken by mistake. A
+// migrated database no longer opens with an earlier build (checkNotNewer), so
+// whatever made this build the wrong one to run has to be said before, not
+// after.
+type MigrationCheck func(ctx context.Context, from, to int, st *Store) error
+
+// OpenChecked is OpenAt, with check asked before any migration. A fresh
+// database, or one already at this build's schema, is not asked about.
+func OpenChecked(dataDir, url string, check MigrationCheck) (*Store, error) {
+	if strings.TrimSpace(url) != "" {
+		return openPostgres(dataDir, url, check)
+	}
+	return openEmbedded(dataDir, check)
+}
+
+func openEmbedded(dataDir string, check MigrationCheck) (*Store, error) {
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)",
 		filepath.Join(dataDir, "meerkat.db"))
 	db, err := sql.Open("sqlite", dsn)
@@ -144,7 +160,7 @@ func openEmbedded(dataDir string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := s.migrate(); err != nil {
+	if err := s.migrate(check); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -1498,7 +1514,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // becomes ref.
 const schemaVersion = 102
 
-func (s *Store) migrate() error {
+func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()
 	if err != nil {
 		return err
@@ -1514,6 +1530,12 @@ func (s *Store) migrate() error {
 	// there is no older database here - running its steps would ask a fresh
 	// schema to undo changes it never had.
 	fresh := v == 0
+	// The last moment the database is still the one the running build wrote.
+	if check != nil && !fresh && v < schemaVersion {
+		if err := check(context.Background(), v, schemaVersion, s); err != nil {
+			return err
+		}
+	}
 	if _, err := s.db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}

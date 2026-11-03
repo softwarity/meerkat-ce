@@ -23,6 +23,7 @@ import { MeService } from './me.service';
 import { SessionWatchService } from './session';
 import { UserMenuComponent } from './shared/user-menu.component';
 import { PauseService } from './shared/pause.service';
+import { UpdatesService } from './shared/updates.service';
 
 // Console scopes (CONSOLE-01): Infra (routing, relay, tokens), Application (the
 // product - identity, RBAC, built-in pages), Tenants (drill into one org), plus
@@ -61,6 +62,7 @@ export class AppComponent {
   // something that is gone.
   private readonly tenantsService = inject(TenantsService);
   protected readonly pause = inject(PauseService);
+  protected readonly updates = inject(UpdatesService);
   protected readonly tenants = this.tenantsService.tenants;
 
   private loadTenants(): void {

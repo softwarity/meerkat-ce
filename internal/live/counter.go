@@ -77,3 +77,7 @@ const DoorTrafficTopic = "door-traffic"
 // PauseTopic is what every console subscribes to, to hear that the gateway was
 // paused or resumed (store/pause.go).
 const PauseTopic = "pause"
+
+// UpdatesTopic says the update check found something, or was switched: the
+// console reads GET /api/updates again. Served to who may read that.
+const UpdatesTopic = "updates"

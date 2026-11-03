@@ -13,19 +13,26 @@ prerequisite.
 
 ## Docker image
 
-Three images, built from the same commit and carrying the same name: the
-**registry** and the tag are what say the edition.
+Two images, built from the same commit, both public on Docker Hub:
 
 | Image | Edition |
 |---|---|
-| `docker.io/softwarity/meerkat:latest` | community, public |
-| `docker.io/softwarity/meerkat:eval` | evaluation, public: everything Enterprise does, with an evaluation notice - not for production until a license makes it Team or Enterprise |
-| `ghcr.io/softwarity/meerkat:latest` | Enterprise, private registry |
+| `docker.io/softwarity/meerkat` | everything Enterprise does. Without a license it is an evaluation, with a notice on its pages and not for production; a license makes it Team or Enterprise, with no restart |
+| `docker.io/softwarity/meerkat-ce` | community |
+
+Each carries the same tags: `X.Y.Z` for a release, `X.Y` and `X` for the
+latest of a line, and `latest` for the build of the day on `main`. Pin a
+release on anything that holds your front door.
+
+Up to 1.22, the community edition was published as `softwarity/meerkat`, and
+the evaluation as `softwarity/meerkat:eval` and `X.Y.Z-eval`. Every community
+version is now at `softwarity/meerkat-ce`, under the same numbers; the `eval`
+tags stay as they were and get no new version.
 
 ```yaml
 services:
   meerkat:
-    image: docker.io/softwarity/meerkat:latest
+    image: docker.io/softwarity/meerkat-ce:latest
     ports:
       - "8080:8080" # data plane
       - "9090:9090" # control plane - keep this one internal
@@ -47,7 +54,7 @@ so `docker exec ... sh` has nothing to open, and a healthcheck runs
 
 ## Verify the signature
 
-All three images are signed when they are built, with
+Both images are signed when they are built, with
 [cosign](https://docs.sigstore.dev/) and no key. There is no public key to go
 and fetch: the signature carries the identity of the GitHub Actions workflow
 that produced the image, and that identity is what you check.
@@ -59,14 +66,12 @@ cosign verify \
   docker.io/softwarity/meerkat:latest
 ```
 
-The same command verifies the evaluation image, `docker.io/softwarity/meerkat:eval`,
-and the Enterprise image at `ghcr.io/softwarity/meerkat` once you are logged in
-to that registry. All three are built by workflows living in
-the public mirror, `softwarity/meerkat-ce`, which is the repository the
-identity names - the Enterprise sources are private, the pipeline that builds
-them is not. The identity names two files of that repository, on `main` and
-nowhere else: `_docker.yml` builds the community `latest`, `ci-ee.yml` the
-Enterprise and evaluation images and every release tag. A workflow on another
+The same command verifies `docker.io/softwarity/meerkat-ce`. Both are built
+by workflows living in the public mirror, `softwarity/meerkat-ce`, which is
+the repository the identity names - the Enterprise sources are private, the
+pipeline that builds them is not. The identity names two files of that
+repository, on `main` and nowhere else: `_docker.yml` builds the community
+`latest`, `ci-ee.yml` the other image and every release tag. A workflow on another
 branch, or another file, does not pass. Versions up to 1.6.0 carry no
 signature: only `latest` and `eval` were signed then.
 
@@ -97,7 +102,6 @@ spec:
       verifyImages:
         - imageReferences:
             - "docker.io/softwarity/meerkat*"
-            - "ghcr.io/softwarity/meerkat*"
           attestors:
             - entries:
                 - keyless:
@@ -191,6 +195,8 @@ single-tenant, and says that too.
 |---|---|---|
 | `-plug-addr` | `MEERKAT_PLUG_ADDR` | developer tunnel listen address, default `:22222`, Enterprise only |
 | `-license` | `MEERKAT_LICENSE_FILE` | the license file Softwarity sent, mounted from a secret (the Helm chart's `license.existingSecret`). Read at start and again on every look, so a secret updated in place needs no restart; the License screen then shows it and takes no other. Enterprise image only |
+| `-migrate-past-license` | `MEERKAT_MIGRATE_PAST_LICENSE` | `true` lets a version built after the updates of the license migrate the database. Without it, such a version stops before migrating and says why ([Update check](/docs/operations/updates)). Take a backup first: the version then runs as an evaluation, and an earlier one no longer opens the database. Enterprise image only |
+| `-update-feed` | `MEERKAT_UPDATE_FEED` | where the update check reads the list of releases, Softwarity's public file when empty. The check itself stays off until root turns it on ([Update check](/docs/operations/updates)) |
 | `-console-url` | `MEERKAT_CONSOLE_URL` | development override: proxy the console to a front dev server |
 | `-version` | - | print version and exit |
 

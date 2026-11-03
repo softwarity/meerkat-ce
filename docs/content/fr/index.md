@@ -119,7 +119,9 @@ docker run -p 8080:8080 -p 9090:9090 \
 ```
 
 Le port 8080 est celui qu'atteignent vos utilisateurs, le 9090 celui de la
-console d'administration. À partir de là, le
+console d'administration. Sans licence, elle tourne en évaluation : tout, avec
+une mention sur ses pages. L'édition Community est `softwarity/meerkat-ce`. À
+partir de là, le
 [démarrage rapide](/docs/start/quick-start) place l'un de vos services derrière
 la gateway en cinq minutes environ.
 

@@ -18,13 +18,12 @@ type Platform = 'docker' | 'swarm' | 'k8s';
 const FILES = 'https://meerkat.softwarity.dev/deploy';
 const PASSWORD = "'choose-one-now'";
 
-// The image each edition is pulled as. A licensed image is served for one
-// licence: the key is part of its address, which is what every client -
-// Docker, containerd, a kubelet - can carry without a login step.
+// The image each edition is pulled as. Evaluation, Team and Enterprise are one
+// image: the licence, given in the console or mounted, is what tells them apart.
 const IMAGE: Record<Edition, string> = {
-  ce: 'softwarity/meerkat',
-  eval: 'softwarity/meerkat:eval',
-  licensed: 'registry.softwarity.io/YOUR_LICENCE_KEY/softwarity/meerkat',
+  ce: 'softwarity/meerkat-ce',
+  eval: 'softwarity/meerkat',
+  licensed: 'softwarity/meerkat',
 };
 
 interface Step {
@@ -40,10 +39,10 @@ const WORDS = {
     editions: { ce: 'Community', eval: 'Evaluation', licensed: 'Team or Enterprise' } as Record<Edition, string>,
     platforms: { docker: 'Docker', swarm: 'Docker Swarm', k8s: 'Kubernetes' } as Record<Platform, string>,
     about: {
-      ce: 'The free edition: the whole gateway for one organisation, production included.',
+      ce: 'The free edition: the whole gateway for one tenant, production included.',
       eval: 'Everything Enterprise does, free, with an evaluation notice. Not for production.',
       licensed:
-        'The image built for your licence. Replace YOUR_LICENCE_KEY with the key you were given: it is part of the image address, so there is no registry to log in to.',
+        'The evaluation image with the licence file Softwarity sent: paste it on Meerkat > License in the console, or mount it as below. No other image, no registry to log in to.',
     } as Record<Edition, string>,
     file: 'The file',
     copy: 'Copy',
@@ -55,10 +54,10 @@ const WORDS = {
     editions: { ce: 'Community', eval: 'Évaluation', licensed: 'Team ou Enterprise' } as Record<Edition, string>,
     platforms: { docker: 'Docker', swarm: 'Docker Swarm', k8s: 'Kubernetes' } as Record<Platform, string>,
     about: {
-      ce: "L'édition gratuite : toute la gateway pour une organisation, production comprise.",
+      ce: "L'édition gratuite : toute la gateway pour un tenant, production comprise.",
       eval: "Tout ce que fait Enterprise, gratuitement, avec une mention d'évaluation. Pas pour la production.",
       licensed:
-        "L'image construite pour votre licence. Remplacez YOUR_LICENCE_KEY par la clé que vous avez reçue : elle fait partie de l'adresse de l'image, il n'y a donc aucun registre auquel se connecter.",
+        "L'image d'évaluation avec le fichier de licence envoyé par Softwarity : collez-le sur Meerkat > License dans la console, ou montez-le comme ci-dessous. Aucune autre image, aucun registre auquel se connecter.",
     } as Record<Edition, string>,
     file: 'Le fichier',
     copy: 'Copier',
@@ -72,6 +71,7 @@ function steps(lang: Lang, edition: Edition, platform: Platform): Step[] {
   const fr = lang === 'fr';
   const image = IMAGE[edition];
   const ee = edition !== 'ce';
+  const licensed = edition === 'licensed';
 
   if (platform === 'docker') {
     const compose = ee ? 'docker-compose.ee.yml' : 'docker-compose.yml';
@@ -83,6 +83,9 @@ function steps(lang: Lang, edition: Edition, platform: Platform): Step[] {
           '  -p 8080:8080 -p 9090:9090 \\',
           `  -e MEERKAT_ADMIN_PASSWORD=${PASSWORD} \\`,
           '  -v meerkat-data:/data \\',
+          ...(licensed
+            ? ['  -v ./meerkat.lic:/etc/meerkat/license.lic:ro \\', '  -e MEERKAT_LICENSE_FILE=/etc/meerkat/license.lic \\']
+            : []),
           `  ${image}`,
         ].join('\n'),
       },
@@ -98,7 +101,7 @@ function steps(lang: Lang, edition: Edition, platform: Platform): Step[] {
         code: [
           `curl -O ${FILES}/${compose}`,
           ee
-            ? `MEERKAT_IMAGE=${image} \\\nMEERKAT_ADMIN_PASSWORD=${PASSWORD} \\\n  docker compose -f ${compose} up -d`
+            ? `MEERKAT_ADMIN_PASSWORD=${PASSWORD} docker compose -f ${compose} up -d`
             : `MEERKAT_ADMIN_PASSWORD=${PASSWORD} docker compose up -d`,
         ].join('\n'),
       },
@@ -129,7 +132,6 @@ function steps(lang: Lang, edition: Edition, platform: Platform): Step[] {
         code: [
           `curl -O ${FILES}/stack.swarm.yml`,
           [
-            `MEERKAT_IMAGE=${image} \\`,
             "MEERKAT_DATABASE_URL='postgres://user:password@db:5432/meerkat' \\",
             'MEERKAT_VAULT_KEY=$(openssl rand -hex 32) \\',
             `MEERKAT_ADMIN_PASSWORD=${PASSWORD} \\`,
@@ -148,22 +150,15 @@ function steps(lang: Lang, edition: Edition, platform: Platform): Step[] {
   // Kubernetes, with the chart.
   const values = ee ? 'values-ee-one-node.yaml' : 'values-ce-one-node.yaml';
   const set: string[] = [];
-  if (edition === 'eval') {
-    set.push('  --set image.repository=docker.io/softwarity/meerkat --set image.tag=eval \\');
-  }
-  if (edition === 'licensed') {
-    set.push(`  --set image.repository=${image} \\`);
-  }
-  if (ee) {
-    // The key is in the address, and the evaluation image is public: neither
-    // needs the pull secret the values file names.
-    set.push("  --set-json 'image.pullSecrets=[]' \\");
+  if (licensed) {
+    set.push('  --set license.existingSecret=meerkat-license \\');
   }
   const out: Step[] = [
     {
       say: fr ? 'Une gateway sur son volume, avec le chart :' : 'One gateway on its own volume, with the chart:',
       file: values,
       code: [
+        ...(licensed ? ['kubectl create secret generic meerkat-license --from-file=license=meerkat.lic'] : []),
         `helm repo add meerkat ${FILES}`,
         'helm install meerkat meerkat/meerkat \\',
         `  -f ${FILES}/${values} \\`,

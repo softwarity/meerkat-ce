@@ -56,8 +56,8 @@ func TestParseRejectsTampering(t *testing.T) {
 	}
 }
 
-// A license is perpetual: long past its expiry date it still validates and
-// still names its edition. Whoever paid keeps what they paid for - cutting
+// A perpetual fallback: long past its date a license still validates and still
+// names its edition, and whoever paid keeps the builds from the term - cutting
 // authentication over a lapsed subscription would make this undeployable in
 // front of a production.
 func TestParseStaysValidPastExpiry(t *testing.T) {
@@ -71,13 +71,60 @@ func TestParseStaysValidPastExpiry(t *testing.T) {
 		t.Fatal("the edition must still be carried")
 	}
 	// What the date DOES say: how far updates were paid for. A build from
-	// before it is covered, one from after is not - and that is only ever
-	// reported, never enforced.
+	// before it is covered, one from after is not.
 	if !lic.Covered(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Fatal("a build released during the term must be covered")
+		t.Fatal("a build from the term must be covered")
 	}
 	if lic.Covered(time.Date(2028, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Fatal("a build released after the term must be reported as uncovered")
+		t.Fatal("a build from after the term must be reported as uncovered")
+	}
+	if lic.Ended(time.Date(2038, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Fatal("a license that is sold never ends")
+	}
+}
+
+// A file cannot be revoked, so a test license ends at its date: it says so in
+// what is signed, and a copy with the line taken out does not verify.
+func TestATestLicenseEndsAtItsDate(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	sample := testLicense()
+	sample.Expires = ExpiresHard
+	data, err := Sign(sample, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lic, err := Parse(data, []ed25519.PublicKey{pub}, time.Date(2038, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("a test license past its date must still be read, to say it ended: %v", err)
+	}
+	if lic.Ended(sample.ExpiresAt) {
+		t.Fatal("it ends after its date, not on it")
+	}
+	if !lic.Ended(sample.ExpiresAt.AddDate(0, 0, 1)) {
+		t.Fatal("a test license must end at its date")
+	}
+}
+
+// The date is a day: everything built on it, up to midnight UTC, is covered, and
+// a test license runs until then. The issuer writes noon so that the date reads
+// the same in every country.
+func TestTheLastDayCountsToItsEnd(t *testing.T) {
+	lic := &License{ExpiresAt: time.Date(2027, 12, 31, 12, 0, 0, 0, time.UTC), Expires: ExpiresHard}
+	evening := time.Date(2027, 12, 31, 23, 59, 59, 0, time.UTC)
+	if !lic.Covered(evening) {
+		t.Fatal("a build from the evening of the last day must be covered")
+	}
+	if lic.Ended(evening) {
+		t.Fatal("a test license must run until the end of its last day")
+	}
+	midnight := time.Date(2028, 1, 1, 0, 0, 0, 0, time.UTC)
+	if lic.Covered(midnight) || !lic.Ended(midnight) {
+		t.Fatal("the next day is past the license")
+	}
+	// The same instant written in another zone is the same build.
+	paris := time.FixedZone("CET", 3600)
+	if !lic.Covered(time.Date(2028, 1, 1, 0, 30, 0, 0, paris)) {
+		t.Fatal("00:30 in Paris is still the last day in UTC")
 	}
 }
 
@@ -148,6 +195,7 @@ func TestParseRefusesWhatAPolicyDoesNotSay(t *testing.T) {
 		"no edition":             func(l *License) { l.Edition = "" },
 		"Team without a ceiling": func(l *License) { l.Tenants = 0 },
 		"no licensee":            func(l *License) { l.Licensee = "" },
+		"an unknown expiry":      func(l *License) { l.Expires = "soon" },
 	} {
 		lic := testLicense()
 		change(&lic)

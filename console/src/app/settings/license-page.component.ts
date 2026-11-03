@@ -55,7 +55,9 @@ interface FeatureRow {
             <mat-icon>{{ e.enterprise ? 'workspace_premium' : 'public' }}</mat-icon>
             <div class="grow">
               <div class="title">
-                @if (e.license?.plan === 'team') {
+                @if (e.license?.lapsed) {
+                  <ng-container i18n="@@Evaluation_edition">Evaluation edition</ng-container>
+                } @else if (e.license?.plan === 'team') {
                   <ng-container i18n="@@Team_edition">Team edition</ng-container>
                 } @else if (e.license) {
                   <ng-container i18n="@@Enterprise_edition">Enterprise edition</ng-container>
@@ -91,12 +93,13 @@ interface FeatureRow {
                     <dt i18n="@@License_covers">Covers</dt>
                     <dd i18n="@@License_covers_value">{{ l.tenants }} tenant(s), {{ l.instances }} instance(s)</dd>
                   }
-                  <dt i18n="@@Updates_support_until">Updates and support until</dt>
+                  @if (l.ends) {
+                    <dt i18n="@@Test_license_ends">Test license, ends on</dt>
+                  } @else {
+                    <dt i18n="@@Updates_support_until">Updates and support until</dt>
+                  }
                   <dd>
                     <span class="nowrap">{{ l.updatesUntil | date: 'longDate' }}</span>
-                    @if (l.covered === false) {
-                      <span class="late" i18n="@@Build_not_covered">this version was released after that date</span>
-                    }
                   </dd>
                 </dl>
               }
@@ -251,11 +254,6 @@ interface FeatureRow {
       }
       .license dd {
         margin: 0;
-      }
-      .late {
-        margin-left: 6px;
-        color: var(--mat-sys-on-surface-variant);
-        font-style: italic;
       }
       .problem {
         margin: 8px 0 0;

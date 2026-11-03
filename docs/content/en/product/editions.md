@@ -18,10 +18,10 @@ notice on it, free, to try everything first.
 
 | Edition | What it is | How you get it |
 | --- | --- | --- |
-| **Community** (CE) | The whole free gateway, production included | `softwarity/meerkat` on Docker Hub |
-| **Evaluation** (Eval) | All of Enterprise, with an evaluation notice; not for production | `softwarity/meerkat:eval` on Docker Hub |
-| **Team** (TE) | Everything Enterprise adds, for one organisation on one instance | The evaluation image and a licence - [talk to us](/pricing/index) |
-| **Enterprise** (EE) | Everything Enterprise adds, without a ceiling | The evaluation image and a licence - [talk to us](/pricing/index) |
+| **Community** (CE) | The whole free gateway, production included | `softwarity/meerkat-ce` on Docker Hub |
+| **Evaluation** (Eval) | All of Enterprise, with an evaluation notice; not for production | `softwarity/meerkat` on Docker Hub, without a licence |
+| **Team** (TE) | Everything Enterprise adds, for one organisation on one instance | `softwarity/meerkat` and a licence - [talk to us](/pricing/index) |
+| **Enterprise** (EE) | Everything Enterprise adds, without a ceiling | `softwarity/meerkat` and a licence - [talk to us](/pricing/index) |
 
 ::: lead
 The line we hold, and the one that matters when you compare:
@@ -76,7 +76,7 @@ Parquet. The [roadmap](/project/roadmap) says where each stands.
 
 ## Trying Enterprise first
 
-The evaluation edition is the Enterprise image with nothing taken out: no time
+The evaluation edition is the `softwarity/meerkat` image without a licence, with nothing taken out: no time
 limit, no counter, no capability switched off. What it adds is a notice -
 *Meerkat evaluation version. Not licensed for production use.* - on the pages
 the gateway serves, in the user button, in the e-mails it sends, and as a
@@ -85,7 +85,7 @@ Enterprise licence, pasted into the console, makes it go.
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat:eval
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
 Moving to a licensed edition later keeps everything: same image, same
@@ -111,7 +111,9 @@ Most of the Enterprise code is simply not in the Community image. Team and
 Enterprise are the evaluation image given a licence: pasted into the console,
 checked on the spot by its signature, it removes the evaluation notice with no
 restart. No activation server to reach, nothing that expires in the middle of
-the night: the gateway never calls us, and sends no usage report.
+the night: the gateway never calls us, and sends no usage report. The
+[update check](/docs/operations/updates), off until you turn it on, reads a public
+file and sends nothing about you.
 
 A licence never cuts traffic. What goes past its ceilings is refused when it
 is created, with a sentence saying so. The same licence covers all your

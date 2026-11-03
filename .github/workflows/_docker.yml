@@ -5,13 +5,14 @@ name: Reusable Docker build & publish
 # pushed by digest; a final job assembles the manifest list. Tags are derived
 # from the caller's ref by metadata-action.
 #
-# The COMMUNITY image, from the public tree: this is what ci.yml calls on the
-# mirror to publish `latest`. The Enterprise image and the release tags are
-# built by ci-ee.yml, in jobs of its own - the sources it builds are in
-# another repository, which a called workflow cannot check out for its caller.
+# The COMMUNITY image, softwarity/meerkat-ce, from the public tree: this is
+# what ci.yml calls on the mirror to publish `latest`. The image itself,
+# softwarity/meerkat, and the release tags are built by ci-ee.yml, in jobs of
+# its own - the sources it builds are in another repository, which a called
+# workflow cannot check out for its caller.
 #
-# Docker Hub is where the image ships: `docker pull softwarity/meerkat` is what
-# a reader types without being told about a registry first. It needs two
+# Docker Hub is where both ship: `docker pull softwarity/meerkat-ce` is what a
+# reader types without being told about a registry first. It needs two
 # secrets, DOCKERHUB_USERNAME and DOCKERHUB_RW (a read/write access token,
 # never the account password); without them the preflight below skips the push
 # and says so, rather than turning the pipeline red over a credential.

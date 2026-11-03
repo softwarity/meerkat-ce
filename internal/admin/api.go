@@ -112,6 +112,13 @@ type API struct {
 	// this node (pause.go). Nil in tests.
 	PauseMoved func()
 
+	// UpdatesMoved wakes the consoles this node holds when the update check
+	// moved (updates.go). Nil in tests.
+	UpdatesMoved func()
+	// UpdateFeed is where the list of releases is read, empty for Softwarity's
+	// public one: an installation may serve its own copy.
+	UpdateFeed string
+
 	// Scheduler is this node's own scheduler (SCHED-01), rung when a schedule
 	// is written here: the other nodes hear it on the bus, and this one
 	// sleeps until the next thing owed, so it has to be told. Wired by main;
@@ -295,6 +302,7 @@ func (a *API) register(mux Mux) {
 	a.registerMetrics(mux)
 	a.registerEdition(mux)
 	a.registerReleaseNotes(mux)
+	a.registerUpdates(mux)
 	a.registerUserModel(mux)
 	a.registerConfig(mux)
 	a.registerConfigurations(mux)

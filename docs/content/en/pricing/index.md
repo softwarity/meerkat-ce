@@ -84,10 +84,10 @@ What "the Enterprise capabilities" are, row by row, is on
 ## Support
 
 The yearly price includes a year of updates and a level of support. Without a
-renewal the licence stays valid: any version released during the period you
-paid for is yours, to install and run for as long as you like. Only the
-versions released afterwards are not covered. Support beyond what is included
-is ordered separately.
+renewal the licence stays valid: any version built during the period you
+paid for is yours, to install and run for as long as you like. A version
+built afterwards runs as an evaluation, notice included, for as long as it
+runs. Support beyond what is included is ordered separately.
 
 | | What it is | For whom |
 | --- | --- | --- |
@@ -108,10 +108,16 @@ instance reads it from there.
 
 - **Checked offline.** The licence is signed by Softwarity and the gateway
   verifies the signature itself. No activation server to reach: the gateway
-  never calls us, and there is no usage report anywhere in it.
+  never calls us, and there is no usage report anywhere in it. The one exception
+  is the [update check](/docs/operations/updates), off until you turn it on, which
+  reads a public file and sends nothing about you.
 - **Perpetual fallback.** A licence does not expire. Its date says how far the covered
-  updates go: a version released after it is outside the agreement, and the
-  console says so, but nothing switches off.
+  updates go. A version built after it is an evaluation: the notice comes
+  back and the console says why, traffic is not touched, and going back to a
+  version from the term or renewing restores the licence. A version that would
+  also migrate the database, which no earlier version could open afterwards,
+  stops before it does and says why: you renew, or you take a backup and let it
+  migrate as an evaluation ([how](/docs/operations/updates)).
 - **Nothing stops in the middle of a night.** A licence never cuts traffic.
   What goes past its ceilings is refused when it is created, with a sentence
   saying so: a second organisation on a Team licence is not created, and
@@ -166,8 +172,8 @@ brings.
 
 **What happens to an installation if we do not renew?** It keeps running,
 licensed: the licence is perpetual. What stops is updates and support. You keep
-the versions released during the period you paid for; later ones are not
-covered, and a renewal opens them again.
+the versions built during the period you paid for; later ones run as an
+evaluation, notice included, and a renewal opens them again.
 
 **Do you sell support for the free edition?** Ask us. The community image is
 supported by the repository - an issue on

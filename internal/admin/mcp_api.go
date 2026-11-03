@@ -54,7 +54,9 @@ var agentClosedSections = map[string]string{
 	"license": "a license is a contract between a company and Softwarity, pasted by a person of " +
 		"that company; describe_gateway says which edition this is",
 	"live": "the console's websocket: an agent does not hold a socket open, it asks again",
-	"mcp":  "the agent endpoint itself",
+	"updates": "whether this gateway reaches out to the internet is decided by a person, and what it " +
+		"found is read on the Release notes screen; describe_gateway says which version runs",
+	"mcp": "the agent endpoint itself",
 }
 
 // agentClosedEndpoints are the single endpoints closed inside open sections.

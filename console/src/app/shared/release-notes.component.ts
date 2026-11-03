@@ -1,7 +1,12 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { MeService } from '../me.service';
+import { UpdatesService } from './updates.service';
+import { ZonedDatePipe } from './zoned-date.pipe';
 
 export interface ReleaseNotes {
   version: string;
@@ -15,9 +20,13 @@ export interface ReleaseNotes {
 // development build is shown as the last release it carries, and the page
 // opens on what is in development. The gateway picks the sections: the minor
 // or major release, then its patches that say something.
+//
+// Above them, for who can act on it, the releases ahead of this gateway
+// (CONSOLE-16): set apart, marked as not installed, and with what installing one
+// would do to the license and the database, said before it is done.
 @Component({
   selector: 'app-release-notes-page',
-  imports: [LoadingIndicatorComponent],
+  imports: [DatePipe, LoadingIndicatorComponent, MatIconModule, MatSlideToggleModule, ZonedDatePipe],
   styles: [
     `
       :host {
@@ -47,6 +56,40 @@ export interface ReleaseNotes {
       }
       .notes-column {
         max-width: 860px;
+      }
+      .check {
+        margin: 0 0 16px;
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .check.failed {
+        color: var(--mat-sys-error);
+      }
+      .available {
+        margin-bottom: 24px;
+        padding: 12px 16px;
+        border-inline-start: 4px solid var(--mat-sys-tertiary);
+        border-radius: 8px;
+        background: var(--mat-sys-surface-container);
+      }
+      .available h2.part {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-top: 0;
+      }
+      .not-installed {
+        color: var(--mat-sys-tertiary);
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .consequence {
+        display: flex;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .consequence mat-icon {
+        flex: none;
+        color: var(--mat-sys-error);
       }
       .missing {
         margin: 8px 0;
@@ -97,12 +140,79 @@ export interface ReleaseNotes {
           <ng-container i18n="@@Release_notes">Release notes</ng-container>
         }
       </h1>
+      @if (me.isRoot() && updates.state(); as u) {
+        <mat-slide-toggle [checked]="u.enabled" (change)="updates.set($event.checked)">
+          <ng-container i18n="@@Check_for_updates">Check for updates</ng-container>
+        </mat-slide-toggle>
+      }
     </div>
     @if (notes.isLoading()) {
       <loading-indicator withContainer />
     } @else {
       <div class="content">
         <div class="notes-column">
+          @if (updates.state(); as u) {
+            @if (!u.enabled) {
+              @if (me.isRoot()) {
+                <p class="check" i18n="@@Update_check_off">
+                  Off. On, this gateway reads a public file on meerkat.softwarity.dev once a day to learn of newer
+                  versions, and sends nothing about itself.
+                </p>
+              }
+            } @else if (u.error) {
+              <p class="check failed">
+                <ng-container i18n="@@Update_check_failed">Last check failed:</ng-container>
+                {{ checkedAt() | zoned: me.timezone() : 'long' }} {{ u.error }}
+              </p>
+            } @else if (u.checkedAt) {
+              <p class="check">
+                <ng-container i18n="@@Update_check_last">Last checked:</ng-container>
+                {{ checkedAt() | zoned: me.timezone() : 'long' }}
+              </p>
+            }
+            @for (r of available(); track r.version) {
+              <section class="available">
+                <h2 class="part">
+                  {{ r.version }}
+                  <span class="not-installed" i18n="@@Not_installed">Not installed</span>
+                </h2>
+                @if (r.outOfLicense) {
+                  <p class="consequence">
+                    <mat-icon>workspace_premium</mat-icon>
+                    <span i18n="@@Update_past_license">
+                      Built after the updates of your license ended on {{ u.licenseUntil | date: 'longDate' }}. Once
+                      installed, this gateway runs as an evaluation: the evaluation notice shows on the pages your
+                      users see, and the license ceilings stop applying. Traffic is not touched. Renewing the license
+                      keeps it in force.
+                    </span>
+                  </p>
+                }
+                @if (r.migrates) {
+                  <p class="consequence">
+                    <mat-icon>database</mat-icon>
+                    <span>
+                      <ng-container i18n="@@Update_migrates">
+                        This version migrates the database. An older version no longer opens it afterwards: take a
+                        backup before you update.
+                      </ng-container>
+                      @if (r.outOfLicense) {
+                        <ng-container i18n="@@Update_migrates_past_license">
+                          Because it falls outside the license, it stops before migrating and says why, unless
+                          MEERKAT_MIGRATE_PAST_LICENSE is set to true: renew the license first, or take the backup and
+                          set it.
+                        </ng-container>
+                      }
+                    </span>
+                  </p>
+                }
+                @if (r.html) {
+                  <div class="notes" [innerHTML]="r.html"></div>
+                } @else {
+                  <p class="missing" i18n="@@Release_notes_missing">No notes for this release.</p>
+                }
+              </section>
+            }
+          }
           @for (p of parts(); track p.title) {
             <h2 class="part">
               @if (p.title === 'NEXT RELEASE') {
@@ -126,7 +236,16 @@ export interface ReleaseNotes {
 })
 export class ReleaseNotesPageComponent {
   protected readonly notes = httpResource<ReleaseNotes>(() => '/api/release-notes');
-  protected readonly enterprise = inject(MeService).enterprise;
+  protected readonly me = inject(MeService);
+  protected readonly updates = inject(UpdatesService);
+  protected readonly enterprise = this.me.enterprise;
+  protected readonly available = computed(() =>
+    (this.updates.state()?.releases ?? []).map((r) => ({ ...r, html: renderNotes(r.notes ?? '') })),
+  );
+  protected readonly checkedAt = computed(() => {
+    const at = this.updates.state()?.checkedAt;
+    return at ? Date.parse(at) / 1000 : null;
+  });
   protected readonly parts = computed(() =>
     (this.notes.value()?.parts ?? []).map((p) => ({ title: p.title, html: renderNotes(p.markdown) })),
   );

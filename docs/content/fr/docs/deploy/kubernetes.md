@@ -183,11 +183,11 @@ spec:
         - name: meerkat
           # La base externe est une capacité Enterprise : l'image Community
           # n'embarque aucun pilote PostgreSQL. Épinglez une version plutôt
-          # que de suivre "latest" sur ce qui tient votre porte d'entrée. Pour
-          # essayer le cluster d'abord : docker.io/softwarity/meerkat:eval,
-          # publique, l'image Enterprise avec une mention d'évaluation - pas
-          # pour la production.
-          image: ghcr.io/softwarity/meerkat:latest
+          # que de suivre "latest" sur ce qui tient votre porte d'entrée. Sans
+          # licence elle tourne en évaluation, avec une mention - pas pour la
+          # production ; une licence collée dans la console, ou montée avec
+          # MEERKAT_LICENSE_FILE, en fait une Team ou une Enterprise.
+          image: docker.io/softwarity/meerkat:latest
           ports:
             - name: app
               containerPort: 8080

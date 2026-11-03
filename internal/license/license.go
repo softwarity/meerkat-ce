@@ -33,6 +33,11 @@ const (
 	EditionEnterprise = "enterprise"
 )
 
+// ExpiresHard in a policy's metadata makes a license's date a real end. It is
+// what a test license has and a sold one does not: a file cannot be revoked, so
+// one that is not worth anything after its date is one that can leak.
+const ExpiresHard = "hard"
+
 // ProductID is Meerkat's product at the issuer. One signing key serves every
 // product of an account, so a signature alone would let a license for another
 // product through.
@@ -82,8 +87,11 @@ type License struct {
 	Tenants   int
 	Instances int
 	IssuedAt  time.Time
-	// ExpiresAt is how far updates and support go, never when anything stops.
+	// ExpiresAt is how far updates and support go: to the end of that day,
+	// in UTC. See Covered and Ended for what it does.
 	ExpiresAt time.Time
+	// Expires is ExpiresHard when the date ends the license itself.
+	Expires string
 }
 
 // certificate is the file once its armour is off.
@@ -130,6 +138,7 @@ type template struct {
 	Edition   string `json:"edition"`
 	Tenants   int    `json:"tenants,omitempty"`
 	Instances int    `json:"instances,omitempty"`
+	Expires   string `json:"expires,omitempty"`
 }
 
 // Load reads and validates a license file against the embedded production
@@ -145,12 +154,12 @@ func Load(path string) (*License, error) {
 // Parse validates a license file against the given public keys at the given
 // instant. It is the testable core of Load.
 //
-// A license is PERPETUAL: whoever paid keeps the right to run what they paid
-// for, and an expiry date never turns anything off. It says how far updates
-// and support go, which Covered reports so the console and the log can say so
-// without anyone being locked out of their own gateway. Cutting authentication
-// over a late invoice would make this unusable in front of a production, and
-// nobody serious would deploy it.
+// A license past its date still verifies: this is a perpetual fallback, and
+// whoever paid keeps the versions released while they paid. What the date does
+// is Covered's and Ended's to say, and the worst of it is the evaluation notice:
+// nobody is ever locked out of their own gateway. Cutting authentication over a
+// late invoice would make this unusable in front of a production, and nobody
+// serious would deploy it.
 func Parse(data []byte, keys []ed25519.PublicKey, now time.Time) (*License, error) {
 	cert, err := unarmour(data)
 	if err != nil {
@@ -228,15 +237,34 @@ func (ds dataset) license() (*License, error) {
 		return nil, fmt.Errorf("its policy names the edition %q, and only %q and %q exist",
 			t.Edition, EditionTeam, EditionEnterprise)
 	}
+	if t.Expires != "" && t.Expires != ExpiresHard {
+		return nil, fmt.Errorf("its policy says it expires %q, and only %q exists", t.Expires, ExpiresHard)
+	}
 	return &License{ID: ds.Data.ID, Licensee: a.Name, Edition: t.Edition, Tenants: t.Tenants,
-		Instances: t.Instances, IssuedAt: ds.Meta.Issued, ExpiresAt: *a.Expiry}, nil
+		Instances: t.Instances, IssuedAt: ds.Meta.Issued, ExpiresAt: *a.Expiry, Expires: t.Expires}, nil
 }
 
 // Covered reports whether a build dated buildDate falls within what this
-// license paid for. False does NOT disable anything - it is what the log and
-// the Licence screen say to explain that an update went past the coverage.
+// license paid for. A build that does not is an evaluation again, for as long as
+// it runs: nothing is written anywhere, so going back to a covered build, or
+// renewing, puts the license back in force.
 func (l *License) Covered(buildDate time.Time) bool {
-	return !buildDate.After(l.ExpiresAt)
+	return buildDate.Before(l.end())
+}
+
+// Hard says the date ends the license itself: a test license.
+func (l *License) Hard() bool { return l.Expires == ExpiresHard }
+
+// Ended reports whether a test license is past its date, whatever the build. A
+// license that is sold never ends.
+func (l *License) Ended(now time.Time) bool { return l.Hard() && !now.Before(l.end()) }
+
+// end is when the license stops counting: the end of the day it names, in UTC.
+// The issuer puts the time at noon so that the date reads the same everywhere;
+// the whole day is still paid for.
+func (l *License) end() time.Time {
+	d := l.ExpiresAt.UTC()
+	return time.Date(d.Year(), d.Month(), d.Day()+1, 0, 0, 0, 0, time.UTC)
 }
 
 // EditionName is the edition as a sentence names it.
@@ -275,7 +303,8 @@ func signFor(lic License, key ed25519.PrivateKey, product string) ([]byte, error
 	ds.Data.Attributes.Expiry = &lic.ExpiresAt
 	ds.Data.Relationships.Product.Data.ID = product
 	policy := included{Type: "policies"}
-	policy.Attributes.Metadata = template{Edition: lic.Edition, Tenants: lic.Tenants, Instances: lic.Instances}
+	policy.Attributes.Metadata = template{Edition: lic.Edition, Tenants: lic.Tenants, Instances: lic.Instances,
+		Expires: lic.Expires}
 	ds.Included = []included{policy}
 	ds.Meta.Issued = lic.IssuedAt
 	raw, err := json.Marshal(ds)

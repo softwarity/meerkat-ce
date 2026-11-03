@@ -7858,7 +7858,15 @@
           },
           "covered": {
             "type": "boolean",
-            "description": "This version was released within it; absent on a development build. False disables nothing"
+            "description": "This version was released within it; absent on a development build. False makes this gateway an evaluation again, for as long as it runs this version"
+          },
+          "ends": {
+            "type": "boolean",
+            "description": "The date ends the license itself: a test license. Absent on a license that is sold"
+          },
+          "lapsed": {
+            "type": "boolean",
+            "description": "This gateway does not honour the license: it is an evaluation until it runs a version released by the date, or the license is replaced. licenseOver says why"
           }
         },
         "required": [
@@ -8006,6 +8014,64 @@
         "required": [
           "title",
           "markdown"
+        ]
+      },
+      "Updates": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last attempt"
+          },
+          "error": {
+            "type": "string",
+            "description": "Why the last attempt failed"
+          },
+          "licenseUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "How far the updates of the license go"
+          },
+          "releases": {
+            "type": "array",
+            "description": "Newer than this gateway, newest first",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string"
+                },
+                "built": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The date a license is compared with"
+                },
+                "migrates": {
+                  "type": "boolean",
+                  "description": "Changes the database schema: an older version no longer opens the database afterwards"
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "Markdown"
+                },
+                "outOfLicense": {
+                  "type": "boolean",
+                  "description": "Built after the date of the license: installed, it runs as an evaluation"
+                }
+              },
+              "required": [
+                "version"
+              ]
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "releases"
         ]
       },
       "ReleaseNotes": {
@@ -18190,6 +18256,89 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/updates": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Read the update check",
+        "operationId": "getUpdates",
+        "description": "Whether the check is on, when it last ran, and the releases newer than this gateway. Root or gateway-admin.",
+        "responses": {
+          "200": {
+            "description": "The check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Turn the update check on or off",
+        "operationId": "putUpdates",
+        "description": "Off by default. On, the gateway reads a public list of releases at once, then once a day, on one instance, and sends nothing about itself. Off forgets what it found. Root only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The check, with what it just found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or unknown field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

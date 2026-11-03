@@ -1503,6 +1503,24 @@ export interface PasswordReset {
   validHours?: number;
 }
 
+// One release ahead of this gateway, and what installing it would do.
+export interface UpdateRelease {
+  version: string;
+  built?: string;
+  migrates?: boolean;
+  notes?: string;
+  outOfLicense?: boolean;
+}
+
+// What the update check found (CONSOLE-16).
+export interface Updates {
+  enabled: boolean;
+  checkedAt?: string;
+  error?: string;
+  releases: UpdateRelease[];
+  licenseUntil?: string;
+}
+
 export interface Edition {
   enterprise: boolean;
   // Where the applications answer - never the console's own origin.
@@ -1729,8 +1747,13 @@ export interface License {
   issuedAt: string;
   updatesUntil: string;
   // Whether this build falls within the updates paid for; absent on a build
-  // with no date. False switches nothing off.
+  // with no date.
   covered?: boolean;
+  // This gateway does not honour it, and licenseOver says why: it is an
+  // evaluation until that changes.
+  lapsed?: boolean;
+  // The date ends the license itself: a test license.
+  ends?: boolean;
 }
 
 // One field's before/after inside an audit event (from/to are the decoded JSON
@@ -3350,6 +3373,15 @@ export class ApiService {
   // Root: back to what the image is without one; answers the edition.
   deleteLicense(): Observable<Edition> {
     return this.http.delete<Edition>('/api/license');
+  }
+
+  updates(): Observable<Updates> {
+    return this.http.get<Updates>('/api/updates');
+  }
+
+  // Root: turning it on reads the list at once, and answers what it found.
+  setUpdates(enabled: boolean): Observable<Updates> {
+    return this.http.put<Updates>('/api/updates', { enabled });
   }
 
   setTenancy(tenancy: 'single' | 'multi'): Observable<Edition> {

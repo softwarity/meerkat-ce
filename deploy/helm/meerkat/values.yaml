@@ -1,7 +1,8 @@
 image:
-  # Two images, two products, built from the same commit: the community one on
-  # Docker Hub, the Enterprise one on GitHub Packages (private - the pull
-  # secret below is how a cluster reaches it).
+  # Two images, two products, built from the same commit, both public on
+  # Docker Hub: softwarity/meerkat, which a license turns into Team or
+  # Enterprise and which runs as an evaluation without one, and
+  # softwarity/meerkat-ce, the community edition.
   repository: docker.io/softwarity/meerkat
   tag: "" # defaults to the chart's appVersion
   pullPolicy: IfNotPresent

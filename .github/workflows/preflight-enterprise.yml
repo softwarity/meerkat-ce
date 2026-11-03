@@ -51,16 +51,7 @@ jobs:
           git ls-remote ee refs/heads/main
           echo "the remote answers and the token is accepted"
 
-      - name: GH Packages (Enterprise image)
-        id: ghcr
-        continue-on-error: true
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_WRITE_PACKAGE }}
-
-      - name: Docker Hub (community image)
+      - name: Docker Hub (softwarity/meerkat)
         id: dockerhub
         continue-on-error: true
         uses: docker/login-action@v4
@@ -75,12 +66,10 @@ jobs:
             echo "|---|---|---|"
             echo "| EE_APP_ID + EE_APP_PRIVATE_KEY (environment: enterprise) | minting a token | ${{ steps.app.outcome }} |"
             echo "| that token | reading softwarity/meerkat | ${{ steps.clone.outcome }} |"
-            echo "| GH_WRITE_PACKAGE (environment: enterprise) | Enterprise image on ghcr.io | ${{ steps.ghcr.outcome }} |"
-            echo "| DOCKERHUB_USERNAME + DOCKERHUB_RW | community image on Docker Hub | ${{ steps.dockerhub.outcome }} |"
+            echo "| DOCKERHUB_USERNAME + DOCKERHUB_RW | softwarity/meerkat on Docker Hub | ${{ steps.dockerhub.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
           test "${{ steps.app.outcome }}" = success \
             && test "${{ steps.clone.outcome }}" = success \
-            && test "${{ steps.ghcr.outcome }}" = success \
             && test "${{ steps.dockerhub.outcome }}" = success
 
   # The release job of ci-ee.yml, with its own environment and its own App:
@@ -119,16 +108,15 @@ jobs:
           git ls-remote ee refs/heads/main
           echo "the remote answers and the token is accepted"
 
-      # Re-tagging the Enterprise image needs the same package credential as
-      # publishing it, held on THIS environment too.
-      - name: GH Packages (re-tagging the Enterprise image)
-        id: ghcr
+      # Stamping the images needs the Docker Hub credential on THIS
+      # environment too.
+      - name: Docker Hub (stamping softwarity/meerkat and meerkat-ce)
+        id: dockerhub
         continue-on-error: true
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_WRITE_PACKAGE }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
 
       - name: Verdict
         run: |
@@ -137,8 +125,8 @@ jobs:
             echo "|---|---|---|"
             echo "| RELEASE_APP_ID + RELEASE_APP_PRIVATE_KEY (environment: release) | minting a token that may write | ${{ steps.app.outcome }} |"
             echo "| that token | reaching softwarity/meerkat | ${{ steps.reach.outcome }} |"
-            echo "| GH_WRITE_PACKAGE (environment: release) | re-tagging the Enterprise image | ${{ steps.ghcr.outcome }} |"
+            echo "| DOCKERHUB_USERNAME + DOCKERHUB_RW | stamping the images on Docker Hub | ${{ steps.dockerhub.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
           test "${{ steps.app.outcome }}" = success \
             && test "${{ steps.reach.outcome }}" = success \
-            && test "${{ steps.ghcr.outcome }}" = success
+            && test "${{ steps.dockerhub.outcome }}" = success

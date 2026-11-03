@@ -1161,6 +1161,16 @@
   },
   {
     "method": "GET",
+    "path": "/api/updates",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/updates",
+    "guard": "rootOnly"
+  },
+  {
+    "method": "GET",
     "path": "/api/users",
     "guard": "appAdmin"
   },

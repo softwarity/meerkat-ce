@@ -124,7 +124,7 @@ Pour en savoir plus : [Le coffre](/docs/operations/vault).
 - **Coffre intégré** : secrets chiffrés en AES-256-GCM, référencés par leur nom dans la configuration, export chiffré, rappel avant expiration. La même clé scelle les clés TLS et les secrets TOTP, et se renouvelle par un redémarrage.
 - **Redirection HTTPS et en-têtes de sécurité** : le HTTP en clair renvoyé vers HTTPS, HSTS, CSP, X-Frame-Options, Referrer-Policy, et protection CSRF pour la console.
 - **Console sur un port distinct** de celui du trafic applicatif : l'administration n'est jamais exposée avec l'application.
-- **Fonctionne sans accès à internet** : aucune ressource n'est chargée depuis l'extérieur, ce qui convient aux environnements isolés du réseau.
+- **Fonctionne sans accès à internet** : aucune ressource n'est chargée depuis l'extérieur, ce qui convient aux environnements isolés du réseau. La [vérification des mises à jour](/docs/operations/updates) reste coupée tant que vous ne l'activez pas.
 
 ## Exploitation
 

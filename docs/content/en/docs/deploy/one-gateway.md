@@ -27,7 +27,7 @@ The community image, in full:
 ```yaml
 services:
   meerkat:
-    image: docker.io/softwarity/meerkat:latest
+    image: docker.io/softwarity/meerkat-ce:latest
     ports:
       - "8080:8080"   # application plane
       - "9090:9090"   # control plane - keep this one internal
@@ -81,15 +81,15 @@ console, **Infra, Plug**, which ships off; that page
 records the address developers use and hands them the commands to install plug
 on macOS, Linux and Windows. See [Plug](/docs/operations/plug).
 
-The Enterprise file is the one above plus three things: the Enterprise image, a
-port, and the socket that lets the agent give a name to a machine. The image
-lives in a private registry, and a commercial agreement is what opens it - see
-[the editions](/product/editions).
+The Enterprise file is the one above plus three things: the image a license
+turns into Team or Enterprise, a port, and the socket that lets the agent give
+a name to a machine. The image is public; the license is what a commercial
+agreement brings - see [the editions](/product/editions).
 
 ```yaml
 services:
   meerkat:
-    image: ghcr.io/softwarity/meerkat:latest
+    image: docker.io/softwarity/meerkat:latest
     ports:
       - "8080:8080"
       - "9090:9090"
@@ -107,22 +107,19 @@ services:
 > nowhere else. Without it the gateway runs exactly as before: the tunnel
 > writes one line saying which resource it lacks, and serves as usual.
 
-### The evaluation image
+### Before the license
 
-To try Enterprise before talking to anyone, the **evaluation image** is the
-Enterprise one with nothing taken out, public on Docker Hub, with an evaluation
-notice on its pages and in its console - not licensed for production. Same
-file, one line changed, no registry to log into:
-
-```yaml
-    image: docker.io/softwarity/meerkat:eval   # or X.Y.Z-eval, to pin a release
-```
+Without a license, the same file is the **evaluation**: everything Enterprise
+does, with an evaluation notice on its pages and in its console - not licensed
+for production. Nothing to change to try it. A license pasted in the console
+(**Meerkat > License**), or mounted with `MEERKAT_LICENSE_FILE`, makes it Team
+or Enterprise with no restart.
 
 The published [docker-compose.ee.yml](/deploy/docker-compose.ee.yml) takes its
-image from `MEERKAT_IMAGE`, so it runs the evaluation untouched:
+image from `MEERKAT_IMAGE`, to pin a release:
 
 ```bash
-MEERKAT_IMAGE=docker.io/softwarity/meerkat:eval docker compose -f docker-compose.ee.yml up -d
+MEERKAT_IMAGE=docker.io/softwarity/meerkat:1.23.0 docker compose -f docker-compose.ee.yml up -d
 ```
 
 ## Kubernetes, with Helm
@@ -137,15 +134,19 @@ of failure.
 ```bash
 helm repo add meerkat https://meerkat.softwarity.dev/deploy
 
+# Community:
 helm install meerkat meerkat/meerkat \
+  --set image.repository=docker.io/softwarity/meerkat-ce \
   --set admin.password='your-first-password'
 
-# Enterprise, with the tunnel open (`plug.enabled` is already true):
+# Team or Enterprise, with the tunnel open (`plug.enabled` is already true),
+# from the license in a Secret:
+kubectl create secret generic meerkat-license --from-file=license=<the file Softwarity sent>
 helm install meerkat meerkat/meerkat \
-  --set image.repository=ghcr.io/softwarity/meerkat --set 'image.pullSecrets[0]=ghcr' \
+  --set license.existingSecret=meerkat-license \
   --set admin.password='your-first-password'
 
-# Evaluation: everything Enterprise does, public, not for production.
+# Evaluation: the same, without a license. Everything Enterprise does, not for production.
 helm install meerkat meerkat/meerkat \
   -f https://meerkat.softwarity.dev/deploy/values-eval-one-node.yaml \
   --set admin.password='your-first-password'
