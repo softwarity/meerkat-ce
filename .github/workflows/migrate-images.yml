@@ -42,10 +42,23 @@ jobs:
     steps:
       - uses: imjasonh/setup-crane@v0.4
       - uses: sigstore/cosign-installer@v4.1.2
-      - uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_RW }}
+      # crane reads its own login: without it every manifest it fetches counts
+      # against the anonymous pull limit, which stopped the first run halfway.
+      - name: Log crane in to Docker Hub
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_RW }}
+        run: printf '%s' "$TOKEN" | crane auth login index.docker.io -u "$USERNAME" --password-stdin
+      # What Docker Hub counts for this login: the limit and what is left, said
+      # before anything is fetched.
+      - name: Pull allowance
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_RW }}
+        run: |
+          t=$(curl -fsS -u "$USERNAME:$TOKEN" "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+          curl -fsSI -H "Authorization: Bearer $t" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest \
+            | grep -i '^ratelimit\|^docker-ratelimit-source' || echo "no limit reported: not counted"
 
       - name: Plan
         run: |
@@ -59,8 +72,17 @@ jobs:
           community=$(cut -f1 before.tsv | grep -v -- '-eval$' | grep -vx eval | grep -vx latest)
           evals=$(cut -f1 before.tsv | grep -- '-eval$' | sed 's/-eval$//' | sort -V)
           : > plan.tsv
+          # A tag already on meerkat-ce was copied by an earlier run, and the
+          # same tag on meerkat may have been retagged since: never copied again.
           for t in $community; do
-            printf 'copy\t%s\t%s\n' "$t" "$(digest "$t")" >> plan.tsv
+            if crane digest "$CE:$t" >/dev/null 2>&1; then
+              printf 'copied\t%s\t%s\n' "$t" "$(crane digest "$CE:$t")" >> plan.tsv
+            elif grep -q -- "-eval	$(digest "$t")$" before.tsv; then
+              echo "::error::meerkat:$t already names an evaluation build and is not on meerkat-ce: copy it by hand from the first run's list"
+              exit 1
+            else
+              printf 'copy\t%s\t%s\n' "$t" "$(digest "$t")" >> plan.tsv
+            fi
           done
           for t in $community; do
             case "$t" in
@@ -107,6 +129,7 @@ jobs:
           set -euo pipefail
           while IFS=$'\t' read -r op tag from d; do
             [ "$op" = retag ] || continue
+            if [ "$(crane digest "$SRC:$tag")" = "$d" ]; then echo "already  meerkat:$tag"; continue; fi
             crane tag "$SRC@$d" "$tag"
             echo "retagged meerkat:$tag = meerkat:$from ($d)"
           done < plan.tsv
@@ -127,7 +150,7 @@ jobs:
           bad=0
           while IFS=$'\t' read -r op tag a b; do
             case "$op" in
-              copy) ref="$CE:$tag" want=$a ;;
+              copy|copied) ref="$CE:$tag" want=$a ;;
               retag) ref="$SRC:$tag" want=$b ;;
               *) continue ;;
             esac
