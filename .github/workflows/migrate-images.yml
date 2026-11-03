@@ -42,13 +42,14 @@ jobs:
     steps:
       - uses: imjasonh/setup-crane@v0.4
       - uses: sigstore/cosign-installer@v4.1.2
-      # crane reads its own login: without it every manifest it fetches counts
-      # against the anonymous pull limit, which stopped the first run halfway.
-      - name: Log crane in to Docker Hub
-        env:
-          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          TOKEN: ${{ secrets.DOCKERHUB_RW }}
-        run: printf '%s' "$TOKEN" | crane auth login index.docker.io -u "$USERNAME" --password-stdin
+      # Reads and retags go through docker buildx, which uses this login: crane
+      # fetched as anonymous on the runner, and the shared anonymous limit
+      # stopped the first two runs halfway. crane only copies what is not on
+      # meerkat-ce yet.
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
       # What Docker Hub counts for this login: the limit and what is left, said
       # before anything is fetched.
       - name: Pull allowance
@@ -63,9 +64,15 @@ jobs:
       - name: Plan
         run: |
           set -euo pipefail
-          for t in $(crane ls "$SRC" | sort -V); do
-            printf '%s\t%s\n' "$t" "$(crane digest "$SRC:$t")"
+          dg() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
+          # The tag list from the Hub API: it counts against nothing.
+          tags() {
+            curl -fsS "https://hub.docker.com/v2/namespaces/softwarity/repositories/$1/tags?page_size=100" | jq -r '.results[].name'
+          }
+          for t in $(tags meerkat | sort -V); do
+            printf '%s\t%s\n' "$t" "$(dg "$SRC:$t")"
           done > before.tsv
+          ce_tags=$(tags meerkat-ce)
           echo "### Before" >> "$GITHUB_STEP_SUMMARY"
           { echo '```'; cat before.tsv; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           digest() { awk -F'\t' -v t="$1" '$1==t{print $2}' before.tsv; }
@@ -75,8 +82,8 @@ jobs:
           # A tag already on meerkat-ce was copied by an earlier run, and the
           # same tag on meerkat may have been retagged since: never copied again.
           for t in $community; do
-            if crane digest "$CE:$t" >/dev/null 2>&1; then
-              printf 'copied\t%s\t%s\n' "$t" "$(crane digest "$CE:$t")" >> plan.tsv
+            if echo "$ce_tags" | grep -qx -- "$t"; then
+              printf 'copied\t%s\t%s\n' "$t" "$(dg "$CE:$t")" >> plan.tsv
             elif grep -q -- "-eval	$(digest "$t")$" before.tsv; then
               echo "::error::meerkat:$t already names an evaluation build and is not on meerkat-ce: copy it by hand from the first run's list"
               exit 1
@@ -127,10 +134,13 @@ jobs:
         if: inputs.apply
         run: |
           set -euo pipefail
+          dg() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
           while IFS=$'\t' read -r op tag from d; do
             [ "$op" = retag ] || continue
-            if [ "$(crane digest "$SRC:$tag")" = "$d" ]; then echo "already  meerkat:$tag"; continue; fi
-            crane tag "$SRC@$d" "$tag"
+            if [ "$(dg "$SRC:$tag")" = "$d" ]; then echo "already  meerkat:$tag"; continue; fi
+            # One source by digest: the index is pushed as it is, same digest.
+            docker buildx imagetools create -t "$SRC:$tag" "$SRC@$d"
+            [ "$(dg "$SRC:$tag")" = "$d" ] || { echo "::error::meerkat:$tag did not take $d"; exit 1; }
             echo "retagged meerkat:$tag = meerkat:$from ($d)"
           done < plan.tsv
 
@@ -147,6 +157,7 @@ jobs:
               --certificate-identity-regexp "$id" "$1" >/dev/null 2>&1
           }
           old() { printf '%s\n1.7.0\n' "$1" | sort -V | head -1 | grep -qvx 1.7.0; }
+          dg() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
           bad=0
           while IFS=$'\t' read -r op tag a b; do
             case "$op" in
@@ -154,7 +165,7 @@ jobs:
               retag) ref="$SRC:$tag" want=$b ;;
               *) continue ;;
             esac
-            got=$(crane digest "$ref")
+            got=$(dg "$ref")
             if [ "$got" != "$want" ]; then echo "::error::$ref is $got, the plan said $want"; bad=1; continue; fi
             case "$tag" in *.*.*) ;; *) echo "ok       $ref"; continue ;; esac
             if old "$tag"; then echo "ok       $ref (unsigned, as every version up to 1.6.0)"
