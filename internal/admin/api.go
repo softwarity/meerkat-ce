@@ -24,6 +24,7 @@ import (
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/gateway"
+	"github.com/softwarity/meerkat/internal/instances"
 	"github.com/softwarity/meerkat/internal/mail"
 	"github.com/softwarity/meerkat/internal/metrics"
 	"github.com/softwarity/meerkat/internal/notifier"
@@ -87,6 +88,12 @@ type API struct {
 	// TLS is the live HTTPS state (SSL-01/02). Wired by main; nil in the tests
 	// that have no listener to open, where saving material still has to work.
 	TLS *certs.Supervisor
+	// Instances is the gateways serving this installation, as each says of
+	// itself (internal/instances): the Infrastructure screen.
+	Instances *instances.Registry
+	// InstancesMoved wakes the Infrastructure screens this node holds when
+	// what it shows moved without a node coming or going: an overrun began.
+	InstancesMoved func()
 	// DoorTraffic is which of the console's doors are called (SSL-15): what
 	// keeps the port a proxy still calls from being switched off.
 	DoorTraffic *certs.Traffic
@@ -298,6 +305,7 @@ func (a *API) register(mux Mux) {
 	a.registerProxyLimits(mux)
 	a.registerRouteHealth(mux)
 	a.registerLogs(mux)
+	a.registerInfrastructure(mux)
 	a.registerServices(mux)
 	a.registerMetrics(mux)
 	a.registerEdition(mux)

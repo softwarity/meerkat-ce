@@ -919,6 +919,27 @@
       }
     },
     {
+      "id": "api-infra-infrastructure",
+      "domain": "infra",
+      "kind": "api",
+      "probe": {
+        "method": "GET",
+        "path": "/api/infrastructure"
+      },
+      "allowed": [
+        "root",
+        "infra-admin"
+      ],
+      "title": {
+        "en": "Read the gateways serving this installation",
+        "fr": "Lire les gateways qui servent l'installation"
+      },
+      "description": {
+        "en": "Every instance as it describes itself, the database they share and what the license says of their number (OBS-07), for the Infrastructure screen. The same readers as the logs: the same nodes, seen from the same plane.",
+        "fr": "Chaque instance telle qu'elle se décrit, la base qu'elles partagent et ce que la licence dit de leur nombre (OBS-07), pour l'écran Infrastructure. Les mêmes lecteurs que les journaux : les mêmes nœuds, vus du même plan."
+      }
+    },
+    {
       "id": "api-infra-log-level",
       "domain": "infra",
       "kind": "api",

@@ -1512,7 +1512,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // given to nobody after its publication.
 // 102 has a step: a notification has one id for its sender, dedup_key
 // becomes ref.
-const schemaVersion = 102
+const schemaVersion = 103
 
 func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()

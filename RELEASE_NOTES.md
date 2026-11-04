@@ -21,6 +21,27 @@
   migrating, writes nothing and says why in its log; the version you ran before starts again as it
   was. Renew the license, or take a backup and set `MEERKAT_MIGRATE_PAST_LICENSE=true` to migrate
   and run as an evaluation, which the audit trail records.
+- **Infra > Topology draws what serves the installation.** Every instance with its version and
+  whether it is ready, the database they share, and what the license says of their number. More
+  instances than the license covers, two versions running at once or an instance not ready are
+  said there in words, with a badge on the entry and on Infra in the rail. Beside them, the
+  services the routes point at, named by their routes, and whether each answers. It follows the
+  gateway live, with no refresh.
+- **A block of custom CSS or JavaScript can be switched off.** On a UI route's Custom section, each
+  block has a toggle: off, it stays on the route, its code or file kept, and leaves the page; on
+  again, it is back where it was.
+- **No part of an OIDC client's secret reaches the audit trail any more.** Changing a secret is
+  recorded as drawn or given, nothing of it. A secret the application brings is now recognised by
+  its hash's fingerprint (`sha256:...`) rather than by its first four characters, on the list and
+  in an exported configuration; the update rewrites the ones already kept and the audit lines
+  that named them.
+- **The vault says which entries want filling.** An import brings the names its routes expect,
+  never their values: those entries, secrets included, are marked "no value", and an entry past its
+  reminder date "expired on". A line above the list counts each, and Vault in the rail carries a
+  badge until they are filled.
+- **A trial license ends on its date.** Softwarity can give one for a set time; past its last day the
+  gateway is an evaluation again, whatever the version, with no restart and traffic untouched. The
+  License screen says when it ends.
 - **Remove license goes back to evaluation.** On the License screen, root takes a pasted license
   away: the notice returns on every instance, and traffic and configuration stay as they are. A
   license mounted by the deployment is removed from the deployment.

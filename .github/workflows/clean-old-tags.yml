@@ -1,0 +1,65 @@
+name: Clean the old community tags (one-off)
+
+# One run, then this file is removed. softwarity/meerkat is the Enterprise
+# image now, and six tags from before the split are still community images
+# under its name: 1.0, 1.0.0, 1.0.1, 1.0.2, 1.1, 1.1.0. Every one of them is on
+# softwarity/meerkat-ce, which is where the community edition lives.
+#
+# Before deleting a tag, its image must be on meerkat-ce under the same tag
+# (the floating 1.0 being 1.0.2, the last 1.0.x - set right first: the
+# migration copied another image there). A tag that fails the check is left
+# where it is and the run fails.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Delete for real. Off, it only prints what it would do.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  clean:
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RW }}
+      - name: Check, set 1.0 right, delete
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_RW }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          digest() { docker buildx imagetools inspect "docker.io/softwarity/$1" --format '{{json .Manifest.Digest}}' | tr -d '"'; }
+
+          want=$(digest meerkat-ce:1.0.2)
+          if [ "$(digest meerkat-ce:1.0)" != "$want" ]; then
+            echo "meerkat-ce:1.0 -> 1.0.2 ($want)"
+            [ "$APPLY" = true ] && docker buildx imagetools create -t docker.io/softwarity/meerkat-ce:1.0 "docker.io/softwarity/meerkat-ce@$want"
+          fi
+
+          jwt=$(jq -n --arg u "$USERNAME" --arg p "$TOKEN" '{username: $u, password: $p}' \
+            | curl -fsS -H 'Content-Type: application/json' -d @- https://hub.docker.com/v2/users/login | jq -r .token)
+          failed=0
+          for t in 1.0 1.0.0 1.0.1 1.0.2 1.1 1.1.0; do
+            here=$(digest "meerkat:$t")
+            there=$(digest "meerkat-ce:$t")
+            if [ "$APPLY" = true ] && [ "$here" != "$there" ]; then
+              echo "KEPT meerkat:$t: $here is not meerkat-ce:$t ($there)"; failed=1; continue
+            fi
+            echo "delete meerkat:$t ($here, on meerkat-ce as $there)"
+            if [ "$APPLY" = true ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $jwt" \
+                "https://hub.docker.com/v2/repositories/softwarity/meerkat/tags/$t/")
+              if [ "$code" = 204 ]; then echo "  deleted"; else echo "  refused: HTTP $code"; failed=1; fi
+            fi
+          done
+          exit $failed

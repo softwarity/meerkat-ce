@@ -18,7 +18,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { hostname } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { chromium, request } from '@playwright/test';
 
 const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -181,7 +181,7 @@ const ROUTES = [
     ui: { userButton: { enabled: true } },
   },
   {
-    id: 'catch-all', name: 'Catch-all', order: 5, enabled: true,
+    id: 'catch-all', name: 'Catch-all', order: 5, enabled: true, isUi: true,
     upstream: 'http://www.svc.acme.internal:80',
     access: {},
     predicates: [{ type: 'path', args: { patterns: ['/**'] } }],
@@ -272,6 +272,21 @@ async function seed() {
     if (r.status() >= 300) throw new Error(`${what} -> ${r.status()} ${await r.text()}`);
     return r;
   };
+  // An Enterprise build is an evaluation until it holds a license, and the
+  // doc shows the product, not the notice. The license is read from this
+  // machine, never from the repository: the repository is mirrored in public,
+  // and a license file that leaks cannot be revoked. Who holds it and its id
+  // are blurred on the one screen that prints them (see `blur` below).
+  if (existsSync(`${repo}/ee`)) {
+    const dir = `${homedir()}/.config/softwarity/licenses`;
+    const license = process.env.MEERKAT_DOC_LICENSE
+      || (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.lic') && f.includes('enterprise')).map((f) => `${dir}/${f}`)[0] : '');
+    if (!license) {
+      throw new Error('no Enterprise license to give the gateway: set MEERKAT_DOC_LICENSE to a license file, or every capture carries the evaluation notice');
+    }
+    await ok(await api.put('/api/license', { data: { license: readFileSync(license, 'utf8') } }), 'license');
+    log('licensed, from', license);
+  }
   // The routes a first start seeds for a demo are not the ones a screenshot
   // should teach: they point at httpbin and they are named after us.
   for (const id of ['demo', 'demo-secure', 'trap']) await api.delete(`/api/routes/${id}`);
@@ -1073,7 +1088,11 @@ const SHOTS = [
   },
   { file: 'api-reference', path: '/system/api', settle: 2500 },
   { file: 'release-notes', path: '/system/release-notes' },
-  { file: 'license', path: '/system/license' },
+  // What serves the installation: here one gateway on its embedded database.
+  { file: 'topology', path: '/infra/topology' },
+  // The license the capture ran with is ours: who holds it and its id are
+  // blurred, the rest (edition, coverage, dates, features) is what to read.
+  { file: 'license', path: '/system/license', blur: ['dl.license dd:nth-of-type(1)', 'dl.license dd:nth-of-type(2)'] },
   // ── Notifications (Enterprise) - last, see seedNotifications ──
   { file: 'notifications', path: '/data-plane/notifications', prepare: seedNotifications, settle: 1600 },
   {
@@ -1248,6 +1267,9 @@ async function shoot(storageState) {
     // And nothing is left FOCUSED: a stray focus ring in a published image
     // reads as a state the reader is meant to notice, and it is not one.
     await shotPage.evaluate(() => document.activeElement?.blur?.());
+    if (s.blur) {
+      await shotPage.addStyleTag({ content: `${s.blur.join(', ')} { filter: blur(6px); }` });
+    }
     await shotPage.waitForTimeout(150);
     const png = `${tmp}/png/${s.file}.png`;
     await shotPage.screenshot({ path: png });

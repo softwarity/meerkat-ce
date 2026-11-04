@@ -36,6 +36,7 @@ import (
 	"github.com/softwarity/meerkat/internal/filters"
 	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/idp"
+	"github.com/softwarity/meerkat/internal/instances"
 	"github.com/softwarity/meerkat/internal/live"
 	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mail"
@@ -504,7 +505,58 @@ func run(o options) error {
 	//
 	// A single-node installation takes exactly the same path with one member.
 	fleet := metrics.NewFleet()
-	go adminAPI.WatchLicense(ctx, fleet.Nodes)
+
+	// Who serves this installation (the Infrastructure screen, and what a
+	// license counts): every node says who it is every few seconds, whether
+	// or not anything passes through it, the others keep it, and a silence
+	// longer than instances.StaleAfter drops it.
+	nodes := instances.New(bus.Node())
+	nodesMoved := live.NewCounter(live.InstancesTopic)
+	nodes.Moved = nodesMoved.Moved
+	host, _ := os.Hostname()
+	started := time.Now().UTC().Truncate(time.Second)
+	bus.OnSignalFrom(store.TopicInstances, func(from, arg string) {
+		if from == bus.Node() {
+			return // reported here before it left
+		}
+		in, err := instances.Decode(from, arg)
+		if err != nil {
+			slog.Debug("a node's word about itself could not be read", "from", from, "err", err)
+			return
+		}
+		nodes.Report(in, time.Now())
+	})
+	go func() {
+		speak := func() {
+			reason := notReady(ctx, st, router)
+			self := instances.Instance{ID: bus.Node(), Host: host, Version: version.Version, Started: started,
+				Ready: reason == "", Reason: reason}
+			now := time.Now()
+			nodes.Report(self, now)
+			bus.Signal(ctx, store.TopicInstances, instances.Encode(self))
+			nodes.Check(now)
+		}
+		speak()
+		t := time.NewTicker(instances.Every)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				// The last word, so the others drop this node now rather than
+				// after twenty seconds of silence: a rolling update reads as
+				// one. Best effort, on a context of its own - this one is over.
+				bye, cancel := context.WithTimeout(context.Background(), time.Second)
+				bus.Signal(bye, store.TopicInstances, instances.Encode(instances.Instance{ID: bus.Node(), Leaving: true}))
+				cancel()
+				return
+			case <-t.C:
+				speak()
+			}
+		}
+	}()
+	adminAPI.Instances = nodes
+	adminAPI.InstancesMoved = nodesMoved.Moved
+	go adminAPI.WatchLicense(ctx, nodes.Count)
 	go adminAPI.WatchUpdates(ctx)
 	window := metrics.NewWindow(metrics.DefaultWindow)
 	var lastSent map[string]metrics.RouteSnapshot
@@ -513,11 +565,15 @@ func run(o options) error {
 			// Only the routes whose totals moved: a table of a hundred and
 			// fifty is mostly idle in any given five seconds, and a
 			// notification may carry 7000 bytes.
+			//
+			// But SOMETHING on every tick, even with nothing moved: this
+			// message is also how the other nodes know this one runs. An idle
+			// node used to say nothing, fell out of the others' count after
+			// twenty seconds, and a cluster at rest - or one whose load
+			// balancer sent everything to one node - passed for a single
+			// gateway: the instances a license covers were never counted.
 			var moved metrics.Snapshot
 			moved, lastSent = metrics.Moved(s, lastSent)
-			if len(moved.Routes) == 0 {
-				return
-			}
 			for _, msg := range metrics.Encode(moved, metrics.Chunk) {
 				bus.Signal(ctx, store.TopicMetrics, msg)
 			}
@@ -701,6 +757,8 @@ func run(o options) error {
 			live.CertificatesTopic: issues,
 			live.DoorTrafficTopic:  doorMoved,
 			live.PauseTopic:        paused,
+			// Read through GET /api/infrastructure, which says who may.
+			live.InstancesTopic: nodesMoved,
 		}
 		if p.Traffic {
 			sources[live.TrafficTopic] = traffic
@@ -1202,24 +1260,31 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 // know which of the two it is.
 func readyz(st *store.Store, router *gateway.Router) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Short, and shorter than any sane probe period: a readiness check
-		// that hangs is a readiness check that says nothing, and the
-		// orchestrator's own timeout then decides on no information at all.
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
 		w.Header().Set("Content-Type", "application/json")
-		if err := st.Ping(ctx); err != nil {
+		if reason := notReady(r.Context(), st, router); reason != "" {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintf(w, `{"status":"DOWN","reason":"the store is not answering","version":%q}`, version.Version)
-			return
-		}
-		if router != nil && !router.Ready() {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintf(w, `{"status":"DOWN","reason":"the routing table has not been compiled yet","version":%q}`, version.Version)
+			_, _ = fmt.Fprintf(w, `{"status":"DOWN","reason":%q,"version":%q}`, reason, version.Version)
 			return
 		}
 		_, _ = fmt.Fprintf(w, `{"status":"UP","version":%q}`, version.Version)
 	}
+}
+
+// notReady says why this node cannot take a request, "" when it can: what
+// /readyz answers, and what the node tells the others of itself.
+func notReady(ctx context.Context, st *store.Store, router *gateway.Router) string {
+	// Short, and shorter than any sane probe period: a readiness check that
+	// hangs is a readiness check that says nothing, and the orchestrator's own
+	// timeout then decides on no information at all.
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := st.Ping(ctx); err != nil {
+		return "the store is not answering"
+	}
+	if router != nil && !router.Ready() {
+		return "the routing table has not been compiled yet"
+	}
+	return ""
 }
 
 // settleTenancy seeds the mode on a first start and gets out of the way after.

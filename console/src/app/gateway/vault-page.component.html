@@ -43,6 +43,26 @@
       >
     </p>
   }
+  @if (!loading() && empty() > 0) {
+    <!-- What an import leaves: the names its routes expect, created empty,
+         never their values. Each resolves to nothing until it is filled. -->
+    <p class="problem">
+      <mat-icon>error</mat-icon>
+      <span i18n="@@Vault_empty_banner"
+        >{{ empty() }} entr{empty(), plural, =1 {y has} other {ies have}} no value: a configuration
+        brings the names its routes expect, never their values. Fill each one marked below.</span
+      >
+    </p>
+  }
+  @if (!loading() && expired() > 0) {
+    <p class="problem">
+      <mat-icon>event_busy</mat-icon>
+      <span i18n="@@Vault_expired_banner"
+        >{{ expired() }} entr{expired(), plural, =1 {y is} other {ies are}} past {expired(), plural, =1 {its} other {their}} reminder date:
+        the value is known to have lapsed at its source. Renew it there, then here.</span
+      >
+    </p>
+  }
   @if (loading()) {
     <loading-indicator withContainer />
   } @else if (entries().length === 0) {
@@ -79,12 +99,17 @@
         <ng-container matColumnDef="value">
           <mat-header-cell *matHeaderCellDef i18n="@@Value">Value</mat-header-cell>
           <mat-cell *matCellDef="let e">
-            @if (e.kind === 'secret' && e.unreadable) {
+            @if (!e.hasValue) {
+              <span class="unreadable" i18n="@@Vault_no_value">no value</span>
+            } @else if (e.kind === 'secret' && e.unreadable) {
               <span class="unreadable" i18n="@@secret_unreadable">encrypted with another master key</span>
             } @else if (e.kind === 'secret') {
               <span class="hidden-val" i18n="@@secret_hidden">encrypted, never shown</span>
             } @else {
               <span class="val">{{ e.value }}</span>
+            }
+            @if (e.hasValue && e.expired) {
+              <span class="unreadable expired" i18n="@@Vault_expired_on">expired on {{ e.expiresAt | zoned: zone() : 'day' }}</span>
             }
           </mat-cell>
         </ng-container>

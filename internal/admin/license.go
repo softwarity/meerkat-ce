@@ -61,7 +61,7 @@ func (i *licenseInfo) lapse(now time.Time) string {
 	until := i.UpdatesUntil.Format(time.DateOnly)
 	switch {
 	case i.lic.Ended(now):
-		return fmt.Sprintf("this test license ended on %s: this gateway is an evaluation again until it is replaced", until)
+		return fmt.Sprintf("this trial license ended on %s: this gateway is an evaluation again until it is replaced", until)
 	case i.Covered != nil && !*i.Covered:
 		return fmt.Sprintf("this version was built after the updates of this license ended on %s: "+
 			"this gateway is an evaluation again until it runs a version built by then, or the license is renewed", until)
@@ -185,7 +185,13 @@ func (a *API) WatchLicense(ctx context.Context, running func() int) {
 			return
 		case now := <-t.C:
 			_ = a.ReloadLicense(ctx)
+			before := license.OverSince()
 			license.Observe(running(), now)
+			// The Infrastructure screen says when the notice comes back: it
+			// hears that an overrun began, or ended, here.
+			if !license.OverSince().Equal(before) && a.InstancesMoved != nil {
+				a.InstancesMoved()
+			}
 		}
 	}
 }

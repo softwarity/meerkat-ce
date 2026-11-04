@@ -15,7 +15,7 @@ d'évaluation à laquelle vous donnez une licence.
 ::: cards
 ### Community - gratuite
 
-**CE.** Toute la gateway pour une organisation sur une instance : le
+**CE.** Toute la gateway pour un tenant sur une instance : le
 routage, les pages de connexion, les rôles et les règles d'accès, TLS, le
 coffre, le second facteur et les passkeys, le journal d'audit, les écrans de
 trafic, la console, le point d'entrée des agents.
@@ -28,7 +28,7 @@ License. Pas de compte à créer, pas de clé, pas de date d'expiration.
 ### Évaluation - gratuite
 
 **Eval.** Tout le produit, Enterprise compris, pour essayer avant d'en parler :
-plusieurs organisations, SAML, LDAP et Active Directory, plusieurs instances synchronisées, ACME, les
+plusieurs tenants, SAML, LDAP et Active Directory, plusieurs instances synchronisées, ACME, les
 configurations dans git, l'export OpenTelemetry, le tunnel développeur. Aucune limite de durée, aucun compteur,
 rien de désactivé.
 
@@ -41,7 +41,7 @@ retire.
 
 ### Team - 4 000 € par an
 
-**TE.** Enterprise pour une organisation sur une instance : l'annuaire de
+**TE.** Enterprise pour un tenant sur une instance : l'annuaire de
 l'entreprise (SAML, LDAP, Active Directory), ACME, les configurations dans
 git, l'export OpenTelemetry, les dispositions des pages et la marque retirée,
 le fournisseur OpenID, le tunnel développeur intégré. Sans mention
@@ -54,7 +54,7 @@ Nous écrire : [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%
 
 ### Enterprise - 24 000 € par an
 
-**EE.** Tout, sans plafond : autant d'organisations que vous en exploitez, et
+**EE.** Tout, sans plafond : autant de tenants que vous en exploitez, et
 la gateway en cluster actif/actif sur PostgreSQL, qui monte en charge en
 ajoutant des instances. Support étendu compris.
 
@@ -76,7 +76,7 @@ Nous écrire : [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%
 | **Usage en production** | Oui | Non | Oui | Oui |
 | **Les capacités Enterprise** | - | Oui | Oui | Oui |
 | **Mention d'évaluation** | - | Partout | - | - |
-| **Organisations** | Une | Sans limite | Une | Sans limite |
+| **Tenants** | Un | Sans limite | Un | Sans limite |
 | **Installations** | Autant que vous voulez | Autant que vous voulez | Autant que vous voulez | Autant que vous voulez |
 | **Instances par installation** | Une | Plusieurs, synchronisées | Une | Plusieurs, synchronisées |
 | **Utilisateurs, routes, requêtes** | Sans limite | Sans limite | Sans limite | Sans limite |
@@ -126,13 +126,13 @@ aussi la monter depuis un secret, où chaque instance la lit.
   ([comment](/docs/operations/updates)).
 - **Rien ne s'arrête au milieu de la nuit.** Une licence ne coupe jamais le
   trafic. Ce qui dépasse ses plafonds est refusé à la création, par une phrase
-  qui le dit : une deuxième organisation sur une licence Team ne se crée pas,
+  qui le dit : un deuxième tenant sur une licence Team ne se crée pas,
   mais tout ce qui est déjà en place continue d'être servi. Une licence ne couvre
-  pas pour autant ce qui la dépasse : tant qu'une gateway sert plus d'organisations
+  pas pour autant ce qui la dépasse : tant qu'une gateway sert plus de tenants
   que sa licence n'en couvre, la mention d'évaluation reste.
 - **Une licence par entreprise, autant d'installations que vous voulez.** La
   même licence se colle dans chacune, sans surcoût : une installation Team
-  garde ses plafonds, une organisation et une instance, mais rien ne limite
+  garde ses plafonds, un tenant et une instance, mais rien ne limite
   leur nombre. Elle couvre les installations de l'entreprise qui l'a achetée,
   et seulement celles-là : la transmettre à une autre structure, cliente ou
   partenaire, n'est pas couvert.
@@ -168,8 +168,8 @@ vous être retiré plus tard.
 produit ne contient aucune télémétrie, et rien en lui ne nous envoie quoi que
 ce soit. La licence se vérifie sur place.
 
-**Team ou Enterprise ?** Les capacités sont les mêmes. Team tient sur une
-organisation et une instance ; dès que vous devez séparer plusieurs clients ou
+**Team ou Enterprise ?** Les capacités sont les mêmes. Team tient sur un
+tenant et une instance ; dès que vous devez séparer plusieurs clients ou
 filiales dans une même installation, ou survivre à la perte d'une machine,
 c'est Enterprise.
 

@@ -33,6 +33,10 @@
    "en": "kind + the Helm chart, values-ee-cluster on PostgreSQL (EE)",
    "fr": "kind + le chart Helm, values-ee-cluster sur PostgreSQL (EE)"
   },
+  "E": {
+   "en": "The editions suite (e2e/editions): binaries built with the dates and the grace each case needs, the CI's real licenses, one gateway, then three on PostgreSQL, started and stopped by the tests (EE)",
+   "fr": "La suite des éditions (e2e/editions) : des binaires construits avec les dates et la tolérance dont chaque cas a besoin, les vraies licences de CI, une gateway, puis trois sur PostgreSQL, démarrées et arrêtées par les tests (EE)"
+  },
   "KO": {
    "en": "kind with OpenShift's rules: namespace under Pod Security 'restricted', the pod run as an arbitrary uid from a namespace range with group 0 (what the restricted SCC does), the chart's values unchanged",
    "fr": "kind soumis aux règles d'OpenShift : namespace en Pod Security 'restricted', pod lancé sous un uid arbitraire tiré d'une plage du namespace, avec le groupe 0 (ce que fait la SCC restricted), valeurs du chart inchangées"
@@ -3482,6 +3486,22 @@
    "fr": "Les métriques et les journaux sont poussés en OTLP vers le collecteur."
   },
   {
+   "id": "OBS-07",
+   "priority": "P2",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I",
+    "E"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "The Infrastructure screen lists every instance with its version and readiness, idle ones included, the database they share and its schema without any password, and says when more instances run than the license covers and when two versions run at once; a node that stops speaking leaves the list within 20 seconds; the services behind the routes are one per address with the routes that point at it, a disabled route bringing none.",
+   "fr": "L'écran Infrastructure liste chaque instance avec sa version et son état, y compris celles sans trafic, la base qu'elles partagent et son schéma sans aucun mot de passe, et dit quand plus d'instances tournent que la licence n'en couvre et quand deux versions tournent en même temps ; un nœud qui se tait quitte la liste en moins de 20 secondes ; les services derrière les routes sont un par adresse avec les routes qui y mènent, une route désactivée n'en apporte aucun."
+  },
+  {
    "id": "DEPLOY-01",
    "priority": "P0",
    "feasibility": "easy",
@@ -3830,14 +3850,15 @@
    "priority": "P2",
    "feasibility": "easy",
    "targets": [
-    "U"
+    "U",
+    "E"
    ],
    "editions": [
     "EVAL",
     "EE"
    ],
-   "en": "A license pasted on the License screen is verified before it is kept, refused with its reason otherwise; a license mounted through MEERKAT_LICENSE_FILE is shown, read again after the secret changes, and the screen neither takes another nor removes it; removing a pasted license brings the evaluation notice back on every node and moves nothing else; a valid license takes the evaluation notice off every surface with no restart and on every node, a broken one brings it back, a Team license refuses a second tenant by creation, by import and by switching mode, and on a gateway already serving several it leaves them served and keeps the notice until only one is served, more instances than covered bring the notice back after 15 minutes and never touch traffic, a license past its date stays in force on a version built by then, a version built after that date is an evaluation for as long as it runs and going back to one from the term restores the license, a test license ends at the end of its day whatever the version, and a version past the term that would migrate the database stops before it, writing nothing, with the reason and the variable that overrides it, which migrates, runs as an evaluation and leaves an audit line.",
-   "fr": "Une licence collée sur l'écran License est vérifiée avant d'être gardée, refusée avec sa raison sinon ; une licence montée par MEERKAT_LICENSE_FILE est affichée, relue après un changement du secret, et l'écran n'en prend pas d'autre et ne la retire pas ; retirer une licence collée ramène la mention d'évaluation sur tous les nœuds et ne change rien d'autre ; une licence valide retire la mention d'évaluation de toutes les surfaces sans redémarrage et sur tous les nœuds, une licence cassée la ramène, une licence Team refuse un deuxième tenant à la création, à l'import et au changement de mode, et sur une gateway qui en sert déjà plusieurs elle les laisse servis et garde la mention jusqu'à ce qu'un seul le soit, plus d'instances que couvert ramènent la mention après 15 minutes sans jamais toucher au trafic, une licence passée sa date reste en vigueur sur une version construite avant, une version construite après cette date redevient une évaluation tant qu'elle tourne et le retour à une version de la période rétablit la licence, une licence de test se termine à la fin de son jour quelle que soit la version, et une version hors période qui devrait migrer la base s'arrête avant, sans rien écrire, avec la raison et la variable qui permet de passer outre, qui migre, tourne en évaluation et laisse une ligne d'audit."
+   "en": "A license pasted on the License screen is verified before it is kept, refused with its reason otherwise; a license mounted through MEERKAT_LICENSE_FILE is shown, read again after the secret changes, and the screen neither takes another nor removes it; removing a pasted license brings the evaluation notice back on every node and moves nothing else; a valid license takes the evaluation notice off every surface with no restart and on every node, a broken one brings it back, a Team license refuses a second tenant by creation, by import and by switching mode, and on a gateway already serving several it leaves them served and keeps the notice until only one is served, more instances than covered bring the notice back after 15 minutes and never touch traffic, a node that carries no traffic counted as much as one that does, a license past its date stays in force on a version built by then, a version built after that date is an evaluation for as long as it runs and going back to one from the term restores the license, a test license ends at the end of its day whatever the version, and a version past the term that would migrate the database stops before it, writing nothing, with the reason and the variable that overrides it, which migrates, runs as an evaluation and leaves an audit line.",
+   "fr": "Une licence collée sur l'écran License est vérifiée avant d'être gardée, refusée avec sa raison sinon ; une licence montée par MEERKAT_LICENSE_FILE est affichée, relue après un changement du secret, et l'écran n'en prend pas d'autre et ne la retire pas ; retirer une licence collée ramène la mention d'évaluation sur tous les nœuds et ne change rien d'autre ; une licence valide retire la mention d'évaluation de toutes les surfaces sans redémarrage et sur tous les nœuds, une licence cassée la ramène, une licence Team refuse un deuxième tenant à la création, à l'import et au changement de mode, et sur une gateway qui en sert déjà plusieurs elle les laisse servis et garde la mention jusqu'à ce qu'un seul le soit, plus d'instances que couvert ramènent la mention après 15 minutes sans jamais toucher au trafic, un nœud sans trafic compté autant qu'un nœud qui en porte, une licence passée sa date reste en vigueur sur une version construite avant, une version construite après cette date redevient une évaluation tant qu'elle tourne et le retour à une version de la période rétablit la licence, une licence de test se termine à la fin de son jour quelle que soit la version, et une version hors période qui devrait migrer la base s'arrête avant, sans rien écrire, avec la raison et la variable qui permet de passer outre, qui migre, tourne en évaluation et laisse une ligne d'audit."
   }
  ],
  "platform": [

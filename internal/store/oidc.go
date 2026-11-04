@@ -156,10 +156,18 @@ const (
 	OIDCMaxGivenSecret = 256
 )
 
-// oidcGivenPrefix is how much of a secret the application brings is shown
-// afterwards: four characters recognise it, and leave the rest unguessable
-// even at the shortest length allowed.
-const oidcGivenPrefix = 4
+// OIDCFingerprint is how a secret the application brings is recognised
+// afterwards: the start of its hash, never a character of the secret. Its first
+// four characters used to be shown, which is a quarter of a sixteen-character
+// one handed to whoever reads the client's screen, its audit line or an
+// exported configuration. A drawn secret keeps its prefix: eight characters of
+// forty-three drawn at random say which one it is and help find none of the rest.
+func OIDCFingerprint(hash string) string {
+	if len(hash) < 8 {
+		return ""
+	}
+	return "sha256:" + hash[:8]
+}
 
 // OIDCSecretGiven keeps a secret handed to the gateway rather than drawn by
 // it: the application's own (its chart generates it, its vendor fixed it), or
@@ -177,11 +185,11 @@ func OIDCSecretGiven(secret string) (hash, prefix string, err error) {
 		return "", "", invalidf(errors.New("a client secret with a space or a control character is not allowed: " +
 			"an application sends it in a form or an Authorization header, where either is lost"))
 	}
-	n := oidcGivenPrefix
-	if strings.HasPrefix(secret, OIDCSecretPrefix) {
-		n = len(OIDCSecretPrefix) + 8
+	hash = HashOIDCSecret(secret)
+	if strings.HasPrefix(secret, OIDCSecretPrefix) && len(secret) > len(OIDCSecretPrefix)+8 {
+		return hash, secret[:len(OIDCSecretPrefix)+8], nil
 	}
-	return HashOIDCSecret(secret), secret[:n], nil
+	return hash, OIDCFingerprint(hash), nil
 }
 
 // SanitizeOIDCClient checks a client and normalises what it can. Refusals

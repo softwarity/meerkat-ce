@@ -23,6 +23,8 @@ import { MeService } from './me.service';
 import { SessionWatchService } from './session';
 import { UserMenuComponent } from './shared/user-menu.component';
 import { PauseService } from './shared/pause.service';
+import { InfrastructureService } from './shared/infrastructure.service';
+import { VaultService } from './shared/vault.service';
 import { UpdatesService } from './shared/updates.service';
 
 // Console scopes (CONSOLE-01): Infra (routing, relay, tokens), Application (the
@@ -63,6 +65,10 @@ export class AppComponent {
   private readonly tenantsService = inject(TenantsService);
   protected readonly pause = inject(PauseService);
   protected readonly updates = inject(UpdatesService);
+  protected readonly infra = inject(InfrastructureService);
+  // What lights the Vault entry: names an import brought without their value,
+  // values past their reminder date.
+  protected readonly vault = inject(VaultService);
   protected readonly tenants = this.tenantsService.tenants;
 
   private loadTenants(): void {
@@ -149,6 +155,10 @@ export class AppComponent {
     // whichever screen happened to watch something.
     // Not for somebody who administers nothing: the channel refuses them.
     if (me.mayWatch()) inject(LiveChangesService).on('tenant', () => this.loadTenants());
+    if (me.isRoot() || me.isInfraAdmin() || me.isAppAdmin()) {
+      void this.vault.ensureLoaded();
+      inject(LiveChangesService).on('vault', () => void this.vault.reload());
+    }
   }
 
   // Clicking "Tenants" lands on the first org's options; the drawer lists the rest.

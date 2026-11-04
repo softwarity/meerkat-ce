@@ -254,7 +254,7 @@
                 <ng-container i18n="@@Secret_PREFIX">secret {{ c.secretPrefix }}...</ng-container>
               } @else if (c.confidential && c.secretPrefix) {
                 <!-- The application's own: drawn neither here nor shown here. -->
-                <ng-container i18n="@@Application_secret_PREFIX">application's secret {{ c.secretPrefix }}...</ng-container>
+                <ng-container i18n="@@Application_secret_FINGERPRINT">application's secret, {{ c.secretPrefix }}</ng-container>
               } @else if (c.confidential) {
                 <!-- Imported from a configuration that did not carry its
                      secret: the application cannot sign in until one is drawn. -->

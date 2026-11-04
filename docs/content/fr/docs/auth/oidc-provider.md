@@ -105,8 +105,9 @@ Un seul champ sous les trois choix, quel que soit le choix :
 | **Given by the application** | vide, à remplir | l'application impose le sien : son chart le génère, ou son éditeur l'a figé. De 16 à 256 caractères, sans espace |
 
 Dans tous les cas, la gateway n'en garde que le sha256 et ne le montre plus jamais :
-la liste en affiche le début, `mko_...` pour un secret tiré, *application's secret*
-et quatre caractères pour l'autre. La longueur minimale est là parce que le sha256
+la liste montre le début d'un secret tiré, `mko_...`, et pour celui de l'application
+*application's secret* suivi de l'empreinte de son hash (`sha256:1a2b3c4d`) : aucun de
+ses caractères n'est montré, ni dans la liste ni dans le journal d'audit. La longueur minimale est là parce que le sha256
 voyage dans une configuration exportée, et qu'un secret court se retrouve à partir
 de lui.
 

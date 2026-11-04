@@ -143,6 +143,10 @@ const (
 	// called, and by whom (SSL-15): one node's whole list as JSON, repeated
 	// while its traffic lasts, so the others pool it and let it expire.
 	TopicDoorTraffic = "door-traffic"
+	// TopicInstances carries a node's word about itself - host, version,
+	// start, readiness - every few seconds (internal/instances): what the
+	// Infrastructure screen draws and the license counts.
+	TopicInstances = "instances"
 	// TopicPause pauses or resumes every node (store/pause.go): "on" or "off".
 	// A signal, never a row - a pause outlives no restart, by design.
 	TopicPause = "pause"

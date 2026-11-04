@@ -427,10 +427,12 @@ func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id, gi
 	}
 	var secret, hash, prefix string
 	var err error
-	what := "new secret "
+	// The trail says which kind of secret, never any part of it: the audit is
+	// read by more people than the client's own screen, and exported further.
+	what := "new secret drawn"
 	if given != "" {
 		hash, prefix, err = store.OIDCSecretGiven(given)
-		what = "secret given "
+		what = "secret given by the application"
 	} else {
 		secret, hash, prefix, err = store.NewOIDCSecret()
 	}
@@ -444,7 +446,7 @@ func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id, gi
 	if err != nil {
 		return oidcClientIssued{}, err
 	}
-	a.auditEvent(ctx, actor, "oidc.client.secret", "oidc-client", id, id, "", what+prefix+"...")
+	a.auditEvent(ctx, actor, "oidc.client.secret", "oidc-client", id, id, "", what)
 	view, err := a.oidcView(ctx, saved)
 	if err != nil {
 		return oidcClientIssued{}, err

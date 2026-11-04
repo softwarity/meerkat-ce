@@ -1947,6 +1947,160 @@
           "startup"
         ]
       },
+      "Infrastructure": {
+        "type": "object",
+        "properties": {
+          "instances": {
+            "type": "array",
+            "description": "Oldest first.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The node's identity for the life of its process."
+                },
+                "host": {
+                  "type": "string",
+                  "description": "Its host name: the pod or the container."
+                },
+                "version": {
+                  "type": "string"
+                },
+                "started": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "ready": {
+                  "type": "boolean",
+                  "description": "What its /readyz answers."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Why it is not ready; absent when it is."
+                },
+                "self": {
+                  "type": "boolean",
+                  "description": "The node that answered."
+                }
+              }
+            }
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The distinct versions running. More than one is an update in progress, or one that stopped half way."
+          },
+          "database": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "embedded",
+                  "postgres"
+                ]
+              },
+              "location": {
+                "type": "string",
+                "description": "The file, or the server and database. Never a password."
+              },
+              "schema": {
+                "type": "integer",
+                "description": "The schema version the database is at."
+              }
+            }
+          },
+          "services": {
+            "type": "array",
+            "description": "What the enabled routes point at, one per address, the ones that want a look first. Only what a route declares.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "description": "host:port."
+                },
+                "routes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "ui": {
+                  "type": "boolean",
+                  "description": "One of its routes serves pages to people."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "degraded",
+                    "down",
+                    "unknown"
+                  ],
+                  "description": "The worst of its routes', as the node that answered sees it."
+                },
+                "why": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "When the state was found out, unix seconds."
+                },
+                "ready": {
+                  "type": "integer",
+                  "description": "Replicas ready, when the runtime counts them."
+                },
+                "wanted": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "synced": {
+            "type": "boolean",
+            "description": "A change bus keeps the instances in step: a shared database."
+          },
+          "enterprise": {
+            "type": "boolean"
+          },
+          "plan": {
+            "type": "string",
+            "description": "The license in force, team or enterprise; absent for none."
+          },
+          "covers": {
+            "type": "integer",
+            "description": "How many instances the license covers; absent for no ceiling."
+          },
+          "over": {
+            "type": "object",
+            "description": "Set while more instances run than the license covers.",
+            "properties": {
+              "since": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "noticeAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the evaluation notice comes back, or came back."
+              }
+            }
+          }
+        }
+      },
       "Logs": {
         "type": "object",
         "properties": {
@@ -16449,6 +16603,34 @@
         "responses": {
           "204": {
             "description": "Reset"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/infrastructure": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "Read the gateways serving this installation",
+        "operationId": "readInfrastructure",
+        "description": "Every instance as it describes itself (host, version, start, readiness), the database they share, whether a change bus keeps them in step, and what the license in force says of their number. Root or infra-admin.",
+        "responses": {
+          "200": {
+            "description": "Instances, database and license",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Infrastructure"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

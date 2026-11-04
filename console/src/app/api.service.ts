@@ -432,6 +432,8 @@ export interface Injection {
   file?: string;
   position: InjectionPosition;
   load?: InjectionLoad;
+  // Kept on the route and out of the page.
+  disabled?: boolean;
 }
 
 // UI-route options: color-scheme interaction, roles/user-info injections,
@@ -595,6 +597,8 @@ export interface VaultEntry {
   // entry's secret is known to lapse at its source. It disables nothing - the
   // reference keeps resolving - it only feeds the daily digest.
   expiresAt?: number;
+  // The reminder date has come: the value is known to have lapsed at its source.
+  expired?: boolean;
   // Inherited from a wider scope: visible so one knows what $name resolves to,
   // but only shadowable, not editable.
   readOnly?: boolean;
@@ -1510,6 +1514,41 @@ export interface UpdateRelease {
   migrates?: boolean;
   notes?: string;
   outOfLicense?: boolean;
+}
+
+// The gateways serving this installation, as each describes itself, the
+// database they share and what the license says of their number.
+export interface InfraInstance {
+  id: string;
+  host: string;
+  version: string;
+  started: string;
+  ready: boolean;
+  reason?: string;
+  self?: boolean;
+}
+
+export interface InfraService {
+  address: string;
+  routes: { id: string; name: string }[];
+  ui: boolean;
+  state: 'up' | 'degraded' | 'down' | 'unknown';
+  why?: string;
+  at?: number;
+  ready?: number;
+  wanted?: number;
+}
+
+export interface Infrastructure {
+  instances: InfraInstance[];
+  services: InfraService[];
+  versions: string[];
+  database: { kind: 'embedded' | 'postgres'; location: string; schema?: number };
+  synced: boolean;
+  enterprise: boolean;
+  plan?: string;
+  covers?: number;
+  over?: { since: string; noticeAt: string };
 }
 
 // What the update check found (CONSOLE-16).
@@ -3373,6 +3412,10 @@ export class ApiService {
   // Root: back to what the image is without one; answers the edition.
   deleteLicense(): Observable<Edition> {
     return this.http.delete<Edition>('/api/license');
+  }
+
+  infrastructure(): Observable<Infrastructure> {
+    return this.http.get<Infrastructure>('/api/infrastructure');
   }
 
   updates(): Observable<Updates> {

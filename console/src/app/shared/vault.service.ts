@@ -1,4 +1,4 @@
-import { Service, inject, signal } from '@angular/core';
+import { Service, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, VaultEntry } from '../api.service';
 
@@ -10,6 +10,10 @@ export class VaultService {
   private readonly api = inject(ApiService);
 
   readonly entries = signal<VaultEntry[]>([]);
+  // The entries this reader can fix that want a look: a name an import brought
+  // without its value, or a value past its reminder date. What the rail's
+  // badge counts. An inherited entry is not this reader's to fill.
+  readonly attention = computed(() => this.entries().filter((e) => !e.readOnly && (!e.hasValue || e.expired)).length);
   private loading?: Promise<VaultEntry[]>;
 
   // Loads on first call, then serves the cache. Failures (a non-infra admin

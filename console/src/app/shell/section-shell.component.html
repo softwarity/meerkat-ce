@@ -15,8 +15,8 @@
       >
         <mat-icon
           matBadgeSize="small"
-          [matBadge]="s.updates ? updates.count() : 0"
-          [matBadgeHidden]="!s.updates || updates.count() === 0"
+          [matBadge]="badge(s)"
+          [matBadgeHidden]="badge(s) === 0"
           >{{ s.icon }}</mat-icon
         >
         <span>{{ s.label }}</span>

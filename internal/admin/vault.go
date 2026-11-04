@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
@@ -88,6 +89,10 @@ type vaultEntryView struct {
 	// migration under another key, every name is listed and none resolves.
 	// The value is never sent; this is the only thing said about it.
 	Unreadable bool `json:"unreadable,omitempty"`
+	// Expired says the reminder date has come: the value is known to have
+	// lapsed at its source. It still resolves - the gateway cannot tell whether
+	// it was rotated there - but it wants a look.
+	Expired bool `json:"expired,omitempty"`
 }
 
 func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -111,13 +116,21 @@ func (a *API) listVault(w http.ResponseWriter, r *http.Request, actor store.User
 		a.internal(w, err)
 		return
 	}
+	empty, err := a.st.EmptyVaultSecrets(r.Context(), a.vaultVisibleScopes(r.Context(), actor))
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	now := time.Now().Unix()
 	out := make([]vaultEntryView, 0, len(entries))
 	for _, e := range entries {
 		out = append(out, vaultEntryView{
 			Name: e.Name, Kind: e.Kind, Scope: e.Scope, Value: e.Value,
-			// A stored secret always holds a value (creating one without is
-			// refused), and that value never travels.
-			HasValue:    e.Kind == vault.KindSecret || e.Value != "",
+			// A secret's value never travels: whether it holds one does. An
+			// import reserves the names its configuration expects, empty, and
+			// those are the holes the screen and the rail have to show.
+			HasValue:    e.Value != "" || e.Kind == vault.KindSecret && !empty[e.Scope+"/"+e.Name],
+			Expired:     e.ExpiresAt > 0 && e.ExpiresAt <= now,
 			Description: e.Description, Tags: e.Tags,
 			CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt, ExpiresAt: e.ExpiresAt,
 			ReadOnly:   !slices.Contains(writable, e.Scope),

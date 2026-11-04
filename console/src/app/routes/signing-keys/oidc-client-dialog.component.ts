@@ -312,7 +312,10 @@ export class OidcClientDialogComponent {
   protected readonly secretPlaceholder = computed(() => {
     const d = this.draft();
     if (d.mode === 'none') return $localize`:@@Oidc_no_secret:No secret`;
-    if (this.editing() && d.mode === this.initialMode && this.currentPrefix && !d.secret) return `${this.currentPrefix}...`;
+    if (this.editing() && d.mode === this.initialMode && this.currentPrefix && !d.secret) {
+      // A drawn secret by its start, the application's by its hash's.
+      return this.currentPrefix.startsWith(DRAWN_PREFIX) ? `${this.currentPrefix}...` : this.currentPrefix;
+    }
     return '';
   });
 

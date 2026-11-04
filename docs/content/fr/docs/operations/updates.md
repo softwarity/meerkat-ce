@@ -87,7 +87,7 @@ Ce qui y met fin :
   plus tard la remet en vigueur. Le journal d'audit le garde (`license.migrate`).
 
 Le contrôle n'a lieu que s'il y a quelque chose à perdre : une licence en
-vigueur et une migration en attente. Sans licence, avec une licence de test
+vigueur et une migration en attente. Sans licence, avec une licence d'essai
 terminée, sur une base neuve ou avec une version qui ne change rien à la base,
 le démarrage se fait comme toujours.
 

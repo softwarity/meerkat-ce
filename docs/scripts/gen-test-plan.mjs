@@ -47,6 +47,7 @@ const goTests = [
 const e2e = [
   await readFile(join(ROOT, 'e2e', 'scenarios.json'), 'utf8'),
   ...(await walk(join(ROOT, 'e2e', 'tests'), (n) => n.endsWith('.ts'))),
+  ...(await walk(join(ROOT, 'e2e', 'editions'), (n) => n.endsWith('.ts'))),
 ];
 const mentions = (id, texts) => {
   const re = new RegExp(`\\b${id}\\b`);

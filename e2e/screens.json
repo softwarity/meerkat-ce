@@ -517,6 +517,15 @@
       ]
     },
     {
+      "path": "/infra/topology",
+      "module": "./topology/topology-page.component",
+      "title": "Topology",
+      "allowed": [
+        "root",
+        "infra-admin"
+      ]
+    },
+    {
       "path": "/system/sessions",
       "module": "./identity/sessions-page/sessions-page.component",
       "title": "Sessions",

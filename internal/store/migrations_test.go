@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -218,7 +219,7 @@ func TestANotificationGetsOneID(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := st.runMigrations([]migration{{Version: schemaVersion, Name: "v102", Up: notificationRefs}}, schemaVersion-1); err != nil {
+	if err := st.runMigrations([]migration{{Version: 102, Name: "v102", Up: notificationRefs}}, 101); err != nil {
 		t.Fatal(err)
 	}
 	for id, want := range map[string]string{"ntf_a": "", "ntf_b": "kept-1", "ntf_c": ""} {
@@ -229,5 +230,44 @@ func TestANotificationGetsOneID(t *testing.T) {
 	}
 	if err := st.RememberEnd(ctx, "svc", "late", EndedWithdrawn, "", 1<<40); err != nil {
 		t.Errorf("notification_ends keyed by ref: %v", err)
+	}
+}
+
+// v103: an application's secret is no longer kept by its first characters but
+// by the start of its hash, and the audit lines that named them say only which
+// kind of secret it was. A drawn secret keeps its prefix.
+func TestAnApplicationsSecretIsKeptByItsHash(t *testing.T) {
+	st, err := OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+	ctx := context.Background()
+	for _, row := range [][3]string{{"given", "abcd", "0123456789abcdef"}, {"drawn", "mko_A1B2C3D4", "fedcba9876543210"}} {
+		if _, err := st.db.ExecContext(ctx, `INSERT INTO oidc_clients (id, confidential, secret_hash, secret_prefix,
+			audience, token_ttl, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', 0, 0)`, row[0], true, row[2], row[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, detail := range []string{"secret given abcd...", "new secret mko_A1B2C3D4..."} {
+		if _, err := st.db.ExecContext(ctx, `INSERT INTO audit_events (id, at, action, detail) VALUES (?, 1, 'oidc.client.secret', ?)`,
+			fmt.Sprintf("evt_%d", i), detail); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.runMigrations([]migration{{Version: schemaVersion, Name: "v103", Up: oidcSecretFingerprints}}, schemaVersion-1); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"given": "sha256:01234567", "drawn": "mko_A1B2C3D4"} {
+		var prefix string
+		if err := st.db.QueryRowContext(ctx, `SELECT secret_prefix FROM oidc_clients WHERE id = ?`, id).Scan(&prefix); err != nil || prefix != want {
+			t.Errorf("%s: %q (%v), want %q", id, prefix, err, want)
+		}
+	}
+	for id, want := range map[string]string{"evt_0": "secret given by the application", "evt_1": "new secret drawn"} {
+		var detail string
+		if err := st.db.QueryRowContext(ctx, `SELECT detail FROM audit_events WHERE id = ?`, id).Scan(&detail); err != nil || detail != want {
+			t.Errorf("%s: %q (%v), want %q", id, detail, err, want)
+		}
 	}
 }

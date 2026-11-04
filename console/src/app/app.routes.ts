@@ -104,6 +104,14 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'routes' },
       {
+        // The gateways serving this installation, drawn: instances, the
+        // database they share, what the license says of their number.
+        path: 'topology',
+        canActivate: [infraOnly],
+        loadComponent: () =>
+          import('./topology/topology-page.component').then((m) => m.TopologyPageComponent),
+      },
+      {
         // The editor drawer is URL-driven (F5-proof): routes/new opens a blank
         // one, routes/:id/:section opens that route on that section.
         matcher: routesMatcher,
@@ -491,6 +499,9 @@ export const routes: Routes = [
         canActivate: [logsAccess],
         loadComponent: () => import('./logs/logs-page.component').then((m) => m.LogsPageComponent),
       },
+      // Moved to the infra plane, first: what serves the installation, before
+      // what it serves.
+      { path: 'infrastructure', redirectTo: '/infra/topology' },
       {
         // Who holds the console: root's alone.
         path: 'sessions',

@@ -88,6 +88,9 @@ func tables() []schemaTable {
 // Dialect names the kind of database: "sqlite" or "postgres".
 func (s *Store) Dialect() string { return s.db.dialect }
 
+// SchemaVersion is the schema the database is at, as it says.
+func (s *Store) SchemaVersion() (int, error) { return s.db.schemaVersion() }
+
 // TableCount is one table's rows, on both sides of a copy.
 type TableCount struct {
 	Table  string `json:"table"`

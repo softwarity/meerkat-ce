@@ -94,7 +94,7 @@ interface FeatureRow {
                     <dd i18n="@@License_covers_value">{{ l.tenants }} tenant(s), {{ l.instances }} instance(s)</dd>
                   }
                   @if (l.ends) {
-                    <dt i18n="@@Test_license_ends">Test license, ends on</dt>
+                    <dt i18n="@@Trial_license_ends">Trial license, ends on</dt>
                   } @else {
                     <dt i18n="@@Updates_support_until">Updates and support until</dt>
                   }

@@ -101,8 +101,9 @@ One field under the three choices, whatever the choice:
 | **Given by the application** | empty, to paste into | the application imposes its own: its chart generates it, or its vendor fixed it. 16 to 256 characters, no spaces |
 
 Whichever it is, the gateway keeps only its sha256 and never shows it again: the
-list shows its first characters, `mko_...` for a drawn one, *application's secret*
-and four characters for the other. The minimum length is there because the sha256
+list shows the start of a drawn one, `mko_...`, and for the application's own
+*application's secret* followed by its hash's fingerprint (`sha256:1a2b3c4d`): none of
+its characters is shown, in the list or in the audit trail. The minimum length is there because the sha256
 travels in an exported configuration, and a short secret is found back from it.
 
 Editing a client shows the start of its secret and keeps it as it is. Draw another

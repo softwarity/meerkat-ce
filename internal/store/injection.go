@@ -31,6 +31,22 @@ type Injection struct {
 	// async or module. defer and async mean nothing to a script written in
 	// the page - a browser ignores them there - so they are a file's only.
 	Load string `json:"load,omitempty"`
+	// Disabled keeps the block on the route and out of the page: switched
+	// off from its line in the console, its code or its file kept, so that
+	// switching it back on is one click rather than a paste from memory. A
+	// disabled block's file is not served either.
+	Disabled bool `json:"disabled,omitempty"`
+}
+
+// Active is the blocks that land in the page, in their order.
+func Active(list []Injection) []Injection {
+	var out []Injection
+	for _, in := range list {
+		if !in.Disabled {
+			out = append(out, in)
+		}
+	}
+	return out
 }
 
 // The kinds, places and loads, in the order the console offers them.

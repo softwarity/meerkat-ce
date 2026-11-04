@@ -272,7 +272,7 @@ func TestAnOIDCClientKeepsTheApplicationsSecret(t *testing.T) {
 	const given = "chart-generated-0123456789"
 	code, out := f.call(t, "POST", "/api/oidc/clients", `{"id": "dbui", "secret": "`+given+`"}`, f.rootC)
 	if code != http.StatusCreated || strings.Contains(out, given) || strings.Contains(out, `"secret":"`) ||
-		!strings.Contains(out, `"secretPrefix":"char"`) {
+		!strings.Contains(out, `"secretPrefix":"`+store.OIDCFingerprint(store.HashOIDCSecret(given))+`"`) || strings.Contains(out, `"secretPrefix":"char`) {
 		t.Fatalf("a client created with the application's secret: %d %s", code, out)
 	}
 	c, err := f.api.st.GetOIDCClient(context.Background(), "dbui")
@@ -316,7 +316,9 @@ func TestAnOIDCClientKeepsTheApplicationsSecret(t *testing.T) {
 	}
 	for _, e := range events {
 		raw, _ := json.Marshal(e)
-		if strings.Contains(string(raw), given) || strings.Contains(string(raw), next) {
+		// Not the secret, and not its start either: the trail is read by more
+		// people than the client's screen.
+		if strings.Contains(string(raw), given[:4]) || strings.Contains(string(raw), next[:4]) || strings.Contains(string(raw), store.OIDCSecretPrefix) {
 			t.Errorf("a secret reached the trail: %s", raw)
 		}
 	}

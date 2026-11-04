@@ -280,7 +280,7 @@ func TestATestLicenseStopsCountingAtItsDate(t *testing.T) {
 	}
 	t.Cleanup(func() { license.Apply(nil) })
 	code, out := f.call(t, "PUT", "/api/license", licenseBody(t, string(file)), f.rootC)
-	if code != http.StatusOK || !strings.Contains(out, "this test license ended on") || !strings.Contains(out, `"ends":true`) {
+	if code != http.StatusOK || !strings.Contains(out, "this trial license ended on") || !strings.Contains(out, `"ends":true`) {
 		t.Fatalf("an ended test license: %d %s", code, out)
 	}
 	if license.Current() != nil || evalmark.Shown("mark") != "mark" {

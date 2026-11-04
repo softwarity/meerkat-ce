@@ -56,6 +56,7 @@ var migrations = []migration{
 	{Version: 90, Name: "the internal plane keeps asking for the tokens it handed out", Up: internalAccessKept},
 	{Version: 95, Name: "a zone nobody chose follows the browser", Up: zoneUnchosen},
 	{Version: 102, Name: "a notification has one id for its sender", Up: notificationRefs},
+	{Version: 103, Name: "an application's secret is recognised by its hash, not its start", Up: oidcSecretFingerprints},
 }
 
 // zoneUnchosen empties the zone of the accounts that hold UTC (v95). UTC was
@@ -79,6 +80,24 @@ func notificationRefs(ctx context.Context, tx *transaction) error {
 		if _, err := tx.ExecContext(ctx, `ALTER TABLE `+table+` RENAME COLUMN dedup_key TO ref`); err != nil {
 			return fmt.Errorf("%s: renaming dedup_key to ref: %w", table, err)
 		}
+	}
+	return nil
+}
+
+// oidcSecretFingerprints stops keeping the first four characters of a secret an
+// application brings (v103): they are replaced by the start of its hash, which
+// recognises it as well and reveals nothing. The audit lines of a secret
+// changed named those characters too; they say now which kind of secret it
+// was, and nothing of it. A drawn secret (mko_) keeps its prefix.
+func oidcSecretFingerprints(ctx context.Context, tx *transaction) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE oidc_clients SET secret_prefix = 'sha256:' || substr(secret_hash, 1, 8)
+		WHERE secret_prefix <> '' AND secret_hash <> '' AND substr(secret_prefix, 1, 4) <> 'mko_'`); err != nil {
+		return fmt.Errorf("oidc clients: the secrets' fingerprints: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE audit_events SET detail = CASE
+		WHEN detail LIKE 'new secret%' THEN 'new secret drawn' ELSE 'secret given by the application' END
+		WHERE action = 'oidc.client.secret'`); err != nil {
+		return fmt.Errorf("audit: the secrets named in it: %w", err)
 	}
 	return nil
 }

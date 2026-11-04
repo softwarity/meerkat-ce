@@ -80,6 +80,38 @@ func (s *Store) UnreadableVaultSecrets(ctx context.Context, scopes []string) (ma
 	return out, rows.Err()
 }
 
+// EmptyVaultSecrets names the secrets of these scopes that open to nothing,
+// keyed scope + "/" + name: the ones an import reserved (a configuration
+// carries the names its routes expect, never a secret's value) and nobody has
+// filled since. Like UnreadableVaultSecrets, what leaves is a yes or a no.
+func (s *Store) EmptyVaultSecrets(ctx context.Context, scopes []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(scopes) == 0 {
+		return out, nil
+	}
+	args := make([]any, 0, len(scopes)+1)
+	args = append(args, vault.KindSecret)
+	for _, sc := range scopes {
+		args = append(args, sc)
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT scope, name, value FROM vault_entries WHERE kind = ? AND scope IN (`+placeholders(len(scopes))+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: read the vault's secrets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var scope, name, sealed string
+		if err := rows.Scan(&scope, &name, &sealed); err != nil {
+			return nil, fmt.Errorf("store: read the vault's secrets: %w", err)
+		}
+		if plain, err := s.vaultCipher.Open(sealed); err == nil && plain == "" {
+			out[scope+"/"+name] = true
+		}
+	}
+	return out, rows.Err()
+}
+
 // VaultValues resolves the entries OF ONE SCOPE to their plain value, secrets
 // decrypted. This is the lookup used when expanding $name while loading the
 // configuration - it never leaves the process. Scoping the resolution is what

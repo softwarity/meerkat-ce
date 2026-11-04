@@ -987,8 +987,10 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	// A UI route's own CSS and JavaScript, in its order, at its places (see
 	// store.Injection). A block cannot break out of its tag: the closing tag
 	// is refused at validation.
-	if r.IsUI && r.UI != nil && len(r.UI.Injections) > 0 {
-		filters.Response = append(filters.Response, injectionFilters(r.ID, r.UI.Injections, files)...)
+	if r.IsUI && r.UI != nil {
+		if active := store.Active(r.UI.Injections); len(active) > 0 {
+			filters.Response = append(filters.Response, injectionFilters(r.ID, active, files)...)
+		}
 	}
 	// The language hook (I18N-04): declared per route, it lands as a function
 	// on the window rather than as an attribute on the button - it is code,

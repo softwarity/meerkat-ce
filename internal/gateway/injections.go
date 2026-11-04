@@ -108,7 +108,7 @@ func injectedFiles(r store.Route, files []store.RouteFile) map[string]store.Rout
 		return nil
 	}
 	named := map[string]bool{}
-	for _, in := range r.UI.Injections {
+	for _, in := range store.Active(r.UI.Injections) {
 		if in.File != "" {
 			named[in.File] = true
 		}

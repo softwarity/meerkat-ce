@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { InfrastructureService } from '../shared/infrastructure.service';
 import { UpdatesService } from '../shared/updates.service';
 
 // One section entry in a plane's left nav. The path is RELATIVE to the plane,
@@ -22,12 +23,16 @@ interface SectionLink {
   plugOnly?: boolean;
   // updates: carries how many releases are ahead of this gateway.
   updates?: boolean;
+  // infra: carries what on the Infrastructure screen wants a look.
+  infra?: boolean;
 }
 
 const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
   infra: {
     title: $localize`:@@Infra:Infra`,
     links: [
+      // What serves the installation, before what it serves.
+      { path: 'topology', label: $localize`:@@Topology:Topology`, icon: 'lan', infra: true },
       { path: 'routes', label: $localize`:@@Routes:Routes`, icon: 'alt_route' },
       // One inventory, two questions somebody arrives with. A single entry
       // named after the objects made neither findable: whoever came to write a
@@ -189,4 +194,10 @@ export class SectionShellComponent {
   protected readonly sections: SectionLink[] = PLANES[this.plane]?.links ?? [];
   protected readonly title = PLANES[this.plane]?.title ?? '';
   protected readonly updates = inject(UpdatesService);
+  protected readonly infra = inject(InfrastructureService);
+
+  // The badge an entry carries, 0 for none.
+  protected badge(s: SectionLink): number {
+    return s.updates ? this.updates.count() : s.infra ? this.infra.warnings() : 0;
+  }
 }

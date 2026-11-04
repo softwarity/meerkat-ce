@@ -5,6 +5,7 @@
       label="Infra"
       routerLink="/infra"
       [active]="inInfra()"
+      [badge]="infra.warnings() > 0"
       any-role="root infra-admin"
     >
       <mat-icon>dns</mat-icon>
@@ -37,6 +38,7 @@
       label="Vault"
       routerLink="/vault"
       [active]="inVault()"
+      [badge]="vault.attention() > 0"
       any-role="root infra-admin app-admin"
     >
       <mat-icon>key</mat-icon>

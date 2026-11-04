@@ -81,3 +81,8 @@ const PauseTopic = "pause"
 // UpdatesTopic says the update check found something, or was switched: the
 // console reads GET /api/updates again. Served to who may read that.
 const UpdatesTopic = "updates"
+
+// InstancesTopic says the gateways serving this installation changed: one came,
+// went, or changed version or readiness. The Infrastructure screen re-reads
+// GET /api/infrastructure.
+const InstancesTopic = "instances"

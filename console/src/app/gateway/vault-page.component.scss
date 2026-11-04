@@ -148,6 +148,9 @@ mat-row:last-of-type {
 .unreadable {
   color: var(--mat-sys-error);
 }
+.expired {
+  margin-left: 12px;
+}
 .problem {
   display: flex;
   align-items: flex-start;

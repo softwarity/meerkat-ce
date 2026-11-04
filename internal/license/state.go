@@ -11,7 +11,22 @@ import (
 // InstanceGrace is how long instances may run past a license's ceiling before
 // it counts. A rolling update runs one more than the ceiling for as long as a
 // new pod takes to come up, and that is not an overrun.
-const InstanceGrace = 15 * time.Minute
+var InstanceGrace = graceOf(instanceGrace)
+
+// instanceGrace is InstanceGrace as written, and it is set at LINK time only,
+// by the platform that proves the overrun (e2e/editions, with -ldflags -X):
+// fifteen minutes is a quarter of an hour of a CI job waiting. No flag, no
+// variable and no setting reaches it - a gateway that could be told its grace
+// would be told a year.
+var instanceGrace = "15m"
+
+func graceOf(s string) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 15 * time.Minute
+	}
+	return d
+}
 
 // The license this node honours, and what it has seen running. In memory
 // because the pages that carry the evaluation notice are drawn without a read
@@ -87,6 +102,15 @@ func TenantOverrun() string {
 // tenantsOver holds with the state's lock taken.
 func tenantsOver() bool {
 	return state.current != nil && state.current.Tenants > 0 && state.served > state.current.Tenants
+}
+
+// OverSince is when the instances first ran past the license's ceiling, and
+// the zero time while they do not: the notice comes back at OverSince plus
+// InstanceGrace.
+func OverSince() time.Time {
+	state.Lock()
+	defer state.Unlock()
+	return state.overSince
 }
 
 // Overrun says in a sentence that more instances run than the license covers,

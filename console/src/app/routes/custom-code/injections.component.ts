@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, Injection, InjectionLoad, InjectionPosition, RouteFile } from '../../api.service';
@@ -30,16 +31,18 @@ import { servedName } from '../filters/files-filter.component';
     MatIconModule,
     MatMenuModule,
     MatSelectModule,
+    MatSlideToggleModule,
     MatTooltipModule,
   ],
   styles: `
     :host { display: block; }
     .list { display: grid; gap: 8px; margin-bottom: 12px; }
     .block {
-      display: grid; grid-template-columns: auto auto minmax(0, 1fr) 11rem 9rem auto; align-items: center; gap: 8px;
+      display: grid; grid-template-columns: auto auto minmax(0, 1fr) 11rem 9rem auto auto; align-items: center; gap: 8px;
       padding: 6px 8px; border-radius: 12px; background: var(--mat-sys-surface-container);
     }
     .handle { cursor: grab; color: var(--mat-sys-on-surface-variant); }
+    .block.off > .dim { opacity: 0.45; }
     .what { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .what .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .meta { font-size: 0.8rem; color: var(--mat-sys-on-surface-variant); white-space: nowrap; }
@@ -53,10 +56,10 @@ import { servedName } from '../filters/files-filter.component';
     @if (value().length) {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (b of value(); track $index; let i = $index) {
-          <div class="block" cdkDrag>
+          <div class="block" [class.off]="b.disabled" cdkDrag>
             <mat-icon class="handle" cdkDragHandle>drag_indicator</mat-icon>
-            <mat-icon>{{ b.kind === 'css' ? 'css' : 'javascript' }}</mat-icon>
-            <span class="what">
+            <mat-icon class="dim">{{ b.kind === 'css' ? 'css' : 'javascript' }}</mat-icon>
+            <span class="what dim">
               @if (b.file) {
                 <mat-icon class="meta">description</mat-icon>
                 <span class="name" [class.missing]="!has(b.file)">{{ b.file }}</span>
@@ -79,7 +82,7 @@ import { servedName } from '../filters/files-filter.component';
                 </button>
               }
             </span>
-            <mat-form-field subscriptSizing="dynamic">
+            <mat-form-field subscriptSizing="dynamic" class="dim">
               <mat-label i18n="@@Injection_position">Where</mat-label>
               <mat-select [value]="b.position" (selectionChange)="patch(i, { position: $event.value })">
                 @for (p of positions; track p.value) {
@@ -88,7 +91,7 @@ import { servedName } from '../filters/files-filter.component';
               </mat-select>
             </mat-form-field>
             @if (b.kind === 'js') {
-              <mat-form-field subscriptSizing="dynamic">
+              <mat-form-field subscriptSizing="dynamic" class="dim">
                 <mat-label i18n="@@Injection_load">Runs</mat-label>
                 <mat-select [value]="b.load ?? ''" (selectionChange)="patch(i, { load: $event.value })">
                   @for (l of loads; track l.value) {
@@ -99,6 +102,9 @@ import { servedName } from '../filters/files-filter.component';
             } @else {
               <span></span>
             }
+            <mat-slide-toggle [checked]="!b.disabled" (change)="patch(i, { disabled: !$event.checked || undefined })"
+              matTooltip="Injected into the page" i18n-matTooltip="@@Injection_on"
+              aria-label="Injected into the page" i18n-aria-label="@@Injection_on" />
             <button matIconButton type="button" (click)="remove(i)"
               matTooltip="Remove the block" i18n-matTooltip="@@Injection_remove"
               aria-label="Remove the block" i18n-aria-label="@@Injection_remove">

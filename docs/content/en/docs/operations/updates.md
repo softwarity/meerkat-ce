@@ -85,7 +85,7 @@ What ends it:
   puts it back in force. The audit trail records it (`license.migrate`).
 
 The check is made only when there is something to lose: a license in force and
-a migration waiting. No license, an ended test license, a fresh database or a
+a migration waiting. No license, an ended trial license, a fresh database or a
 version that changes nothing in the database start as they always do.
 
 ## When the check fails

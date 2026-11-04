@@ -15,7 +15,7 @@ licence.
 ::: cards
 ### Community - free
 
-**CE.** The whole gateway for one organisation on one instance: routing, the
+**CE.** The whole gateway for one tenant on one instance: routing, the
 sign-in pages, roles and access rules, TLS, the vault, two-factor and passkeys,
 the audit trail, the traffic screens, the console, the agent endpoint.
 
@@ -27,7 +27,7 @@ License. No account, no key, no expiry.
 ### Evaluation - free
 
 **Eval.** Everything, Enterprise included, to try before a conversation:
-several organisations, SAML, LDAP and Active Directory, several instances kept in sync, ACME,
+several tenants, SAML, LDAP and Active Directory, several instances kept in sync, ACME,
 configurations in git, the OpenTelemetry export, the developer tunnel. No time limit, no counter, nothing
 switched off.
 
@@ -39,7 +39,7 @@ across the console. Only a licence removes it.
 
 ### Team - EUR 4,000 a year
 
-**TE.** Enterprise for one organisation on one instance: the corporate
+**TE.** Enterprise for one tenant on one instance: the corporate
 directory (SAML, LDAP, Active Directory), ACME, configurations in git, the
 OpenTelemetry export, the page layouts and the mark removed, the OpenID
 provider, the built-in developer tunnel. No evaluation notice. A perpetual
@@ -51,7 +51,7 @@ Write to us: [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%20
 
 ### Enterprise - EUR 24,000 a year
 
-**EE.** All of it, without a ceiling: as many organisations as you run, and the
+**EE.** All of it, without a ceiling: as many tenants as you run, and the
 gateway as an active/active cluster on PostgreSQL, scaled out by adding
 instances. Extended support included.
 
@@ -72,7 +72,7 @@ Write to us: [sales@softwarity.io](mailto:sales@softwarity.io?subject=Meerkat%20
 | **Production use** | Yes | No | Yes | Yes |
 | **The Enterprise capabilities** | - | Yes | Yes | Yes |
 | **Evaluation notice** | - | On every surface | - | - |
-| **Organisations** | One | Not limited | One | Not limited |
+| **Tenants** | One | Not limited | One | Not limited |
 | **Installations** | As many as you like | As many as you like | As many as you like | As many as you like |
 | **Instances per installation** | One | Several, kept in sync | One | Several, kept in sync |
 | **Users, routes, requests** | Not limited | Not limited | Not limited | Not limited |
@@ -120,13 +120,13 @@ instance reads it from there.
   migrate as an evaluation ([how](/docs/operations/updates)).
 - **Nothing stops in the middle of a night.** A licence never cuts traffic.
   What goes past its ceilings is refused when it is created, with a sentence
-  saying so: a second organisation on a Team licence is not created, and
+  saying so: a second tenant on a Team licence is not created, and
   everything already in place keeps being served. That does not make it covered:
-  while a gateway serves more organisations than its licence covers, the
+  while a gateway serves more tenants than its licence covers, the
   evaluation notice stays.
 - **One licence per company, as many installations as you like.** The same
   licence is pasted into each of them at no extra cost: a Team installation
-  keeps its ceilings, one organisation and one instance, but nothing limits how
+  keeps its ceilings, one tenant and one instance, but nothing limits how
   many you run. It covers the installations of the company that bought it, and
   only those: handing it on to another company, customer or partner, is not
   covered.
@@ -161,7 +161,7 @@ telemetry in the product, and nothing in it sends anything to us. The licence
 is checked on the spot.
 
 **Team or Enterprise?** The capabilities are the same. Team holds one
-organisation on one instance; as soon as you have to keep several customers or
+tenant on one instance; as soon as you have to keep several customers or
 subsidiaries apart inside one installation, or survive the loss of a machine,
 it is Enterprise.
 

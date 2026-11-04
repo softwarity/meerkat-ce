@@ -396,6 +396,11 @@
   },
   {
     "method": "GET",
+    "path": "/api/infrastructure",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/issues",
     "guard": "authed"
   },
@@ -752,12 +757,12 @@
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "runReport"
+    "guard": "serviceTokens"
   },
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "serviceTokens"
+    "guard": "runReport"
   },
   {
     "method": "POST",

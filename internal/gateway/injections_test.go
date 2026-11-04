@@ -94,3 +94,38 @@ func TestTheTwoFreeBlocksReadAsTheList(t *testing.T) {
 		t.Errorf("%+v", ui.Injections)
 	}
 }
+
+// A block switched off stays on the route and out of the page, and its file is
+// not served: switching it back on is the way back, and nothing is lost.
+func TestASwitchedOffBlockStaysOutOfThePage(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, `<!doctype html><html><head></head><body><p>ok</p></body></html>`)
+	}))
+	t.Cleanup(up.Close)
+	r := pathRoute("ui", "ui", 1, "/app/**", up.URL)
+	r.IsUI = true
+	r.UI = &store.RouteUI{Injections: []store.Injection{
+		{Kind: "css", Code: "p { color: red }", Position: "head-end"},
+		{Kind: "css", Code: "p { color: blue }", Position: "head-end", Disabled: true},
+		{Kind: "js", File: "off.js", Position: "body-end", Disabled: true},
+	}}
+	rt := newRouter(t, r)
+	ctx := context.Background()
+	if _, err := rt.st.SetRouteFile(ctx, "ui", "off.js", []byte("window.off = 1")); err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	_, body := get(t, rt, "/app/")
+	if !strings.Contains(body, "color: red") {
+		t.Fatalf("the block left on is missing: %s", body)
+	}
+	if strings.Contains(body, "color: blue") || strings.Contains(body, "off.js") {
+		t.Fatalf("a switched-off block reached the page: %s", body)
+	}
+	if res, _ := get(t, rt, "/meerkat/route-assets/ui/off.js"); res.StatusCode != http.StatusNotFound {
+		t.Fatalf("a switched-off block's file is served: %d", res.StatusCode)
+	}
+}

@@ -32,3 +32,41 @@ test('vault-secret-edit: a stored secret can be typed again and saved', async ({
   await api.delete(`/api/vault/infra/${name}`);
   await api.dispose();
 });
+
+// An import brings the names its routes expect, never their values: the vault
+// says which entries are empty, and which values are past their reminder date,
+// on the entries, in a line above them and as a badge on the rail.
+test('vault-attention: an imported name without its value, and a lapsed value, are said', async ({ browser }) => {
+  const api = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+  const stamp = Date.now();
+  const hole = `e2e-imported-${stamp}`;
+  const lapsed = `e2e-lapsed-${stamp}`;
+  const route = `e2e-vault-hole-${stamp}`;
+  const imported = await api.post('/api/config/import', {
+    data: {
+      version: 1,
+      routes: [{
+        id: route, name: route, order: 990, enabled: false, upstream: `http://\${${hole}}:8080`,
+        predicates: [{ type: 'path', args: { patterns: [`/${route}/**`] } }],
+      }],
+    },
+  });
+  expect(imported.ok(), await imported.text()).toBeTruthy();
+  const yesterday = Math.floor(Date.now() / 86_400_000 - 1) * 86_400;
+  const put = await api.put(`/api/vault/infra/${lapsed}`, { data: { kind: 'secret', value: 'old', expiresAt: yesterday } });
+  expect(put.ok(), await put.text()).toBeTruthy();
+
+  const context = await browser.newContext({ storageState: authFile('root') });
+  const page = await context.newPage();
+  await page.goto(ADMIN_URL + '/vault');
+  await expect(page.locator('mat-row', { hasText: hole })).toContainText('no value');
+  await expect(page.locator('mat-row', { hasText: lapsed })).toContainText('expired on');
+  await expect(page.locator('.problem', { hasText: 'no value' })).toBeVisible();
+  await expect(page.locator('.problem', { hasText: 'reminder date' })).toBeVisible();
+  await expect(page.locator('rail-nav-item[label="Vault"] .rail-badge'), 'the rail says so too').toBeVisible();
+
+  await context.close();
+  await api.delete(`/api/routes/${route}`);
+  for (const name of [hole, lapsed]) await api.delete(`/api/vault/infra/${name}`);
+  await api.dispose();
+});

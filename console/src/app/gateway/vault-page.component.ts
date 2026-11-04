@@ -12,6 +12,8 @@ import { ApiService, VaultEntry } from '../api.service';
 import { DialogsService } from '../shared/dialogs.service';
 import { VaultEntryFormComponent, VaultEntryFormData } from '../shared/vault-entry-form.component';
 import { VaultService } from '../shared/vault.service';
+import { MeService } from '../me.service';
+import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 import { VaultFileDialogComponent, VaultFileDialogData } from './vault-file-dialog.component';
 import { LiveChangesService } from '../shared/live-changes.service';
 
@@ -31,7 +33,7 @@ import { LiveChangesService } from '../shared/live-changes.service';
     LoadingIndicatorComponent,
     RowActionsDirective,
     VaultEntryFormComponent,
-  ],
+   ZonedDatePipe],
   styleUrl: './vault-page.component.scss',
   templateUrl: './vault-page.component.html',
 })
@@ -45,6 +47,11 @@ export class VaultPageComponent {
   protected readonly loading = signal(true);
   protected readonly entries = computed(() => this.vault.entries());
   protected readonly unreadable = computed(() => this.entries().filter((e) => e.unreadable).length);
+  // The holes an import leaves (its configuration names what its routes
+  // expect, never a value) and the values past their reminder date.
+  protected readonly empty = computed(() => this.entries().filter((e) => !e.readOnly && !e.hasValue).length);
+  protected readonly expired = computed(() => this.entries().filter((e) => !e.readOnly && e.hasValue && e.expired).length);
+  protected readonly zone = inject(MeService).timezone;
   protected readonly columns = ['name', 'kind', 'value', 'usedBy'];
 
   // The editor lives in a right drawer here (the routes/users pattern), holding
