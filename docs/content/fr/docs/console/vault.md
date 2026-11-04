@@ -47,6 +47,8 @@ bord gauche. Un avis au-dessus de la liste compte chaque cas, et son **Show only
 réduit la liste à celles-là ; **Vault** porte une pastille dans le rail tant qu'il en reste
 une que vous pouvez remplir.
 
+![Le Vault après un import : deux entrées sans valeur et une entrée dont la date de rappel est passée viennent en tête, marquées sur leur bord, sous un avis qui les compte](img/console/vault-attention.webp)
+
 **Used by** donne une pastille par sorte d'usage : une entrée que plusieurs emplacements git
 partagent affiche *git location: base, bogdan, francois +3*, la liste complète au survol.
 

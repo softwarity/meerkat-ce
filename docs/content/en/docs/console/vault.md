@@ -45,6 +45,8 @@ left edge. A notice above the list counts each kind, and its **Show only these**
 narrows the list to them; **Vault** in the rail carries a badge while one is left
 that you can fill.
 
+![The Vault after an import: two entries with no value and one past its reminder date come first, marked on their edge, under one notice that counts them](img/console/vault-attention.webp)
+
 **Used by** gives one chip per kind of user: an entry several git locations share
 reads *git location: base, bogdan, francois +3*, the full list under the pointer.
 

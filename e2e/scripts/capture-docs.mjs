@@ -257,6 +257,29 @@ async function clusterTopology(page) {
   });
 }
 
+// A vault that wants a hand: what a configuration import leaves (names its
+// routes expect, empty), a value past its reminder date, and one token shared
+// by several git locations. The list is the real one plus these; nothing is
+// written, so the plain vault capture beside it stays as it was.
+async function vaultAttention(page) {
+  await page.route('**/api/vault', async (route) => {
+    const res = await route.fetch();
+    const real = await res.json();
+    const at = Math.floor(Date.parse('2026-10-20T09:00:00Z') / 1000);
+    const base = { scope: 'infra', createdAt: at, updatedAt: at };
+    const imported = 'expected by an imported configuration';
+    real.push(
+      { ...base, name: 'github-client-secret', kind: 'secret', hasValue: false, description: imported, usedBy: ['authority: GitHub'] },
+      { ...base, name: 'smtp-password', kind: 'secret', hasValue: false, description: imported, usedBy: ['mail relay'] },
+      { ...base, name: 'registry-token', kind: 'secret', hasValue: true, description: 'Pull token of the image registry',
+        expiresAt: Math.floor(Date.parse('2026-10-31T00:00:00Z') / 1000), expired: true, usedBy: ['schedule: nightly-pull'] },
+      { ...base, name: 'git-token', kind: 'secret', hasValue: true, description: 'Access token of the configuration repositories',
+        usedBy: ['platform', 'billing', 'storefront', 'identity', 'docs'].map((n) => `git location: ${n}`) },
+    );
+    await route.fulfill({ response: res, json: real });
+  });
+}
+
 async function onlyDifferences(page) {
   await page.getByRole('option', { name: 'Only differences' }).click();
   await page.locator('fieldset.block').first().waitFor();
@@ -1025,6 +1048,7 @@ const SHOTS = [
   { file: 'group-rules', path: () => TENANT && RULE && `/tenants/${TENANT}/rules/${RULE}`, settle: 1600 },
   // ── Vault ──
   { file: 'vault', path: '/vault' },
+  { file: 'vault-attention', path: '/vault', prepare: vaultAttention, settle: 1200, cleanup: (page) => page.unroute('**/api/vault') },
   // ── Data plane ──
   { file: 'traffic', path: '/data-plane/metrics', settle: 2500 },
   {
