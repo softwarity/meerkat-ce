@@ -318,7 +318,7 @@ func TestAnotherNamespaceIsNamedInFull(t *testing.T) {
 
 // A service of the own namespace reads under its bare name and is stored
 // under its qualified one: a certificate authority constrained to svc and
-// cluster.local can certify reference-data.canopy.svc, never reference-data.
+// cluster.local can certify reference-data.apps.svc, never reference-data.
 func TestTheOwnNamespaceStoresTheQualifiedName(t *testing.T) {
 	svc := service("reference-data", nil)
 	svc.Spec.Ports = append(svc.Spec.Ports, struct {
@@ -326,11 +326,11 @@ func TestTheOwnNamespaceStoresTheQualifiedName(t *testing.T) {
 		NodePort int `json:"nodePort"`
 	}{Port: 443})
 	st := &k8sState{services: map[string]k8sService{"reference-data": svc}, pods: map[string]k8sPod{}}
-	s := st.result("canopy", true, true).Services[0]
+	s := st.result("apps", true, true).Services[0]
 	if s.Name != "reference-data" || len(s.Names) != 2 || s.Names[0] != "reference-data" {
 		t.Errorf("names: %+v", s)
 	}
-	if s.Full != "reference-data.canopy.svc" || s.Suggested != "http://reference-data.canopy.svc:443" {
+	if s.Full != "reference-data.apps.svc" || s.Suggested != "http://reference-data.apps.svc:443" {
 		t.Errorf("full = %q, suggested = %q, want the qualified name", s.Full, s.Suggested)
 	}
 }

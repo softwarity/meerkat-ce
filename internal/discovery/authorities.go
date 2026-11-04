@@ -488,8 +488,8 @@ type ServiceTarget struct {
 }
 
 // ServiceOf resolves an upstream host to a Service of a namespace this
-// gateway reads - "geoserver", "geoserver.canopy", "geoserver.canopy.svc",
-// "geoserver.canopy.svc.cluster.local" - and asks its ports. false when the
+// gateway reads - "geoserver", "geoserver.apps", "geoserver.apps.svc",
+// "geoserver.apps.svc.cluster.local" - and asks its ports. false when the
 // host is not one, or the Service is not there.
 func ServiceOf(ctx context.Context, host string) (ServiceTarget, bool) {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {

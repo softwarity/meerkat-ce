@@ -10,11 +10,11 @@ import (
 
 // The record is read from the URL the copy used, and the password stops there.
 func TestTheLastCopyKeepsNoPassword(t *testing.T) {
-	c, err := LastCopyOf("postgres://meerkat:s3cr%40t@canopydb-primary:6432/gw?sslmode=require")
+	c, err := LastCopyOf("postgres://meerkat:s3cr%40t@appsdb-primary:6432/gw?sslmode=require")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Host != "canopydb-primary" || c.Port != 6432 || c.Database != "gw" || c.User != "meerkat" || c.SSLMode != "require" {
+	if c.Host != "appsdb-primary" || c.Port != 6432 || c.Database != "gw" || c.User != "meerkat" || c.SSLMode != "require" {
 		t.Fatalf("read as %+v", c)
 	}
 	s, err := OpenAt(t.TempDir(), dbtest.URL(t))
@@ -74,15 +74,15 @@ func TestACopyRememberedElsewhereIsNotThisOne(t *testing.T) {
 // Running on the database it was copied into, the switch is done: the record
 // no longer stands, whatever it says it came from.
 func TestTheCopyEndsOnceTheGatewayRunsOnIt(t *testing.T) {
-	c := LastCopy{Host: "CanopyDB-primary", Port: 5432, Database: "gw", From: "sqlite:/data/meerkat.db"}
-	here := postgresLocation("postgres://meerkat:x@canopydb-primary/gw?sslmode=require")
+	c := LastCopy{Host: "AppsDB-primary", Port: 5432, Database: "gw", From: "sqlite:/data/meerkat.db"}
+	here := postgresLocation("postgres://meerkat:x@appsdb-primary/gw?sslmode=require")
 	if c.standing(dialectPostgres, here) {
 		t.Fatal("still standing on the database it was copied into")
 	}
 	if !c.standing(dialectSQLite, "sqlite:/data/meerkat.db") {
 		t.Fatal("not standing on the database it was copied from")
 	}
-	if l := postgresLocation("host=canopydb-primary port=5432 dbname=gw user=meerkat"); l != here {
+	if l := postgresLocation("host=appsdb-primary port=5432 dbname=gw user=meerkat"); l != here {
 		t.Fatalf("the key=value form reads as %q, the URL as %q", l, here)
 	}
 }

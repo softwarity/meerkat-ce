@@ -60,7 +60,7 @@ alone.
 ## 2. The address and the certificate
 
 Point the upstream at the service's **full name** inside the platform:
-`https://reference-data.canopy.svc:443` on Kubernetes, `stack_service` on Swarm.
+`https://reference-data.apps.svc:443` on Kubernetes, `stack_service` on Swarm.
 The upstream picker offers the short name to read and stores the full one, and the
 editor flags an `https` route stored with a bare short name, with a button that
 writes the full one.

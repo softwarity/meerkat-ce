@@ -86,14 +86,14 @@ func TestTheListAdmitsWhatItNames(t *testing.T) {
 	if !everyone.Admits("") || !everyone.Admits("anything") {
 		t.Fatal("no list must admit everyone, the unidentified included")
 	}
-	listed := InternalAccess{Mode: InternalAccessNone, Callers: []string{"canopy/Deployment/reference-data"}}
+	listed := InternalAccess{Mode: InternalAccessNone, Callers: []string{"apps/Deployment/reference-data"}}
 	if listed.Admits("") || listed.Admits() {
 		t.Fatal("a list admitted an unidentified caller")
 	}
-	if !listed.Admits("", "Canopy/Deployment/Reference-Data") {
+	if !listed.Admits("", "Apps/Deployment/Reference-Data") {
 		t.Fatal("a listed identity was refused")
 	}
-	if listed.Admits("canopy/Deployment/other") {
+	if listed.Admits("apps/Deployment/other") {
 		t.Fatal("an identity the list does not hold was admitted")
 	}
 }

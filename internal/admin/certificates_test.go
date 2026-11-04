@@ -740,7 +740,7 @@ func TestADoorServesWhatItsModeFits(t *testing.T) {
 	f.api.TLS.Ports("127.0.0.1:18080", "127.0.0.1:19090", "127.0.0.1:17070")
 	f.api.LookupInternal = func(_ context.Context, port int) discovery.Internal {
 		if port == 18080 {
-			return discovery.Internal{Names: []string{"meerkat.canopy.svc.cluster.local", "meerkat.canopy.svc", "meerkat"}, Source: "kubernetes"}
+			return discovery.Internal{Names: []string{"meerkat.apps.svc.cluster.local", "meerkat.apps.svc", "meerkat"}, Source: "kubernetes"}
 		}
 		return discovery.Internal{}
 	}
@@ -763,10 +763,10 @@ func TestADoorServesWhatItsModeFits(t *testing.T) {
 	if code, out := f.call(t, "PUT", "/api/settings/tls/doors/app", `{"proxied":true,"names":["shop.example.org"]}`, f.rootC); code != http.StatusOK {
 		t.Fatalf("proxied: %d %s", code, out)
 	}
-	if code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["meerkat.canopy.svc"],"app":true}`, f.rootC); code != http.StatusCreated {
+	if code, out := f.call(t, "POST", "/api/certificates/self-signed", `{"names":["meerkat.apps.svc"],"app":true}`, f.rootC); code != http.StatusCreated {
 		t.Fatalf("a cluster certificate on a proxied plane: %d %s", code, out)
 	}
-	if !f.api.TLS.App.Answers("meerkat.canopy.svc") || f.api.TLS.App.Answers("shop.example.org") {
+	if !f.api.TLS.App.Answers("meerkat.apps.svc") || f.api.TLS.App.Answers("shop.example.org") {
 		t.Fatal("behind a proxy the plane serves the cluster certificate, not the public one")
 	}
 	_, out := f.call(t, "GET", "/api/certificates", "", f.rootC)
@@ -778,7 +778,7 @@ func TestADoorServesWhatItsModeFits(t *testing.T) {
 	for _, c := range list {
 		unused[c.Name()] = c.Unused
 	}
-	if strings.Join(unused["*.example.org"], ",") != store.PlaneApp || len(unused["meerkat.canopy.svc"]) != 0 {
+	if strings.Join(unused["*.example.org"], ",") != store.PlaneApp || len(unused["meerkat.apps.svc"]) != 0 {
 		t.Fatalf("the public certificate is the unused one: %v", unused)
 	}
 	// And back: the public one serves again, the cluster one waits.

@@ -50,7 +50,7 @@ une que vous pouvez remplir.
 ![Le Vault après un import : deux entrées sans valeur et une entrée dont la date de rappel est passée viennent en tête, marquées sur leur bord, sous un avis qui les compte](img/console/vault-attention.webp)
 
 **Used by** donne une pastille par sorte d'usage : une entrée que plusieurs emplacements git
-partagent affiche *git location: base, bogdan, francois +3*, la liste complète au survol.
+partagent affiche *git location: platform, billing, storefront +2*, la liste complète au survol.
 
 Une entrée comprend :
 

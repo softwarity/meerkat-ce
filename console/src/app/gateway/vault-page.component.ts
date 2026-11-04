@@ -88,7 +88,7 @@ export class VaultPageComponent {
     return [...list].sort((a, b) => rank(a) - rank(b));
   });
 
-  // "Used by", one chip per kind of user: "git location: base, bogdan +4"
+  // "Used by", one chip per kind of user: "git location: platform, billing, storefront +2"
   // rather than six chips each saying git location. The full list in the
   // tooltip when some are left out.
   protected uses(e: VaultEntry): { kind: string; text: string; hidden: number; all: string }[] {

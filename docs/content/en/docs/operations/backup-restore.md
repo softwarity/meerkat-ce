@@ -115,7 +115,7 @@ form starts on sample values, and the SQL and every command below follow what is
 typed:
 
 ```sql
--- as an administrator: psql -h canopydb-primary -p 5432 -U postgres
+-- as an administrator: psql -h pg-primary -p 5432 -U postgres
 CREATE ROLE meerkat LOGIN PASSWORD 'change-me-now';
 CREATE DATABASE meerkat OWNER meerkat;
 
@@ -174,7 +174,7 @@ On a Helm release, with sample names:
 ```bash
 # the new database, as a Secret (the vault key is already in the deployment, unchanged)
 kubectl -n shop create secret generic meerkat-database \
-  --from-literal=database-url='postgres://meerkat:PASSWORD@canopydb-primary:5432/meerkat?sslmode=require'
+  --from-literal=database-url='postgres://meerkat:PASSWORD@pg-primary:5432/meerkat?sslmode=require'
 
 # point the release at it: the pods restart on PostgreSQL, unpaused
 helm upgrade edge meerkat/meerkat -n shop --reuse-values \

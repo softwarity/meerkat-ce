@@ -901,9 +901,9 @@ func TestOnlyANameWithACertificateIsRedirected(t *testing.T) {
 	d.SetServes(func(host string) bool { return host == "shop.example.com" })
 	h := d.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
 	for url, want := range map[string]int{
-		"http://shop.example.com:8080/x":                                             http.StatusMovedPermanently,
-		"http://meerkat-meerkat.canopy.svc.cluster.local:8080/.well-known/jwks.json": http.StatusTeapot,
-		"http://10.1.2.3:8080/x":                                                     http.StatusTeapot,
+		"http://shop.example.com:8080/x":                                           http.StatusMovedPermanently,
+		"http://meerkat-meerkat.apps.svc.cluster.local:8080/.well-known/jwks.json": http.StatusTeapot,
+		"http://10.1.2.3:8080/x":                                                   http.StatusTeapot,
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))

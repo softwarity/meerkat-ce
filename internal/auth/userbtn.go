@@ -1753,7 +1753,7 @@ const userButtonJS = `(() => {
     const renderIdle = () => {
       st.full = st.shot = st.rect = null;
       stage.innerHTML = '';
-      // ONE capture mode, the exact one (Francois's call): real pixels via
+      // ONE capture mode, the exact one: real pixels via
       // the native picker. A DOM re-render was tried and dropped - it can
       // erase the very glitch being reported. The hint under the button
       // reassures whoever shares a whole screen: nothing leaves the panel

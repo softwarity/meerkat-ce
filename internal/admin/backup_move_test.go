@@ -35,11 +35,11 @@ func TestAMigrationWaitsForThePause(t *testing.T) {
 // The parts of a target become one URL, the password escaped by the URL
 // package and never by hand.
 func TestTheTargetIsAssembledFromItsParts(t *testing.T) {
-	u, err := copyRequest{Host: "canopydb-primary", Database: "meerkat", User: "meerkat", Password: "p@ss/w:rd", SSLMode: "require"}.target()
+	u, err := copyRequest{Host: "appsdb-primary", Database: "meerkat", User: "meerkat", Password: "p@ss/w:rd", SSLMode: "require"}.target()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(u, "postgres://meerkat:p%40ss%2Fw%3Ard@canopydb-primary:5432/meerkat?sslmode=require") {
+	if !strings.HasPrefix(u, "postgres://meerkat:p%40ss%2Fw%3Ard@appsdb-primary:5432/meerkat?sslmode=require") {
 		t.Fatalf("assembled as %s", u)
 	}
 	if _, err := (copyRequest{Host: "h"}).target(); err == nil {
@@ -62,7 +62,7 @@ func TestTheBackupInfoSaysThePlatformAndTheLastCopy(t *testing.T) {
 	f.api.LookupPlatform = func(context.Context) discovery.Platform {
 		return discovery.Platform{Name: "kubernetes", Helm: true, Release: "edge", Namespace: "shop", Workload: "edge-meerkat"}
 	}
-	c, err := store.LastCopyOf("postgres://meerkat:hunter2@canopydb-primary:5432/gw?sslmode=require")
+	c, err := store.LastCopyOf("postgres://meerkat:hunter2@appsdb-primary:5432/gw?sslmode=require")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestTheBackupInfoSaysThePlatformAndTheLastCopy(t *testing.T) {
 	if code != http.StatusOK || json.Unmarshal([]byte(body), &info) != nil {
 		t.Fatalf("info answered %d: %s", code, body)
 	}
-	if info.Platform.Release != "edge" || info.LastCopy == nil || info.LastCopy.Host != "canopydb-primary" || info.LastCopy.Rows != 42 {
+	if info.Platform.Release != "edge" || info.LastCopy == nil || info.LastCopy.Host != "appsdb-primary" || info.LastCopy.Rows != 42 {
 		t.Fatalf("info read as %s", body)
 	}
 	if strings.Contains(body, "hunter2") {

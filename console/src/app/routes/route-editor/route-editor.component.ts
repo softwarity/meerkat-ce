@@ -1945,7 +1945,7 @@ export class RouteEditorComponent {
   });
   // An https upstream spelled with a service's bare name when the platform has
   // a qualified one: a CA constrained to cluster names (svc, cluster.local)
-  // certifies reference-data.canopy.svc, never reference-data. Said, with the
+  // certifies reference-data.apps.svc, never reference-data. Said, with the
   // way out, and never rewritten behind anyone's back on save.
   protected readonly shortUpstream = computed(() => {
     if (this.mode() !== "proxy" || this.upstreamScheme() !== "https") return null;

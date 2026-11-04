@@ -159,10 +159,10 @@ func TestTellUpstream(t *testing.T) {
 		name, peer, host, xfp, xff  string
 		wantProto, wantFor, wantFwd string
 	}{
-		{"behind a trusted proxy ending TLS", "10.0.0.7:5000", "canopy.example.com", "https", "203.0.113.9",
-			"https", "203.0.113.9, 10.0.0.7", "for=203.0.113.9;host=canopy.example.com;proto=https"},
-		{"a stranger claiming https", "198.51.100.4:5000", "canopy.example.com", "https", "1.2.3.4",
-			"http", "198.51.100.4", "for=198.51.100.4;host=canopy.example.com;proto=http"},
+		{"behind a trusted proxy ending TLS", "10.0.0.7:5000", "apps.example.com", "https", "203.0.113.9",
+			"https", "203.0.113.9, 10.0.0.7", "for=203.0.113.9;host=apps.example.com;proto=https"},
+		{"a stranger claiming https", "198.51.100.4:5000", "apps.example.com", "https", "1.2.3.4",
+			"http", "198.51.100.4", "for=198.51.100.4;host=apps.example.com;proto=http"},
 		{"plain, nobody in front", "198.51.100.4:5000", "gw.example.com:8080", "", "",
 			"http", "198.51.100.4", `for=198.51.100.4;host="gw.example.com:8080";proto=http`},
 		{"an IPv6 client", "[2001:db8::7]:5000", "gw.example.com", "", "",

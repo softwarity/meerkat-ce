@@ -349,7 +349,7 @@ Access tokens sur son filtre **Internal** ([plus bas](#le-jeton)).
 
 | Mode | L'appelant présente | Il est connu comme |
 |---|---|---|
-| **None** (sans) | rien | le nom de son jeton ou son ServiceAccount quand il en envoie un, sinon le workload qui tient son adresse : `canopy/Deployment/reference-data` sur Kubernetes, le service ou le conteneur sur Docker et Swarm |
+| **None** (sans) | rien | le nom de son jeton ou son ServiceAccount quand il en envoie un, sinon le workload qui tient son adresse : `apps/Deployment/reference-data` sur Kubernetes, le service ou le conteneur sur Docker et Swarm |
 | **Meerkat token** | un jeton de périmètre `schedules` ([plus bas](#le-jeton)) | le nom du jeton |
 | **Cluster token** | le jeton de ServiceAccount de son pod, que Kubernetes vérifie (TokenReview). Kubernetes seulement | `namespace/serviceaccount` |
 

@@ -334,7 +334,7 @@ tokens on its **Internal** filter ([below](#the-token)).
 
 | Mode | The caller presents | It is known as |
 |---|---|---|
-| **None** | nothing | its token's name or its ServiceAccount when it sends one, otherwise the workload holding its address: `canopy/Deployment/reference-data` on Kubernetes, the service or container on Docker and Swarm |
+| **None** | nothing | its token's name or its ServiceAccount when it sends one, otherwise the workload holding its address: `apps/Deployment/reference-data` on Kubernetes, the service or container on Docker and Swarm |
 | **Meerkat token** | a token of perimeter `schedules` ([below](#the-token)) | the token's name |
 | **Cluster token** | its pod's ServiceAccount token, which Kubernetes checks (TokenReview). Kubernetes only | `namespace/serviceaccount` |
 

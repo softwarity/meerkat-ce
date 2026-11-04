@@ -49,7 +49,7 @@ func TestATokenIsReviewedOnceAMinute(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&review)
 		switch review.Spec.Token {
 		case "sa":
-			_, _ = io.WriteString(w, `{"status":{"authenticated":true,"user":{"username":"system:serviceaccount:canopy:reference-data"}}}`)
+			_, _ = io.WriteString(w, `{"status":{"authenticated":true,"user":{"username":"system:serviceaccount:apps:reference-data"}}}`)
 		case "person":
 			_, _ = io.WriteString(w, `{"status":{"authenticated":true,"user":{"username":"alice@example.com"}}}`)
 		default:
@@ -59,13 +59,13 @@ func TestATokenIsReviewedOnceAMinute(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	c.now = func() time.Time { return now }
 	ctx := context.Background()
-	for _, want := range []struct{ token, id string }{{"sa", "canopy/reference-data"}, {"person", ""}, {"forged", ""}} {
+	for _, want := range []struct{ token, id string }{{"sa", "apps/reference-data"}, {"person", ""}, {"forged", ""}} {
 		id, err := c.Review(ctx, want.token)
 		if err != nil || id != want.id {
 			t.Fatalf("%s: %q %v, want %q", want.token, id, err, want.id)
 		}
 	}
-	if id, _ := c.Review(ctx, "sa"); id != "canopy/reference-data" || asked.Load() != 3 {
+	if id, _ := c.Review(ctx, "sa"); id != "apps/reference-data" || asked.Load() != 3 {
 		t.Fatalf("asked %d times for three tokens and a repeat", asked.Load())
 	}
 	now = now.Add(callerTTL)
@@ -92,12 +92,12 @@ func callerPodJSON(ns, name, ip, phase string, labels map[string]string, ownerKi
 // nothing at an address is nobody. Kept a minute.
 func TestAnAddressIsFollowedToItsWorkload(t *testing.T) {
 	pods := map[string]map[string]any{
-		"10.42.0.15": callerPodJSON("canopy", "reference-data-7d9f8b6c5-x2x9q", "10.42.0.15", "Running",
+		"10.42.0.15": callerPodJSON("apps", "reference-data-7d9f8b6c5-x2x9q", "10.42.0.15", "Running",
 			map[string]string{"pod-template-hash": "7d9f8b6c5"}, "ReplicaSet", "reference-data-7d9f8b6c5"),
-		"10.42.0.16": callerPodJSON("canopy", "legacy-abc12", "10.42.0.16", "Running", nil, "ReplicaSet", "legacy-rs"),
+		"10.42.0.16": callerPodJSON("apps", "legacy-abc12", "10.42.0.16", "Running", nil, "ReplicaSet", "legacy-rs"),
 		"10.42.0.17": callerPodJSON("data", "postgres-0", "10.42.0.17", "Running", nil, "StatefulSet", "postgres"),
-		"10.42.0.18": callerPodJSON("canopy", "debug", "10.42.0.18", "Running", nil, "", ""),
-		"10.42.0.19": callerPodJSON("canopy", "done", "10.42.0.19", "Succeeded", nil, "Job", "migrate"),
+		"10.42.0.18": callerPodJSON("apps", "debug", "10.42.0.18", "Running", nil, "", ""),
+		"10.42.0.19": callerPodJSON("apps", "done", "10.42.0.19", "Succeeded", nil, "Job", "migrate"),
 	}
 	var listed atomic.Int32
 	c := clusterCallers(t, func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,7 @@ func TestAnAddressIsFollowedToItsWorkload(t *testing.T) {
 				items = append(items, p)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"items": items})
-		case "/apis/apps/v1/namespaces/canopy/replicasets/legacy-rs":
+		case "/apis/apps/v1/namespaces/apps/replicasets/legacy-rs":
 			_, _ = io.WriteString(w, `{"metadata":{"name":"legacy-rs","ownerReferences":[{"kind":"Deployment","name":"legacy","controller":true}]}}`)
 		default:
 			http.NotFound(w, r)
@@ -118,10 +118,10 @@ func TestAnAddressIsFollowedToItsWorkload(t *testing.T) {
 	})
 	ctx := context.Background()
 	for ip, want := range map[string]string{
-		"10.42.0.15": "canopy/Deployment/reference-data",
-		"10.42.0.16": "canopy/Deployment/legacy",
+		"10.42.0.15": "apps/Deployment/reference-data",
+		"10.42.0.16": "apps/Deployment/legacy",
 		"10.42.0.17": "data/StatefulSet/postgres",
-		"10.42.0.18": "canopy/Pod/debug",
+		"10.42.0.18": "apps/Pod/debug",
 		"10.42.0.19": "",
 		"10.42.0.99": "",
 	} {

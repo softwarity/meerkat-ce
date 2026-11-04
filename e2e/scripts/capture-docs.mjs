@@ -1132,7 +1132,7 @@ const SHOTS = [
     act: async (page) => {
       await page.locator('mat-button-toggle', { hasText: 'PostgreSQL' }).locator('button').click();
       await page.locator('mat-button-toggle', { hasText: 'A server' }).locator('button').click();
-      await page.getByLabel('Host').fill('canopydb-primary.db.svc');
+      await page.getByLabel('Host').fill('pg-primary.db.svc');
       await page.getByText('How to migrate').scrollIntoViewIfNeeded();
       await page.mouse.wheel(0, 320);
       await page.waitForTimeout(600);

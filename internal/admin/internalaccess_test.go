@@ -46,11 +46,11 @@ func (f *fakeCallers) ByAddress(_ context.Context, ip string) (string, string) {
 }
 
 func (f *fakeCallers) ServiceAccounts(context.Context) ([]string, error) {
-	return []string{"canopy/default", "canopy/reference-data"}, nil
+	return []string{"apps/default", "apps/reference-data"}, nil
 }
 
 func (f *fakeCallers) Workloads(context.Context) ([]string, error) {
-	return []string{"canopy/Deployment/reference-data"}, nil
+	return []string{"apps/Deployment/reference-data"}, nil
 }
 
 func setAccess(t *testing.T, f fixture, mode string, callers ...string) {
@@ -83,7 +83,7 @@ func TestTheModeDecidesWhoGetsIn(t *testing.T) {
 	f := setupBare(t)
 	aRoute(t, f)
 	token := serviceToken(t, f, "stations")
-	runtime := &fakeCallers{reviews: map[string]string{"sa-token": "canopy/reference-data"}, addrs: map[string]string{}}
+	runtime := &fakeCallers{reviews: map[string]string{"sa-token": "apps/reference-data"}, addrs: map[string]string{}}
 	f.api.Callers = runtime
 	srv := internalPlane(t, f)
 
@@ -101,23 +101,23 @@ func TestTheModeDecidesWhoGetsIn(t *testing.T) {
 	}{
 		// None: nothing asked; the caller is whatever can be worked out.
 		{name: "none, nobody known, no list", mode: "none", code: 201, via: store.CallerUnidentified},
-		{name: "none, nobody known, a list", mode: "none", callers: []string{"canopy/Deployment/reference-data"},
+		{name: "none, nobody known, a list", mode: "none", callers: []string{"apps/Deployment/reference-data"},
 			code: 403, says: "could not be identified"},
-		{name: "none, address known, no list", kube: true, at: "canopy/Deployment/reference-data", mode: "none",
-			code: 201, who: "canopy/Deployment/reference-data", via: store.CallerWorkload},
-		{name: "none, address known, listed", kube: true, at: "canopy/Deployment/reference-data", mode: "none",
-			callers: []string{"canopy/Deployment/reference-data"}, code: 201, who: "canopy/Deployment/reference-data",
+		{name: "none, address known, no list", kube: true, at: "apps/Deployment/reference-data", mode: "none",
+			code: 201, who: "apps/Deployment/reference-data", via: store.CallerWorkload},
+		{name: "none, address known, listed", kube: true, at: "apps/Deployment/reference-data", mode: "none",
+			callers: []string{"apps/Deployment/reference-data"}, code: 201, who: "apps/Deployment/reference-data",
 			via: store.CallerWorkload},
-		{name: "none, address known, not listed", kube: true, at: "canopy/Deployment/other", mode: "none",
-			callers: []string{"canopy/Deployment/reference-data"}, code: 403, says: "canopy/Deployment/reference-data"},
+		{name: "none, address known, not listed", kube: true, at: "apps/Deployment/other", mode: "none",
+			callers: []string{"apps/Deployment/reference-data"}, code: 403, says: "apps/Deployment/reference-data"},
 		{name: "none, a container on Docker", at: "orders", mode: "none", callers: []string{"orders"},
 			code: 201, who: "orders", via: store.CallerContainer},
 		{name: "none, a Meerkat token", mode: "none", bearer: token, code: 201, who: "stations", via: store.CallerToken},
-		{name: "none, a token whose workload is listed", kube: true, at: "canopy/Deployment/reference-data", mode: "none",
-			callers: []string{"canopy/Deployment/reference-data"}, bearer: token, code: 201, who: "stations",
+		{name: "none, a token whose workload is listed", kube: true, at: "apps/Deployment/reference-data", mode: "none",
+			callers: []string{"apps/Deployment/reference-data"}, bearer: token, code: 201, who: "stations",
 			via: store.CallerToken},
 		{name: "none, a ServiceAccount token", kube: true, mode: "none", bearer: "sa-token", code: 201,
-			who: "canopy/reference-data", via: store.CallerServiceAccount},
+			who: "apps/reference-data", via: store.CallerServiceAccount},
 		{name: "none, a bearer nobody vouches for", kube: true, mode: "none", bearer: "forged", code: 401,
 			says: "does not vouch"},
 		{name: "none, a foreign bearer off Kubernetes", mode: "none", bearer: "forged", code: 401, says: "mk_"},
@@ -135,11 +135,11 @@ func TestTheModeDecidesWhoGetsIn(t *testing.T) {
 		{name: "cluster, none sent", kube: true, mode: "cluster", code: 401, says: "ServiceAccount token"},
 		{name: "cluster, a Meerkat token", kube: true, mode: "cluster", bearer: token, code: 401, says: "not accepted"},
 		{name: "cluster, vouched for, no list", kube: true, mode: "cluster", bearer: "sa-token", code: 201,
-			who: "canopy/reference-data", via: store.CallerServiceAccount},
-		{name: "cluster, vouched for, listed", kube: true, mode: "cluster", callers: []string{"canopy/reference-data"},
-			bearer: "sa-token", code: 201, who: "canopy/reference-data", via: store.CallerServiceAccount},
-		{name: "cluster, vouched for, not listed", kube: true, mode: "cluster", callers: []string{"canopy/billing"},
-			bearer: "sa-token", code: 403, says: "canopy/billing"},
+			who: "apps/reference-data", via: store.CallerServiceAccount},
+		{name: "cluster, vouched for, listed", kube: true, mode: "cluster", callers: []string{"apps/reference-data"},
+			bearer: "sa-token", code: 201, who: "apps/reference-data", via: store.CallerServiceAccount},
+		{name: "cluster, vouched for, not listed", kube: true, mode: "cluster", callers: []string{"apps/billing"},
+			bearer: "sa-token", code: 403, says: "apps/billing"},
 		{name: "cluster, not vouched for", kube: true, mode: "cluster", bearer: "forged", code: 401},
 	}
 	for _, c := range cases {
@@ -169,7 +169,7 @@ func TestTheModeDecidesWhoGetsIn(t *testing.T) {
 func TestWhoCreatedItIsKept(t *testing.T) {
 	f := setupBare(t)
 	aRoute(t, f)
-	f.api.Callers = &fakeCallers{kube: true, addrs: map[string]string{"127.0.0.1": "canopy/Deployment/reference-data"}}
+	f.api.Callers = &fakeCallers{kube: true, addrs: map[string]string{"127.0.0.1": "apps/Deployment/reference-data"}}
 	srv := internalPlane(t, f)
 	forged := strings.Replace(stationSchedule, `"name"`, `"caller":"root","callerVia":"token","name"`, 1)
 	code, body := on(t, srv, "POST", "/api/schedules", forged, "", nil)
@@ -177,7 +177,7 @@ func TestWhoCreatedItIsKept(t *testing.T) {
 		t.Fatalf("create: %d %s", code, body)
 	}
 	sc := created(t, body)
-	if sc.Caller != "canopy/Deployment/reference-data" || sc.CallerVia != store.CallerWorkload {
+	if sc.Caller != "apps/Deployment/reference-data" || sc.CallerVia != store.CallerWorkload {
 		t.Fatalf("the body chose its creator: %+v", sc)
 	}
 	token := serviceToken(t, f, "stations")
@@ -185,14 +185,14 @@ func TestWhoCreatedItIsKept(t *testing.T) {
 		t.Fatalf("update: %d %s", code, body)
 	}
 	got, err := f.api.st.GetSchedule(context.Background(), sc.ID)
-	if err != nil || got.Caller != "canopy/Deployment/reference-data" || got.CallerVia != store.CallerWorkload {
+	if err != nil || got.Caller != "apps/Deployment/reference-data" || got.CallerVia != store.CallerWorkload {
 		t.Fatalf("a later writer replaced the creator: %+v %v", got, err)
 	}
 	// And the trail says who wrote it, and how that was known.
 	events, _ := f.api.st.ListAuditEvents(context.Background(), store.AuditFilter{TargetID: sc.ID})
 	found := false
 	for _, e := range events {
-		if e.Action == "schedule.create" && e.ActorID == "workload canopy/Deployment/reference-data" &&
+		if e.Action == "schedule.create" && e.ActorID == "workload apps/Deployment/reference-data" &&
 			strings.Contains(e.Detail, "deduced from its address 127.0.0.1") {
 			found = true
 		}
@@ -300,7 +300,7 @@ func TestTheSettingIsReadByAdminsAndChangedByInfra(t *testing.T) {
 		t.Fatalf("a mode that does not exist: %d %s", code, body)
 	}
 	f.api.Callers = &fakeCallers{kube: true}
-	if code, body := f.call(t, "PUT", path, `{"mode":"cluster","callers":["canopy/default"]}`, infra); code != http.StatusOK ||
+	if code, body := f.call(t, "PUT", path, `{"mode":"cluster","callers":["apps/default"]}`, infra); code != http.StatusOK ||
 		!strings.Contains(body, `"cluster"]`) {
 		t.Fatalf("cluster on Kubernetes: %d %s", code, body)
 	}
@@ -319,8 +319,8 @@ func TestTheSettingIsReadByAdminsAndChangedByInfra(t *testing.T) {
 	serviceToken(t, f, "stations")
 	for mode, want := range map[string]string{
 		"token":   `"stations"`,
-		"cluster": `"canopy/default"`,
-		"none":    `"canopy/Deployment/reference-data"`,
+		"cluster": `"apps/default"`,
+		"none":    `"apps/Deployment/reference-data"`,
 	} {
 		code, body := f.call(t, "GET", path+"/candidates?mode="+mode, "", app)
 		if code != http.StatusOK || !strings.Contains(body, want) {

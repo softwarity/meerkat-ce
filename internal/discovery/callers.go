@@ -313,7 +313,7 @@ func (c *Callers) podsAt(ctx context.Context, ip string) ([]callerPod, error) {
 }
 
 // workloadOf names the workload owning p, qualified by its namespace:
-// canopy/Deployment/reference-data. A ReplicaSet is followed to the
+// apps/Deployment/reference-data. A ReplicaSet is followed to the
 // Deployment that made it - by the template hash it carries in its name, and
 // by asking for the ReplicaSet when the label does not say; a StatefulSet, a
 // DaemonSet, a Job or anything else owning it is named as itself; a pod

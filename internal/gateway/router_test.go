@@ -2433,7 +2433,7 @@ func TestTheUpstreamIsToldTheBrowsersScheme(t *testing.T) {
 	t.Cleanup(up.Close)
 	rt := newRouter(t, pathRoute("r1", "app", 1, "/**", up.URL))
 
-	req := httptest.NewRequest("GET", "http://canopy.example.com/x", nil)
+	req := httptest.NewRequest("GET", "http://apps.example.com/x", nil)
 	req.RemoteAddr = "10.0.0.7:5000" // the ingress, on the cluster network
 	req.Header.Set("X-Forwarded-Proto", "https")
 	req.Header.Set("X-Forwarded-For", "203.0.113.9")
@@ -2441,13 +2441,13 @@ func TestTheUpstreamIsToldTheBrowsersScheme(t *testing.T) {
 	if p := got.Get("X-Forwarded-Proto"); p != "https" {
 		t.Errorf("behind a trusted proxy ending TLS the service was told %q, want https", p)
 	}
-	if f := got.Get("Forwarded"); f != "for=203.0.113.9;host=canopy.example.com;proto=https" {
+	if f := got.Get("Forwarded"); f != "for=203.0.113.9;host=apps.example.com;proto=https" {
 		t.Errorf("Forwarded %q", f)
 	}
 
 	// Its redirect, brought home by the gateway, never says http: to the
 	// browser (relative, it keeps the scheme the browser used).
-	req = httptest.NewRequest("GET", "http://canopy.example.com/login", nil)
+	req = httptest.NewRequest("GET", "http://apps.example.com/login", nil)
 	req.RemoteAddr = "10.0.0.7:5000"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	rec := httptest.NewRecorder()
@@ -2457,7 +2457,7 @@ func TestTheUpstreamIsToldTheBrowsersScheme(t *testing.T) {
 	}
 
 	// A stranger saying https is not believed, and its chain is not passed on.
-	req = httptest.NewRequest("GET", "http://canopy.example.com/x", nil)
+	req = httptest.NewRequest("GET", "http://apps.example.com/x", nil)
 	req.RemoteAddr = "198.51.100.4:5000"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")

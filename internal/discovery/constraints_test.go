@@ -21,7 +21,7 @@ import (
 )
 
 // testCA is an authority made for one test, with the DNS constraints given
-// and every IP excluded, as the canopy cluster's.
+// and every IP excluded, as the apps cluster's.
 type testCA struct {
 	cert *x509.Certificate
 	key  *ecdsa.PrivateKey
@@ -76,7 +76,7 @@ func (ca *testCA) leaf(t *testing.T, names ...string) (*x509.Certificate, []byte
 	return c, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
 
-var canopyPermitted = []string{"canopy", "cluster.local", "localhost", "meerkat-meerkat-internal", "rabbitmq", "svc", "understory.com"}
+var appsPermitted = []string{"apps", "cluster.local", "localhost", "meerkat-meerkat-internal", "rabbitmq", "svc", "understory.com"}
 
 // TestTheMatcherIsCryptoX509s: for each constraint set and name, the matcher
 // says what crypto/x509 decides when it verifies a leaf carrying that one
@@ -89,14 +89,14 @@ func TestTheMatcherIsCryptoX509s(t *testing.T) {
 		name                string
 		want                bool
 	}{
-		{canopyPermitted, nil, "meerkat-meerkat.canopy.svc.cluster.local", true},
-		{canopyPermitted, nil, "meerkat-meerkat.canopy.svc", true},
-		{canopyPermitted, nil, "meerkat-meerkat.canopy", true},
-		{canopyPermitted, nil, "meerkat-meerkat", false},
-		{canopyPermitted, nil, "meerkat-meerkat-internal", true},
-		{canopyPermitted, nil, "svc", true},
-		{canopyPermitted, nil, "xsvc", false},
-		{canopyPermitted, nil, "Meerkat.CANOPY", true},
+		{appsPermitted, nil, "meerkat-meerkat.apps.svc.cluster.local", true},
+		{appsPermitted, nil, "meerkat-meerkat.apps.svc", true},
+		{appsPermitted, nil, "meerkat-meerkat.apps", true},
+		{appsPermitted, nil, "meerkat-meerkat", false},
+		{appsPermitted, nil, "meerkat-meerkat-internal", true},
+		{appsPermitted, nil, "svc", true},
+		{appsPermitted, nil, "xsvc", false},
+		{appsPermitted, nil, "Meerkat.APPS", true},
 		{[]string{".svc"}, nil, "svc", false},
 		{[]string{".svc"}, nil, "a.svc", true},
 		{[]string{".svc"}, nil, "a.b.svc", true},
@@ -135,18 +135,18 @@ func TestTheMatcherIsCryptoX509s(t *testing.T) {
 // that only excludes IPs or constrains nothing.
 func TestTheChainIsReadFromTheSecret(t *testing.T) {
 	root := newTestCA(t, "root", nil, nil, nil)
-	inter := newTestCA(t, "intermediate", root, canopyPermitted, nil)
+	inter := newTestCA(t, "intermediate", root, appsPermitted, nil)
 	other := newTestCA(t, "other", nil, []string{"elsewhere"}, nil)
-	_, leaf := inter.leaf(t, "meerkat-meerkat.canopy", "meerkat-meerkat")
+	_, leaf := inter.leaf(t, "meerkat-meerkat.apps", "meerkat-meerkat")
 	l := limitsOf(append(slices.Clone(leaf), inter.pem...), append(slices.Clone(other.pem), root.pem...))
 	if len(l.cas) != 1 || l.cas[0].Subject.CommonName != "intermediate" {
 		t.Fatalf("constraining: %v", l)
 	}
-	kept, refused := l.split([]string{"meerkat-meerkat.canopy", "meerkat-meerkat", "meerkat-meerkat-internal"})
-	if !slices.Equal(kept, []string{"meerkat-meerkat.canopy", "meerkat-meerkat-internal"}) || !slices.Equal(refused, []string{"meerkat-meerkat"}) {
+	kept, refused := l.split([]string{"meerkat-meerkat.apps", "meerkat-meerkat", "meerkat-meerkat-internal"})
+	if !slices.Equal(kept, []string{"meerkat-meerkat.apps", "meerkat-meerkat-internal"}) || !slices.Equal(refused, []string{"meerkat-meerkat"}) {
 		t.Fatalf("kept %v, refused %v", kept, refused)
 	}
-	if !strings.Contains(l.String(), "permitted canopy, cluster.local") {
+	if !strings.Contains(l.String(), "permitted apps, cluster.local") {
 		t.Fatalf("said: %s", l)
 	}
 
@@ -240,7 +240,7 @@ func secretEvent(t *testing.T, leaf, ca []byte) json.RawMessage {
 	return b
 }
 
-var serviceNames = []string{"meerkat-meerkat.canopy.svc.cluster.local", "meerkat-meerkat.canopy.svc", "meerkat-meerkat.canopy", "meerkat-meerkat"}
+var serviceNames = []string{"meerkat-meerkat.apps.svc.cluster.local", "meerkat-meerkat.apps.svc", "meerkat-meerkat.apps", "meerkat-meerkat"}
 
 // TestTheNamesFollowANameConstrainedAuthority: once the Secret shows an
 // authority that may not sign the bare Service name, the Certificate is
@@ -248,7 +248,7 @@ var serviceNames = []string{"meerkat-meerkat.canopy.svc.cluster.local", "meerkat
 // issuer, the bare name does not come back; asked of another, the whole set
 // goes, its own Secret to be read in turn.
 func TestTheNamesFollowANameConstrainedAuthority(t *testing.T) {
-	ca := newTestCA(t, "canopy", nil, canopyPermitted, nil)
+	ca := newTestCA(t, "apps", nil, appsPermitted, nil)
 	_, leaf := ca.leaf(t, serviceNames...)
 	cl := &certManagerCluster{dnsNames: serviceNames, issuer: "cluster-ca"}
 	m := cl.serve(t)
@@ -322,7 +322,7 @@ func TestAnOrdinaryAuthorityChangesNothing(t *testing.T) {
 // request, so the Certificate keeps its names, and the status names the ones
 // refused and the constraints refusing them.
 func TestNoPermittedNameLeavesTheCertificateAndSaysWhy(t *testing.T) {
-	ca := newTestCA(t, "canopy", nil, canopyPermitted, nil)
+	ca := newTestCA(t, "apps", nil, appsPermitted, nil)
 	_, leaf := ca.leaf(t, "meerkat-meerkat")
 	cl := &certManagerCluster{dnsNames: []string{"meerkat-meerkat"}, issuer: "cluster-ca"}
 	m := cl.serve(t)
@@ -333,7 +333,7 @@ func TestNoPermittedNameLeavesTheCertificateAndSaysWhy(t *testing.T) {
 		t.Fatalf("requests: %v", got)
 	}
 	st, err := m.Status(ctx)
-	if err != nil || !strings.Contains(st.Refused, "(meerkat-meerkat)") || !strings.Contains(st.Refused, "permitted canopy") {
+	if err != nil || !strings.Contains(st.Refused, "(meerkat-meerkat)") || !strings.Contains(st.Refused, "permitted apps") {
 		t.Fatalf("status: %+v %v", st, err)
 	}
 	if err := m.Ensure(ctx, "ClusterIssuer", "cluster-ca", []string{"meerkat-meerkat"}); err != nil {

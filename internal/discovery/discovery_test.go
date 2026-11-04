@@ -380,12 +380,12 @@ func TestNoRuntimeStillAnswersAList(t *testing.T) {
 
 // A namespace is checked before it reaches a URL path (SVC-02).
 func TestANamespaceIsALabel(t *testing.T) {
-	for _, ok := range []string{"canopy", "monitoring", "a", "kube-system", "ns1"} {
+	for _, ok := range []string{"apps", "monitoring", "a", "kube-system", "ns1"} {
 		if err := ValidNamespace(ok); err != nil {
 			t.Errorf("%q refused: %v", ok, err)
 		}
 	}
-	for _, bad := range []string{"", "Canopy", "-x", "x-", "a/b", "../x", "a.b", strings.Repeat("a", 64)} {
+	for _, bad := range []string{"", "Apps", "-x", "x-", "a/b", "../x", "a.b", strings.Repeat("a", 64)} {
 		if ValidNamespace(bad) == nil {
 			t.Errorf("%q accepted", bad)
 		}
@@ -398,13 +398,13 @@ func TestOnlyANamespaceWithAServiceIsOffered(t *testing.T) {
 	var list k8sMetaList
 	if err := json.Unmarshal([]byte(`{"items":[
 		{"metadata":{"namespace":"monitoring"}},
-		{"metadata":{"namespace":"canopy"}},
+		{"metadata":{"namespace":"apps"}},
 		{"metadata":{"namespace":"monitoring"}},
 		{"metadata":{"namespace":"kube-system"}}]}`), &list); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.Join(servedNamespaces(list, "meerkat"), ",")
-	if want := "canopy,kube-system,meerkat,monitoring"; got != want {
+	if want := "apps,kube-system,meerkat,monitoring"; got != want {
 		t.Fatalf("offered %s, want %s", got, want)
 	}
 }

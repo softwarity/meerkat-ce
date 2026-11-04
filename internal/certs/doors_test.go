@@ -17,8 +17,8 @@ import (
 // Which placed certificates a door serves with, in each mode.
 func TestACertificateIsActiveInTheModeItFits(t *testing.T) {
 	public := []string{"*.example.org"}
-	cluster := []string{"meerkat.canopy.svc", "meerkat.canopy.svc.cluster.local"}
-	runtime := []string{"meerkat.canopy.svc.cluster.local", "meerkat.canopy.svc", "meerkat.canopy", "meerkat"}
+	cluster := []string{"meerkat.apps.svc", "meerkat.apps.svc.cluster.local"}
+	runtime := []string{"meerkat.apps.svc.cluster.local", "meerkat.apps.svc", "meerkat.apps", "meerkat"}
 
 	gateway := Door{Names: []string{"shop.example.org"}}
 	if !gateway.Active(public, runtime) || gateway.Active(cluster, runtime) {
@@ -84,7 +84,7 @@ func TestWhoADoorTrusts(t *testing.T) {
 // filters whom the door trusts.
 func TestASupervisorServesWhatTheDoorsModeFits(t *testing.T) {
 	public := mustSelfSigned(t, Request{DNSNames: []string{"shop.example.org"}})
-	cluster := mustSelfSigned(t, Request{DNSNames: []string{"meerkat.canopy.svc"}})
+	cluster := mustSelfSigned(t, Request{DNSNames: []string{"meerkat.apps.svc"}})
 	src := &fakeSource{
 		app: []*Material{public, cluster}, appFallback: public,
 		settings: Settings{AppDoor: Door{Proxied: true, Names: []string{"shop.example.org"}, ProxyAddresses: []string{"203.0.113.0/24"}}},
@@ -92,14 +92,14 @@ func TestASupervisorServesWhatTheDoorsModeFits(t *testing.T) {
 	sup := NewSupervisor(src, func(error) bool { return true },
 		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
 		NewListener("admin", "127.0.0.1:0", http.NotFoundHandler(), nil), NewRedirect())
-	sup.RuntimeNames = func(context.Context, string) []string { return []string{"meerkat.canopy.svc"} }
+	sup.RuntimeNames = func(context.Context, string) []string { return []string{"meerkat.apps.svc"} }
 	told := map[string][]netip.Prefix{}
 	sup.Trust = func(plane string, p []netip.Prefix, _ []string) { told[plane] = p }
 	if err := sup.Reload(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sup.Stop(context.Background()) })
-	if !sup.App.Answers("meerkat.canopy.svc") || sup.App.Answers("shop.example.org") {
+	if !sup.App.Answers("meerkat.apps.svc") || sup.App.Answers("shop.example.org") {
 		t.Error("the proxied door must serve the cluster certificate and not the public one")
 	}
 	if len(told[PlaneApp]) != 1 || told[PlaneApp][0] != netip.MustParsePrefix("203.0.113.0/24") {
@@ -136,7 +136,7 @@ func (f *staleFirst) CertificateMaterials(ctx context.Context, plane string) ([]
 // Reloads take turns: one that read before a certificate arrived never
 // closes the door a fresher one opened (2026-10-15, on the eval).
 func TestAStaleReloadNeverClosesAFresherDoor(t *testing.T) {
-	cert := mustSelfSigned(t, Request{DNSNames: []string{"meerkat-admin.canopy.svc"}})
+	cert := mustSelfSigned(t, Request{DNSNames: []string{"meerkat-admin.apps.svc"}})
 	src := &staleFirst{cert: cert, started: make(chan struct{}), release: make(chan struct{})}
 	sup := NewSupervisor(src, func(error) bool { return true },
 		NewListener("data", "127.0.0.1:0", http.NotFoundHandler(), nil),
@@ -152,7 +152,7 @@ func TestAStaleReloadNeverClosesAFresherDoor(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	close(src.release)
 	wg.Wait()
-	if !sup.Console.Answers("meerkat-admin.canopy.svc") {
+	if !sup.Console.Answers("meerkat-admin.apps.svc") {
 		t.Fatal("the stale reload applied last and closed the console's door")
 	}
 }

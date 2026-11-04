@@ -48,7 +48,7 @@ that you can fill.
 ![The Vault after an import: two entries with no value and one past its reminder date come first, marked on their edge, under one notice that counts them](img/console/vault-attention.webp)
 
 **Used by** gives one chip per kind of user: an entry several git locations share
-reads *git location: base, bogdan, francois +3*, the full list under the pointer.
+reads *git location: platform, billing, storefront +2*, the full list under the pointer.
 
 An entry carries:
 

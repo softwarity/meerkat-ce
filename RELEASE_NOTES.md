@@ -2,14 +2,6 @@
 
 ## NEXT RELEASE
 
----
-
-## 1.23.0
-
-<!-- release: built=2026-11-04T12:00:04Z migrates=true -->
-- **This version migrates the database** (schema 102 to 103). An older version no longer opens it
-  afterwards: take a backup before you update.
-
 - **A license turns the evaluation image into Team or Enterprise.** Paste, drop or mount the
   license file: it is checked offline against the key in the binary, and the evaluation notice
   goes from the pages, the mails and the console with no restart, on every instance. Nothing
@@ -47,7 +39,7 @@
   never their values: those entries, secrets included, are marked "no value", and an entry past its
   reminder date "expired on". They come first in the list, marked on their edge; one notice above
   counts each kind and narrows the list to it, and Vault in the rail carries a badge until they
-  are filled. Used by gives one chip per kind of user ("git location: base, bogdan +4").
+  are filled. Used by gives one chip per kind of user ("git location: platform, billing, storefront +2").
 - **The vault's Used by names the git locations.** An entry holding a configuration repository's
   access token read "not used", and looked like a leftover to delete.
 - **A trial license ends on its date.** Softwarity can give one for a set time; past its last day the
@@ -338,7 +330,7 @@
 - **The upstream picker lists each service once, and stores its full name.** The route editor's
   list showed one entry per port, so a service on three ports read as three services, each with
   a replica count. It now shows each service once, by its short name, with the full one smaller
-  on a second line (`reference-data.canopy.svc` on Kubernetes, `stack_service` on Swarm, nothing
+  on a second line (`reference-data.apps.svc` on Kubernetes, `stack_service` on Swarm, nothing
   more on Compose), and that full name is what the route keeps. Its **Port** sits beside it,
   always shown and filled: a list when the service has several, read-only on a single one, typed
   when the runtime knows none, and a port the list does not carry (a route set up by hand) stays
