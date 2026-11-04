@@ -17,6 +17,11 @@ import { ZonedDatePipe } from '../shared/zoned-date.pipe';
 import { VaultFileDialogComponent, VaultFileDialogData } from './vault-file-dialog.component';
 import { LiveChangesService } from '../shared/live-changes.service';
 
+type Trouble = 'unreadable' | 'empty' | 'expired';
+const TROUBLES: Trouble[] = ['unreadable', 'empty', 'expired'];
+// How many names a "used by" chip spells out before it says +N.
+const SHOWN_USES = 3;
+
 // The vault (VAULT-01/02): every named value the configuration refers to, in
 // one place. Secrets are encrypted at rest and never shown again; plain values
 // are readable. Both are referenced the same way, by $name, so promoting a
@@ -52,6 +57,60 @@ export class VaultPageComponent {
   protected readonly empty = computed(() => this.entries().filter((e) => !e.readOnly && !e.hasValue).length);
   protected readonly expired = computed(() => this.entries().filter((e) => !e.readOnly && e.hasValue && e.expired).length);
   protected readonly zone = inject(MeService).timezone;
+
+  // What an entry wants, if anything: the same tests as the counts above.
+  protected issue(e: VaultEntry): Trouble | null {
+    if (e.unreadable) return 'unreadable';
+    if (e.readOnly) return null;
+    if (!e.hasValue) return 'empty';
+    if (e.expired) return 'expired';
+    return null;
+  }
+
+  // A notice line narrows the table to what it counts. Once none is left (the
+  // last one filled), the narrowing lapses on its own and the line goes.
+  private readonly narrowed = signal<Trouble | null>(null);
+  protected readonly filter = computed(() => {
+    const f = this.narrowed();
+    return f && this.entries().some((e) => this.issue(e) === f) ? f : null;
+  });
+  protected toggle(kind: Trouble): void {
+    this.narrowed.set(this.filter() === kind ? null : kind);
+  }
+
+  // The entries that want a hand first, worst first, then the rest in the
+  // vault's own order: on a vault of forty names, the three holes are not
+  // scattered among them.
+  protected readonly shown = computed(() => {
+    const f = this.filter();
+    const rank = (e: VaultEntry) => TROUBLES.indexOf(this.issue(e) as Trouble) >>> 0;
+    const list = f ? this.entries().filter((e) => this.issue(e) === f) : this.entries();
+    return [...list].sort((a, b) => rank(a) - rank(b));
+  });
+
+  // "Used by", one chip per kind of user: "git location: base, bogdan +4"
+  // rather than six chips each saying git location. The full list in the
+  // tooltip when some are left out.
+  protected uses(e: VaultEntry): { kind: string; text: string; hidden: number; all: string }[] {
+    const groups = new Map<string, string[]>();
+    for (const u of e.usedBy ?? []) {
+      const at = u.indexOf(': ');
+      const kind = at < 0 ? u : u.slice(0, at);
+      const name = at < 0 ? '' : u.slice(at + 2);
+      const names = groups.get(kind) ?? [];
+      if (name) names.push(name);
+      groups.set(kind, names);
+    }
+    return [...groups].map(([kind, names]) => {
+      const kept = names.slice(0, SHOWN_USES);
+      return {
+        kind,
+        text: names.length ? `${kind}: ${kept.join(', ')}` : kind,
+        hidden: names.length - kept.length,
+        all: names.join(', '),
+      };
+    });
+  }
   protected readonly columns = ['name', 'kind', 'value', 'usedBy'];
 
   // The editor lives in a right drawer here (the routes/users pattern), holding

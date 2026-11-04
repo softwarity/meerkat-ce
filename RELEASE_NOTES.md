@@ -37,8 +37,11 @@
   that named them.
 - **The vault says which entries want filling.** An import brings the names its routes expect,
   never their values: those entries, secrets included, are marked "no value", and an entry past its
-  reminder date "expired on". A line above the list counts each, and Vault in the rail carries a
-  badge until they are filled.
+  reminder date "expired on". They come first in the list, marked on their edge; one notice above
+  counts each kind and narrows the list to it, and Vault in the rail carries a badge until they
+  are filled. Used by gives one chip per kind of user ("git location: base, bogdan +4").
+- **The vault's Used by names the git locations.** An entry holding a configuration repository's
+  access token read "not used", and looked like a leftover to delete.
 - **A trial license ends on its date.** Softwarity can give one for a set time; past its last day the
   gateway is an evaluation again, whatever the version, with no restart and traffic untouched. The
   License screen says when it ends.

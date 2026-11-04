@@ -229,6 +229,34 @@ async function seedCompose(page) {
   composePath = `/system/configuration/compose?right=configuration:${staging.id}`;
 }
 
+async function clusterTopology(page) {
+  await page.route('**/api/infrastructure', async (route) => {
+    const res = await route.fetch();
+    const real = await res.json();
+    const started = Date.parse('2026-11-04T07:56:01Z');
+    // The version the page is published for, not the capture's own dev build.
+    const version = '1.23.0';
+    real.instances = ['meerkat-6f8b9c-x2k4p', 'meerkat-6f8b9c-m8q2z', 'meerkat-6f8b9c-t7w1c'].map((host, i) => ({
+      id: `node${i}`, host, version, ready: true, self: i === 1,
+      started: new Date(started + i * 3000).toISOString().replace(/\.\d+Z$/, 'Z'),
+    }));
+    real.versions = [version];
+    real.database = { kind: 'postgres', location: 'db.acme.internal:5432/meerkat', schema: real.database.schema };
+    real.synced = true;
+    real.plan = 'enterprise';
+    delete real.covers;
+    delete real.over;
+    const at = Math.floor(started / 1000) + 600;
+    real.services = real.services.map((v, i) =>
+      i === 0
+        ? { ...v, state: 'down', why: 'connection refused', at }
+        : i === 1
+          ? { ...v, state: 'degraded', ready: 1, wanted: 2, why: '1 of 2 ready in Kubernetes', at }
+          : { ...v, state: 'up', why: 'answers', at });
+    await route.fulfill({ response: res, json: real });
+  });
+}
+
 async function onlyDifferences(page) {
   await page.getByRole('option', { name: 'Only differences' }).click();
   await page.locator('fieldset.block').first().waitFor();
@@ -1088,8 +1116,12 @@ const SHOTS = [
   },
   { file: 'api-reference', path: '/system/api', settle: 2500 },
   { file: 'release-notes', path: '/system/release-notes' },
-  // What serves the installation: here one gateway on its embedded database.
-  { file: 'topology', path: '/infra/topology' },
+  // What serves the installation. The capture runs ONE gateway whose services
+  // are names that resolve nowhere, so the screen it would draw is a lone node
+  // and a wall of red: the answer is completed here into the cluster the page
+  // explains - three instances on PostgreSQL, the routes' own services, most
+  // answering. The routes, their addresses and the schema stay the gateway's.
+  { file: 'topology', path: '/infra/topology', prepare: clusterTopology, cleanup: (page) => page.unroute('**/api/infrastructure') },
   // The license the capture ran with is ours: who holds it and its id are
   // blurred, the rest (edition, coverage, dates, features) is what to read.
   { file: 'license', path: '/system/license', blur: ['dl.license dd:nth-of-type(1)', 'dl.license dd:nth-of-type(2)'] },
@@ -1273,6 +1305,7 @@ async function shoot(storageState) {
     await shotPage.waitForTimeout(150);
     const png = `${tmp}/png/${s.file}.png`;
     await shotPage.screenshot({ path: png });
+    if (s.cleanup) await s.cleanup(shotPage);
     const conv = spawnSync('cwebp', ['-quiet', '-q', '82', png, '-o', `${out}/${s.file}.webp`]);
     if (conv.status !== 0) throw new Error(`cwebp failed for ${s.file}`);
     log('captured', s.file);

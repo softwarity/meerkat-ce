@@ -304,5 +304,18 @@ func (a *API) vaultUsage(ctx context.Context) (map[string][]string, error) {
 			return nil, err
 		}
 	}
+	// The git locations the configurations are pulled from and pushed to
+	// (CFG-07): their access token is a reference, resolved in the infra
+	// scope when a pull or a push runs. Left out, the token the forge needs
+	// read "not used", and looked like a leftover to delete.
+	remotes, err := a.st.ListConfigRemotes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, rm := range remotes {
+		if err := add("git location: "+rm.Name, rm.TokenRef, vault.ScopeInfra); err != nil {
+			return nil, err
+		}
+	}
 	return usage, nil
 }

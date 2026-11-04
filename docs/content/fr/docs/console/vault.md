@@ -38,6 +38,18 @@ oui ou un non - jamais la valeur. Démarrez-la avec la clé sous laquelle les se
 été scellés (`MEERKAT_VAULT_KEY`, ou `MEERKAT_VAULT_KEY_PREVIOUS` pendant une rotation),
 ou saisissez à nouveau chaque valeur.
 
+Une entrée **sans valeur** l'affiche (*no value*). C'est ce que laisse un import : une
+configuration porte les noms que ses routes attendent, jamais leurs valeurs - encore moins
+celle d'un secret -, donc l'import crée vide chaque entrée manquante, et elle ne se résout
+en rien tant que personne ne l'a remplie. Une entrée dont la **date de rappel** est passée
+affiche *expired on* et ce jour. Ces entrées passent en tête de la liste, marquées sur leur
+bord gauche. Un avis au-dessus de la liste compte chaque cas, et son **Show only these**
+réduit la liste à celles-là ; **Vault** porte une pastille dans le rail tant qu'il en reste
+une que vous pouvez remplir.
+
+**Used by** donne une pastille par sorte d'usage : une entrée que plusieurs emplacements git
+partagent affiche *git location: base, bogdan, francois +3*, la liste complète au survol.
+
 Une entrée comprend :
 
 - **Name** - ce que désignera `$name`.

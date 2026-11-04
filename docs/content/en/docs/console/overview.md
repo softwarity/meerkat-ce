@@ -25,7 +25,7 @@ The left rail holds the two planes and the transverse screens.
 
 | Rail entry | URL | What it answers |
 |---|---|---|
-| **Infra** | `/infra/...` | How requests travel: routes, endpoints, authorities, TLS, the relay |
+| **Infra** | `/infra/...` | What serves and how requests travel: the topology, routes, endpoints, authorities, TLS, the relay |
 | **Application** | `/application/...` | The product your users see: identity, roles, pages, portal, policies |
 | **Tenants** | `/tenants/:id/...` | One organisation at a time (several-organisations mode only) |
 | **Vault** | `/vault` | Every named value and secret the configuration points at |
@@ -86,6 +86,7 @@ Learn these five and the console stops surprising you.
 
 ### Infra
 
+- **[Topology](/docs/console/topology)** - the instances in sync, their database, the services behind the routes.
 - **[Routes](/docs/console/routes)** - the routing table, in order, and the route editor.
 - **[Endpoint security and rate limits](/docs/console/endpoints)** - per operation, from a route's OpenAPI spec.
 - **[Endpoint audit](/docs/operations/audit#auditing-a-routes-operations)** - which operations are recorded in the audit trail.

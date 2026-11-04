@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/store"
 	"github.com/softwarity/meerkat/internal/vault"
 )
 
@@ -50,5 +51,27 @@ func TestTheVaultSaysWhatIsEmptyAndWhatHasLapsed(t *testing.T) {
 	}
 	if got["lapsed"].Value != "" {
 		t.Fatal("a secret's value travelled")
+	}
+}
+
+// A git location's access token is a vault reference: the entry says who uses
+// it, like a route's or a relay's, instead of reading "not used".
+func TestAGitLocationsTokenIsAUse(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	if err := f.api.st.SaveVaultEntry(ctx, vault.Entry{Name: "github-conf", Kind: vault.KindSecret, Scope: vault.ScopeInfra, Value: "ghp_x"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.api.st.SaveConfigRemote(ctx, &store.ConfigRemote{ID: "conf", Name: "Configurations", URL: "https://github.com/acme/conf.git",
+		Branch: "main", TokenRef: "${github-conf}"}); err != nil {
+		t.Fatal(err)
+	}
+	usage, err := f.api.vaultUsage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := usage[vaultKey(vault.ScopeInfra, "github-conf")]
+	if len(got) != 1 || got[0] != "git location: Configurations" {
+		t.Fatalf("the git location is not said to use its token: %v", got)
 	}
 }

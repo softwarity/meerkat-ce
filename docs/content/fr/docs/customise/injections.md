@@ -42,19 +42,29 @@ URL depuis la racine.
 
 ## Votre propre CSS et votre propre JavaScript
 
-Deux éditeurs de code sur la route, parmi ses options d'interface. Le CSS est transporté
-dans une balise `<style>`, le JavaScript dans une balise `<script>`, l'un et l'autre tels
-quels.
+Sur une route UI, la section **Custom** contient une liste ordonnée de blocs. Chacun est du
+CSS ou du JavaScript, écrit sur place ou téléversé en fichier, et placé au début de l'en-tête,
+à sa fin, ou à la fin du corps ; la liste fait l'ordre à l'intérieur de chaque place. Le CSS
+écrit est transporté dans une balise `<style>`, le JavaScript écrit dans une balise
+`<script>`, l'un et l'autre tels quels ; un fichier est lié depuis le chemin propre de la
+gateway.
+
+![La section Custom d'une route : un bloc CSS écrit sur place et un fichier JavaScript, chacun avec sa place, son interrupteur et sa corbeille](img/console/route-editor-custom.webp)
+
+Chaque bloc a un **interrupteur** sur sa ligne. Éteint, le bloc reste sur la route - son
+code ou son fichier gardé - et sort de la page, et son fichier n'est plus servi ; rallumé,
+il reprend sa place. C'est le moyen d'écarter un bloc pour trouver ce qui casse une page,
+sans rien supprimer.
 
 | Règle | Pourquoi |
 |---|---|
 | Au plus `64 KiB` chacun | c'est largement assez pour retoucher une page ; au-delà, il s'agit d'un bundle, et un bundle a sa place dans l'application |
 | `</style` et `</script` sont refusés à l'enregistrement | l'un comme l'autre ferait sortir le contenu de la balise qui le transporte |
 
-Ils sont injectés après `<head>` et passent donc **avant** les feuilles de style et les
-scripts de l'application dans l'ordre du document. Pour le CSS, cela signifie que les règles
-de l'application l'emportent à spécificité égale - écrivez en en tenant compte, plutôt que
-de recourir d'emblée à `!important`.
+Placé au début de l'en-tête, un bloc passe **avant** les feuilles de style et les scripts
+de l'application, et les règles de l'application l'emportent à spécificité égale. Placé à
+la fin de l'en-tête, une feuille de style passe après elles et les surcharge : c'est là que
+va une surcharge, plutôt que de recourir d'emblée à `!important`.
 
 ## Adapter le style aux rôles du visiteur
 

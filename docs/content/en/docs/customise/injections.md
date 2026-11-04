@@ -40,17 +40,26 @@ under a prefix would then resolve every URL from the root.
 
 ## Your own CSS and JavaScript
 
-Two code editors on the route, under its UI options. The CSS rides a `<style>` tag, the JavaScript a
-`<script>` tag, both verbatim.
+On a UI route, the **Custom** section holds an ordered list of blocks. Each is CSS or JavaScript,
+written there or uploaded as a file, and placed at the start of the head, at its end, or at the end of
+the body; the list is the order within each place. Written CSS rides a `<style>` tag, written
+JavaScript a `<script>` tag, both verbatim; a file is linked from the gateway's own path.
+
+![The Custom section of a route: a CSS block written here and a JavaScript file, each with its place, its toggle and its bin](img/console/route-editor-custom.webp)
+
+Each block has a **toggle** on its line. Off, the block stays on the route - its code or its file
+kept - and leaves the page, and its file is no longer served; on again, it is back where it was.
+That is the way to rule a block out while finding what breaks a page, without deleting anything.
 
 | Rule | Why |
 |---|---|
 | At most `64 KiB` each | plenty for page tweaks; more is a bundle, and a bundle belongs to the application |
 | `</style` and `</script` are refused on save | either would break out of the tag it travels in |
 
-They are injected after `<head>`, so they come **before** the application's own stylesheets and
-scripts in document order. For CSS that means the application's own rules win on equal specificity -
-write with that in mind rather than reaching for `!important` first.
+Placed at the start of the head, a block comes **before** the application's own stylesheets and
+scripts, and the application's rules win on equal specificity. Placed at the end of the head, a
+stylesheet comes after them and overrides them: that is where an override belongs, rather than
+reaching for `!important`.
 
 ## Styling on the visitor's roles
 

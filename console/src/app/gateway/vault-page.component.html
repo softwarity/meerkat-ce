@@ -30,38 +30,64 @@
 </div>
 
 <div class="content">
-  @if (!loading() && unreadable() > 0) {
-    <!-- What a migration under another master key leaves: every name
-         listed, none of the secrets opening. Said here, before a route, a
-         relay or an authority fails on one. -->
-    <p class="problem">
-      <mat-icon>key_off</mat-icon>
-      <span i18n="@@Vault_unreadable_banner"
-        >{{ unreadable() }} secret(s) were encrypted with another master key. Start the gateway with
-        that key (MEERKAT_VAULT_KEY, or MEERKAT_VAULT_KEY_PREVIOUS while rotating), or enter each
-        value again.</span
-      >
-    </p>
-  }
-  @if (!loading() && empty() > 0) {
-    <!-- What an import leaves: the names its routes expect, created empty,
-         never their values. Each resolves to nothing until it is filled. -->
-    <p class="problem">
-      <mat-icon>error</mat-icon>
-      <span i18n="@@Vault_empty_banner"
-        >{{ empty() }} entr{empty(), plural, =1 {y has} other {ies have}} no value: a configuration
-        brings the names its routes expect, never their values. Fill each one marked below.</span
-      >
-    </p>
-  }
-  @if (!loading() && expired() > 0) {
-    <p class="problem">
-      <mat-icon>event_busy</mat-icon>
-      <span i18n="@@Vault_expired_banner"
-        >{{ expired() }} entr{expired(), plural, =1 {y is} other {ies are}} past {expired(), plural, =1 {its} other {their}} reminder date:
-        the value is known to have lapsed at its source. Renew it there, then here.</span
-      >
-    </p>
+  @if (!loading() && (unreadable() > 0 || empty() > 0 || expired() > 0)) {
+    <!-- What wants a hand, in ONE frame: a line per kind of trouble, each able
+         to narrow the table to the entries it counts. The entries themselves
+         come first in the table and carry a mark on their edge. -->
+    <div class="problems" role="status">
+      @if (unreadable() > 0) {
+        <!-- What a migration under another master key leaves: every name
+             listed, none of the secrets opening. -->
+        <div class="problem" [class.active]="filter() === 'unreadable'">
+          <mat-icon>key_off</mat-icon>
+          <div class="problem-body">
+            <div class="problem-title" i18n="@@Vault_unreadable_title">{{ unreadable() }} secret{unreadable(), plural, =1 {} other {s}} encrypted with another master key</div>
+            <div class="problem-text" i18n="@@Vault_unreadable_text">Start the gateway with that key (MEERKAT_VAULT_KEY, or MEERKAT_VAULT_KEY_PREVIOUS while rotating), or enter each value again.</div>
+          </div>
+          <button matButton (click)="toggle('unreadable')">
+            @if (filter() === 'unreadable') {
+              <ng-container i18n="@@Show_all">Show all</ng-container>
+            } @else {
+              <ng-container i18n="@@Show_only_these_unreadable">Show only {unreadable(), plural, =1 {this one} other {these}}</ng-container>
+            }
+          </button>
+        </div>
+      }
+      @if (empty() > 0) {
+        <!-- What an import leaves: the names its routes expect, created
+             empty. Each resolves to nothing until it is filled. -->
+        <div class="problem" [class.active]="filter() === 'empty'">
+          <mat-icon>error</mat-icon>
+          <div class="problem-body">
+            <div class="problem-title" i18n="@@Vault_empty_title">{{ empty() }} entr{empty(), plural, =1 {y has} other {ies have}} no value</div>
+            <div class="problem-text" i18n="@@Vault_empty_text">A configuration brings the names its routes expect, never their values. Open each entry marked no value to give it one.</div>
+          </div>
+          <button matButton (click)="toggle('empty')">
+            @if (filter() === 'empty') {
+              <ng-container i18n="@@Show_all">Show all</ng-container>
+            } @else {
+              <ng-container i18n="@@Show_only_these_empty">Show only {empty(), plural, =1 {this one} other {these}}</ng-container>
+            }
+          </button>
+        </div>
+      }
+      @if (expired() > 0) {
+        <div class="problem" [class.active]="filter() === 'expired'">
+          <mat-icon>event_busy</mat-icon>
+          <div class="problem-body">
+            <div class="problem-title" i18n="@@Vault_expired_title">{{ expired() }} entr{expired(), plural, =1 {y is} other {ies are}} past {expired(), plural, =1 {its} other {their}} reminder date</div>
+            <div class="problem-text" i18n="@@Vault_expired_text">The value is known to have lapsed at its source. Renew it there, then here.</div>
+          </div>
+          <button matButton (click)="toggle('expired')">
+            @if (filter() === 'expired') {
+              <ng-container i18n="@@Show_all">Show all</ng-container>
+            } @else {
+              <ng-container i18n="@@Show_only_these_expired">Show only {expired(), plural, =1 {this one} other {these}}</ng-container>
+            }
+          </button>
+        </div>
+      }
+    </div>
   }
   @if (loading()) {
     <loading-indicator withContainer />
@@ -69,7 +95,7 @@
     <div class="empty" i18n="@@No_vault_entry">No entry yet. Add the first one.</div>
   } @else {
     <div class="table-wrap">
-      <mat-table [dataSource]="entries()">
+      <mat-table [dataSource]="shown()">
         <ng-container matColumnDef="name">
           <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
           <mat-cell *matCellDef="let e">
@@ -99,18 +125,20 @@
         <ng-container matColumnDef="value">
           <mat-header-cell *matHeaderCellDef i18n="@@Value">Value</mat-header-cell>
           <mat-cell *matCellDef="let e">
-            @if (!e.hasValue) {
-              <span class="unreadable" i18n="@@Vault_no_value">no value</span>
-            } @else if (e.kind === 'secret' && e.unreadable) {
-              <span class="unreadable" i18n="@@secret_unreadable">encrypted with another master key</span>
-            } @else if (e.kind === 'secret') {
-              <span class="hidden-val" i18n="@@secret_hidden">encrypted, never shown</span>
-            } @else {
-              <span class="val">{{ e.value }}</span>
-            }
-            @if (e.hasValue && e.expired) {
-              <span class="unreadable expired" i18n="@@Vault_expired_on">expired on {{ e.expiresAt | zoned: zone() : 'day' }}</span>
-            }
+            <span class="value-cell">
+              @if (!e.hasValue) {
+                <span class="unreadable" i18n="@@Vault_no_value">no value</span>
+              } @else if (e.kind === 'secret' && e.unreadable) {
+                <span class="unreadable" i18n="@@secret_unreadable">encrypted with another master key</span>
+              } @else if (e.kind === 'secret') {
+                <span class="hidden-val" i18n="@@secret_hidden">encrypted, never shown</span>
+              } @else {
+                <span class="val">{{ e.value }}</span>
+              }
+              @if (e.hasValue && e.expired) {
+                <span class="unreadable expired" i18n="@@Vault_expired_on">expired on {{ e.expiresAt | zoned: zone() : 'day' }}</span>
+              }
+            </span>
           </mat-cell>
         </ng-container>
 
@@ -119,8 +147,15 @@
           <mat-cell *matCellDef="let e">
             @if (e.usedBy?.length) {
               <span class="used">
-                @for (u of e.usedBy; track u) {
-                  <span class="use">{{ u }}</span>
+                <!-- One chip per KIND of user: six git locations read as one
+                     chip naming them, not six chips repeating the kind. -->
+                @for (g of uses(e); track g.kind) {
+                  <span class="use" [matTooltip]="g.all" [matTooltipDisabled]="g.hidden === 0">
+                    {{ g.text }}
+                    @if (g.hidden > 0) {
+                      <ng-container i18n="@@and_N_more">+{{ g.hidden }}</ng-container>
+                    }
+                  </span>
                 }
               </span>
             } @else {
@@ -142,7 +177,12 @@
         </ng-container>
 
         <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
-        <mat-row *matRowDef="let row; columns: columns" class="clickable" (click)="edit(row)"></mat-row>
+        <mat-row
+          *matRowDef="let row; columns: columns"
+          class="clickable"
+          [class.attention]="issue(row) !== null"
+          (click)="edit(row)"
+        ></mat-row>
       </mat-table>
     </div>
   }

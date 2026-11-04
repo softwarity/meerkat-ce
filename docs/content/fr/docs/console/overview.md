@@ -26,7 +26,7 @@ Le rail de gauche regroupe les deux plans et les écrans transverses.
 
 | Entrée du rail | URL | Ce qu'elle vous apprend |
 |---|---|---|
-| **Infra** | `/infra/...` | Le trajet des requêtes : routes, endpoints, autorités, TLS, relais de messagerie |
+| **Infra** | `/infra/...` | Ce qui sert et le trajet des requêtes : la topologie, routes, endpoints, autorités, TLS, relais de messagerie |
 | **Application** | `/application/...` | Le produit que voient vos utilisateurs : identité, rôles, pages, portail, politiques |
 | **Tenants** | `/tenants/:id/...` | Une organisation à la fois (en mode multi-organisation uniquement) |
 | **Vault** | `/vault` | Toutes les valeurs et tous les secrets nommés auxquels la configuration fait référence |
@@ -91,6 +91,7 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 
 ### Infra
 
+- **[Topology](/docs/console/topology)** - les instances synchronisées, leur base, les services derrière les routes.
 - **[Routes](/docs/console/routes)** - la table de routage, dans l'ordre, et l'éditeur de route.
 - **[Endpoint security et Endpoint rate limits](/docs/console/endpoints)** - opération par opération, à partir de la spécification OpenAPI d'une route.
 - **[Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)** - les opérations consignées dans le journal d'audit.

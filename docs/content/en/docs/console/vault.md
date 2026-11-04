@@ -36,6 +36,18 @@ gateway checks each secret by opening it, and sends a yes or a no - never the
 value. Start it with the key the secrets were sealed with (`MEERKAT_VAULT_KEY`, or
 `MEERKAT_VAULT_KEY_PREVIOUS` while rotating), or type each value again.
 
+An entry that holds **no value** says so. It is what an import leaves: a
+configuration carries the names its routes expect, never their values - a
+secret's least of all - so the import creates each missing one empty, and it
+resolves to nothing until somebody fills it. An entry past its **reminder date**
+reads *expired on* that day. Those entries come first in the list, marked on their
+left edge. A notice above the list counts each kind, and its **Show only these**
+narrows the list to them; **Vault** in the rail carries a badge while one is left
+that you can fill.
+
+**Used by** gives one chip per kind of user: an entry several git locations share
+reads *git location: base, bogdan, francois +3*, the full list under the pointer.
+
 An entry carries:
 
 - **Name** - what `$name` will say.
