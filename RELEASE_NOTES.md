@@ -2,6 +2,14 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.23.0
+
+<!-- release: built=2026-11-04T13:15:02Z migrates=true -->
+- **This version migrates the database** (schema 102 to 103). An older version no longer opens it
+  afterwards: take a backup before you update.
+
 - **A license turns the evaluation image into Team or Enterprise.** Paste, drop or mount the
   license file: it is checked offline against the key in the binary, and the evaluation notice
   goes from the pages, the mails and the console with no restart, on every instance. Nothing
