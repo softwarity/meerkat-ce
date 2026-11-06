@@ -29,13 +29,13 @@ se fait à chaque requête, et c'est l'objet de cette section.
 |---|---|---|
 | La règle d'accès d'une route | la section *Security* de la route | cet appelant peut-il seulement atteindre cette route |
 | Une règle d'endpoint | **Infra > Endpoint security**, à partir de la spec OpenAPI de la route | cet appelant peut-il appeler *cette opération* |
-| Appartenances et groupes | les membres et les groupes d'une organisation | quels rôles cette personne détient, ici |
+| Appartenances et groupes | les membres et les groupes d'un tenant | quels rôles cette personne détient, ici |
 | Le catalogue des rôles | **Application > Roles** | quels noms de rôle existent, et lesquels impliquent lesquels |
 | Les capacités | **Application > Users** | qui peut administrer la gateway elle-même |
 
-Les rôles viennent des groupes, les groupes appartiennent à une organisation, et
-**les rôles n'existent qu'à l'intérieur d'une organisation** : une session sans
-organisation active ne détient aucun rôle, quelles que soient les organisations
+Les rôles viennent des groupes, les groupes appartiennent à un tenant, et
+**les rôles n'existent qu'à l'intérieur d'un tenant** : une session sans
+tenant actif ne détient aucun rôle, quels que soient les tenants
 dont la personne est membre par ailleurs.
 
 ## L'ordre, pour une requête
@@ -67,8 +67,8 @@ requête à l'upstream, qui applique ses propres règles s'il en a.
 ## À quoi ressemble un refus
 
 Sur une **route UI**, un refus mène à une page, dans la langue du visiteur : le
-choix de l'organisation quand en changer résoudrait réellement le problème, la
-salle d'attente quand le compte n'appartient à aucune organisation, et sinon
+choix du tenant quand en changer résoudrait réellement le problème, la
+salle d'attente quand le compte n'appartient à aucun tenant, et sinon
 `/refused`, qui nomme la règle à l'origine du refus et propose ce que cette
 session *peut* ouvrir.
 

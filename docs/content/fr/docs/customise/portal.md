@@ -76,7 +76,7 @@ filtrage a lieu avant leur écriture, et c'est pourquoi la page ne contient rien
 à lire ni à falsifier.
 
 C'est aussi la raison pour laquelle le catalogue est global plutôt que propre à
-chaque organisation : il est déjà personnalisé, par les routes.
+chaque tenant : il est déjà personnalisé, par les routes.
 
 > [!NOTE] Une route ne s'inscrit plus toute seule dans la liste
 > Auparavant, le nom d'une application se décidait sur **chaque route
@@ -84,7 +84,7 @@ chaque organisation : il est déjà personnalisé, par les routes.
 > même application et, comme la liste était déduite des routes, il fallait bien
 > deviner lesquelles désignaient la même chose - il est courant qu'une
 > installation expose un seul produit par plusieurs routes, une par
-> organisation ou par version, qui diffèrent par ce qu'elles relaient et jamais
+> tenant ou par version, qui diffèrent par ce qu'elles relaient et jamais
 > par l'endroit où elles mènent.
 >
 > Une nouvelle route d'interface n'apparaît donc plus d'elle-même : vous
@@ -151,6 +151,6 @@ champs.
  application qu'il peut ouvrir.
 - **Le glisser-déposer** : réordonner à la main, ou faire glisser une entrée
  pour la changer de niveau. Les flèches font l'affaire.
-- **Un agencement par organisation.** Ce serait la première surcharge visuelle
- par organisation du produit, alors que le thème et la marque sont aujourd'hui
+- **Un agencement par tenant.** Ce serait la première surcharge visuelle
+ par tenant du produit, alors que le thème et la marque sont aujourd'hui
  globaux.

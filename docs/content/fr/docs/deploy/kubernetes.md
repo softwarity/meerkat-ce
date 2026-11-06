@@ -43,7 +43,7 @@ par pod est précisément ce qu'un cluster n'est pas.
 
 Les sessions se trouvent dans la base, pas dans un pod. Chaque nœud garde un cache de cinq
 secondes pour répondre vite, et ce cache est invalidé par le même bus : une révocation, ou
-une organisation qui vient d'être choisie sur le nœud A, n'est donc pas servie périmée par le
+un tenant qui vient d'être choisi sur le nœud A, n'est donc pas servi périmé par le
 nœud B. Une requête peut ainsi arriver sur n'importe quelle réplique, et c'est ce qui rend
 une mise à jour progressive sans histoire : un pod qui s'arrête n'emporte aucune session.
 

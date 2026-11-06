@@ -13,23 +13,23 @@ the whole application, and writing to them takes the `app admin` capability (or
 
 ## General
 
-![The General screen: the organisations switch and the weekly working-hours grid](img/console/general.webp)
+![The General screen: the tenants switch and the weekly working-hours grid](img/console/general.webp)
 
 The switch, then the working hours: a time zone and one line per day, each
 with its own window and a + to add a second one.
 
 A statement about what this installation **is**, and one access window.
 
-**Several organisations.** Off, this gateway serves one organisation and never
+**Several tenants.** Off, this gateway serves one tenant and never
 names it: its groups and members are administered right here, under Application.
-On, organisations get their own entry in the rail. Going **down** to a single
-organisation asks first, and counts what stops being served: nothing is deleted,
-and switching back brings the organisations and their access straight back.
+On, tenants get their own entry in the rail. Going **down** to a single
+tenant asks first, and counts what stops being served: nothing is deleted,
+and switching back brings the tenants and their access straight back.
 
 > [!NOTE]
-> Enterprise edition: several organisations.
+> Enterprise edition: several tenants.
 
-**Working hours** are the application-wide access window every organisation
+**Working hours** are the application-wide access window every tenant
 inherits unless it defines its own; an account, a member or a group (in exclusive
 mode) can replace them in turn, the most precise winning - see
 [working hours](/docs/access/tenants#working-hours).
@@ -52,7 +52,7 @@ whole screen.
 
 ![The Security screen on the password policy: the kinds of characters, history, expiry and how long a temporary password works](img/console/security.webp)
 
-- **Two-factor** - require a second factor for everyone; organisations and
+- **Two-factor** - require a second factor for everyone; tenants and
   members can override it. Beside it, **a one-time code by e-mail** as a
   fallback for an enrolled user who cannot reach their authenticator: it needs a
   [mail relay](/docs/console/mail-relay) and only shows for accounts that carry
@@ -87,7 +87,7 @@ whole screen.
 
 ## Traps
 
-- **General saves on the button, its switch does not.** The organisation mode
+- **General saves on the button, its switch does not.** The tenant mode
   takes effect on the click; the working hours wait for Save.
 - **Languages are the applications', not the console's.** The console is
   English only, and what the built-in pages offer comes from the routes.

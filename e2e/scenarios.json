@@ -23,13 +23,13 @@
       "id": "tenant-admin",
       "username": "tadmin",
       "en": "Tenant admin: ADMIN member of the acme tenant",
-      "fr": "Admin d'organisation : membre ADMIN de l'organisation acme"
+      "fr": "Admin de tenant : membre ADMIN du tenant acme"
     },
     {
       "id": "user",
       "username": "alice",
       "en": "Plain user: USER member of the acme tenant, no capability",
-      "fr": "Simple utilisateur : membre USER de l'organisation acme, sans aucune capacité"
+      "fr": "Simple utilisateur : membre USER du tenant acme, sans aucune capacité"
     }
   ],
   "scenarios": [
@@ -378,8 +378,8 @@
         "fr": "Exporter le coffre, chiffré"
       },
       "description": {
-        "en": "Seals the entries the caller administers under a passphrase, and only those: an app admin's export holds no infrastructure entry, a tenant admin's holds only their organisation's. This is the half a configuration export never carries, which is what lets a configuration be public. A profile administering no vault at all is refused; 422 means the caller's scopes hold nothing yet.",
-        "fr": "Scelle sous une phrase secrète les entrées que l'appelant administre, et seulement celles-là : l'export d'un admin applicatif ne contient aucune entrée d'infrastructure, celui d'un admin d'organisation uniquement celles de son organisation. C'est la moitié qu'un export de configuration n'emporte jamais, et c'est ce qui permet à une configuration d'être publique. Un profil qui n'administre aucun coffre est refusé ; un 422 signifie que les périmètres de l'appelant ne contiennent encore rien."
+        "en": "Seals the entries the caller administers under a passphrase, and only those: an app admin's export holds no infrastructure entry, a tenant admin's holds only their tenant's. This is the half a configuration export never carries, which is what lets a configuration be public. A profile administering no vault at all is refused; 422 means the caller's scopes hold nothing yet.",
+        "fr": "Scelle sous une phrase secrète les entrées que l'appelant administre, et seulement celles-là : l'export d'un admin applicatif ne contient aucune entrée d'infrastructure, celui d'un admin de tenant uniquement celles de son tenant. C'est la moitié qu'un export de configuration n'emporte jamais, et c'est ce qui permet à une configuration d'être publique. Un profil qui n'administre aucun coffre est refusé ; un 422 signifie que les périmètres de l'appelant ne contiennent encore rien."
       }
     },
     {
@@ -650,7 +650,7 @@
       },
       "description": {
         "en": "The audit trail is a transverse section scoped by capability (RBAC-05): root sees all, infra-admin the routing plane (routes, themes), app-admin the identity (users, roles, settings), a tenant admin only their tenants' events. Anyone who administers nothing is refused.",
-        "fr": "Le journal d'audit est une section transverse, délimitée par les capacités (RBAC-05) : root voit tout, l'admin infra le plan de routage (routes, thèmes), l'admin applicatif l'identité (utilisateurs, rôles, réglages), et un admin d'organisation seulement les événements de ses organisations. Qui n'administre rien est refusé."
+        "fr": "Le journal d'audit est une section transverse, délimitée par les capacités (RBAC-05) : root voit tout, l'admin infra le plan de routage (routes, thèmes), l'admin applicatif l'identité (utilisateurs, rôles, réglages), et un admin de tenant seulement les événements de ses tenants. Qui n'administre rien est refusé."
       }
     },
     {
@@ -717,7 +717,7 @@
       },
       "description": {
         "en": "The embedded issue tracker (ISSUE-03) is a transverse section: root and infra/app admins see every report, a tenant admin only those filed under their tenants. Anyone who administers nothing is refused.",
-        "fr": "Le suivi des signalements embarqué (ISSUE-03) est une section transverse : root et les admins infra et applicatifs voient tous les signalements, un admin d'organisation seulement ceux qui ont été déposés dans ses organisations. Qui n'administre rien est refusé."
+        "fr": "Le suivi des signalements embarqué (ISSUE-03) est une section transverse : root et les admins infra et applicatifs voient tous les signalements, un admin de tenant seulement ceux qui ont été déposés dans ses tenants. Qui n'administre rien est refusé."
       }
     },
     {
@@ -785,8 +785,8 @@
         "fr": "S'abonner à ce qu'affiche un écran"
       },
       "description": {
-        "en": "One websocket for the whole console, with a source per screen: the traffic curves, the scheduled calls, and the journal of administrative writes every screen watches to learn that what it is showing moved. It answers every ADMINISTRATOR - the routing plane's, the application's, an organisation's - and WHAT each may watch is decided at the upgrade, from the audit trail's own partition, then handed to the socket as a registry holding those sources and nothing else. A source cannot check it: the library shares one read between the subscribers of a topic. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
-        "fr": "Un seul WebSocket pour toute la console, avec une source par écran : les courbes de trafic, les appels planifiés, et le journal des écritures d'administration, que chaque écran surveille pour savoir que ce qu'il affiche a changé. Il répond à tout ADMINISTRATEUR - celui du plan de routage, celui de l'application, celui d'une organisation - et CE QUE chacun peut surveiller est décidé au moment de l'upgrade WebSocket, à partir du cloisonnement du journal d'audit lui-même, puis remis au socket sous la forme d'un registre qui contient ces sources et rien d'autre. Une source ne peut pas faire ce contrôle : la bibliothèque partage une même lecture entre tous les abonnés d'un sujet. Il est monté DERRIÈRE le même entonnoir que tous les appels d'API, et un abonnement passe donc les mêmes contrôles : session, connexion en attente, périmètre du jeton, restriction au domaine du jeton. Un simple GET n'est pas un upgrade : un appelant autorisé est donc refusé par le protocole et non par le périmètre, et c'est tout l'intérêt de la sonde."
+        "en": "One websocket for the whole console, with a source per screen: the traffic curves, the scheduled calls, and the journal of administrative writes every screen watches to learn that what it is showing moved. It answers every ADMINISTRATOR - the routing plane's, the application's, a tenant's - and WHAT each may watch is decided at the upgrade, from the audit trail's own partition, then handed to the socket as a registry holding those sources and nothing else. A source cannot check it: the library shares one read between the subscribers of a topic. It is mounted BEHIND the same funnel as every API call, so a subscription passes the same checks: session, pending login, token perimeter, narrowing to the token's domain. A plain GET is not an upgrade, so an allowed caller is refused by the protocol rather than by the perimeter, which is the point of the probe.",
+        "fr": "Un seul WebSocket pour toute la console, avec une source par écran : les courbes de trafic, les appels planifiés, et le journal des écritures d'administration, que chaque écran surveille pour savoir que ce qu'il affiche a changé. Il répond à tout ADMINISTRATEUR - celui du plan de routage, celui de l'application, celui d'un tenant - et CE QUE chacun peut surveiller est décidé au moment de l'upgrade WebSocket, à partir du cloisonnement du journal d'audit lui-même, puis remis au socket sous la forme d'un registre qui contient ces sources et rien d'autre. Une source ne peut pas faire ce contrôle : la bibliothèque partage une même lecture entre tous les abonnés d'un sujet. Il est monté DERRIÈRE le même entonnoir que tous les appels d'API, et un abonnement passe donc les mêmes contrôles : session, connexion en attente, périmètre du jeton, restriction au domaine du jeton. Un simple GET n'est pas un upgrade : un appelant autorisé est donc refusé par le protocole et non par le périmètre, et c'est tout l'intérêt de la sonde."
       }
     },
     {
@@ -1022,11 +1022,11 @@
       ],
       "title": {
         "en": "List a tenant's members",
-        "fr": "Lister les membres d'une organisation"
+        "fr": "Lister les membres d'un tenant"
       },
       "description": {
         "en": "Tenant administration is ownership or the ADMIN membership on THAT tenant: neither capability admins nor plain members reach another tenant's member list.",
-        "fr": "Administrer une organisation suppose d'en être le propriétaire ou un membre ADMIN de CETTE organisation : ni les administrateurs par capacité ni les simples membres n'accèdent à la liste des membres d'une autre organisation."
+        "fr": "Administrer un tenant suppose d'en être le propriétaire ou un membre ADMIN de CE tenant : ni les administrateurs par capacité ni les simples membres n'accèdent à la liste des membres d'un autre tenant."
       }
     },
     {
@@ -1047,7 +1047,7 @@
       },
       "description": {
         "en": "The sign-in history of a member is visible to root and to that tenant's owner or ADMIN, nobody else.",
-        "fr": "L'historique des connexions d'un membre est visible de root et du propriétaire ou d'un ADMIN de cette organisation, et de personne d'autre."
+        "fr": "L'historique des connexions d'un membre est visible de root et du propriétaire ou d'un ADMIN de ce tenant, et de personne d'autre."
       }
     },
     {
@@ -1070,11 +1070,11 @@
       ],
       "title": {
         "en": "Transfer tenant ownership",
-        "fr": "Transférer la propriété d'une organisation"
+        "fr": "Transférer la propriété d'un tenant"
       },
       "description": {
         "en": "Ownership is a tenant field (TENANT-02): only root or the current owner may transfer it. A tenant ADMIN reaches the endpoint but is refused (403); root reaches the handler and 422s on the probe's unknown user, without changing anything.",
-        "fr": "La propriété est un champ de l'organisation (TENANT-02) : seuls root et le propriétaire actuel peuvent la transférer. Un ADMIN de l'organisation atteint l'endpoint mais se voit refusé (403) ; root atteint le handler, qui répond 422 parce que l'utilisateur de la sonde est inconnu, sans rien modifier."
+        "fr": "La propriété est un champ du tenant (TENANT-02) : seuls root et le propriétaire actuel peuvent la transférer. Un ADMIN du tenant atteint l'endpoint mais se voit refusé (403) ; root atteint le handler, qui répond 422 parce que l'utilisateur de la sonde est inconnu, sans rien modifier."
       }
     },
     {
@@ -1139,8 +1139,8 @@
         "app-admin"
       ],
       "title": {
-        "en": "Choose between one organisation and several",
-        "fr": "Choisir entre une seule organisation et plusieurs"
+        "en": "Choose between one tenant and several",
+        "fr": "Choisir entre un seul tenant et plusieurs"
       },
       "description": {
         "en": "The shape of the identity - who belongs where - so it is the app-admin's decision, not root's alone. The probe sends a mode that does not exist, refused after the guard, so the run never switches the installation it is testing.",
@@ -1166,7 +1166,7 @@
       },
       "description": {
         "en": "The access mode of the scheduled calls API (none, a Meerkat token, a cluster token) and the callers let in. The Scheduler's readers see it, read-only: root, the infra-admin and the app-admin. A tenant admin or a plain user gets 403.",
-        "fr": "Le mode d'accès de l'API des appels planifiés (sans titre, jeton Meerkat, jeton de cluster) et les appelants admis. Les lecteurs du Scheduler le voient, en lecture seule : root, l'admin infra et l'admin applicatif. Un admin d'organisation ou un simple utilisateur reçoit 403."
+        "fr": "Le mode d'accès de l'API des appels planifiés (sans titre, jeton Meerkat, jeton de cluster) et les appelants admis. Les lecteurs du Scheduler le voient, en lecture seule : root, l'admin infra et l'admin applicatif. Un admin de tenant ou un simple utilisateur reçoit 403."
       }
     },
     {
@@ -1453,11 +1453,11 @@
       ],
       "title": {
         "en": "The Tenants rail entry shows for tenant admins",
-        "fr": "L'entrée Tenants du rail apparaît pour les administrateurs d'organisation"
+        "fr": "L'entrée Tenants du rail apparaît pour les administrateurs de tenant"
       },
       "description": {
         "en": "A tenant owner or ADMIN (or a tenant creator) sees the Tenants scope; plain members and capability admins without a tenant do not.",
-        "fr": "Le propriétaire ou un ADMIN d'une organisation (ou un créateur d'organisations) voit le périmètre Tenants ; les simples membres et les administrateurs par capacité sans organisation ne le voient pas."
+        "fr": "Le propriétaire ou un ADMIN d'un tenant (ou un créateur de tenants) voit le périmètre Tenants ; les simples membres et les administrateurs par capacité sans tenant ne le voient pas."
       }
     },
     {
@@ -1523,7 +1523,7 @@
       },
       "description": {
         "en": "Opening the console root: infra admins land on /infra/routes, app admins on /application/general, everyone else on their tenant.",
-        "fr": "À l'ouverture de la racine de la console : les admins infra arrivent sur /infra/routes, les admins applicatifs sur /application/general, et tous les autres sur leur organisation."
+        "fr": "À l'ouverture de la racine de la console : les admins infra arrivent sur /infra/routes, les admins applicatifs sur /application/general, et tous les autres sur leur tenant."
       }
     },
     {
@@ -1664,7 +1664,7 @@
       },
       "description": {
         "en": "A user mints a token on Profile > Security > API tokens (shown once); it captures their current tenant+group context and authenticates 'Authorization: Bearer mk_...' calls to the data-plane API routes with no browser session. Disabling or revoking it - or disabling the account - stops it at the next request; the admin port never accepts it.",
-        "fr": "Un utilisateur crée un jeton dans Profil > Sécurité > Jetons d'API (affiché une seule fois) ; le jeton capture son contexte du moment, organisation + groupe, et authentifie les appels 'Authorization: Bearer mk_...' vers les routes d'API du plan de données, sans session de navigateur. Le désactiver ou le révoquer - ou désactiver le compte - l'arrête dès la requête suivante ; le port d'administration ne l'accepte jamais."
+        "fr": "Un utilisateur crée un jeton dans Profil > Sécurité > Jetons d'API (affiché une seule fois) ; le jeton capture son contexte du moment, tenant + groupe, et authentifie les appels 'Authorization: Bearer mk_...' vers les routes d'API du plan de données, sans session de navigateur. Le désactiver ou le révoquer - ou désactiver le compte - l'arrête dès la requête suivante ; le port d'administration ne l'accepte jamais."
       }
     },
     {
@@ -1745,7 +1745,7 @@
       },
       "description": {
         "en": "With a tenant forced to SINGLE, a member holding several groups lands on /select-group after signing in (and again after each tenant switch); only the chosen group's roles apply to the session.",
-        "fr": "Quand une organisation est forcée en SINGLE, un membre qui a plusieurs groupes arrive sur /select-group après s'être connecté (et de nouveau à chaque changement d'organisation) ; seuls les rôles du groupe choisi s'appliquent à la session."
+        "fr": "Quand un tenant est forcé en SINGLE, un membre qui a plusieurs groupes arrive sur /select-group après s'être connecté (et de nouveau à chaque changement de tenant) ; seuls les rôles du groupe choisi s'appliquent à la session."
       }
     },
     {
@@ -1770,12 +1770,12 @@
       "spec": "access-levels",
       "allowed": [],
       "title": {
-        "en": "An account awaiting access passes \"signed in\" and stops at \"in an organisation\"",
-        "fr": "Un compte en attente d'accès passe le niveau \"connecté\" et s'arrête au niveau \"dans une organisation\""
+        "en": "An account awaiting access passes \"signed in\" and stops at \"in a tenant\"",
+        "fr": "Un compte en attente d'accès passe le niveau \"connecté\" et s'arrête au niveau \"dans un tenant\""
       },
       "description": {
-        "en": "The belonging axis (RBAC-06) over a real gateway: a confirmed account that belongs to no organisation still passes a route gated on authentication - that level says who it is and nothing more - but a route asking for an organisation sends it to /account-pending rather than answering a bare 403.",
-        "fr": "L'axe de l'appartenance (RBAC-06) sur une vraie gateway : un compte confirmé qui n'appartient à aucune organisation passe tout de même une route protégée par l'authentification - ce niveau dit qui il est, et rien de plus - mais une route qui exige une organisation le renvoie vers /account-pending au lieu de répondre par un simple 403."
+        "en": "The belonging axis (RBAC-06) over a real gateway: a confirmed account that belongs to no tenant still passes a route gated on authentication - that level says who it is and nothing more - but a route asking for a tenant sends it to /account-pending rather than answering a bare 403.",
+        "fr": "L'axe de l'appartenance (RBAC-06) sur une vraie gateway : un compte confirmé qui n'appartient à aucun tenant passe tout de même une route protégée par l'authentification - ce niveau dit qui il est, et rien de plus - mais une route qui exige un tenant le renvoie vers /account-pending au lieu de répondre par un simple 403."
       }
     },
     {
@@ -1788,12 +1788,12 @@
         "root"
       ],
       "title": {
-        "en": "Single-organisation mode is switched live, and gives the others back",
-        "fr": "Le mode mono-organisation se bascule à chaud, et restitue les autres organisations"
+        "en": "Single-tenant mode is switched live, and gives the others back",
+        "fr": "Le mode mono-tenant se bascule à chaud, et restitue les autres tenants"
       },
       "description": {
-        "en": "The shape of an installation is a setting read per request, not a value frozen at boot: switching it takes effect at once. Going down to one organisation holds the others back without deleting anything - the console is served knowing it, on the first paint - and switching up gives them and their people's access straight back.",
-        "fr": "La forme d'une installation est un réglage lu à chaque requête, pas une valeur figée au démarrage : la bascule prend effet immédiatement. Redescendre à une seule organisation met les autres en retrait sans rien supprimer - la console est servie en le sachant, dès le premier affichage - et remonter les restitue aussitôt, elles et les accès de leurs membres."
+        "en": "The shape of an installation is a setting read per request, not a value frozen at boot: switching it takes effect at once. Going down to one tenant holds the others back without deleting anything - the console is served knowing it, on the first paint - and switching up gives them and their people's access straight back.",
+        "fr": "La forme d'une installation est un réglage lu à chaque requête, pas une valeur figée au démarrage : la bascule prend effet immédiatement. Redescendre à un seul tenant met les autres en retrait sans rien supprimer - la console est servie en le sachant, dès le premier affichage - et remonter les restitue aussitôt, eux et les accès de leurs membres."
       }
     },
     {

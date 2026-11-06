@@ -45,20 +45,20 @@ Le tiroir comporte un seul interrupteur, **Override the route config**.
   touchez jamais reste sécurisée par le backend lui-même.
 - Si vous l'activez, vous retrouvez l'éditeur d'accès qu'utilise la route. Il comporte
   deux axes, qui doivent être satisfaits tous les deux : le **niveau d'appartenance**,
-  et un **filtre de rôles** évalué dans l'organisation active de l'appelant.
+  et un **filtre de rôles** évalué dans le tenant actif de l'appelant.
 
 | Niveau | Ce qu'il exige |
 |---|---|
 | **Delegated** | Rien. Tout le monde passe, connecté ou non ; c'est le service qui décide |
-| **Signed in** | N'importe quel compte, y compris un compte qui n'appartient encore à aucune organisation |
-| **In an organisation** | Une organisation doit être active dans la session |
-| **In one of these organisations** | L'organisation active doit faire partie de celles qui sont nommées |
+| **Signed in** | N'importe quel compte, y compris un compte qui n'appartient encore à aucun tenant |
+| **In a tenant** | Un tenant doit être actif dans la session |
+| **In one of these tenants** | Le tenant actif doit faire partie de ceux qui sont nommés |
 | **Nobody** | Refusé avant même que le service soit appelé |
 
 ![Le même éditeur d'accès, dans la section Security d'une route : un niveau, une liste de rôles et une exception pour des utilisateurs nommés](img/console/route-editor-security.webp)
 
 Le même éditeur, ici sur la route *Orders API* : le niveau, les rôles (un seul suffit
-pour obtenir l'accès, et il doit être détenu dans l'organisation active) et l'exception
+pour obtenir l'accès, et il doit être détenu dans le tenant actif) et l'exception
 pour les utilisateurs nommés. Le panneau d'une opération affiche exactement cela une
 fois la dérogation activée.
 
@@ -84,7 +84,7 @@ choisissez la clé sur laquelle il porte :
 | **The whole operation** | opération, pour tout ce qu'elle reçoit, quel que soit l'appelant |
 | **Each user** | compte connecté (les appelants anonymes ne sont pas couverts) |
 | **Each API token** | jeton, ce qui limite une intégration sans limiter son propriétaire |
-| **Each organisation** | organisation - un quota vendu à un client |
+| **Each tenant** | tenant - un quota vendu à un client |
 | **Each address** | adresse du client, la seule clé dont dispose un appelant anonyme |
 
 La seconde moitié d'une règle précise **à qui** elle s'applique, sous la même forme que

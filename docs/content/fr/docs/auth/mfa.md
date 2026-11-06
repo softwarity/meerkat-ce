@@ -111,8 +111,8 @@ le désactiver ensuite : la désactivation en libre-service répond `403` et exp
 pourquoi.
 
 > [!NOTE]
-> Il n'existe volontairement **aucun niveau par organisation** : le second facteur est
-> demandé avant que l'organisation soit connue, et une règle par organisation ne pourrait
+> Il n'existe volontairement **aucun niveau par tenant** : le second facteur est
+> demandé avant que le tenant soit connu, et une règle par tenant ne pourrait
 > donc pas être lue à temps. Il n'existe **pas non plus de niveau par rôle**, pour la même
 > raison ; c'est l'élément que FEATURES.md signale encore comme manquant sur cette
 > fonctionnalité.

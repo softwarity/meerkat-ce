@@ -16,7 +16,7 @@ rien à voir :
 | Fonctionne sur | le port du plan de données | le port d'administration uniquement |
 | Créé par | toute personne connectée, depuis son profil | toute personne qui administre un domaine (root, infra-admin, app-admin), depuis la console, pour elle-même |
 | Géré dans | `/profile/tokens` sur le plan de données ; les administrateurs des applications le voient et le révoquent dans **Access tokens** | **Access tokens**, sous Infra ou Application |
-| Porte | l'organisation et le groupe de la session qui l'a créé | un périmètre : jusqu'où, sur quoi, depuis où |
+| Porte | le tenant et le groupe de la session qui l'a créé | un périmètre : jusqu'où, sur quoi, depuis où |
 
 Les deux se présentent de la même façon, et de celle-là seulement :
 
@@ -48,14 +48,14 @@ qu'**une seule fois**, dans une boîte de dialogue ; ensuite, la liste n'en mont
 les douze premiers caractères et la date de dernière utilisation (mise à jour au plus une
 fois par minute).
 
-**Ce qu'il porte, c'est le contexte de la session qui l'a créé** : l'organisation active
+**Ce qu'il porte, c'est le contexte de la session qui l'a créé** : le tenant actif
 et, en mode groupe exclusif, le groupe actif. Il n'y a rien à sélectionner. Si vous avez
-besoin d'un jeton pour une autre organisation, basculez d'abord sur celle-ci, puis créez le
+besoin d'un jeton pour un autre tenant, basculez d'abord sur celui-ci, puis créez le
 jeton : la page vous indique le contexte qu'elle s'apprête à retenir, et vous prévient
 quand il n'y en a aucun.
 
 **Ce qu'il ne porte pas, ce sont les rôles.** Les rôles sont recalculés à chaque requête à
-partir du compte, de l'organisation et du groupe. Un rôle accordé demain s'applique donc à
+partir du compte, du tenant et du groupe. Un rôle accordé demain s'applique donc à
 un jeton créé aujourd'hui, et un rôle retiré cesse aussitôt de s'appliquer.
 
 **La révocation** se fait sur la même page : vous désactivez un jeton pour le mettre en
@@ -65,7 +65,7 @@ titulaire est désactivé, sort de sa période d'accès ou est supprimé.
 
 Les personnes qui administrent les applications (root, app-admin) voient en outre les
 jetons d'application de **tout le monde** sur l'écran **Access tokens** de la console, avec
-leur titulaire, leur organisation et leur dernière utilisation. Elles peuvent en révoquer
+leur titulaire, leur tenant et leur dernière utilisation. Elles peuvent en révoquer
 un depuis son tiroir : le jeton que porte encore le script d'un collègue parti, ou
 celui qui a fuité. Elles n'en créent jamais à cet endroit : seul son titulaire peut créer
 un moyen d'authentification. La révocation laisse une ligne `token.revoke` dans le

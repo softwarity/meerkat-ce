@@ -73,7 +73,7 @@ The payload served to the browser carries no rule either: the filtering happens
 before it is written, which is why there is nothing in the page to read or
 tamper with.
 
-It is also why the catalogue is global rather than per organisation: it is
+It is also why the catalogue is global rather than per tenant: it is
 already personalised, by the routes.
 
 > [!NOTE] A route no longer lists itself
@@ -81,7 +81,7 @@ already personalised, by the routes.
 > field. Three places could therefore name the same application, and since the
 > list was derived from the routes, something had to guess which ones were the
 > same thing - an installation commonly fronts one product with several routes,
-> one per organisation or per version, which differ in what they proxy and never
+> one per tenant or per version, which differ in what they proxy and never
 > in where you go.
 >
 > So a new UI route no longer shows up on its own: you add it here. It is the
@@ -141,5 +141,5 @@ a list of fields.
  application they arrive on is not redirected to one they can.
 - **Drag and drop**: reordering by hand, or dragging an entry to change level.
  The arrows do the job.
-- **A per-organisation arrangement.** It would be the product's first per-tenant
+- **A per-tenant arrangement.** It would be the product's first per-tenant
  visual override, and the theme and branding are global today.

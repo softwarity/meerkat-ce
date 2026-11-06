@@ -16,7 +16,7 @@ par appelant.
 
 | Moitié | Ce qu'elle dit |
 |---|---|
-| **par** | sur quoi le compteur est indexé : la route entière, un utilisateur, un jeton d'API, une organisation ou une adresse cliente |
+| **par** | sur quoi le compteur est indexé : la route entière, un utilisateur, un jeton d'API, un tenant ou une adresse cliente |
 | **s'applique à** | qui la règle concerne, exprimé par un `Access` - le vocabulaire que les règles d'accès emploient déjà. Vide signifie tout le monde. |
 
 C'est ce qui fait d'un rôle un palier tarifaire sans inventer de nouveau concept :
@@ -52,7 +52,7 @@ Les bornes qui se passent d'identité - une pour la route entière, une par adre
 vérifiées **en tout premier** : avant de chercher une session, avant de lire un corps,
 avant de contacter un upstream. Refuser tôt, c'est toute la raison d'être d'une borne.
 
-Les bornes indexées sur un utilisateur, un jeton ou une organisation ne peuvent pas
+Les bornes indexées sur un utilisateur, un jeton ou un tenant ne peuvent pas
 l'être : elles coûtent une résolution de session, que seules paient les routes qui en
 demandent une. Une règle *restreinte* à certains appelants a elle aussi besoin d'une
 identité, quel que soit son critère de comptage.

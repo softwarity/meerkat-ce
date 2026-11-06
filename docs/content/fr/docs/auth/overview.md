@@ -14,7 +14,7 @@ répond ainsi à la question "qui peut prouver son identité ici ?".
 
 Une autorité établit **qui** est la personne. Elle ne décide jamais de ce que cette
 personne a le droit de faire : une première connexion crée un compte qui n'a accès à rien
-tant qu'un administrateur ne l'a pas rattaché à une organisation et ne lui a pas attribué
+tant qu'un administrateur ne l'a pas rattaché à un tenant et ne lui a pas attribué
 de rôles. Cette seconde moitié relève du [contrôle d'accès](/docs/access/overview).
 
 ## Les cinq types
@@ -60,11 +60,11 @@ que la valeur elle-même.
 1. **Le premier facteur.** Un mot de passe saisi dans le formulaire, une redirection vers un fournisseur, une passkey ou un [code reçu par e-mail](/docs/auth/email-code). Pour un mot de passe saisi, les comptes locaux sont interrogés en premier ; s'ils refusent, chaque annuaire activé est interrogé à son tour, dans l'ordre de l'écran. Un mot de passe erroné, un identifiant inconnu et un compte désactivé reçoivent tous la même réponse.
 2. **Un mot de passe à changer** - temporaire, ou expiré au regard de la politique. La session existe, mais elle reste bloquée à cette étape : toute navigation y ramène.
 3. **Le second facteur**, si le compte y est soumis.
-4. **L'organisation.** Si le compte n'en a aucune, la personne patiente sur `/account-pending`. S'il en a une seule, elle est inscrite sur la session sans rien demander. S'il en a plusieurs, la personne choisit.
-5. **Le groupe**, en mode groupe exclusif, quand l'organisation en compte plusieurs.
+4. **Le tenant.** Si le compte n'en a aucun, la personne patiente sur `/account-pending`. S'il en a un seul, il est inscrit sur la session sans rien demander. S'il en a plusieurs, la personne choisit.
+5. **Le groupe**, en mode groupe exclusif, quand le tenant en compte plusieurs.
 
 Une passkey règle d'un coup les étapes un à trois : elle vaut pour les deux facteurs, et la
-personne arrive directement au choix de l'organisation.
+personne arrive directement au choix du tenant.
 
 ## La règle sur le cumul des facteurs
 

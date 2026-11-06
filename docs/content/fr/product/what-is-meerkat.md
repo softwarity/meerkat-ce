@@ -9,7 +9,7 @@ summary: Un point d'entrée unique devant vos applications internes, qui se char
 
 Meerkat est un **proxy d'authentification et une API gateway** : une porte
 unique, avec son contrôle d'accès, devant les applications de votre
-organisation. Il prend la place du proxy d'authentification, du serveur
+entreprise. Il prend la place du proxy d'authentification, du serveur
 d'identité et de l'API gateway que l'on assemble d'ordinaire pour elles. Les
 requêtes arrivent à Meerkat, qui décide quoi en faire, puis les transmet.
 Softwarity appelle cela une app-gateway.
@@ -17,7 +17,7 @@ Softwarity appelle cela une app-gateway.
 Ce dont elle se charge, pour que vos services n'aient pas à le faire :
 
 - **Qui appelle** - pages de connexion, authentification unique (SSO), authentification à plusieurs facteurs, jetons d'API, sessions.
-- **Qui peut passer** - rôles, groupes, organisations, règles par route et par endpoint.
+- **Qui peut passer** - rôles, groupes, tenants, règles par route et par endpoint.
 - **Comment la requête voyage** - routage, réécriture, en-têtes, limites de débit, TLS.
 - **Ce qui se passe** - trafic, journal d'audit, métriques, santé de vos services.
 

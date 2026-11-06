@@ -9,8 +9,8 @@ summary: Ce qu'est le cookie de session, combien de temps il vit, ce qui met pr�
 
 Une session de navigateur est un **cookie opaque**. Il ne contient ni identité, ni claims,
 ni signature : trente-deux octets aléatoires, dont la gateway ne conserve qu'une
-empreinte. Tout ce qui concerne la session - à qui elle appartient, quelle organisation est
-active, quelle étape de connexion reste à franchir - se trouve côté serveur, dans une ligne
+empreinte. Tout ce qui concerne la session - à qui elle appartient, quel tenant est
+actif, quelle étape de connexion reste à franchir - se trouve côté serveur, dans une ligne
 de la base.
 
 C'est voulu. Les JWT servent aux appels d'API et à ce qui est transmis à l'upstream, jamais au
@@ -85,8 +85,8 @@ La durée de vie elle-même est prise au niveau le plus précis qui en définit 
 
 | Niveau | Où elle se trouve | Modifiable |
 |---|---|---|
-| L'appartenance, une personne dans une organisation | `sessionTTL` sur l'appartenance | API d'administration uniquement |
-| L'organisation | `sessionTTL` sur l'organisation | API d'administration uniquement |
+| L'appartenance, une personne dans un tenant | `sessionTTL` sur l'appartenance | API d'administration uniquement |
+| Le tenant | `sessionTTL` sur le tenant | API d'administration uniquement |
 | L'installation | réglage `session_ttl`, `PT30M` par défaut | **Application > Security** |
 
 Les valeurs sont des durées ISO-8601 : `PT15M`, `PT1H`, `P1D`. Seuls les jours, les heures,
@@ -103,8 +103,8 @@ définie ailleurs au lieu de la perdre.
 > par l'API.
 
 Une session à laquelle il reste une étape de connexion à franchir - un mot de passe à
-changer, un code à saisir - utilise la durée de vie de l'installation, car l'organisation
-n'est pas encore connue.
+changer, un code à saisir - utilise la durée de vie de l'installation, car le tenant
+n'est pas encore connu.
 
 ## Ce qui met fin à une session
 
@@ -140,8 +140,8 @@ Cette liste compte davantage que la précédente :
 
 - **Changer de mot de passe n'y met pas fin.** Ni le changement volontaire depuis le profil, ni le changement imposé à la connexion, ni la réinitialisation par un administrateur. Seul le lien de réinitialisation reçu par e-mail révoque les sessions - ainsi que les jetons d'API et les navigateurs de confiance du compte - parce que ce parcours existe précisément pour un compte que quelqu'un d'autre détient peut-être.
 - **L'obligation de changer de mot de passe non plus.** L'indicateur est lu à la connexion *suivante*.
-- **Les changements de rôle, de groupe et d'appartenance non plus.** Ils prennent effet en quelques secondes : l'identité mémorisée est abandonnée et la session conservée. C'est pourquoi un ajout à une organisation peut prendre effet sans déconnexion. Le retrait d'un rôle fonctionne de la même façon.
-- **La désactivation d'une organisation non plus.**
+- **Les changements de rôle, de groupe et d'appartenance non plus.** Ils prennent effet en quelques secondes : l'identité mémorisée est abandonnée et la session conservée. C'est pourquoi un ajout à un tenant peut prendre effet sans déconnexion. Le retrait d'un rôle fonctionne de la même façon.
+- **La désactivation d'un tenant non plus.**
 - **Sur le plan de contrôle, la période de validité d'un compte n'est pas contrôlée de nouveau** pour une session par cookie : elle l'est à la connexion et à chaque appel par jeton, mais une session de console déjà ouverte se poursuit jusqu'à son expiration.
 
 ## Voir les sessions
@@ -156,9 +156,9 @@ Les administrateurs les consultent dans **Data plane, Sessions** pour les applic
 **Meerkat, Sessions** pour la console : qui, quel navigateur et quelle adresse, depuis
 quand - avec un filtre par compte, une pagination, et une mise à jour en direct. Chacun
 voit son propre périmètre. Root voit les deux plans. Un administrateur
-des applications voit les sessions des applications, toutes organisations confondues, mais
+des applications voit les sessions des applications, tous tenants confondus, mais
 pas celles de la console : savoir qui utilise la console, et depuis où, ne regarde que
-root. L'administrateur d'une organisation voit les sessions ouvertes dans les organisations
+root. L'administrateur d'un tenant voit les sessions ouvertes dans les tenants
 qu'il administre, et ne peut mettre fin qu'à celles-là. Mettre fin à une session écrit
 `session.revoke` dans le [journal d'audit](/docs/operations/audit).
 

@@ -16,7 +16,7 @@ thing at all:
 | Works on | the data plane port | the admin port only |
 | Minted by | anybody signed in, from their profile | anybody who administers a domain (root, infra-admin, app-admin), from the console, for themselves |
 | Managed in | `/profile/tokens` on the data plane; seen and revoked by application administrators on **Access tokens** | **Access tokens**, under Infra or Application |
-| Carries | the organisation and group of the session that minted it | a perimeter: how far, over what, from where |
+| Carries | the tenant and group of the session that minted it | a perimeter: how far, over what, from where |
 
 Both are presented the same way, and only that way:
 
@@ -48,13 +48,13 @@ list shows only its first twelve characters and the date it was last used
 (stamped at most once a minute).
 
 **What it carries is the context of the session that created it**: the active
-organisation and, in exclusive-group mode, the active group. There is no picker.
-If you need a token for another organisation, switch to it first and then mint
+tenant and, in exclusive-group mode, the active group. There is no picker.
+If you need a token for another tenant, switch to it first and then mint
 one - the page tells you which context it is about to capture, and says so when
 there is none.
 
 **What it does not carry is roles.** Roles are recomputed on every request from
-the account, the organisation and the group, so a role granted tomorrow applies
+the account, the tenant and the group, so a role granted tomorrow applies
 to a token minted today, and a role withdrawn stops applying at once.
 
 **Revoking** is on the same page: disable to park it, revoke to destroy it.
@@ -63,7 +63,7 @@ moment its owner is disabled, falls outside their access window, or is deleted.
 
 Those who administer the applications (root, app-admin) also see **everyone's**
 application tokens on the console's **Access tokens** screen, with their owner,
-organisation and last use, and revoke one from its drawer: the token a departed
+tenant and last use, and revoke one from its drawer: the token a departed
 colleague's script still carries, or the one that leaked. They never create one
 there - a credential is only minted by its owner. The revocation is a
 `token.revoke` line of the [audit trail](/docs/operations/audit), on the owner.

@@ -8,19 +8,19 @@ summary: What the free edition does, what Enterprise adds, how to try all of it,
 # Editions
 
 One product, four editions. **Community** is not a demo and not a trial: it is
-the whole gateway for the common case - one organisation, one instance, your own
+the whole gateway for the common case - one tenant, one instance, your own
 accounts or an OpenID Connect provider - free, production included.
 **Enterprise** is for when you grow in one of three directions: several
-organisations, several instances as a cluster, or your corporate directory. **Team** is
-Enterprise for one organisation on one instance: the directory, without
-horizontal scaling or several organisations. And **Evaluation** is Enterprise with a
+tenants, several instances as a cluster, or your corporate directory. **Team** is
+Enterprise for one tenant on one instance: the directory, without
+horizontal scaling or several tenants. And **Evaluation** is Enterprise with a
 notice on it, free, to try everything first.
 
 | Edition | What it is | How you get it |
 | --- | --- | --- |
 | **Community** (CE) | The whole free gateway, production included | `softwarity/meerkat-ce` on Docker Hub |
 | **Evaluation** (Eval) | All of Enterprise, with an evaluation notice; not for production | `softwarity/meerkat` on Docker Hub, without a licence |
-| **Team** (TE) | Everything Enterprise adds, for one organisation on one instance | `softwarity/meerkat` and a licence - [talk to us](/pricing/index) |
+| **Team** (TE) | Everything Enterprise adds, for one tenant on one instance | `softwarity/meerkat` and a licence - [talk to us](/pricing/index) |
 | **Enterprise** (EE) | Everything Enterprise adds, without a ceiling | `softwarity/meerkat` and a licence - [talk to us](/pricing/index) |
 
 ::: lead
@@ -32,7 +32,7 @@ always will be. Selling safety to those least able to pay for it is not a
 business model we want.
 :::
 
-The rule fits in one sentence: **what a growing organisation needs is paid
+The rule fits in one sentence: **what a growing company needs is paid
 for; what protects the user is not.** Where identity products put single
 sign-on and two-factor in a higher plan, Meerkat never makes anyone choose
 between paying less and being safe.
@@ -51,12 +51,12 @@ company, commercially, for free.
 
 | | Community | Enterprise |
 | --- | --- | --- |
-| **Organisations** | One, and the console never makes you name it. | Several, each with its members, groups and owner, chosen at sign-in. |
+| **Tenants** | One, and the console never makes you name it. | Several, each with its members, groups and owner, chosen at sign-in. |
 | **Corporate directory** | OpenID Connect, GitHub | SAML 2.0, LDAP and Active Directory as well. |
 | **The OpenID provider of your tools** | - | Applications that only sign in against an OpenID provider sign their people in through the gateway, the route deciding who and with which roles. See [the OpenID provider](/docs/auth/oidc-provider). |
 | **Roles from the directory** | Granted in Meerkat | Group rules: an LDAP group, a GitHub team or an OIDC claim becomes a membership and its roles, at each sign-in. |
 | **Certificates** | Generated, imported or signed on request, placed on the console and the application by hand | ACME as well: Let's Encrypt, ZeroSSL, Google or your own step-ca issue and renew them on their own, several authorities side by side. |
-| **Business hours** | - | Access windows: time ranges, week days, dates, time zone; for the whole gateway, an organisation, an account, a member, or a group in exclusive mode (a day shift, a night shift). A session ends when its window closes. See [working hours](/docs/access/tenants#working-hours). |
+| **Business hours** | - | Access windows: time ranges, week days, dates, time zone; for the whole gateway, a tenant, an account, a member, or a group in exclusive mode (a day shift, a night shift). A session ends when its window closes. See [working hours](/docs/access/tenants#working-hours). |
 | **Horizontal scaling** | One instance on its embedded storage | Several instances of the same gateway, active/active on one shared PostgreSQL: a change reaches every node within a second, certificates are shared, any node serves any session. See [the cluster page](/docs/deploy/kubernetes). |
 | **Monitoring** | Traffic and metrics screens, built in, nothing to install. Logs written as OpenTelemetry JSON for a node agent. | The same screens, plus export to your OpenTelemetry collector: traces, metrics and logs pushed over OTLP. |
 | **Audit** | The audit trail, in the console | The trail sent to your collector, Endpoint audit per operation, and CSV export. |
@@ -67,7 +67,7 @@ company, commercially, for free.
 | **Developer tunnel** | plug, free, runs on its own beside the gateway; Meerkat knows nothing of it | plug integrated into the gateway: each developer signs in with their own key, and every substitution is named and announced to users. See [Dev mode](/product/dev-mode). |
 | **Support** | The repository: an issue is read, and the answer stays where it helps the next person | Part of the agreement - you reach the people who wrote the gateway, not a tier. |
 
-**Team** carries every one of these rows but two: a single organisation, and
+**Team** carries every one of these rows but two: a single tenant, and
 a single instance on its own storage, as Community has. Its support is standard;
 Enterprise's is extended.
 

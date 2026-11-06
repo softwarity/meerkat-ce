@@ -229,8 +229,8 @@ A trace answers "what was slow"; a support ticket asks "for whom". The **Name th
 | Attribute | What |
 |---|---|
 | `user.id`, `user.name` | the account (OpenTelemetry's own names, which a backend that knows them shows as a user) |
-| `meerkat.tenant.id`, `meerkat.tenant.name` | the active organisation |
-| `meerkat.group` | the session's chosen group, in an organisation that works in exclusive mode |
+| `meerkat.tenant.id`, `meerkat.tenant.name` | the active tenant |
+| `meerkat.group` | the session's chosen group, in a tenant that works in exclusive mode |
 | `meerkat.roles` | the roles the access rules were judged on - a list, and what explains a refusal |
 
 An anonymous call carries nothing.

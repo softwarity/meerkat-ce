@@ -12,25 +12,25 @@ entière, et il faut la capacité `app admin` (ou `root`) pour y écrire.
 
 ## General
 
-![L'écran General : l'interrupteur des organisations et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
+![L'écran General : l'interrupteur des tenants et la grille hebdomadaire des heures ouvrées](img/console/general.webp)
 
 L'interrupteur, puis les heures ouvrées : un fuseau horaire et une ligne par
 jour, chacune avec sa plage horaire et un + pour en ajouter une seconde.
 
 Une déclaration sur ce que cette installation **est**, et une plage d'accès.
 
-**Several organisations.** Désactivé, cette gateway sert une seule organisation et
-ne la nomme jamais : ses groupes et ses membres s'administrent ici même, sous
-Application. Activé, les organisations ont leur propre entrée dans le rail. **Revenir**
-à une seule organisation demande d'abord confirmation, en comptant ce qui cessera
+**Several tenants.** Désactivé, cette gateway sert un seul tenant et
+ne le nomme jamais : ses groupes et ses membres s'administrent ici même, sous
+Application. Activé, les tenants ont leur propre entrée dans le rail. **Revenir**
+à un seul tenant demande d'abord confirmation, en comptant ce qui cessera
 d'être servi : rien n'est supprimé, et réactiver l'option rétablit aussitôt les
-organisations et leurs accès.
+tenants et leurs accès.
 
 > [!NOTE]
-> Édition Enterprise : plusieurs organisations.
+> Édition Enterprise : plusieurs tenants.
 
-**Working hours** définit la plage d'accès de toute l'application : chaque organisation
-en hérite, sauf si elle définit la sienne ; un compte, un membre ou un groupe (en mode
+**Working hours** définit la plage d'accès de toute l'application : chaque tenant
+en hérite, sauf s'il définit la sienne ; un compte, un membre ou un groupe (en mode
 exclusif) peuvent à leur tour la remplacer, la plus précise l'emportant - voir
 [les heures ouvrées](/docs/access/tenants#heures-ouvres).
 
@@ -54,7 +54,7 @@ pour tout l'écran.
 
 ![L'écran Security sur la politique de mots de passe : les types de caractères, l'historique, l'expiration et la durée de validité d'un mot de passe temporaire](img/console/security.webp)
 
-- **Two-factor** - impose un second facteur à tout le monde ; les organisations et les
+- **Two-factor** - impose un second facteur à tout le monde ; les tenants et les
   membres peuvent déroger à ce réglage. Juste à côté, **un code à usage unique envoyé
   par e-mail** sert de solution de secours à un utilisateur déjà enrôlé qui n'a pas
   accès à son application d'authentification : il nécessite un
@@ -98,7 +98,7 @@ pour tout l'écran.
 ## Pièges
 
 - **General enregistre avec le bouton, mais pas son interrupteur.** Le mode
-  d'organisation prend effet dès le clic ; les heures ouvrées attendent Save.
+  mono ou multi-tenant prend effet dès le clic ; les heures ouvrées attendent Save.
 - **Les langues sont celles des applications, pas celles de la console.** La console
   n'existe qu'en anglais, et ce que proposent les pages intégrées vient des routes.
 - **Une politique de mots de passe vide accepte n'importe quoi**, même un mot de passe

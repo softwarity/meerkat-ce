@@ -50,8 +50,8 @@ navigation come from the console.
 ::: gallery
 ![Users](img/showcase/users.webp) The accounts, what they can administer, and the fields you decided to ask for.
 ![Roles](img/showcase/roles.webp) A hierarchical catalogue: a role that inherits another gets everything it opens.
-![Groups](img/showcase/groups.webp) Groups per organisation, so a role is granted by membership rather than one by one.
-![Members](img/showcase/members.webp) Who belongs to an organisation, and as what.
+![Groups](img/showcase/groups.webp) Groups per tenant, so a role is granted by membership rather than one by one.
+![Members](img/showcase/members.webp) Who belongs to a tenant, and as what.
 ![Authorities](img/showcase/auth-providers.webp) OpenID Connect, LDAP, Active Directory, GitHub. They authenticate; they never decide roles.
 ![API tokens](img/showcase/access-tokens.webp) Tokens with a plane and a perimeter, and a secret shown exactly once.
 :::

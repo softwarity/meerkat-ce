@@ -15,7 +15,7 @@ counter is **keyed on**, and the budgets make themselves - one per caller.
 
 | Half | What it says |
 |---|---|
-| **per** | what the counter is keyed on: the whole route, a user, an API token, an organisation, or a client address |
+| **per** | what the counter is keyed on: the whole route, a user, an API token, a tenant, or a client address |
 | **applies to** | who the rule is about, written as an `Access` - the same vocabulary the access rules already use. Empty means everybody. |
 
 Which is what turns a role into a pricing tier without inventing a concept: *a
@@ -49,7 +49,7 @@ Bounds that need no identity - one for the whole route, one per address - are ch
 **outermost**: before a session is looked up, before a body is read, before an upstream
 is dialled. Refusing early is the whole point of a bound.
 
-Bounds keyed on a user, a token or an organisation cannot be, so they cost a session
+Bounds keyed on a user, a token or a tenant cannot be, so they cost a session
 resolve - paid only by the routes that ask for one. A rule *narrowed* to some callers
 needs an identity too, whatever it counts by.
 

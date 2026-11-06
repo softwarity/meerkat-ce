@@ -54,7 +54,7 @@ application at all.
 
 ## What a rule is
 
-The same rule as a route's - level, organisations, roles, named users - plus a
+The same rule as a route's - level, tenants, roles, named users - plus a
 method and a path:
 
 | Part | Values |

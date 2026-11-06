@@ -2,19 +2,19 @@
 title: Groupes, membres et règles de groupe
 section: La console
 order: 172
-summary: Relier les personnes aux rôles - les groupes d'une organisation, leurs membres, et les règles qui les alimentent depuis un annuaire.
+summary: Relier les personnes aux rôles - les groupes d'un tenant, leurs membres, et les règles qui les alimentent depuis un annuaire.
 ---
 
 # Groupes, membres et règles de groupe
 
-Trois écrans pour administrer **l'organisation servie**. En mode mono-organisation,
-ils se trouvent sous **Application**, puisqu'il n'y a qu'une organisation et que
-personne ne la nomme. Quand il y en a plusieurs, les mêmes écrans s'ouvrent pour chaque
-organisation depuis [Tenants](/docs/console/tenants), là où se pose la question
-*laquelle*.
+Trois écrans pour administrer **le tenant servi**. En mode mono-tenant,
+ils se trouvent sous **Application**, puisqu'il n'y a qu'un tenant et que
+personne ne le nomme. Quand il y en a plusieurs, les mêmes écrans s'ouvrent pour chaque
+tenant depuis [Tenants](/docs/console/tenants), là où se pose la question
+*lequel*.
 
 La chaîne est courte : un **rôle** est global, un **groupe** est un ensemble de rôles
-au sein d'une organisation, et une **appartenance** place une personne dans des
+au sein d'un tenant, et une **appartenance** place une personne dans des
 groupes.
 
 ## Groups
@@ -25,8 +25,8 @@ Trois groupes - Finance, Support, Warehouse - en regard du catalogue. Chaque lig
 affiche la description du rôle au-dessus de son nom technique, et la ligne *Whole
 column* se trouve juste sous les en-têtes.
 
-Une matrice : le **catalogue des rôles** en lignes, les **groupes** de cette
-organisation en colonnes, et une coche là où un rôle appartient à un groupe.
+Une matrice : le **catalogue des rôles** en lignes, les **groupes** de ce
+tenant en colonnes, et une coche là où un rôle appartient à un groupe.
 
 - **Cocher un rôle parent coche tous ceux qui en dépendent.** C'est la hiérarchie du
   catalogue qui fait le travail.
@@ -50,7 +50,7 @@ d'une personne :
 Sur l'écran Groups, le nom d'un groupe (son en-tête de colonne, un bouton tonal)
 ouvre **son tiroir** : nom,
 description et, en mode exclusif seulement, ses **heures ouvrées** (Enterprise),
-qui remplacent celles du compte et de l'organisation pour qui se connecte avec ce
+qui remplacent celles du compte et du tenant pour qui se connecte avec ce
 groupe. Save enregistre ; la suppression est dans la danger zone du tiroir, après
 confirmation.
 
@@ -58,35 +58,35 @@ confirmation.
 
 ![L'écran Members : les comptes en lignes, les trois mêmes colonnes de groupes, et la dernière connexion](img/console/members.webp)
 
-La même installation en mode mono-organisation : la matrice est identique à celle d'une
-organisation, appartenance et badge admin compris - une organisation unique reste une
-organisation.
+La même installation en mode mono-tenant : la matrice est identique à celle d'un
+tenant, appartenance et badge admin compris - un tenant unique reste un
+tenant.
 
-Encore une matrice : les comptes en lignes, les groupes de cette organisation en
+Encore une matrice : les comptes en lignes, les groupes de ce tenant en
 colonnes.
 
 - La **première colonne** représente l'appartenance elle-même, dans les deux modes : la
-  coche fait entrer dans l'organisation ou en fait sortir, et le badge **admin**
-  voisin promeut un membre au rang d'administrateur de l'organisation. Le propriétaire
+  coche fait entrer dans le tenant ou en fait sortir, et le badge **admin**
+  voisin promeut un membre au rang d'administrateur du tenant. Le propriétaire
   affiche à la place un badge **owner** en lecture seule ; la propriété se transfère
-  depuis la Danger zone de l'organisation.
+  depuis la Danger zone du tenant.
 - Cocher un groupe pour une personne qui n'est pas encore membre en fait un membre ; la
   case de colonne entière agit sur les membres affichés.
 - La dernière colonne indique la dernière connexion et donne accès à la
-  réinitialisation du mot de passe, limitée à cette organisation : un mot de passe
+  réinitialisation du mot de passe, limitée à ce tenant : un mot de passe
   temporaire affiché une fois, ou un lien envoyé par mail au membre pour en choisir
   un nouveau.
 - Deux boutons sur la ligne d'un membre ouvrent **son tiroir**, chacun sur sa page :
-  l'horloge sur ses **heures ouvrées** dans cette organisation (Enterprise), propres
+  l'horloge sur ses **heures ouvrées** dans ce tenant (Enterprise), propres
   ou héritées, et les dates entre lesquelles son accès court, valables dans les deux
-  cas ; l'historique sur son **historique de connexion** dans cette organisation.
+  cas ; l'historique sur son **historique de connexion** dans ce tenant.
 
 Members et [Users](/docs/console/users) répondent à deux questions différentes et
 restent séparés : Users traite du compte, cet écran de son affectation.
 
 ## Group rules
 
-![Une règle de groupe ouverte dans son tiroir : l'autorité, le groupe amont, et le groupe de l'organisation qu'elle accorde](img/console/group-rules.webp)
+![Une règle de groupe ouverte dans son tiroir : l'autorité, le groupe amont, et le groupe du tenant qu'elle accorde](img/console/group-rules.webp)
 
 Ce que déclare une **autorité**, converti ici en appartenance et en groupes. Une
 organisation ou une équipe GitHub, un groupe LDAP, une revendication (claim) émise par
@@ -110,8 +110,8 @@ Deux caractéristiques des règles qui surprennent :
 
 ## Pièges
 
-- **En mode multi-organisation, ces entrées disparaissent d'Application.** Elles sont
-  propres à chaque organisation, sous Tenants.
+- **En mode multi-tenant, ces entrées disparaissent d'Application.** Elles sont
+  propres à chaque tenant, sous Tenants.
 - **Le mode Exclusive modifie ce que les personnes voient à la connexion** : on leur
   demande de choisir un groupe. Ne l'activez pas sur une installation en service sans
   prévenir personne.

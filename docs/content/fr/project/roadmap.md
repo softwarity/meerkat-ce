@@ -25,8 +25,8 @@ visible après coup.
 - **L'identité** : comptes locaux, OpenID Connect, SAML 2.0, LDAP et Active
   Directory, GitHub, tous testés face à de vrais serveurs. Sessions, jetons d'API, jetons
   signés transmis aux upstreams.
-- **L'accès** : un catalogue hiérarchique de rôles, des groupes par organisation,
-  les organisations elles-mêmes, une règle par route, et une sécurité par endpoint
+- **L'accès** : un catalogue hiérarchique de rôles, des groupes par tenant,
+  les tenants eux-mêmes, une règle par route, et une sécurité par endpoint
   lue dans la description OpenAPI d'un service.
 - **Le second facteur** : TOTP avec navigateurs de confiance, et passkeys.
 - **Le coffre** : des secrets scellés au repos et des valeurs en clair, tous
@@ -81,7 +81,7 @@ indique, ligne par ligne, ce qui manque à chacune.
   votre collecteur. Il reste à ce que la gateway se déclare dans `tracestate`
   et `baggage`, et à relier une ligne d'audit à sa trace.
 - **Les quotas** - ils se définissent par route, par endpoint et par
-  consommateur - utilisateur, jeton, organisation, adresse - et un dépassement
+  consommateur - utilisateur, jeton, tenant, adresse - et un dépassement
   reçoit un 429 avec les en-têtes standard. Il manque l'écran qui montre la
   consommation, la possibilité de ralentir plutôt que de refuser, et des compteurs
   qui restent justes en cluster.
@@ -119,8 +119,8 @@ indique, ligne par ligne, ce qui manque à chacune.
   est retiré à l'aller ; il reste à réécrire ce que l'application renvoie.
 - **gRPC pour de bon** : la sécurité par méthode, et gRPC-Web. Les compteurs
   lisent déjà `grpc-status`.
-- **Un portail par organisation** : une icône, un titre et un agencement propres à
-  chaque client. Ce serait la première personnalisation visuelle par organisation
+- **Un portail par tenant** : une icône, un titre et un agencement propres à
+  chaque client. Ce serait la première personnalisation visuelle par tenant
   du produit.
 - **HTTP/3**, le jour où le gain se mesurera au lieu de se raconter.
 - **Un coffre externe** : HashiCorp Vault, les secrets Kubernetes et les secrets

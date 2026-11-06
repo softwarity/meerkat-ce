@@ -29,7 +29,7 @@ endpoint can modify an event.
 | actor | the account, plus the **token** when one was used |
 | action | `route.update`, `theme.branding`, `settings.update`, `maintenance`, `backup.snapshot`... |
 | target | the kind of object, its id and its name |
-| organisation | when the change belongs to one |
+| tenant | when the change belongs to one |
 | changes | one entry per field that moved, with its `from` and its `to` |
 | detail | a note, for creations, deletions and acts that have no diff; the reason of a refused sign-in |
 | address | on the security half, the address the gateway resolved |
@@ -43,7 +43,7 @@ An update whose diff comes out empty writes **nothing**: saving a form without
 changing a value is not an event.
 
 The diff is computed generically, by comparing the old and the new object field
-by field, so it works for a route, an account, an organisation or a settings
+by field, so it works for a route, an account, a tenant or a settings
 payload without any per-type code. A nested object or a list compares by its
 whole encoding: a change anywhere inside surfaces the whole field.
 
@@ -74,7 +74,7 @@ for a sign-in to the console.
 | Action | When | Detail |
 |---|---|---|
 | `signin` | a session was issued | how: `password`, `totp`, `passkey`, `email-code`, `external-totp`... |
-| `signin.organisation` | an organisation entered, chosen after signing in or switched to later | its name |
+| `signin.organisation` | a tenant entered, chosen after signing in or switched to later | its name |
 | `signin.refused` | a door stayed shut | the reason (below) |
 | `signin.locked` | the attempt that tripped the throttle | `throttled`, or `bad-code` for a second factor |
 | `signout` | the account signed out | `remote` when closed from *Active sessions* |
@@ -107,10 +107,10 @@ writes `signin.locked`, and the attempts refused after it write nothing: an
 attacker at a thousand tries a second is not a thousand rows a second.
 
 Each line carries the **address** the gateway resolved, never an
-`X-Forwarded-For` that the caller wrote. And the **organisation** when there is
+`X-Forwarded-For` that the caller wrote. And the **tenant** when there is
 one: on the sign-in itself for an account that belongs to a single one, on the
 `signin.organisation` line when it is chosen afterwards. That stamp is what
-shows the line to that organisation's administrators.
+shows the line to that tenant's administrators.
 
 These lines are not pushed live to the console: a list of accounts re-read at
 every sign-in of anybody would be noise. The account's own
@@ -127,7 +127,7 @@ their capabilities cover:
 | root | everything, console sign-ins included |
 | infra-admin | routes, identity providers, certificates, settings, issue reports |
 | app-admin | accounts, roles, themes, languages, schedules, settings, issue reports, and the application accounts' security |
-| an organisation's administrator | the events of the organisations they administer, their members' sign-ins into them included |
+| a tenant's administrator | the events of the tenants they administer, their members' sign-ins into them included |
 | anybody else | nothing, and the endpoint refuses rather than serving an empty page |
 
 A sign-in to the console is root's alone: it says where and when the people who
@@ -151,7 +151,7 @@ nobody's fault in particular.
 Each event also leaves as an OpenTelemetry **log** whose resource says
 `meerkat.stream=audit`: the Collector and the backend keep it apart from
 ordinary logs, with its own query, retention and readers. The action is the
-body; the actor (`user.id`, `user.name`), the target, the organisation, the
+body; the actor (`user.id`, `user.name`), the target, the tenant, the
 client address and the field-level changes are attributes; the trace id is the
 request's, which joins the event to its trace and its access line.
 
@@ -168,7 +168,7 @@ sent to the collector with the rest of the trail when the OpenTelemetry
 **Audit** tab is on.
 
 An event names the caller as the gateway authenticated them (account,
-organisation, group, roles), the operation, the path as requested, the status,
+tenant, group, roles), the operation, the path as requested, the status,
 the address and the trace id, then the fields the operation takes from the call
 and, when asked, the JSON body with its secrets masked.
 
@@ -178,7 +178,7 @@ the screen says how many since the gateway started. Their volume follows the
 traffic, so they have their own lifetime, a month by default, which root sets
 on the same screen (**Keep operations for**): seven days to a year, apart from
 the year the changes are kept. An application administrator reads every call;
-an organisation's administrator, the calls made in their organisation.
+a tenant's administrator, the calls made in their tenant.
 
 On the community image the screen is locked, and so is the route editor's
 upload: an event nothing would ever send is a trail that looks kept and is not.

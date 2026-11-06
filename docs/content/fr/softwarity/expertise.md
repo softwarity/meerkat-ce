@@ -15,7 +15,7 @@ le plus de temps et en retire le moins de reconnaissance.
 ## La porte d'entrée
 
 Une gateway n'est pas un routeur. Devant une application interne, c'est
-l'endroit où l'identité, les règles d'accès, les organisations, les quotas et
+l'endroit où l'identité, les règles d'accès, les tenants, les quotas et
 l'audit existent - faute de quoi ils sont dispersés dans chacun des services
 qui se trouvent derrière. Ce terrain, nous le connaissons :
 
@@ -27,7 +27,7 @@ qui se trouvent derrière. Ce terrain, nous le connaissons :
   franchissons pas : un annuaire externe authentifie, il ne décide jamais des
   rôles.
 - **Des autorisations qui résistent à un audit** : rôles hiérarchiques, groupes
-  par organisation, une règle par route et par endpoint, et un journal qui dit
+  par tenant, une règle par route et par endpoint, et un journal qui dit
   qui a changé quoi, avec l'avant et l'après.
 
 ## L'écran

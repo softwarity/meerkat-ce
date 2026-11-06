@@ -23,7 +23,7 @@ personne n'ouvre ses sources.
 | | Ce que c'est | Activé par |
 |---|---|---|
 | Agent de page | `/meerkat/page.js`, qui installe `window.meerkatPage` | le fait que la route soit une route UI |
-| Bouton utilisateur | un Web Component `meerkat-user-button` : qui vous êtes, l'organisation, la langue, la déconnexion | un interrupteur sur la route |
+| Bouton utilisateur | un Web Component `meerkat-user-button` : qui vous êtes, le tenant, la langue, la déconnexion | un interrupteur sur la route |
 | Portail de navigation | une barre `meerkat-portal-nav` qui liste les applications que cette personne peut ouvrir | le catalogue global en mode `portal` (Enterprise) ; elle remplace le bouton seul |
 | Marquage d'identité | les rôles et les champs de l'utilisateur écrits dans le balisage même de la page, côté serveur | un interrupteur sur la route, champ par champ |
 | CSS et JS personnalisés | les blocs de la section Custom de la route, écrits là ou téléversés en fichiers | au moins un bloc |
@@ -118,7 +118,7 @@ premier affichage : une page peut masquer un bouton à tous ceux qui ne
 détiennent pas un rôle, avec une feuille de style et rien d'autre.
 
 **Le JSON**, sur `/meerkat/user-button.json`, est ce que lit un script qui veut
-la vue d'ensemble : l'identité, les organisations vers lesquelles cette
+la vue d'ensemble : l'identité, les tenants vers lesquels cette
 personne peut basculer, les applications qu'elle peut ouvrir, ses rôles et ses
 groupes. Il est servi en `no-store`.
 

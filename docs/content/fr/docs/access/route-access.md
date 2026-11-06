@@ -10,8 +10,8 @@ summary: La règle unique qui dit qui peut atteindre une route - niveau, rôles,
 Chaque route porte une règle, dans la section **Security** de l'éditeur de
 route. Elle comprend trois parties, qui ne sont pas des alternatives :
 
-- **un niveau** : le type d'appelant, en termes de session et d'organisation ;
-- **des rôles** : lesquels, détenus dans l'organisation active ;
+- **un niveau** : le type d'appelant, en termes de session et de tenant ;
+- **des rôles** : lesquels, détenus dans le tenant actif ;
 - **des utilisateurs nommés** : des personnes qui passent de toute façon.
 
 Le niveau et les rôles sont combinés par un **ET**. Les utilisateurs nommés s'y
@@ -22,9 +22,9 @@ ajoutent par un **OU**, par-dessus le tout.
 | Niveau | Qui passe |
 |---|---|
 | **Delegated** (rien de choisi) | tout le monde, connecté ou non. Aucune session n'est même recherchée ; c'est le service qui décide |
-| **Signed in** | toute personne qui a un compte - y compris un compte qui n'appartient encore à aucune organisation |
-| **In an organisation** | une session qui a une organisation active. Écarte un compte encore en attente d'accès |
-| **In one of these organisations** | l'organisation active doit faire partie de celles que vous nommez |
+| **Signed in** | toute personne qui a un compte - y compris un compte qui n'appartient encore à aucun tenant |
+| **In a tenant** | une session qui a un tenant actif. Écarte un compte encore en attente d'accès |
+| **In one of these tenants** | le tenant actif doit faire partie de ceux que vous nommez |
 | **Nobody** | refusé avant tout appel au service. Seuls les utilisateurs nommés passent |
 
 Il n'existe pas de niveau *public*, parce que déléguer en est déjà un, et qu'un
@@ -40,24 +40,24 @@ qui rend une page de salle d'attente, ou un profil en libre-service, accessible
 ## Les rôles
 
 Choisissez-en autant que vous voulez ; **il suffit d'en détenir un pour
-passer**. Ils sont lus dans l'organisation *active*, et comprennent tout ce que
+passer**. Ils sont lus dans le tenant *actif*, et comprennent tout ce que
 les rôles de la personne impliquent par la hiérarchie.
 
-Comme le catalogue est global alors que les groupes appartiennent à une
-organisation, les deux axes disent réellement des choses différentes :
+Comme le catalogue est global alors que les groupes appartiennent à un
+tenant, les deux axes disent réellement des choses différentes :
 
 | Règle | Signification |
 |---|---|
-| rôles `billing-admin`, niveau *In an organisation* | un administrateur de la facturation de l'organisation active, quelle qu'elle soit - une console commune à toutes les organisations |
+| rôles `billing-admin`, niveau *In a tenant* | un administrateur de la facturation du tenant actif, quel qu'il soit - une console commune à tous les tenants |
 | rôles `billing-admin`, niveau *In one of these*, Acme | un administrateur de la facturation **d'Acme** |
 
 Si vous laissez les rôles vides, n'importe quel rôle convient : le niveau décide
 seul.
 
 > [!NOTE]
-> Une règle qui exige un rôle a toujours besoin d'une organisation, que vous
-> l'ayez précisé ou non : les rôles n'existent qu'à l'intérieur d'une
-> organisation. En pratique, choisissez *In an organisation* dès que vous
+> Une règle qui exige un rôle a toujours besoin d'un tenant, que vous
+> l'ayez précisé ou non : les rôles n'existent qu'à l'intérieur d'un
+> tenant. En pratique, choisissez *In a tenant* dès que vous
 > nommez un rôle.
 
 ## Les utilisateurs nommés
@@ -105,16 +105,16 @@ Sur une **route UI**, la personne arrive sur une page dans sa propre langue :
 
 | Situation | Où elle arrive |
 |---|---|
-| Changer d'organisation lèverait le refus | `/select-tenant`, qui explique pourquoi |
-| Elle n'appartient à aucune organisation et la règle en exige une | `/account-pending`, la salle d'attente |
+| Changer de tenant lèverait le refus | `/select-tenant`, qui explique pourquoi |
+| Elle n'appartient à aucun tenant et la règle en exige un | `/account-pending`, la salle d'attente |
 | Tout autre cas | `/refused`, qui nomme la règle à l'origine du refus et liste ce que cette session peut ouvrir |
 | Aucune session | la page de connexion, qui retient la destination |
 
-La proposition de changer d'organisation est confrontée à la réalité : elle
-n'est faite que si une autre organisation à laquelle la personne appartient
+La proposition de changer de tenant est confrontée à la réalité : elle
+n'est faite que si un autre tenant auquel la personne appartient
 satisferait effectivement la règle.
 
 Sur une **route de service**, la réponse est un `403` accompagné d'une phrase
-qui nomme ce qui manquait - l'organisation, l'un de ces rôles, cet endpoint est
+qui nomme ce qui manquait - le tenant, l'un de ces rôles, cet endpoint est
 fermé - ou un `401` avec `WWW-Authenticate: Session` quand il n'y a aucune
 session. Personne ne lit une page HTML dans un `curl`.

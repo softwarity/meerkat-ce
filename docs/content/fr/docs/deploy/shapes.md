@@ -10,7 +10,7 @@ summary: Trois architectures et les fichiers de chacune : une gateway Community,
 
 Trois architectures possibles, et le choix ne dépend pas du nombre
 d'utilisateurs : il dépend de ce que vous acceptez de perdre quand une machine
-tombe, et du nombre d'organisations que sert la gateway.
+tombe, et du nombre de tenants que sert la gateway.
 
 ::: figure shapes
 Ce que contient chaque architecture, et le fichier qui la déploie.
@@ -20,7 +20,7 @@ Ce que contient chaque architecture, et le fichier qui la déploie.
 
 Un conteneur, un volume, rien d'autre à côté. Le stockage embarqué contient les
 routes, les comptes, les rôles, le coffre scellé et les certificats. C'est la
-gateway complète pour une organisation, gratuite, production comprise.
+gateway complète pour un tenant, gratuite, production comprise.
 
 Ce qu'elle ne sait pas faire, c'est survivre à la perte de sa machine : un
 volume ne suit pas un conteneur d'un hôte à un autre. Sauvegardez le volume, et
@@ -39,7 +39,7 @@ helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/va
 
 ## Une gateway, Enterprise
 
-La même architecture avec l'image Enterprise : plusieurs organisations, les
+La même architecture avec l'image Enterprise : plusieurs tenants, les
 annuaires d'entreprise et le **tunnel développeur**. Ce dernier écoute sur le
 port **`22222`** : c'est un port de plus à publier, là où vos développeurs
 peuvent l'atteindre et nulle part ailleurs. Il ne parle pas HTTP mais SSH, et

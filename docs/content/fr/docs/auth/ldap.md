@@ -82,7 +82,7 @@ reprendre un compte local existant qui porte la même adresse.
 Le nom d'un groupe est la feuille du DN, pas le DN entier :
 `cn=developer,ou=groups,dc=acme,dc=io` est rapporté sous le nom `developer`. Les groupes
 deviennent des appartenances et des rôles par l'intermédiaire d'une règle de groupe définie
-sur une organisation.
+sur un tenant.
 
 ## TLS
 

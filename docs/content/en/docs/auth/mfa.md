@@ -109,8 +109,8 @@ through enrolment at their next sign-in, before they reach anything, and cannot
 turn it off afterwards - the self-service disable answers `403` and says why.
 
 > [!NOTE]
-> There is deliberately **no per-organisation** level: the second factor is
-> asked before the organisation is known, so a rule per organisation could not be
+> There is deliberately **no per-tenant** level: the second factor is
+> asked before the tenant is known, so a rule per tenant could not be
 > read in time. There is **no per-role level either**, for the same reason; it is
 > the piece FEATURES.md still lists as missing on this feature.
 

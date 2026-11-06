@@ -52,18 +52,18 @@ est traitée comme un secret à protéger.
 ## Portées
 
 Une entrée appartient à une portée, et **un nom est unique au sein d'une portée** - le
-même `db-password` peut donc désigner deux choses différentes pour deux organisations.
+même `db-password` peut donc désigner deux choses différentes pour deux tenants.
 
 | Portée | Qui l'administre | Ce qui s'y résout |
 |---|---|---|
 | `infra` | gateway-admin | les routes, les arguments des filtres, les identifiants des upstreams |
 | `app` | app-admin | le relais de messagerie, les fournisseurs d'identité |
-| une organisation | les administrateurs de cette organisation | ses propres entrées |
+| un tenant | les administrateurs de ce tenant | ses propres entrées |
 
 La résolution respecte le même cloisonnement, et c'est ce qui empêche l'administrateur
 d'un plan de modifier discrètement ce que résout un autre plan : une route ne se résout
-jamais qu'à partir des entrées `infra`. Une organisation cherche d'abord dans ses
-propres entrées, puis se rabat sur celles de l'application : elle peut donc **utiliser**
+jamais qu'à partir des entrées `infra`. Un tenant cherche d'abord dans ses
+propres entrées, puis se rabat sur celles de l'application : il peut donc **utiliser**
 une valeur globale sans pouvoir la modifier, et la masquer en déclarant la sienne sous le
 même nom.
 

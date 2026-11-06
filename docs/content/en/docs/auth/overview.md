@@ -14,7 +14,7 @@ who they are here".
 
 An authority proves **who** someone is. It never decides what they may do: a
 first sign-in produces an account that reaches nothing until an administrator
-places it in an organisation and grants roles. That half is
+places it in a tenant and grants roles. That half is
 [access control](/docs/access/overview).
 
 ## The five kinds
@@ -25,7 +25,7 @@ places it in an organisation and grants roles. That half is
 | **OpenID Connect** | a company identity provider: Keycloak, Entra ID, Okta, Auth0, Google | a button per provider | both |
 | **SAML 2.0** | an identity provider that speaks SAML rather than OIDC: ADFS, Entra ID, Okta, Shibboleth | a button per provider | **Enterprise** |
 | **Directory** | an LDAP directory or an Active Directory, asked straight | no button: it answers the same form | **Enterprise** |
-| **GitHub** | a GitHub account, restricted to the organisations you name | a button | both |
+| **GitHub** | a GitHub account, restricted to the GitHub organisations you name | a button | both |
 
 > [!NOTE]
 > Kerberos - the Windows single sign-on - is not implemented yet. Do not plan an
@@ -60,11 +60,11 @@ value itself.
 1. **The first factor.** A password typed into the form, a redirect to a provider, a passkey, or a [code received by e-mail](/docs/auth/email-code). For a typed password, the local accounts are asked first; if they say no, each enabled directory is asked in turn, in the order on the screen. A wrong password, an unknown username and a disabled account all answer the same sentence.
 2. **A password that must change** - temporary, or expired under the policy. The session exists but is stuck on that step, and every navigation lands back on it.
 3. **The second factor**, if the account owes one.
-4. **The organisation.** None, and the person waits in `/account-pending`. One, and it is stamped on the session silently. Several, and they choose.
-5. **The group**, in exclusive-group mode when the organisation has more than one.
+4. **The tenant.** None, and the person waits in `/account-pending`. One, and it is stamped on the session silently. Several, and they choose.
+5. **The group**, in exclusive-group mode when the tenant has more than one.
 
 A passkey answers steps one to three at once: it is treated as both factors, and
-lands directly on the organisation.
+lands directly on the tenant.
 
 ## The rule about stacking factors
 

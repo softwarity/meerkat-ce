@@ -2,7 +2,7 @@
 title: Roles and groups
 section: Access control
 order: 132
-summary: One role catalogue for the gateway, groups per organisation, and how a person's effective roles are worked out.
+summary: One role catalogue for the gateway, groups per tenant, and how a person's effective roles are worked out.
 ---
 
 # Roles and groups
@@ -10,9 +10,9 @@ summary: One role catalogue for the gateway, groups per organisation, and how a 
 Roles are the names your rules are written in - `orders-reader`, `support`,
 `billing-admin`. Groups are how people get them.
 
-The split is deliberate: **the catalogue is gateway-wide, the groups belong to an
-organisation**. One vocabulary for the whole installation, assembled differently
-for each organisation.
+The split is deliberate: **the catalogue is gateway-wide, the groups belong to a
+tenant**. One vocabulary for the whole installation, assembled differently
+for each tenant.
 
 ## The catalogue
 
@@ -50,25 +50,25 @@ decisions.
 
 ## Groups
 
-**A group belongs to one organisation** and holds a set of roles from the
-catalogue. Its name is unique within that organisation. A member of the
-organisation is then assigned groups, and their roles are the roles of those
+**A group belongs to one tenant** and holds a set of roles from the
+catalogue. Its name is unique within that tenant. A member of the
+tenant is then assigned groups, and their roles are the roles of those
 groups.
 
 Nothing else grants a role. There is no role on an account, and no role outside
-an organisation:
+a tenant:
 
 > [!WARNING]
-> A session with **no active organisation holds no roles at all**. Not the roles
-> of another organisation, not a subset - none. Any rule asking for a role
-> therefore also requires an active organisation, even when the rule does not
+> A session with **no active tenant holds no roles at all**. Not the roles
+> of another tenant, not a subset - none. Any rule asking for a role
+> therefore also requires an active tenant, even when the rule does not
 > mention one.
 
-![Groups of an organisation, each granting a set of roles to its members](img/console/groups.webp)
+![Groups of a tenant, each granting a set of roles to its members](img/console/groups.webp)
 
 ## One group at a time, or all of them
 
-Each organisation chooses how its groups combine:
+Each tenant chooses how its groups combine:
 
 | Mode | What it does |
 |---|---|
@@ -76,19 +76,19 @@ Each organisation chooses how its groups combine:
 | Exclusive | one group applies, chosen at sign-in |
 
 Exclusive mode exists for the case where somebody wears two hats in the same
-organisation and the two must not be worn together. When it is on and the person
+tenant and the two must not be worn together. When it is on and the person
 has more than one group, they are sent to `/select-group`, and they may switch
 later from the user button. An exclusive session that has not chosen carries **no
-roles** - the same rule as no organisation.
+roles** - the same rule as no tenant.
 
 There is no installation-wide default for this: it is a property of the
-organisation, and an organisation that says nothing is cumulative.
+tenant, and a tenant that says nothing is cumulative.
 
 ## How effective roles are computed
 
-On every request, for the account, the active organisation and the active group:
+On every request, for the account, the active tenant and the active group:
 
-1. take the groups assigned in **this** organisation - or only the active one, in exclusive mode;
+1. take the groups assigned in **this** tenant - or only the active one, in exclusive mode;
 2. take the roles of those groups;
 3. expand each role down the hierarchy, adding every descendant;
 4. sort, drop duplicates.
@@ -97,7 +97,7 @@ The result is what route rules and endpoint rules are answered against, and what
 is forwarded upstream with the identity - so your service receives the expanded
 list and never has to know the hierarchy.
 
-The computation is remembered for a few seconds per account, organisation and
+The computation is remembered for a few seconds per account, tenant and
 group. A role granted or withdrawn therefore takes effect within seconds, without
 signing anyone out.
 
@@ -105,7 +105,7 @@ signing anyone out.
 
 Group assignments can be placed by hand, or projected from what an external
 authority reports: a directory group, a GitHub team, a claim from an identity
-provider. A rule maps one reported group to one group of one organisation, and
+provider. A rule maps one reported group to one group of one tenant, and
 runs on every external sign-in - so membership follows the directory rather than a
 spreadsheet.
 

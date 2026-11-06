@@ -1,5 +1,5 @@
 {
-  "_why": "Every routed screen of the console (console/src/app/app.routes.ts), who may open it, and the title that says it rendered. Read by tests/every-screen.spec.ts (QUAL-01), which also fails when app.routes.ts routes a component this file does not list. 'edition': 'ee' needs several organisations, 'ce' is a single-organisation screen the multi-organisation console replaces by Tenants. 'refused' lists the reads a screen makes that its viewer is refused today, each with why; any OTHER failed request fails the spec, so a new one is caught and an old one is a decision written down.",
+  "_why": "Every routed screen of the console (console/src/app/app.routes.ts), who may open it, and the title that says it rendered. Read by tests/every-screen.spec.ts (QUAL-01), which also fails when app.routes.ts routes a component this file does not list. 'edition': 'ee' needs several tenants, 'ce' is a single-tenant screen the multi-tenant console replaces by Tenants. 'refused' lists the reads a screen makes that its viewer is refused today, each with why; any OTHER failed request fails the spec, so a new one is caught and an old one is a decision written down.",
   "containers": [
     "./theme/built-in-pages/built-in-pages.component",
     "./identity/tenant-page/tenant-page.component",
@@ -197,12 +197,12 @@
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         },
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default/groups",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         }
       ]
     },
@@ -228,17 +228,17 @@
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         },
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default/members",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         },
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default/groups",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         }
       ]
     },
@@ -255,7 +255,7 @@
         {
           "profile": "app-admin",
           "request": "GET /api/tenants/default",
-          "why": "community build: Application offers the single organisation's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
+          "why": "community build: Application offers the single tenant's groups, members and rules to an application admin, and every /api/tenants/{id} call refuses them (root, owner or ADMIN member only): the screen is empty for the profile it is offered to (TEST-PLAN: to decide)"
         }
       ]
     },

@@ -37,8 +37,8 @@ outil d'exploitant, elle ne fait pas partie de ce que votre produit donne à voi
 
 ## Ce qui n'est pas personnalisable
 
-- **Par organisation.** Il n'existe ni thème, ni marque, ni portail propres à une
- organisation. Ce serait la première surcharge visuelle par organisation du produit : elle
+- **Par tenant.** Il n'existe ni thème, ni marque, ni portail propres à un
+ tenant. Ce serait la première surcharge visuelle par tenant du produit : elle
  est prévue, et nous préférons l'écrire ici plutôt que la livrer à moitié faite.
 - **Par application.** Un groupe de routes partageant sa propre marque et ses propres langues
  n'existe pas : la configuration est globale et une route n'appartient à aucun groupe.

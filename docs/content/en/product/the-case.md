@@ -37,7 +37,7 @@ This is the list as it appears in security questionnaires and tenders.
 | **A polished sign-in** | pages in your brand, translated, light and dark |
 | **Two-factor and passkeys** | authenticator app, recovery codes, security keys |
 | **Customer SSO** | Entra ID, Okta, Google, SAML, LDAP, Active Directory |
-| **Several organisations** | each customer isolated, with its members, groups and admins |
+| **Several tenants** | each customer isolated, with its members, groups and admins |
 | **Roles and fine-grained access** | per screen, per application, per API endpoint |
 | **API tokens** | for integrations and machines |
 | **Traffic protection** | rate limits, quotas, timeouts, a breaker for failing services |
@@ -64,7 +64,7 @@ or a paid service.
 | Sign-in, two-factor, passkeys | Keycloak, Zitadel, Authentik | Auth0, WorkOS, Clerk, FusionAuth | included |
 | Branded pages, 21 languages | a theme to build | depends on the plan | included |
 | Customer SSO: OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, billed per connection | included, Enterprise for SAML and LDAP |
-| Organisations your customers manage | admin screens to build | WorkOS, Frontegg | included, Enterprise |
+| Tenants your customers manage | admin screens to build | WorkOS, Frontegg | included, Enterprise |
 | Single sign-on into tools that only speak OpenID Connect | Keycloak, a realm and a client per tool | Auth0, Okta | included, Enterprise |
 | Protect an application that has no login | oauth2-proxy, Pomerium Core | Pomerium Enterprise, Cloudflare Access | included |
 | Routing, rate limits, quotas | Kong OSS, APISIX, Traefik, Envoy Gateway | Kong Enterprise, Tyk, Traefik Hub, API7, Gravitee | included |
@@ -139,12 +139,12 @@ in time (below). Paid services show a price. To compare them, take a software
 vendor selling to businesses, the case where this foundation weighs the most:
 
 - 5,000 active users a month
-- 20 customer organisations, 10 of them with their own SSO
+- 20 customer tenants, 10 of them with their own SSO
 - 15 services, in production and staging
 - 50 million requests a month
 - a team of 10 developers
 
-With 20 organisations, this case needs Meerkat Enterprise.
+With 20 tenants, this case needs Meerkat Enterprise.
 
 | Building block | Cheapest that fits | Typical choice | Meerkat |
 | --- | --- | --- | --- |
@@ -195,7 +195,7 @@ Person-days to reach the same result, from the low estimate to the high one.
 | --- | --- | --- | --- |
 | Identity: install, two-factor, passkeys, SSO | 10 to 20 | 5 to 10 | 0.5 to 1 |
 | Branded, translated sign-in pages | 5 to 10 | 2 to 4 | 0.5 to 1 |
-| Customer organisations and their admin | 15 to 30 | 5 to 15 | 0.5 to 1 |
+| Customer tenants and their admin | 15 to 30 | 5 to 15 | 0.5 to 1 |
 | Login proxy, identity passed to services | 3 to 6 | 3 to 6 | 0.5 to 1 |
 | API gateway: routes, rate limits, quotas | 8 to 15 | 5 to 10 | 1 to 2 |
 | Certificates and secrets vault | 6 to 13 | 3 to 6 | 0.5 to 1 |

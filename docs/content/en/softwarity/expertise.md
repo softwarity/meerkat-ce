@@ -14,7 +14,7 @@ the two places where an IT team loses the most time and gets the least credit.
 ## The front door
 
 A gateway is not a router. In front of an internal application it is where
-identity, access rules, organisations, quotas and audit either exist or are
+identity, access rules, tenants, quotas and audit either exist or are
 scattered across every service behind it. We know that ground:
 
 - **Reverse proxying done properly**: predicates and filters, hot reload,
@@ -24,7 +24,7 @@ scattered across every service behind it. We know that ground:
   Active Directory, two-factor, passkeys. And the line we do not cross - an
   external directory authenticates, it never decides roles.
 - **Authorisation that survives an audit**: hierarchical roles, groups per
-  organisation, a rule per route and per endpoint, and a trail that says who
+  tenant, a rule per route and per endpoint, and a trail that says who
   changed what, with the before and the after.
 
 ## The screen

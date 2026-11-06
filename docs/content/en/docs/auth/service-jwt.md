@@ -25,7 +25,7 @@ client sent is removed first, so a caller cannot forge one. It carries:
 | `sub` | the caller's account id |
 | `aud` | the route's **Audience**, or its name when the field is empty: set one when the service checks for a value of its own, or so that renaming the route does not change its tokens. The same rule as an OIDC client's audience: any text up to 255 characters, spaces inside included, no control character |
 | `iat`, `exp` | when it was signed, and when it stops being valid: two minutes later by default, set per route |
-| your claims | the attributes the route chose to send - username, e-mail, roles, organisation - under the names you gave them |
+| your claims | the attributes the route chose to send - username, e-mail, roles, tenant - under the names you gave them |
 
 It is chosen in the route editor, under **Auth forward**: the mechanism
 `signed-jwt`, the algorithm (**ES256** recommended, EdDSA or RS256 for a
@@ -58,7 +58,7 @@ verb that reshapes them.
 The expression is Go's [text/template](https://pkg.go.dev/text/template), so it
 can also decide: a selection that keeps nothing is false, and `if`, `else if`,
 `else` turn a set of roles into the single value an application wants. Grafana's
-organisation role, from three roles tagged `grafana`:
+tenant role, from three roles tagged `grafana`:
 
 ```text
 {{if .Roles | .Keep "ROLE_ADMIN" "grafana-admin"}}Admin{{else if .Roles | .Keep "grafana-editor"}}Editor{{else}}Viewer{{end}}

@@ -29,11 +29,11 @@ the power without opening the drawer.
 
 | Capability | What it opens |
 |---|---|
-| `root` | The whole gateway: routes, users, organisations, settings |
+| `root` | The whole gateway: routes, users, tenants, settings |
 | `infra admin` | The routing plane: routes and the built-in pages |
 | `app admin` | The application identity: users, roles, settings |
 | `dev` | The developer tooling on the served applications |
-| `tenant creator` | Creating organisations (several-organisations mode only) |
+| `tenant creator` | Creating tenants (several-tenants mode only) |
 
 Row actions enable and disable an account. You cannot revoke your own `root`, nor
 disable or delete yourself.
@@ -74,7 +74,7 @@ Three pages in one drawer, and the first is the only one you **fill**.
 - **Two-factor** - required, optional, or inherited from the application policy;
   the label says what inherited currently resolves to.
 - **Working hours** (Enterprise) - the account's own: set, they replace the
-  installation's and its organisations' for this person, unless a membership
+  installation's and its tenants' for this person, unless a membership
   sets its own. Not offered on a root account, which is never held to hours.
 - **Password** - *Reset password* asks how: a temporary password to hand over, or
   a link mailed to the account to choose a new one (the current password keeps
@@ -122,7 +122,7 @@ whole list.
 - **A capability is not a role.** Capabilities administer *this console*; roles
   are what your applications read. Granting `app admin` grants nothing inside a
   proxied application.
-- **An account with no organisation reaches nothing.** Create it here, then place
+- **An account with no tenant reaches nothing.** Create it here, then place
   it on [Members](/docs/console/organisation).
 - **A value outside a choice list is refused**, by a sentence that names what is
   allowed - as is a route that forwards a field the model does not define.

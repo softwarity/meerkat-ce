@@ -10,8 +10,8 @@ summary: Les deux écrans que l'on consulte après coup - qui a modifié quoi, q
 Deux écrans transverses, voisins dans le rail. Tous deux se consultent après coup, et
 tous deux sont restreints côté serveur à ce qu'administre la personne qui les
 consulte : root voit tout, un administrateur infra le plan de routage, un
-administrateur d'application l'identité, un administrateur d'organisation ses propres
-organisations.
+administrateur d'application l'identité, un administrateur de tenant ses propres
+tenants.
 
 ## Audit
 
@@ -76,7 +76,7 @@ signalement comporte :
 
 - Son **statut** - ouvert, en cours, clos - modifiable depuis le tiroir, et
   qui sert de filtre sur la liste.
-- Qui l'a déposé, depuis quelle organisation, et quand.
+- Qui l'a déposé, depuis quel tenant, et quand.
 - L'**URL**, la taille de la fenêtre d'affichage et le ratio de pixels, la langue, le
   user agent.
 - La **capture d'écran**, sur laquelle un clic l'ouvre en taille réelle.

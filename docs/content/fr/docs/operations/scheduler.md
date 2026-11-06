@@ -24,7 +24,7 @@ rôles que son appel doit porter (`roles`, ou `role` s'il n'y en a qu'un), la
 gateway effectue l'appel sous le nom `meerkat`, muni de ces rôles, et tout ce qui
 se trouve devant le service les lit comme il lit ceux de n'importe qui : les
 prédicats, les filtres, la règle de la route, les règles par endpoint, les horaires
-de l'organisation. Une planification qui demande le mauvais rôle n'est pas une
+du tenant. Une planification qui demande le mauvais rôle n'est pas une
 faille : c'est une planification qui échoue chaque nuit, et la console conserve la
 phrase qui l'explique.
 
@@ -457,8 +457,8 @@ personne ne regarde la réponse.
 **`headers`** porte ce que le service a demandé à recevoir, en plus de ce que la
 gateway écrit d'elle-même. Dix au maximum. Une valeur peut être une **référence
 au coffre** - `${stations-key}` ou `$stations-key` - résolue au moment de l'appel,
-dans la portée de l'application, ou dans celle de l'organisation quand la
-planification en a une : la ligne conserve la référence, si bien que le secret
+dans la portée de l'application, ou dans celle du tenant quand la
+planification en a un : la ligne conserve la référence, si bien que le secret
 n'apparaît ni dans les réponses de cette API ni dans la console. Un nom absent du
 coffre part **tel quel**, `$typo`, au lieu de devenir un en-tête vide, dont l'échec
 serait bien plus déroutant.
@@ -720,7 +720,7 @@ moins une fois. Si vous avez besoin du reste, il vous faut un broker.
 ## Ce que voit l'exploitant
 
 **Data plane, Scheduler** liste tout ce qui est planifié, avec un filtre par
-organisation et par service, et se met à jour en direct : une exécution qui
+tenant et par service, et se met à jour en direct : une exécution qui
 démarre, progresse et se termine apparaît sans rien rafraîchir. Les actions qui
 s'y trouvent sont celles dont on a besoin à deux heures du matin : mettre en pause
 (et reprendre), avancer le prochain tour, annuler l'exécution en cours, supprimer

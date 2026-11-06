@@ -49,17 +49,17 @@ to protect.
 ## Scopes
 
 An entry belongs to a scope, and **a name is unique per scope** - so the same
-`db-password` can mean a different thing for two organisations.
+`db-password` can mean a different thing for two tenants.
 
 | Scope | Who administers it | What resolves against it |
 |---|---|---|
 | `infra` | gateway-admin | routes, filter arguments, upstream credentials |
 | `app` | app-admin | the mail relay, the identity providers |
-| an organisation | that organisation's administrators | its own entries |
+| a tenant | that tenant's administrators | its own entries |
 
 Resolution honours the same split, which is what stops the administrator of one plane
 quietly changing what another plane resolves: a route only ever expands against `infra`
-entries. An organisation resolves its own first and falls back to the application's, so it
+entries. A tenant resolves its own first and falls back to the application's, so it
 may **use** a global value without being able to edit it, and may shadow it by declaring its
 own under the same name.
 

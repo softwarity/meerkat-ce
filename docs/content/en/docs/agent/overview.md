@@ -47,7 +47,7 @@ tools, and nobody gets more by asking an assistant instead of clicking.
 | `list_operations`, `call_route` | What a route's service offers, then a real call to it through the gateway. |
 | `save_route`, `delete_route` | Write a route and apply it at once. |
 | `list_route_bricks` | The catalogue of predicates and filters, with their parameters. |
-| `list_users`, `list_tenants` | The accounts and the organisations. |
+| `list_users`, `list_tenants` | The accounts and the tenants. |
 | `list_services` | What the gateway sees running around it. |
 | `list_schedules` | The scheduled calls: what runs at night, how often, as whom, and how the last run ended. |
 | `pause_schedule`, `run_schedule` | Stop a scheduled call, let it fire again, or bring its next turn forward to now. |
@@ -114,9 +114,9 @@ forwards to the service.
   catalogue - in the identity the service receives too - so an administrator's
   agent is not stopped by rights it would have to manage. Pass `as` and `roles`
   to call as somebody shaped otherwise, and `tenant` for a route reserved to
-  organisations.
+  tenants.
 - **Why a refusal.** A `403` says why in its body: the gateway names the role
-  or the organisation missing, and a service's own reason comes back as the
+  or the tenant missing, and a service's own reason comes back as the
   service wrote it.
 - **For real.** A `POST`, `PUT` or `DELETE` changes the service's data. The call
   is offered to a full-access token, never to a read-only one, and every call

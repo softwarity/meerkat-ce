@@ -23,7 +23,7 @@ There is **no account** behind a scheduled call. The schedule says which roles
 its call must carry (`roles`, or `role` when there is only one), the gateway
 makes the call under the name `meerkat` holding them, and everything standing
 in front of the service reads them as it reads anybody's: the predicates, the
-filters, the route's rule, the per-endpoint rules, the organisation's hours. A
+filters, the route's rule, the per-endpoint rules, the tenant's hours. A
 schedule asking for the wrong role is not a hole: it is a schedule that fails
 every night, and the console keeps the sentence that says so.
 
@@ -438,7 +438,7 @@ looks at.
 **`headers`** carries what the service asked to be told, beyond what the
 gateway writes by itself. Ten at most. A value may be a **vault reference** -
 `${stations-key}` or `$stations-key` - resolved at the moment of the call,
-against the application's scope or the organisation's when the schedule has
+against the application's scope or the tenant's when the schedule has
 one: the row keeps the reference, so the secret appears neither in this API's
 answers nor in the console. A name the vault does not hold goes out
 **verbatim**, `$typo`, rather than becoming an empty header, which would fail
@@ -691,7 +691,7 @@ thing, you need a broker.
 ## What the operator sees
 
 **Data plane, Scheduler** lists everything scheduled, filtered by
-organisation and service, updated live: a run starting, advancing and finishing
+tenant and service, updated live: a run starting, advancing and finishing
 appears without refreshing anything. The actions there are the ones wanted at
 two in the morning: pause (and resume), bring the next turn forward, cancel the
 run in flight, remove - and write what a schedule is for when its service did

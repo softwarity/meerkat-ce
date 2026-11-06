@@ -29,7 +29,7 @@ part that is yours stays yours.
 ### Products
 
 [Meerkat](/index), the authentication proxy and API gateway: one door in front
-of an internal application, which takes charge of authentication, access rules, organisations,
+of an internal application, which takes charge of authentication, access rules, tenants,
 routing, quotas and audit. Its ancestor, **Archway**, did the same job on a
 Spring Cloud Gateway stack. It taught us what to do differently - and how much
 further the idea could be taken.

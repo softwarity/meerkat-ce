@@ -8,20 +8,20 @@ summary: Ce que fait l'édition gratuite, ce qu'ajoute Enterprise, comment tout 
 # Éditions
 
 Un produit, quatre éditions. **Community** n'est ni une démonstration ni une
-version d'essai : c'est toute la gateway pour le cas courant - une
-organisation, une instance, vos propres comptes ou un fournisseur OpenID
+version d'essai : c'est toute la gateway pour le cas courant - un
+tenant, une instance, vos propres comptes ou un fournisseur OpenID
 Connect - gratuite, production comprise. **Enterprise** sert quand vous grandissez
-dans l'une de trois directions : plusieurs organisations, plusieurs instances
-en cluster, ou l'annuaire de votre entreprise. **Team**, c'est Enterprise pour une
-organisation sur une instance : l'annuaire, sans la montée en charge horizontale ni les
-organisations multiples. Et **Évaluation**, c'est Enterprise avec une mention
+dans l'une de trois directions : plusieurs tenants, plusieurs instances
+en cluster, ou l'annuaire de votre entreprise. **Team**, c'est Enterprise pour un
+tenant sur une instance : l'annuaire, sans la montée en charge horizontale ni les
+tenants multiples. Et **Évaluation**, c'est Enterprise avec une mention
 affichée, gratuite, pour tout essayer d'abord.
 
 | Édition | Ce qu'elle est | Comment l'obtenir |
 | --- | --- | --- |
 | **Community** (CE) | Toute la gateway gratuite, production comprise | `softwarity/meerkat-ce` sur Docker Hub |
 | **Évaluation** (Eval) | Tout Enterprise, avec une mention d'évaluation ; pas pour la production | `softwarity/meerkat` sur Docker Hub, sans licence |
-| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour une organisation sur une instance | `softwarity/meerkat` et une licence - [parlons-en](/pricing/index) |
+| **Team** (TE) | Tout ce qu'ajoute Enterprise, pour un tenant sur une instance | `softwarity/meerkat` et une licence - [parlons-en](/pricing/index) |
 | **Enterprise** (EE) | Tout ce qu'ajoute Enterprise, sans plafond | `softwarity/meerkat` et une licence - [parlons-en](/pricing/index) |
 
 ::: lead
@@ -34,7 +34,7 @@ sécurité à ceux qui ont le moins les moyens de la payer n'est pas un modèle
 économique qui nous intéresse.
 :::
 
-La règle tient en une phrase : **ce dont une organisation qui grandit a besoin
+La règle tient en une phrase : **ce dont une entreprise qui grandit a besoin
 se paie ; ce qui protège l'utilisateur ne se paie pas.** Là où les produits
 d'identité mettent l'authentification unique et le second facteur dans une
 offre supérieure, Meerkat n'oblige jamais personne à choisir entre payer moins
@@ -55,12 +55,12 @@ en entreprise, pour un usage commercial, gratuitement.
 
 | | Community | Enterprise |
 | --- | --- | --- |
-| **Organisations** | Une seule, que la console ne vous demande jamais de nommer. | Plusieurs, chacune avec ses membres, ses groupes et son propriétaire, choisie à la connexion. |
+| **Tenants** | Un seul, que la console ne vous demande jamais de nommer. | Plusieurs, chacun avec ses membres, ses groupes et son propriétaire, choisi à la connexion. |
 | **Annuaire d'entreprise** | OpenID Connect, GitHub | SAML 2.0, LDAP et Active Directory en plus. |
 | **Le fournisseur OpenID de vos outils** | - | Les applications qui ne savent se connecter qu'à un fournisseur OpenID connectent leurs utilisateurs par la gateway, la route décidant qui et avec quels rôles. Voir [le fournisseur OpenID](/docs/auth/oidc-provider). |
 | **Rôles issus de l'annuaire** | Accordés dans Meerkat | Règles de groupe : un groupe LDAP, une équipe GitHub ou un claim OIDC devient une appartenance et ses rôles, à chaque connexion. |
 | **Certificats** | Générés, importés ou signés sur demande, placés à la main sur la console et sur l'application | ACME en plus : Let's Encrypt, ZeroSSL, Google ou votre propre step-ca les émettent et les renouvellent sans intervention, avec plusieurs autorités côte à côte. |
-| **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, dates, fuseau horaire ; pour toute la gateway, une organisation, un compte, un membre, ou un groupe en mode exclusif (équipe de jour, équipe de nuit). Une session se termine à la fermeture de sa plage. Voir [les heures ouvrées](/docs/access/tenants#heures-ouvres). |
+| **Heures ouvrées** | - | Fenêtres d'accès : plages horaires, jours de la semaine, dates, fuseau horaire ; pour toute la gateway, un tenant, un compte, un membre, ou un groupe en mode exclusif (équipe de jour, équipe de nuit). Une session se termine à la fermeture de sa plage. Voir [les heures ouvrées](/docs/access/tenants#heures-ouvres). |
 | **Montée en charge horizontale** | Une instance sur son stockage embarqué | Plusieurs instances de la même gateway, en actif/actif sur un PostgreSQL partagé : une modification atteint tous les nœuds en moins d'une seconde, les certificats sont partagés, n'importe quel nœud sert n'importe quelle session. Voir [la page sur le cluster](/docs/deploy/kubernetes). |
 | **Supervision** | Écrans de trafic et de métriques intégrés, rien à installer. Journaux écrits en JSON OpenTelemetry pour un agent installé sur le nœud. | Les mêmes écrans, plus l'export vers votre collecteur OpenTelemetry : traces, métriques et journaux envoyés en OTLP. |
 | **Audit** | Le journal d'audit, dans la console | Le journal envoyé à votre collecteur, l'audit des endpoints (Endpoint audit) opération par opération, et l'export CSV. |
@@ -71,7 +71,7 @@ en entreprise, pour un usage commercial, gratuitement.
 | **Tunnel développeur** | plug, gratuit, tourne seul à côté de la gateway ; Meerkat n'en sait rien | plug intégré à la gateway : chaque développeur se connecte avec sa propre clé, et chaque substitution est nommée et annoncée aux utilisateurs. Voir [Mode développement](/product/dev-mode). |
 | **Support** | Le dépôt : un ticket est lu, et la réponse reste là où elle servira au suivant | Compris dans l'accord : vous joignez ceux qui ont écrit la gateway, pas un premier niveau de support. |
 
-**Team** porte toutes ces lignes sauf deux : une seule organisation, et une
+**Team** porte toutes ces lignes sauf deux : un seul tenant, et une
 seule instance sur son stockage, comme Community. Le support y est standard ;
 celui d'Enterprise est étendu.
 

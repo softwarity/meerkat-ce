@@ -81,7 +81,7 @@ attribute**, et le compte est lié par lui.
 
 La suite est celle de toute autorité : un premier venu crée un compte en attente, ou est
 refusé, selon la politique de l'autorité ; le second facteur et les passkeys suivent ses
-politiques ; les groupes qu'elle envoie sont ce qu'une règle de groupe d'une organisation
+politiques ; les groupes qu'elle envoie sont ce qu'une règle de groupe d'un tenant
 fait correspondre à des rôles. Voir [OpenID Connect](/docs/auth/oidc).
 
 ## Demandes signées, assertions chiffrées

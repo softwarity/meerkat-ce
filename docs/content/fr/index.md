@@ -1,6 +1,6 @@
 ---
 title: Proxy d'authentification et API gateway pour vos applications internes
-summary: Meerkat place la connexion, le contrôle d'accès, les organisations, le routage, les quotas et l'audit devant vos applications internes, à la place d'un proxy d'authentification, d'un serveur d'identité et d'une API gateway. Un seul binaire, aucune dépendance.
+summary: Meerkat place la connexion, le contrôle d'accès, les tenants, le routage, les quotas et l'audit devant vos applications internes, à la place d'un proxy d'authentification, d'un serveur d'identité et d'une API gateway. Un seul binaire, aucune dépendance.
 layout: wide
 ---
 
@@ -10,7 +10,7 @@ layout: wide
 Meerkat est un **proxy d'authentification et une API gateway** qui place le
 contrôle d'accès devant les applications internes que construisent vos équipes.
 Il remplace les oauth2-proxy, Keycloak et Kong que l'on assemble d'ordinaire
-autour d'elles : connexion, règles d'accès, organisations, routage, quotas,
+autour d'elles : connexion, règles d'accès, tenants, routage, quotas,
 audit. Une seule image, aucune dépendance.
 
 - [Démarrer](/docs/start/quick-start)
@@ -37,7 +37,7 @@ même CPU, avec [des chiffres](/product/performance) tenus à jour par la CI.
 
 ::: lead
 Vos services reçoivent des requêtes déjà authentifiées, accompagnées d'un jeton
-signé qui porte une identité, des rôles et une organisation. Ils n'ont plus à
+signé qui porte une identité, des rôles et un tenant. Ils n'ont plus à
 fournir une page de connexion, un modèle de rôles ni une table d'utilisateurs,
 et redeviennent ce que vous vendez réellement.
 
@@ -57,7 +57,7 @@ le journal d'audit, les règles de quotas et la santé des services sont des
 
 ### L'identité fait partie du produit
 
-Les comptes, les rôles, les groupes, les organisations et les pages de
+Les comptes, les rôles, les groupes, les tenants et les pages de
 connexion sont dans la gateway, pas à côté. L'annuaire de votre entreprise -
 OpenID Connect, GitHub, et avec Enterprise SAML, LDAP ou Active Directory -
 connecte les utilisateurs, et en Enterprise ses groupes peuvent accorder des
@@ -128,17 +128,17 @@ la gateway en cinq minutes environ.
 ::: cta
 ### Gratuite, et ce n'est pas une version d'essai
 
-L'édition Community est toute la gateway pour une organisation sur une
+L'édition Community est toute la gateway pour un tenant sur une
 instance - en production, en entreprise, pour un usage commercial, sans rien
 payer. Elle est source-available, sous Functional Source License : lisez le
 code, modifiez-le, livrez-le dans votre propre produit ; deux
 ans après sa publication, chaque version passe sous licence Apache 2.0.
 
 Enterprise est ce qu'il vous faut dès que l'installation grandit : plusieurs
-organisations, SAML, LDAP et Active Directory, le fournisseur OpenID de vos autres
+tenants, SAML, LDAP et Active Directory, le fournisseur OpenID de vos autres
 outils, plusieurs instances de la gateway derrière un même point d'entrée. Jamais une brique de sécurité : TLS, le second facteur, les passkeys,
 le coffre et le journal d'audit sont gratuits et le resteront. Team, c'est
-Enterprise pour une organisation sur une instance, et l'édition d'évaluation, c'est
+Enterprise pour un tenant sur une instance, et l'édition d'évaluation, c'est
 Enterprise avec une mention affichée, gratuite, pour tout essayer d'abord.
 
 [plug](https://softwarity.github.io/plug/), le tunnel développeur de

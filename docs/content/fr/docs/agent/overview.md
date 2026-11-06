@@ -48,7 +48,7 @@ assistant plutôt qu'en cliquant.
 | `list_operations`, `call_route` | Ce que propose le service d'une route, puis un vrai appel à travers la gateway. |
 | `save_route`, `delete_route` | Écrire une route et l'appliquer immédiatement. |
 | `list_route_bricks` | Le catalogue des prédicats et des filtres, avec leurs paramètres. |
-| `list_users`, `list_tenants` | Les comptes et les organisations. |
+| `list_users`, `list_tenants` | Les comptes et les tenants. |
 | `list_services` | Ce que la gateway voit tourner autour d'elle. |
 | `list_schedules` | Les appels planifiés : ce qui s'exécute la nuit, à quelle fréquence, au nom de qui, et comment s'est terminée la dernière exécution. |
 | `pause_schedule`, `run_schedule` | Suspendre un appel planifié, le laisser repartir, ou avancer sa prochaine exécution à maintenant. |
@@ -117,9 +117,9 @@ route transmet au service.
   rôles** du catalogue - dans l'identité que reçoit le service aussi - pour que
   l'agent d'un administrateur ne bute pas sur des droits qu'il faudrait gérer.
   `as` et `roles` font appeler en tant que quelqu'un d'autre, et `tenant` sert
-  pour une route réservée à des organisations.
+  pour une route réservée à des tenants.
 - **Pourquoi un refus.** Un `403` dit pourquoi dans son corps : la gateway nomme
-  le rôle ou l'organisation qui manque, et la raison propre d'un service revient
+  le rôle ou le tenant qui manque, et la raison propre d'un service revient
   telle que le service l'a écrite.
 - **Pour de vrai.** Un `POST`, un `PUT` ou un `DELETE` modifie les données du
   service. L'appel est proposé à un jeton complet, jamais à un jeton en lecture

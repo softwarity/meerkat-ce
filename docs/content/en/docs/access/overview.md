@@ -27,12 +27,12 @@ happens on every request, and it is what this section is about.
 |---|---|---|
 | A route's access rule | the route's *Security* section | may this caller reach this route at all |
 | An endpoint rule | **Infra > Endpoint security**, from the route's OpenAPI spec | may this caller call *this operation* |
-| Membership and groups | an organisation's members and groups | which roles this person holds, here |
+| Membership and groups | a tenant's members and groups | which roles this person holds, here |
 | The role catalogue | **Application > Roles** | which role names exist, and which imply which |
 | Capabilities | **Application > Users** | who may administer the gateway itself |
 
-Roles come from groups, groups belong to an organisation, and **roles only exist
-inside an organisation**: a session with no active organisation holds no roles at
+Roles come from groups, groups belong to a tenant, and **roles only exist
+inside a tenant**: a session with no active tenant holds no roles at
 all, whatever the person is a member of elsewhere.
 
 ## The order on one request
@@ -63,7 +63,7 @@ which applies whatever rules it has of its own.
 ## What a refusal looks like
 
 A refusal on a **UI route** lands on a page, in the visitor's language: the
-organisation chooser when changing organisation would actually help, the waiting
+tenant chooser when changing tenant would actually help, the waiting
 room when the account belongs nowhere, and otherwise `/refused`, which names the
 rule that turned them away and offers what this session *can* open.
 

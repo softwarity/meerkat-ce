@@ -24,8 +24,8 @@ qu'une base de données apparaît.
 Le second facteur, les passkeys, TLS, le coffre, le journal d'audit : tout cela
 est dans l'image gratuite, et y restera. Les vendre reviendrait à vendre la
 sécurité à ceux qui ont le moins les moyens de la payer. Ce qu'apporte
-l'édition payante, c'est le passage à l'échelle et l'organisation - plusieurs
-organisations, des annuaires externes, le cluster - pas la serrure de votre
+l'édition payante, c'est le passage à l'échelle - plusieurs
+tenants, des annuaires externes, le cluster - pas la serrure de votre
 propre porte d'entrée.
 
 ## Une erreur est une occasion d'aider

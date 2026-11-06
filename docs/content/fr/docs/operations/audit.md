@@ -29,7 +29,7 @@ endpoint ne permet de modifier un événement.
 | acteur | le compte, et le **jeton** quand il y en a eu un |
 | action | `route.update`, `theme.branding`, `settings.update`, `maintenance`, `backup.snapshot`... |
 | cible | le type d'objet, son identifiant et son nom |
-| organisation | quand la modification relève de l'une d'elles |
+| tenant | quand la modification relève de l'un d'eux |
 | changements | une entrée par champ modifié, avec son `from` et son `to` |
 | détail | une note, pour les créations, les suppressions et les actions sans diff ; le motif d'une connexion refusée |
 | adresse | dans le volet sécurité, l'adresse que la gateway a résolue |
@@ -43,7 +43,7 @@ Une mise à jour dont le diff est vide n'écrit **rien** : enregistrer un formul
 changer aucune valeur n'est pas un événement.
 
 Le diff est calculé de façon générique, en comparant l'ancien objet et le nouveau champ par
-champ. Il fonctionne donc pour une route, un compte, une organisation ou un bloc de réglages
+champ. Il fonctionne donc pour une route, un compte, un tenant ou un bloc de réglages
 sans code propre à chaque type. Un objet imbriqué ou une liste sont comparés sur leur encodage
 complet : un changement à l'intérieur, où qu'il soit, fait apparaître le champ entier.
 
@@ -75,7 +75,7 @@ contrôle. Elles ont leurs deux types de cible : `account` pour un compte applic
 | Action | Quand | Détail |
 |---|---|---|
 | `signin` | une session a été ouverte | par quel moyen : `password`, `totp`, `passkey`, `email-code`, `external-totp`... |
-| `signin.organisation` | l'entrée dans une organisation, choisie après la connexion ou rejointe plus tard | son nom |
+| `signin.organisation` | l'entrée dans un tenant, choisi après la connexion ou rejoint plus tard | son nom |
 | `signin.refused` | une porte est restée fermée | le motif (voir ci-dessous) |
 | `signin.locked` | la tentative qui a déclenché le blocage | `throttled`, ou `bad-code` pour un second facteur |
 | `signout` | le compte s'est déconnecté | `remote` quand la session a été fermée depuis *Active sessions* |
@@ -108,10 +108,10 @@ enregistré, tronqué, comme nom de la cible : la ligne dit ainsi ce qui a été
 enchaîne mille essais par seconde ne produit pas mille lignes par seconde.
 
 Chaque ligne porte l'**adresse** que la gateway a résolue, jamais un `X-Forwarded-For`
-écrit par l'appelant. Elle porte aussi l'**organisation** quand il y en a une : sur la
-connexion elle-même pour un compte qui n'appartient qu'à une seule organisation, sur la ligne
-`signin.organisation` quand elle est choisie ensuite. C'est cette mention qui rend la ligne
-visible aux administrateurs de l'organisation.
+écrit par l'appelant. Elle porte aussi le **tenant** quand il y en a un : sur la
+connexion elle-même pour un compte qui n'appartient qu'à un seul tenant, sur la ligne
+`signin.organisation` quand il est choisi ensuite. C'est cette mention qui rend la ligne
+visible aux administrateurs du tenant.
 
 Ces lignes ne sont pas poussées en direct vers la console : une liste de comptes rechargée à
 chaque connexion de n'importe qui ne serait que du bruit. L'[historique des
@@ -128,7 +128,7 @@ capacités :
 | root | tout, y compris les connexions à la console |
 | infra-admin | les routes, les fournisseurs d'identité, les certificats, les réglages, les signalements |
 | app-admin | les comptes, les rôles, les thèmes, les langues, les planifications, les réglages, les signalements, et la sécurité des comptes applicatifs |
-| l'administrateur d'une organisation | les événements des organisations qu'il administre, y compris les connexions de leurs membres à ces organisations |
+| l'administrateur d'un tenant | les événements des tenants qu'il administre, y compris les connexions de leurs membres à ces tenants |
 | tous les autres | rien, et l'endpoint refuse au lieu de renvoyer une page vide |
 
 Les connexions à la console sont réservées à root : elles disent où et quand travaillent
@@ -152,7 +152,7 @@ capacités, sans que ce soit la faute de qui que ce soit en particulier.
 Chaque événement part aussi sous la forme d'un **log** OpenTelemetry dont la ressource porte
 `meerkat.stream=audit` : le Collector et le backend le tiennent ainsi à l'écart des logs
 ordinaires, avec sa propre requête, sa propre durée de conservation et ses propres lecteurs.
-L'action constitue le corps ; l'acteur (`user.id`, `user.name`), la cible, l'organisation,
+L'action constitue le corps ; l'acteur (`user.id`, `user.name`), la cible, le tenant,
 l'adresse du client et les changements champ par champ sont des attributs ; l'identifiant de
 trace est celui de la requête, ce qui relie l'événement à sa trace et à sa ligne d'accès.
 
@@ -168,7 +168,7 @@ route, avec un interrupteur par opération. Un appel audité devient un événem
 conservé dans le journal, où **Data plane, Audit, Operations** l'affiche, et envoyé au
 collecteur avec le reste du journal quand l'onglet **Audit** d'OpenTelemetry est activé.
 
-Un événement nomme l'appelant tel que la gateway l'a authentifié (compte, organisation,
+Un événement nomme l'appelant tel que la gateway l'a authentifié (compte, tenant,
 groupe, rôles), l'opération, le chemin tel qu'il a été demandé, le statut, l'adresse et
 l'identifiant de trace, puis les champs que l'opération tire de l'appel et, si elle le
 demande, le corps JSON avec ses secrets masqués.
@@ -179,7 +179,7 @@ indique combien depuis le démarrage de la gateway. Leur volume suit le trafic :
 leur propre durée de conservation, un mois par défaut, que root règle sur le même écran
 (**Keep operations for**) : de sept jours à un an, indépendamment de l'année pendant
 laquelle on garde les modifications. Un administrateur des applications lit tous les appels ;
-l'administrateur d'une organisation, ceux faits dans son organisation.
+l'administrateur d'un tenant, ceux faits dans son tenant.
 
 Sur l'image Community, l'écran est verrouillé, tout comme le téléversement dans l'éditeur de
 route : un événement que rien n'enverrait jamais, c'est un journal qui semble tenu et qui ne

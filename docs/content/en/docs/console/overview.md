@@ -27,7 +27,7 @@ The left rail holds the two planes and the transverse screens.
 |---|---|---|
 | **Infra** | `/infra/...` | What serves and how requests travel: the topology, routes, endpoints, authorities, TLS, the relay |
 | **Application** | `/application/...` | The product your users see: identity, roles, pages, portal, policies |
-| **Tenants** | `/tenants/:id/...` | One organisation at a time (several-organisations mode only) |
+| **Tenants** | `/tenants/:id/...` | One tenant at a time (several-tenants mode only) |
 | **Vault** | `/vault` | Every named value and secret the configuration points at |
 | **Data plane** | `/data-plane/...` | What the applications are doing: their sign-ins (Audit), who is signed in to them (Sessions), the calls made to them on a schedule (Scheduler), what their services told their users (Notifications), what the gateway served (Metrics), what your users reported (Issues) |
 | **Meerkat** | `/system/...` | The gateway itself: who changed what and who signed in to the console (Audit), what it says about itself, live (Logs), who holds the console (Sessions), the whole installation as a document or a database (Configuration) - and, at the foot, the control plane's REST reference (API reference), what this version brought (Release notes) and the edition (License) |
@@ -53,13 +53,13 @@ same scopes on every call.
 | `root` | Everything, including Configuration |
 | `infra admin` | The Infra plane (with Access tokens and MCP), Metrics, Logs, Audit and Issues, the vault's infra scope |
 | `app admin` | The Application plane (with Access tokens), Sessions, Scheduler, Notifications, Audit and Issues, the vault's application scope |
-| `tenant admin` | The organisations they administer, Sessions, Audit and Issues scoped to them |
-| `tenant creator` | Creating an organisation from the Tenants drawer |
+| `tenant admin` | The tenants they administer, Sessions, Audit and Issues scoped to them |
+| `tenant creator` | Creating a tenant from the Tenants drawer |
 | `dev` | The developer tooling on the served applications, not a console screen |
 
 Signing in lands you on the first section you may use: Infra on Routes for an
 infra admin, Application on General for an app admin, Tenants otherwise (License
-when there is a single organisation). Capabilities are granted per account on
+when there is a single tenant). Capabilities are granted per account on
 [Users](/docs/console/users).
 
 ## The habits of the screens
@@ -111,7 +111,7 @@ Learn these five and the console stops surprising you.
 
 ### Across both
 
-- **[Tenants](/docs/console/tenants)** - one organisation's own administration.
+- **[Tenants](/docs/console/tenants)** - one tenant's own administration.
 - **[Vault](/docs/console/vault)** - secrets and values, referenced as `$name`.
 - **[Metrics](/docs/console/traffic)** - traffic, latency, the ranking of routes.
 - **[Scheduler](/docs/operations/scheduler)** - the scheduled calls and their runs.

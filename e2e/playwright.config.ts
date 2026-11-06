@@ -34,7 +34,16 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['setup'],
       testMatch: /tests\/.*\.spec\.ts/,
-      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/, /tests\/oidc-provider\.spec\.ts/, /tests\/user-flows\.spec\.ts/],
+      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/, /tests\/oidc-provider\.spec\.ts/, /tests\/user-flows\.spec\.ts/, /tests\/tls-doors\.spec\.ts/],
+    },
+    // Domains & TLS gives the application plane a public name for a moment,
+    // and the first public name is the issuer the WHOLE gateway signs with: a
+    // spec reading the issuer beside it read this one's. After the rest.
+    {
+      name: 'doors',
+      use: { browserName: 'chromium' },
+      dependencies: ['chromium'],
+      testMatch: /tests\/tls-doors\.spec\.ts/,
     },
     // The tenancy switch flips the WHOLE installation to single mode for a
     // moment. Run beside the rest, it made a landing test read the wrong mode
@@ -43,7 +52,7 @@ export default defineConfig({
     {
       name: 'tenancy',
       use: { browserName: 'chromium' },
-      dependencies: ['chromium'],
+      dependencies: ['doors'],
       testMatch: /tests\/tenancy\.spec\.ts/,
     },
     // The portal tests switch the WHOLE installation's bar on for a moment,

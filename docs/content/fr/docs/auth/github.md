@@ -68,8 +68,8 @@ comptes sur la foi d'une adresse non vérifiée, c'est permettre une prise de co
 compte.
 
 Les groupes ne sont récupérés que si vous avez indiqué des organisations. Ils deviennent
-des appartenances et des rôles par l'intermédiaire d'une règle de groupe définie sur une
-organisation.
+des appartenances et des rôles par l'intermédiaire d'une règle de groupe définie sur un
+tenant.
 
 ## Comment se comporte la restriction par organisation
 

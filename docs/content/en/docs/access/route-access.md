@@ -10,8 +10,8 @@ summary: The one rule that says who may reach a route - level, roles, named user
 Every route carries one rule, in the route editor's **Security** section. It has
 three parts, and they are not alternatives:
 
-- **a level**: what kind of caller, in terms of session and organisation;
-- **roles**: which roles, held in the active organisation;
+- **a level**: what kind of caller, in terms of session and tenant;
+- **roles**: which roles, held in the active tenant;
 - **named users**: people who pass anyway.
 
 The level and the roles are **ANDed**. The named users are **ORed over the top**.
@@ -21,9 +21,9 @@ The level and the roles are **ANDed**. The named users are **ORed over the top**
 | Level | Who passes |
 |---|---|
 | **Delegated** (nothing chosen) | everyone, signed in or not. No session is even looked up; the service decides |
-| **Signed in** | anybody with an account - including one that belongs to no organisation yet |
-| **In an organisation** | a session with an active organisation. Turns away an account still awaiting access |
-| **In one of these organisations** | the active organisation must be one of those you name |
+| **Signed in** | anybody with an account - including one that belongs to no tenant yet |
+| **In a tenant** | a session with an active tenant. Turns away an account still awaiting access |
+| **In one of these tenants** | the active tenant must be one of those you name |
 | **Nobody** | refused before the service is called. Only the named users get through |
 
 There is no *public* level, because delegating already is one, and a level named
@@ -39,22 +39,22 @@ just been recognised and granted nothing.
 ## Roles
 
 Pick any number; **any one of them grants access**. They are read in the *active*
-organisation, and they include everything the person's roles imply through the
+tenant, and they include everything the person's roles imply through the
 hierarchy.
 
-Because the catalogue is global while groups belong to an organisation, the two
+Because the catalogue is global while groups belong to a tenant, the two
 axes say genuinely different things:
 
 | Rule | Means |
 |---|---|
-| roles `billing-admin`, level *In an organisation* | a billing administrator of whichever organisation is active - a cross-organisation console |
+| roles `billing-admin`, level *In a tenant* | a billing administrator of whichever tenant is active - a cross-tenant console |
 | roles `billing-admin`, level *In one of these*, Acme | a billing administrator **of Acme** |
 
 Leaving the roles empty means any role passes - the level alone decides.
 
 > [!NOTE]
-> A rule asking for a role always needs an organisation too, whether or not you
-> said so: roles only exist inside one. In practice, choose *In an organisation*
+> A rule asking for a role always needs a tenant too, whether or not you
+> said so: roles only exist inside one. In practice, choose *In a tenant*
 > whenever you name a role.
 
 ## Named users
@@ -97,15 +97,15 @@ On a **UI route**, the person lands on a page in their own language:
 
 | Situation | Where they land |
 |---|---|
-| Changing organisation would lift the refusal | `/select-tenant`, which says why |
-| They belong to no organisation and the rule needs one | `/account-pending`, the waiting room |
+| Changing tenant would lift the refusal | `/select-tenant`, which says why |
+| They belong to no tenant and the rule needs one | `/account-pending`, the waiting room |
 | Anything else | `/refused`, naming the rule that turned them away and listing what this session can open |
 | No session at all | the sign-in page, with the destination kept |
 
-The offer to switch organisation is filtered against reality: it is only made
-when another organisation the person belongs to would actually satisfy the rule.
+The offer to switch tenant is filtered against reality: it is only made
+when another tenant the person belongs to would actually satisfy the rule.
 
 On a **service route**, the answer is a `403` with a sentence naming what was
-missing - the organisation, one of these roles, this endpoint is closed - or a
+missing - the tenant, one of these roles, this endpoint is closed - or a
 `401` with `WWW-Authenticate: Session` when there is no session at all. Nobody
 reads an HTML page in a `curl`.

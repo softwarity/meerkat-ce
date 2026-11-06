@@ -51,8 +51,8 @@ logo et la navigation viennent de la console.
 ::: gallery
 ![Les utilisateurs](img/showcase/users.webp) Les comptes, ce qu'ils peuvent administrer, et les champs que vous avez choisi de demander.
 ![Les rôles](img/showcase/roles.webp) Un catalogue hiérarchique : un rôle qui hérite d'un autre obtient tout ce que cet autre ouvre.
-![Les groupes](img/showcase/groups.webp) Des groupes par organisation, pour accorder un rôle par appartenance plutôt que compte par compte.
-![Les membres](img/showcase/members.webp) Qui appartient à une organisation, et à quel titre.
+![Les groupes](img/showcase/groups.webp) Des groupes par tenant, pour accorder un rôle par appartenance plutôt que compte par compte.
+![Les membres](img/showcase/members.webp) Qui appartient à un tenant, et à quel titre.
 ![Les autorités](img/showcase/auth-providers.webp) OpenID Connect, LDAP, Active Directory, GitHub. Elles authentifient ; elles ne décident jamais des rôles.
 ![Les jetons d'API](img/showcase/access-tokens.webp) Des jetons dotés d'un plan et d'un périmètre, et un secret affiché une fois, pas deux.
 :::

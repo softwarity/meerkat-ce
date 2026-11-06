@@ -44,7 +44,7 @@ Des recettes pour des applications courantes, une par mécanisme, sont dans
    **refresh token** : depuis son serveur avec son secret, ou depuis son code
    navigateur avec PKCE.
 5. À chaque **refresh**, la route est choisie de nouveau, avec ce qu'est la
-   personne à ce moment-là. Un rôle retiré, une organisation quittée, une route
+   personne à ce moment-là. Un rôle retiré, un tenant quitté, une route
    désactivée : chacun s'applique au refresh suivant, pas à la prochaine
    déconnexion.
 
@@ -137,7 +137,7 @@ client** - et remplissez **Claims sent** : ce que les jetons disent de la person
 Chaque claim est un nom et une source :
 
 - **un fait** que déclare la section **Identity** de la route : le nom
-  d'utilisateur, l'e-mail, le nom complet, l'organisation, les rôles... rendu
+  d'utilisateur, l'e-mail, le nom complet, le tenant, les rôles... rendu
   comme le mécanisme JWT le rend, les rôles par l'expression que leur donne
   Identity ;
 - **une valeur fixe**, la même pour tous ceux qui se connectent par cette route.
@@ -199,7 +199,7 @@ routes.
 Le client ne dit rien des personnes. Qui peut se connecter à l'application, c'est
 la **règle d'accès** de la route qui lui est liée, posée dans **Security** comme
 toute autre. Une personne qu'elle refuse reçoit la réponse de la gateway elle-même :
-le choix d'organisation quand une autre organisation la laisserait entrer, sinon la
+le choix de tenant quand un autre tenant la laisserait entrer, sinon la
 page de refus qui nomme la règle.
 
 ### Deux niveaux d'accès
@@ -280,8 +280,8 @@ sans page.
 ## Essayer une connexion
 
 L'icône de flèche sur la ligne d'un client essaie une connexion pour n'importe qui,
-sans lui et sans rien émettre. Choisissez la personne, et l'organisation dans laquelle
-sa session serait ouverte (la seule qu'elle ait, par défaut) :
+sans lui et sans rien émettre. Choisissez la personne, et le tenant dans lequel
+sa session serait ouverte (le seul qu'elle ait, par défaut) :
 
 - la route qui la laisse entrer - la première liée au client, dans l'ordre de
   routage, dont la règle le fait - ou un refus quand aucune ne le fait ;

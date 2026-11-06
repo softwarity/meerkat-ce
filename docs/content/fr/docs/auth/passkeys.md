@@ -17,8 +17,8 @@ construite ; lisez les manques avant de vous appuyer dessus.
 ## Ce qui fonctionne aujourd'hui
 
 Les passkeys sont autorisées par défaut, pour toute la gateway : **Application >
-Security**, *Allow passkeys*. Il n'y a pas de réglage par organisation, car une connexion
-par passkey a lieu avant que l'organisation soit connue.
+Security**, *Allow passkeys*. Il n'y a pas de réglage par tenant, car une connexion
+par passkey a lieu avant que le tenant soit connu.
 
 **L'enregistrement** se fait en libre-service, depuis `/profile/passkeys`, et suppose une
 session complète : vous vous connectez d'abord de la façon habituelle, puis vous ajoutez
@@ -32,7 +32,7 @@ identifiant* : Meerkat demande une clé découvrable (discoverable credential), 
 clé qui désigne le compte. Les clés découvrables sont exigées à l'enregistrement, ce qui
 rend la chose possible.
 
-La clé vous amène directement dans votre organisation, ou sur la page de choix si vous
+La clé vous amène directement dans votre tenant, ou sur la page de choix si vous
 appartenez à plusieurs - exactement comme le ferait une connexion par mot de passe.
 
 ## Une passkey vaut pour les deux facteurs
@@ -42,7 +42,7 @@ fonctionnalité :
 
 > [!WARNING]
 > Une connexion par passkey **ne demande jamais de second facteur**, même pour un compte
-> où il est *exigé*. Elle passe directement au choix de l'organisation. Si votre politique
+> où il est *exigé*. Elle passe directement au choix du tenant. Si votre politique
 > est "tout le monde doit avoir deux facteurs", une passkey y répond par hypothèse et non
 > par vérification - voir ci-dessous.
 

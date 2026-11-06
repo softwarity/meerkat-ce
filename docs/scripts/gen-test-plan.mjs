@@ -64,7 +64,7 @@ const FEAS = {
 };
 const FAMILY = {
   AUTH: ['Sign-in', 'Connexion'], MFA: ['Second factor', 'Second facteur'], RBAC: ['Roles and access', 'Rôles et accès'],
-  MODEL: ['Account model', 'Modèle de compte'], TENANT: ['Organisations', 'Organisations'], ROUTE: ['Routing', 'Routage'],
+  MODEL: ['Account model', 'Modèle de compte'], TENANT: ['Tenants', 'Tenants'], ROUTE: ['Routing', 'Routage'],
   SVC: ['Services', 'Services'], UIF: ['Injected UI', 'Interface injectée'], PORTAL: ['Portal', 'Portail'],
   SAUTH: ['Identity to the upstream', "Identité transmise à l'upstream"], VAULT: ['Vault', 'Coffre'], SSL: ['TLS', 'TLS'],
   NOTIF: ['Notifications', 'Notifications'], SCHED: ['Scheduled calls', 'Appels planifiés'], I18N: ['Languages', 'Langues'],

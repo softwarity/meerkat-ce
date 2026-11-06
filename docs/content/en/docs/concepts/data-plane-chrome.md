@@ -21,7 +21,7 @@ language picker without anyone opening its source.
 | | What it is | Turned on by |
 |---|---|---|
 | Page agent | `/meerkat/page.js`, which installs `window.meerkatPage` | the route being a UI route |
-| User button | a `meerkat-user-button` Web Component: who you are, organisation, language, sign out | a switch on the route |
+| User button | a `meerkat-user-button` Web Component: who you are, tenant, language, sign out | a switch on the route |
 | Navigation portal | a `meerkat-portal-nav` bar listing the applications this person may open | the global catalogue in `portal` mode (Enterprise); it replaces the standalone button |
 | Identity stamp | roles and user fields written into the page's own markup, server-side | a switch on the route, per field |
 | Custom CSS and JS | the blocks of the route's Custom section, written there or uploaded as files | at least one block |
@@ -112,7 +112,7 @@ hide a button for everyone who does not hold a role, with a stylesheet and
 nothing else.
 
 **The JSON**, at `/meerkat/user-button.json`, is what a script reads when it
-wants the whole picture: the identity, the organisations this person may switch
+wants the whole picture: the identity, the tenants this person may switch
 to, the applications they may open, their roles and groups. It is served
 `no-store`.
 

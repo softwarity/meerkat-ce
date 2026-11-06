@@ -9,7 +9,7 @@ summary: Fixe un paramètre de requête sur la requête envoyée à l'upstream.
 
 Fixe un paramètre de requête au niveau de la route, en remplaçant ce que
 l'appelant a envoyé. Servez-vous-en quand la valeur relève de la route et non de
-l'appelant - une organisation, une clé d'API, un format imposé.
+l'appelant - un tenant, une clé d'API, un format imposé.
 
 ## Paramètres
 

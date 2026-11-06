@@ -9,7 +9,7 @@ summary: Three shapes and the files for each: a community gateway, an Enterprise
 # Which shape to deploy
 
 Three shapes, and the choice is not made on the number of users: it is made on
-what you accept to lose when a machine goes, and on how many organisations the
+what you accept to lose when a machine goes, and on how many tenants the
 gateway serves.
 
 ::: figure shapes
@@ -20,7 +20,7 @@ What each shape holds, and the file that deploys it.
 
 One container, one volume, nothing beside it. The embedded store holds the
 routes, the accounts, the roles, the sealed vault and the certificates. That is
-the whole gateway for one organisation, free, production included.
+the whole gateway for one tenant, free, production included.
 
 What it does not do is survive the loss of its machine: a volume does not
 follow a container from one host to another. Back up the volume and you have
@@ -39,7 +39,7 @@ helm install meerkat meerkat/meerkat -f https://meerkat.softwarity.dev/deploy/va
 
 ## One gateway, Enterprise
 
-Same shape, Enterprise image: several organisations, the corporate
+Same shape, Enterprise image: several tenants, the corporate
 directories, and the **developer tunnel**. That one listens on **`22222`**, and
 it is one more port to publish where your developers reach it and nowhere
 else. It does not speak HTTP: it is SSH, and what the gateway checks there is

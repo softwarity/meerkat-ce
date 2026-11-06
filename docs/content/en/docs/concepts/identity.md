@@ -29,14 +29,14 @@ its plane. A token from one is refused on the other.
 
 The lifetime measures **inactivity**, not time since sign-in: any request
 carrying a live session pushes its deadline. The default is 30 minutes, and it
-resolves from the member, then the organisation, then the installation.
+resolves from the member, then the tenant, then the installation.
 
 > [!NOTE]
 > That resolution exists, and only the global value is editable in the console
-> today. The per-organisation and per-member overrides are stored but have no
+> today. The per-tenant and per-member overrides are stored but have no
 > editor yet.
 
-A session also carries what the sign-in flow settled: the active organisation,
+A session also carries what the sign-in flow settled: the active tenant,
 the active group, and the step still owed. A session stuck on a step is bounced
 back to it on every navigation until it completes.
 
@@ -101,12 +101,12 @@ language and the installation's theme. The order is fixed:
 
 1. **Password update**, if it is temporary or expired.
 2. **Second factor**: a TOTP code if the account is enrolled, unless this browser has been marked trusted; forced enrolment if MFA is required and there is no factor yet.
-3. **Organisation**, then **group** when the organisation works in single-group mode.
+3. **Tenant**, then **group** when the tenant works in single-group mode.
 
-With no organisation at all, the person lands in a waiting room that explains
+With no tenant at all, the person lands in a waiting room that explains
 how to ask for access, rather than on a refusal.
 
-The control plane skips step 3 entirely: the console has no organisation to
+The control plane skips step 3 entirely: the console has no tenant to
 choose.
 
 ## Read more

@@ -37,19 +37,19 @@ Read more: [How someone signs in](/docs/auth/overview).
 - **API tokens**, personal and machine-to-machine, with the secret shown only once.
 - **Accounts** with a validity window in days, custom fields for your domain passed to applications, and an email alert on sign-in from a new browser.
 
-## Access and organisations
+## Access and tenants
 
 Who reaches what, decided at the door, never inside each application.
 
 Read more: [Authenticating and authorising](/docs/access/overview).
 
-- **Hierarchical roles** and per-organisation role groups, cumulative or picked at sign-in.
-- **Customer organisations** isolated by the gateway, admin or user members, organisation picked at sign-in. Single-organisation mode is free, multi-organisation is Enterprise. **Enterprise**
-- **Per-route access** on organisation, role and account; a refusal lands on a page that explains, never on a line of text.
+- **Hierarchical roles** and per-tenant role groups, cumulative or picked at sign-in.
+- **Customer tenants** isolated by the gateway, admin or user members, tenant picked at sign-in. Single-tenant mode is free, multi-tenant is Enterprise. **Enterprise**
+- **Per-route access** on tenant, role and account; a refusal lands on a page that explains, never on a line of text.
 - **Per-endpoint security** derived from the service's OpenAPI spec, edited in a Swagger-like console.
 - **The roles the application declares**, read from its own spec, shown per operation, imported into the catalogue in one click and forwarded under the application's names, only to those who hold them.
-- **Delegated administration with clear boundaries**: super-admin, infrastructure admin, application admin, organisation admin, and self-service for each user.
-- **Access time windows** per organisation, by day, date and time zone. **Enterprise** *partly*
+- **Delegated administration with clear boundaries**: super-admin, infrastructure admin, application admin, tenant admin, and self-service for each user.
+- **Access time windows** per tenant, by day, date and time zone. **Enterprise** *partly*
 - **Identity passed to your services** as headers, as REMOTE_USER or as a signed JWT (ES256, EdDSA, RS256), with published keys that rotate without downtime; you choose which roles each service receives.
 
 ## Scheduled calls
@@ -87,7 +87,7 @@ Read more: [Routes](/docs/concepts/routes), and what a request costs in
 
 - **Routes changed live**, with no restart, propagated to every node within a second.
 - **11 predicates and 34 filters**: path, host, header, cookie, method, weight for canaries, time window; request and response rewriting.
-- **Rate limiting** per route, user, token, organisation or address, several limits at once; **per-endpoint quotas**; standard 429 response. In a cluster, each node counts on its own for now. *partly*
+- **Rate limiting** per route, user, token, tenant or address, several limits at once; **per-endpoint quotas**; standard 429 response. In a cluster, each node counts on its own for now. *partly*
 - **Circuit breaker, timeouts** at three levels, and service health in the console: a heart per route, from discovery or a TCP check, and real traffic.
 - **WebSocket, gRPC and body streaming** end to end; a gRPC call is counted by its `grpc-status`, not by the 200 it rides on. *partly*
 - **Service discovery** for Docker, Swarm and Kubernetes when creating a route. *partly*
@@ -102,7 +102,7 @@ What the gateway adds to the pages it serves.
 
 Read more: [What the gateway injects](/docs/concepts/data-plane-chrome).
 
-- **Injected user button**: profile, sign-out, organisation switch, language, light or dark.
+- **Injected user button**: profile, sign-out, tenant switch, language, light or dark.
 - **Application menu** in the user button, grouped by container, showing only what access rights allow.
 - **Navigation portal** across your applications, as a bar or a rail. **Enterprise**
 - **Hide UI by role** in pure CSS: roles are stamped on the page server-side.
@@ -174,8 +174,8 @@ Read more: [The agent endpoint](/docs/agent/overview).
 ## An app-gateway, and what follows from it
 
 Meerkat serves **one** application made of many services: users who have a
-name, roles, an organisation, and a single door in front of all of it. That
-decision explains the rest - why identity, roles, organisations and the sign-in
+name, roles, a tenant, and a single door in front of all of it. That
+decision explains the rest - why identity, roles, tenants and the sign-in
 pages are in the product rather than beside it, and why the console is an
 operator's tool rather than a YAML editor.
 
@@ -190,10 +190,10 @@ here saves you time.
 
 ## Four editions
 
-Community, the free one, is the whole gateway for one organisation on one
+Community, the free one, is the whole gateway for one tenant on one
 instance. Enterprise is what an installation needs once it grows: several
-organisations, your corporate directory, several instances of the gateway
-behind one entry point. Team is Enterprise for one organisation on one instance, and the evaluation
+tenants, your corporate directory, several instances of the gateway
+behind one entry point. Team is Enterprise for one tenant on one instance, and the evaluation
 edition is Enterprise with a notice on it, free, to try all of it first.
 
 The rule for what falls on each side is one line, and it is the one to check

@@ -58,7 +58,7 @@ aucune modification de l'application.
 
 ## Ce qu'est une règle
 
-La même règle que celle d'une route - niveau, organisations, rôles,
+La même règle que celle d'une route - niveau, tenants, rôles,
 utilisateurs nommés - à laquelle s'ajoutent une méthode et un chemin :
 
 | Partie | Valeurs |

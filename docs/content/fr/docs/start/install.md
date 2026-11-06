@@ -196,7 +196,7 @@ et ne crée rien d'autre que le compte de l'administrateur.
 `-tenancy` sert à l'amorçage : un premier démarrage, une installation
 préconfigurée, du GitOps. Une fois le mode choisi, l'option est ignorée, et une
 ligne du journal le signale : la valeur n'est jamais remplacée en silence.
-Demander `multi` sur une image Community démarre avec une seule organisation,
+Demander `multi` sur une image Community démarre avec un seul tenant,
 et le journal le dit aussi.
 
 ### Options d'exploitation

@@ -31,15 +31,15 @@ marque de son plan. Un jeton de l'un est refusé sur l'autre.
 La durée de vie mesure l'**inactivité**, et non le temps écoulé depuis la
 connexion : toute requête qui porte une session valide repousse son échéance.
 La valeur par défaut est de 30 minutes ; elle se résout d'abord au niveau du
-membre, puis de l'organisation, puis de l'installation.
+membre, puis du tenant, puis de l'installation.
 
 > [!NOTE]
 > Cette résolution existe, mais seule la valeur globale se modifie aujourd'hui
-> dans la console. Les surcharges par organisation et par membre sont stockées,
+> dans la console. Les surcharges par tenant et par membre sont stockées,
 > sans écran pour les modifier à ce jour.
 
 Une session porte aussi ce que le parcours de connexion a établi :
-l'organisation active, le groupe actif, et l'étape qui reste à franchir. Une
+le tenant actif, le groupe actif, et l'étape qui reste à franchir. Une
 session bloquée sur une étape y est renvoyée à chaque navigation, jusqu'à ce
 que l'étape soit franchie.
 
@@ -109,13 +109,13 @@ langue du visiteur et avec le thème de l'installation. L'ordre est fixe :
 
 1. **Changement du mot de passe**, s'il est temporaire ou expiré.
 2. **Second facteur** : un code TOTP si le compte est enrôlé, sauf si ce navigateur a été déclaré de confiance ; un enrôlement forcé si le MFA est obligatoire et qu'aucun facteur n'existe encore.
-3. **Organisation**, puis **groupe** quand l'organisation fonctionne en mode à groupe unique.
+3. **Tenant**, puis **groupe** quand le tenant fonctionne en mode à groupe unique.
 
-Sans aucune organisation, la personne arrive dans une salle d'attente qui lui
+Sans aucun tenant, la personne arrive dans une salle d'attente qui lui
 explique comment demander un accès, et non sur un refus.
 
 Le plan de contrôle saute entièrement l'étape 3 : la console n'a pas
-d'organisation à faire choisir.
+de tenant à faire choisir.
 
 ## Pour aller plus loin
 

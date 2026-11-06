@@ -282,7 +282,7 @@ second automatique et horodaté (*l'état à 14 h 32*).
 ![L'onglet Database : la pause, la base sur laquelle tourne la gateway et la plateforme qui la déploie, le téléchargement et les étapes de restauration](img/console/database.webp)
 
 Une copie cohérente de **toute la base de données**, prise pendant que la gateway
-tourne : les routes et le coffre, mais aussi les utilisateurs, les organisations, les
+tourne : les routes et le coffre, mais aussi les utilisateurs, les tenants, les
 sessions et le journal d'audit. C'est ce que restaure une sauvegarde ; un export de
 configuration, lui, est ce que reproduit une seconde gateway. L'onglet s'appelait
 *Snapshot* tant qu'il ne faisait que sauvegarder ; l'ancienne adresse mène toujours ici.

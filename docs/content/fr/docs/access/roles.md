@@ -2,7 +2,7 @@
 title: Rôles et groupes
 section: Contrôle d'accès
 order: 132
-summary: Un catalogue de rôles pour toute la gateway, des groupes par organisation, et la manière dont se calculent les rôles effectifs d'une personne.
+summary: Un catalogue de rôles pour toute la gateway, des groupes par tenant, et la manière dont se calculent les rôles effectifs d'une personne.
 ---
 
 # Rôles et groupes
@@ -12,8 +12,8 @@ Les rôles sont les noms dans lesquels s'écrivent vos règles - `orders-reader`
 les obtiennent.
 
 Ce découpage est voulu : **le catalogue est commun à toute la gateway, les
-groupes appartiennent à une organisation**. Un seul vocabulaire pour toute
-l'installation, assemblé différemment dans chaque organisation.
+groupes appartiennent à un tenant**. Un seul vocabulaire pour toute
+l'installation, assemblé différemment dans chaque tenant.
 
 ## Le catalogue
 
@@ -52,25 +52,25 @@ Elles n'ont aucun effet sur les décisions d'accès.
 
 ## Les groupes
 
-**Un groupe appartient à une seule organisation** et réunit un ensemble de
-rôles du catalogue. Son nom est unique au sein de cette organisation. Des
-groupes sont ensuite attribués à chaque membre de l'organisation, et ses rôles
+**Un groupe appartient à un seul tenant** et réunit un ensemble de
+rôles du catalogue. Son nom est unique au sein de ce tenant. Des
+groupes sont ensuite attribués à chaque membre du tenant, et ses rôles
 sont ceux de ces groupes.
 
 Rien d'autre n'accorde un rôle. Il n'y a pas de rôle porté par un compte, ni de
-rôle en dehors d'une organisation :
+rôle en dehors d'un tenant :
 
 > [!WARNING]
-> Une session **sans organisation active ne détient aucun rôle**. Ni les rôles
-> d'une autre organisation, ni un sous-ensemble : aucun. Toute règle qui exige
-> un rôle exige donc aussi une organisation active, même si elle n'en mentionne
+> Une session **sans tenant actif ne détient aucun rôle**. Ni les rôles
+> d'un autre tenant, ni un sous-ensemble : aucun. Toute règle qui exige
+> un rôle exige donc aussi un tenant actif, même si elle n'en mentionne
 > pas.
 
-![Les groupes d'une organisation, chacun accordant un ensemble de rôles à ses membres](img/console/groups.webp)
+![Les groupes d'un tenant, chacun accordant un ensemble de rôles à ses membres](img/console/groups.webp)
 
 ## Un groupe à la fois, ou tous
 
-Chaque organisation choisit la manière dont ses groupes se combinent :
+Chaque tenant choisit la manière dont ses groupes se combinent :
 
 | Mode | Ce qu'il fait |
 |---|---|
@@ -78,21 +78,21 @@ Chaque organisation choisit la manière dont ses groupes se combinent :
 | Exclusive | un seul groupe s'applique, choisi à la connexion |
 
 Le mode Exclusive répond au cas d'une personne qui porte deux casquettes dans
-la même organisation, sans pouvoir les porter en même temps. Quand il est
+le même tenant, sans pouvoir les porter en même temps. Quand il est
 activé et que la personne a plusieurs groupes, elle est envoyée sur
 `/select-group`, et peut en changer plus tard depuis le bouton utilisateur.
 Une session en mode Exclusive qui n'a pas encore choisi ne porte **aucun
-rôle** - la même règle que sans organisation.
+rôle** - la même règle que sans tenant.
 
 Il n'y a pas de valeur par défaut à l'échelle de l'installation : c'est une
-propriété de l'organisation, et une organisation qui ne précise rien est en
+propriété du tenant, et un tenant qui ne précise rien est en
 mode Cumulative.
 
 ## Comment se calculent les rôles effectifs
 
-À chaque requête, pour le compte, l'organisation active et le groupe actif :
+À chaque requête, pour le compte, le tenant actif et le groupe actif :
 
-1. prendre les groupes attribués dans **cette** organisation - ou seulement le groupe actif, en mode Exclusive ;
+1. prendre les groupes attribués dans **ce** tenant - ou seulement le groupe actif, en mode Exclusive ;
 2. prendre les rôles de ces groupes ;
 3. développer chaque rôle vers le bas de la hiérarchie, en ajoutant tous ses descendants ;
 4. trier, et éliminer les doublons.
@@ -101,7 +101,7 @@ C'est à ce résultat que sont confrontées les règles de route et les règles
 d'endpoint, et c'est lui qui est transmis à l'upstream avec l'identité : votre
 service reçoit la liste développée et n'a jamais à connaître la hiérarchie.
 
-Le calcul est conservé quelques secondes par compte, organisation et groupe. Un
+Le calcul est conservé quelques secondes par compte, tenant et groupe. Un
 rôle accordé ou retiré prend donc effet en quelques secondes, sans déconnecter
 personne.
 
@@ -110,7 +110,7 @@ personne.
 Les groupes peuvent être attribués à la main, ou déduits de ce que rapporte une
 autorité externe : un groupe d'annuaire, une équipe GitHub, un claim d'un
 fournisseur d'identité. Une règle fait correspondre un groupe rapporté à un
-groupe d'une organisation, et s'exécute à chaque connexion externe : les
+groupe d'un tenant, et s'exécute à chaque connexion externe : les
 appartenances suivent ainsi l'annuaire plutôt qu'un tableur.
 
 Une règle ne gère jamais que ce qu'une règle a placé. Une appartenance ou un

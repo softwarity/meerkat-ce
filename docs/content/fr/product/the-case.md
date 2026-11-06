@@ -38,7 +38,7 @@ appels d'offres.
 | **Une connexion soignée** | des pages à votre marque, traduites, en clair et en sombre |
 | **Second facteur et passkeys** | application d'authentification, codes de secours, clés de sécurité |
 | **Le SSO de vos clients** | Entra ID, Okta, Google, SAML, LDAP, Active Directory |
-| **Plusieurs organisations** | chaque client isolé, avec ses membres, ses groupes et ses administrateurs |
+| **Plusieurs tenants** | chaque client isolé, avec ses membres, ses groupes et ses administrateurs |
 | **Rôles et accès fins** | par écran, par application, par endpoint d'API |
 | **Jetons d'API** | pour les intégrations et les machines |
 | **Protection du trafic** | limites de débit, quotas, délais, coupe-circuit pour les services en panne |
@@ -66,7 +66,7 @@ produit gratuit qu'elles hébergent elles-mêmes, ou un service payant.
 | Connexion, second facteur, passkeys | Keycloak, Zitadel, Authentik | Auth0, WorkOS, Clerk, FusionAuth | inclus |
 | Pages à votre marque, 21 langues | un thème à construire | selon l'offre | inclus |
 | SSO des clients : OIDC, SAML, LDAP, AD | Keycloak | Auth0, WorkOS, facturé à la connexion | inclus, Enterprise pour SAML et LDAP |
-| Organisations gérées par vos clients | des écrans d'administration à construire | WorkOS, Frontegg | inclus, Enterprise |
+| Tenants gérés par vos clients | des écrans d'administration à construire | WorkOS, Frontegg | inclus, Enterprise |
 | Authentification unique des outils qui ne parlent qu'OpenID Connect | Keycloak, un realm et un client par outil | Auth0, Okta | inclus, Enterprise |
 | Protéger une application sans connexion | oauth2-proxy, Pomerium Core | Pomerium Enterprise, Cloudflare Access | inclus |
 | Routage, limites de débit, quotas | Kong OSS, APISIX, Traefik, Envoy Gateway | Kong Enterprise, Tyk, Traefik Hub, API7, Gravitee | inclus |
@@ -145,12 +145,12 @@ les comparer, prenons un éditeur de logiciels qui vend à des entreprises, le c
 où ce socle pèse le plus lourd :
 
 - 5 000 utilisateurs actifs par mois
-- 20 organisations clientes, dont 10 avec leur propre SSO
+- 20 tenants, un par client, dont 10 avec leur propre SSO
 - 15 services, en production et en préproduction
 - 50 millions de requêtes par mois
 - une équipe de 10 développeurs
 
-Avec 20 organisations, ce cas demande Meerkat Enterprise.
+Avec 20 tenants, ce cas demande Meerkat Enterprise.
 
 | Brique | La moins chère qui convient | Le choix courant | Meerkat |
 | --- | --- | --- | --- |
@@ -205,7 +205,7 @@ haute.
 | --- | --- | --- | --- |
 | Identité : installation, second facteur, passkeys, SSO | 10 à 20 | 5 à 10 | 0,5 à 1 |
 | Pages de connexion à votre marque, traduites | 5 à 10 | 2 à 4 | 0,5 à 1 |
-| Organisations clientes et leur administration | 15 à 30 | 5 à 15 | 0,5 à 1 |
+| Tenants clients et leur administration | 15 à 30 | 5 à 15 | 0,5 à 1 |
 | Proxy de connexion, identité transmise aux services | 3 à 6 | 3 à 6 | 0,5 à 1 |
 | Gateway d'API : routes, limites de débit, quotas | 8 à 15 | 5 à 10 | 1 à 2 |
 | Certificats et coffre à secrets | 6 à 13 | 3 à 6 | 0,5 à 1 |

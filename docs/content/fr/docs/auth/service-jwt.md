@@ -26,7 +26,7 @@ porte :
 | `sub` | l'identifiant du compte de l'appelant |
 | `aud` | l'**Audience** de la route, ou son nom quand le champ est vide : en poser une quand le service attend une valeur à lui, ou pour qu'un renommage de la route ne change pas ses jetons. La même règle que l'audience d'un client OIDC : un texte de 255 caractères au plus, espaces à l'intérieur compris, sans caractère de contrôle |
 | `iat`, `exp` | quand il a été signé, et quand il cesse d'être valide : deux minutes plus tard par défaut, réglable par route |
-| vos claims | les attributs que la route a choisi d'envoyer - nom d'utilisateur, e-mail, rôles, organisation - sous les noms que vous leur avez donnés |
+| vos claims | les attributs que la route a choisi d'envoyer - nom d'utilisateur, e-mail, rôles, tenant - sous les noms que vous leur avez donnés |
 
 Il se choisit dans l'éditeur de route, sous **Auth forward** : le mécanisme
 `signed-jwt`, l'algorithme (**ES256** recommandé, EdDSA ou RS256 pour une

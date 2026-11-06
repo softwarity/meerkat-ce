@@ -9,7 +9,7 @@ summary: What the session cookie is, how long it lives, and exactly what ends a 
 
 A browser session is an **opaque cookie**. It carries no identity, no claims and
 no signature: thirty-two random bytes, of which the gateway keeps only a hash.
-Everything about the session - who it belongs to, which organisation is active,
+Everything about the session - who it belongs to, which tenant is active,
 which login step is still owed - lives server-side, in a row.
 
 That is on purpose. JWTs are for the API path and for what is forwarded
@@ -79,8 +79,8 @@ The lifetime itself is resolved from the narrowest level that says something:
 
 | Level | Where it lives | Editable |
 |---|---|---|
-| Membership, one person in one organisation | `sessionTTL` on the membership | admin API only |
-| Organisation | `sessionTTL` on the organisation | admin API only |
+| Membership, one person in one tenant | `sessionTTL` on the membership | admin API only |
+| Tenant | `sessionTTL` on the tenant | admin API only |
 | Installation | setting `session_ttl`, default `PT30M` | **Application > Security** |
 
 Values are ISO-8601 durations: `PT15M`, `PT1H`, `P1D`. Days, hours, minutes and
@@ -97,7 +97,7 @@ dropping it.
 > API.
 
 A session still owed a login step - a password to change, a code to enter - uses
-the installation-wide lifetime, because the organisation is not known yet.
+the installation-wide lifetime, because the tenant is not known yet.
 
 ## What ends a session
 
@@ -131,8 +131,8 @@ This list matters more than the previous one:
 
 - **Changing a password does not.** Neither the voluntary change in the profile, nor the forced change at sign-in, nor an administrator's reset. Only the e-mailed reset link revokes sessions - with the account's API tokens and trusted browsers - because that is the flow that exists for an account someone else may be holding.
 - **"Must change password" does not.** The flag is read at the *next* sign-in.
-- **Role, group and membership changes do not.** They take effect within seconds: the remembered identity is dropped, the session is kept, which is why being added to an organisation can take effect without signing out. Removing a role works the same way.
-- **Disabling an organisation does not.**
+- **Role, group and membership changes do not.** They take effect within seconds: the remembered identity is dropped, the session is kept, which is why being added to a tenant can take effect without signing out. Removing a role works the same way.
+- **Disabling a tenant does not.**
 - **On the control plane, an account's validity window is not re-checked** on a cookie session: it is checked at sign-in and on every token call, but a console session already open runs until it expires.
 
 ## Seeing the sessions
@@ -146,9 +146,9 @@ Administrators read them on **Data plane, Sessions** for the applications and
 **Meerkat, Sessions** for the console: who, which browser and address, since
 when - filtered by account, paged, updated live. Each reads their own perimeter.
 Root reads both planes. An application administrator reads the
-applications' sessions, across every organisation, but not the console's: who
-runs the console, and from where, is root's business. An organisation's
-administrator reads the sessions open in the organisations they administer, and
+applications' sessions, across every tenant, but not the console's: who
+runs the console, and from where, is root's business. A tenant's
+administrator reads the sessions open in the tenants they administer, and
 can end only those. Ending one writes `session.revoke` to the
 [audit trail](/docs/operations/audit).
 

@@ -2,14 +2,14 @@
 title: Access control
 section: Concepts
 order: 23
-summary: Roles, groups and organisations, and how a route's rule reads them to decide whether a request goes through.
+summary: Roles, groups and tenants, and how a route's rule reads them to decide whether a request goes through.
 ---
 
 # Access control
 
 Knowing who is calling is one question; whether they may pass is another. Meerkat
 answers the second one with four pieces: a role catalogue, groups that hand
-roles out, organisations that scope the groups, and a rule on each route that
+roles out, tenants that scope the groups, and a rule on each route that
 reads the result.
 
 ## Roles
@@ -22,16 +22,16 @@ Roles carry tags, which are for classification rather than for permission.
 Roles marked as system roles cannot be deleted; deleting an ordinary role
 moves its children to the top level rather than deleting them.
 
-The catalogue is global on purpose. What differs between organisations is who
+The catalogue is global on purpose. What differs between tenants is who
 holds what - not what the words mean.
 
 ## Groups
 
-A group belongs to an **organisation** and bundles roles from the catalogue.
-People are assigned groups per organisation, which is what lets the same account
+A group belongs to an **tenant** and bundles roles from the catalogue.
+People are assigned groups per tenant, which is what lets the same account
 be an administrator in one and a reader in another.
 
-Each organisation chooses how its groups add up:
+Each tenant chooses how its groups add up:
 
 | Mode | Meaning |
 |---|---|
@@ -41,24 +41,24 @@ Each organisation chooses how its groups add up:
 `MULTIPLE` is the default. In `SINGLE` mode, a session with no group chosen has
 no roles at all.
 
-## Organisations
+## Tenants
 
-An organisation - a tenant - groups people and the groups they are in. A
+A tenant groups people and the groups they are in. A
 membership is typed `ADMIN` or `USER`. Ownership is a separate field on the
-organisation, always set, transferable, and independent of membership: an owner
+tenant, always set, transferable, and independent of membership: an owner
 need not be a member.
 
-A member carries their own overrides on top of the organisation: whether they are
+A member carries their own overrides on top of the tenant: whether they are
 enabled, their access window, their session lifetime.
 
 > [!NOTE]
-> Enterprise edition, for more than one organisation. A community installation
+> Enterprise edition, for more than one tenant. A community installation
 > serves exactly one, which the console never names - the screens simply act on
 > it.
 
 ## The inheritance chain
 
-Two settings resolve **member, then organisation, then installation**, most
+Two settings resolve **member, then tenant, then installation**, most
 specific wins:
 
 - the session lifetime;
@@ -67,8 +67,8 @@ specific wins:
 > [!WARNING]
 > That chain is exactly two settings long. The second factor is **not** in
 > it - it resolves from the account, then the installation, with no
-> organisation level, because the MFA step runs before an organisation has been
-> chosen. A per-organisation rule would have nothing to read yet.
+> tenant level, because the MFA step runs before a tenant has been
+> chosen. A per-tenant rule would have nothing to read yet.
 
 A third, separate chain exists per authentication authority, for MFA, passkeys
 and account auto-creation.
@@ -88,9 +88,9 @@ administering the gateway rather than about using an application.
 | `infraAdmin` | the routing side: routes, TLS, authorities, the mail relay |
 | `appAdmin` | the application side: accounts, roles, the global settings, the built-in pages |
 | `dev` | the developer tooling on the served applications (root always has it) |
-| `tenantCreator` | may create organisations |
+| `tenantCreator` | may create tenants |
 
-Administering an organisation is deliberately **not** a flag: it is being its
+Administering a tenant is deliberately **not** a flag: it is being its
 `ADMIN` member, or its owner.
 
 ## The rule on a route
@@ -103,13 +103,13 @@ The first axis is what belonging is required:
 |---|---|
 | *(empty)* | everyone - the route asks nothing and the upstream decides |
 | `auth` | any signed-in account |
-| `tenant` | a signed-in account with an active organisation |
-| `tenants` | ...and that organisation is one of the named ones |
+| `tenant` | a signed-in account with an active tenant |
+| `tenants` | ...and that tenant is one of the named ones |
 | `deny` | nobody |
 
-The second axis is the roles the caller holds **in their active organisation**.
+The second axis is the roles the caller holds **in their active tenant**.
 
-So `roles: [admin]` on its own means an administrator of any organisation, while
+So `roles: [admin]` on its own means an administrator of any tenant, while
 `tenants: [acme]` plus `roles: [admin]` means an administrator of Acme. A list of
 named accounts can be added, and it is read first: a named person passes
 whatever the level asks, `deny` included.
@@ -123,7 +123,7 @@ The gateway answers in the order of what the person can actually do about it:
 | No session, and this is a navigation | the sign-in page, with where they were going |
 | No session, and this is an API call | 401 with `WWW-Authenticate: Session` |
 | A sign-in step still owed | that step |
-| Switching organisation would help | the organisation chooser, saying why |
+| Switching tenant would help | the tenant chooser, saying why |
 | No membership at all | the waiting room |
 | Anything else, on a UI route | `/refused`, which names the rule that turned them away and offers what this session can open |
 | Anything else, on a service route | a plain 403 - nobody reads a 403 in a browser |

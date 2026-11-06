@@ -67,7 +67,7 @@ The session's **effective roles** can be stamped onto the served HTML, **server-
 as one attribute on a tag of your choice, or as a `<meta>`. No client JavaScript, no call home. Your
 CSS can then hide or show elements by role with nothing but a selector.
 
-The same mechanism can stamp the user's own facts - username, id, full name, e-mail, organisation,
+The same mechanism can stamp the user's own facts - username, id, full name, e-mail, tenant,
 time zone, locale - each under an attribute or meta name you choose. A fact the person does not
 have is left out: no time zone chosen on the profile, no time zone attribute, and the page uses the
 browser's.

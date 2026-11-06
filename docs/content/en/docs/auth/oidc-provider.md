@@ -43,7 +43,7 @@ Recipes for common applications, one per mechanism, are in
    a **refresh token**: from its server, with its secret, or from its browser code
    with PKCE.
 5. At every **refresh**, the route is chosen again, with who the person is now. A
-   role removed, an organisation left, a route turned off: each applies at the next
+   role removed, a tenant left, a route turned off: each applies at the next
    refresh, not at the next sign-out.
 
 There is no consent screen because the clients are declared by an administrator:
@@ -132,7 +132,7 @@ and fill **Claims sent**: what the tokens say about the person. Each claim is a
 name and a source:
 
 - **a fact** that the route's **Identity** section declares: the username, the
-  e-mail, the full name, the organisation, the roles... rendered as the JWT
+  e-mail, the full name, the tenant, the roles... rendered as the JWT
   mechanism renders it, the roles through the expression Identity gives them;
 - **a fixed value**, the same for everyone who signs in through this route.
 
@@ -190,8 +190,8 @@ same origins: the gateway's public address and the routes' hosts.
 
 The client says nothing about people. Who may sign in to the application is the
 **access rule** of the route bound to it, posed in **Security** like any other.
-Somebody it turns away gets the gateway's own answer: the organisation chooser
-when another organisation would let them in, otherwise the refusal page that
+Somebody it turns away gets the gateway's own answer: the tenant chooser
+when another tenant would let them in, otherwise the refusal page that
 names the rule.
 
 ### Two levels of access
@@ -272,7 +272,7 @@ page.
 ## Try a sign-in
 
 The arrow icon on a client's row tries a sign-in for anyone, without them and
-without issuing anything. Pick the person, and the organisation their session
+without issuing anything. Pick the person, and the tenant their session
 would be opened in (their only one by default):
 
 - the route that lets them in - the first bound to the client, in routing order,

@@ -17,8 +17,8 @@ you should read the gaps before you rely on it.
 ## What works today
 
 Passkeys are allowed by default, gateway-wide: **Application > Security**,
-*Allow passkeys*. There is no per-organisation setting - a passkey sign-in
-happens before the organisation is known.
+*Allow passkeys*. There is no per-tenant setting - a passkey sign-in
+happens before the tenant is known.
 
 **Registering one** is self-service, from `/profile/passkeys`, and it needs a
 finished session: you sign in the ordinary way first, then add a key. Keys are
@@ -32,7 +32,7 @@ Meerkat asks for a discoverable credential, and the credential says which
 account it is. Discoverable keys are required at registration, which is what
 makes that possible.
 
-The key lands you straight on your organisation, or on the chooser if you belong
+The key lands you straight on your tenant, or on the chooser if you belong
 to several - exactly as a password sign-in would.
 
 ## A passkey is both factors at once
@@ -41,7 +41,7 @@ This is the design, and it is the thing to understand before turning it on:
 
 > [!WARNING]
 > A passkey sign-in **never asks for a second factor**, even for an account where
-> two-factor is *required*. It goes straight to organisation resolution. If your
+> two-factor is *required*. It goes straight to tenant resolution. If your
 > policy is "everybody must have two factors", a passkey satisfies it by
 > assumption rather than by verification - see below.
 

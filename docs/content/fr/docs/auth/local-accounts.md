@@ -26,7 +26,7 @@ local est une porte qui permet de les contourner.
 Il n'y a qu'une politique pour toute l'installation, dans **Application > Security**. Un
 mot de passe est contrôlé là où il est saisi, et les endroits où on le saisit - le
 formulaire d'inscription, le changement imposé à la première connexion, le profil, un lien
-de réinitialisation - ignorent tout des organisations.
+de réinitialisation - ignorent tout des tenants.
 
 | Champ | Ce qu'il exige | Par défaut |
 |---|---|---|
@@ -169,7 +169,7 @@ Quatre conditions doivent être réunies pour que cette page existe :
 
 Une inscription ne donne volontairement accès à rien : le compte existe, mais il reste
 inutilisable tant que l'adresse n'est pas confirmée, et il n'a accès à rien tant qu'un
-administrateur ne l'a pas rattaché à une organisation et ne lui a pas attribué de rôles. Le
+administrateur ne l'a pas rattaché à un tenant et ne lui a pas attribué de rôles. Le
 lien de confirmation est un jeton à usage unique, valable 24 heures, 48 heures ou 7 jours
 selon le réglage **Confirmation links valid for**, à côté de l'interrupteur
 d'auto-inscription. Une personne qui se connecte avant d'avoir confirmé son adresse reçoit

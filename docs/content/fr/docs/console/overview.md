@@ -28,7 +28,7 @@ Le rail de gauche regroupe les deux plans et les écrans transverses.
 |---|---|---|
 | **Infra** | `/infra/...` | Ce qui sert et le trajet des requêtes : la topologie, routes, endpoints, autorités, TLS, relais de messagerie |
 | **Application** | `/application/...` | Le produit que voient vos utilisateurs : identité, rôles, pages, portail, politiques |
-| **Tenants** | `/tenants/:id/...` | Une organisation à la fois (en mode multi-organisation uniquement) |
+| **Tenants** | `/tenants/:id/...` | Un tenant à la fois (en mode multi-tenant uniquement) |
 | **Vault** | `/vault` | Toutes les valeurs et tous les secrets nommés auxquels la configuration fait référence |
 | **Data plane** | `/data-plane/...` | Ce que font les applications : leurs connexions (Audit), qui y est connecté (Sessions), les appels planifiés qui leur sont adressés (Scheduler), ce que leurs services ont dit à leurs utilisateurs (Notifications), ce que la gateway a servi (Metrics), ce que vos utilisateurs ont signalé (Issues) |
 | **Meerkat** | `/system/...` | La gateway elle-même : qui a modifié quoi et qui s'est connecté à la console (Audit), ce qu'elle dit d'elle-même en direct (Logs), qui tient la console (Sessions), l'installation entière comme document ou comme base (Configuration) - et, en bas, la référence REST du plan de contrôle (API reference), ce qu'apporte cette version (Release notes) et l'édition (License) |
@@ -55,14 +55,14 @@ d'administration applique les mêmes périmètres à chaque appel.
 | `root` | Tout, y compris Configuration |
 | `infra admin` | Le plan Infra (avec Access tokens et MCP), Metrics, Logs, Audit et Issues, ainsi que le périmètre infra du coffre |
 | `app admin` | Le plan Application (avec Access tokens), Sessions, Scheduler, Notifications, Audit et Issues, ainsi que le périmètre applicatif du coffre |
-| `tenant admin` | Les organisations que le compte administre, avec Sessions, Audit et Issues restreints à celles-ci |
-| `tenant creator` | La création d'une organisation depuis le tiroir Tenants |
+| `tenant admin` | Les tenants que le compte administre, avec Sessions, Audit et Issues restreints à ceux-ci |
+| `tenant creator` | La création d'un tenant depuis le tiroir Tenants |
 | `dev` | L'outillage développeur sur les applications servies ; ce n'est pas un écran de la console |
 
 Une fois connecté, vous arrivez sur la première section qui vous est ouverte :
 Infra, sur Routes, pour un administrateur infra ; Application, sur General, pour un
 administrateur applicatif ; Tenants dans les autres cas (License lorsqu'il n'y a
-qu'une seule organisation). Les capacités s'accordent compte par compte, sur
+qu'un seul tenant). Les capacités s'accordent compte par compte, sur
 l'écran [Users](/docs/console/users).
 
 ## Les habitudes des écrans
@@ -116,7 +116,7 @@ Retenez ces cinq principes et la console ne vous surprendra plus.
 
 ### Communs aux deux plans
 
-- **[Tenants](/docs/console/tenants)** - l'administration propre à une organisation.
+- **[Tenants](/docs/console/tenants)** - l'administration propre à un tenant.
 - **[Vault](/docs/console/vault)** - les secrets et les valeurs, référencés sous la forme `$name`.
 - **[Metrics](/docs/console/traffic)** - le trafic, la latence, le classement des routes.
 - **[Scheduler](/docs/operations/scheduler)** - les appels planifiés et leurs exécutions.

@@ -13,7 +13,7 @@ auxquels elle délègue l'authentification.
 
 Une autorité prouve l'identité d'une personne. Elle ne décide jamais de ce que cette
 personne a le droit de faire : une première connexion crée un compte qui n'a accès à
-rien tant qu'un administrateur ne l'a pas placé dans une organisation et ne lui a pas
+rien tant qu'un administrateur ne l'a pas placé dans un tenant et ne lui a pas
 attribué de rôles. Désactivez toutes les autorités et plus personne ne se connecte au
 plan de données - ce qui peut convenir à une gateway qui ne sert que des routes
 publiques.
@@ -85,7 +85,7 @@ locale, le bloc vous avertit : un fournisseur à qui l'on donne une URL de retou
   de saisir les autres endpoints.
 - **Allowed e-mail domains** (OIDC) - vide, le champ accepte toutes les adresses que
   connaît l'autorité. Renseignez-le quand le fournisseur est partagé avec des personnes
-  extérieures à votre organisation.
+  extérieures à votre entreprise.
 - **Allowed organisations** (GitHub) - **vide, le champ laisse entrer n'importe quel
   compte GitHub**. Ces organisations et ces équipes sont aussi transmises comme
   groupes, nommés `org` et `org/team`, qu'une
@@ -117,7 +117,7 @@ suppression se trouve dans la zone de danger, tout en bas.
 ## Pièges
 
 - **Une première connexion ne donne aucun droit.** Elle crée un compte sans
-  organisation ni rôle. Placez les personnes à la main depuis
+  tenant ni rôle. Placez les personnes à la main depuis
   [Members](/docs/console/organisation), ou écrivez des règles de groupe.
 - **Une liste d'autorisation vide est une porte ouverte.** GitHub sans aucune
   organisation renseignée laisse entrer tout GitHub.

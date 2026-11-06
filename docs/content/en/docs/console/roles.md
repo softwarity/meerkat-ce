@@ -9,7 +9,7 @@ summary: The global role catalogue, its hierarchy, and the tags that make it usa
 
 **Application > Roles.** One catalogue for the whole gateway: the names your
 access rules and your services speak. Roles are global; what binds a person to
-one is a [group](/docs/console/organisation) inside an organisation.
+one is a [group](/docs/console/organisation) inside a tenant.
 
 ![The Roles screen: the catalogue as a tree under an All roles row, with descriptions and tags](img/console/roles.webp)
 
@@ -36,13 +36,13 @@ on the root is a top-level role.
 
 The hierarchy is not decoration: **a parent implies its children**. Ticking a
 parent in the groups matrix ticks what hangs under it, so a catalogue shaped like
-your organisation is a catalogue you assign in one click.
+your tenant is a catalogue you assign in one click.
 
 ## The editor
 
 - **Role name** - the technical name, the one a rule or a service reads. It is set
   when the role is created and cannot be changed afterwards.
-- **Description** - the human sentence the organisation screens put forward. Write
+- **Description** - the human sentence the tenant screens put forward. Write
   it: a person granting roles reads this, not the name.
 - **Tags** - free labels, proposed from what the catalogue already uses so a
   second spelling does not creep in. The groups matrix and this table filter on

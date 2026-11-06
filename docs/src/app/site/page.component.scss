@@ -113,6 +113,30 @@
   letter-spacing: 0;
 }
 
+// The chevron says the name opens: down while closed, turned up once open.
+.beside-caret {
+  align-self: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  margin: -2px -4px -2px -4px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+
+  .open & {
+    transform: rotate(180deg);
+    color: var(--text);
+  }
+}
+
+// The pages of the open section, indented on a guide line under its name.
+.beside-pages.nested {
+  margin: 2px 0 4px 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
 .version {
   display: flex;
   align-items: center;
@@ -228,7 +252,8 @@
   }
 
   .beside-head,
-  .beside-all {
+  .beside-all,
+  .beside-pages {
     width: 100%;
   }
 }

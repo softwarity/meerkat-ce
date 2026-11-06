@@ -37,7 +37,7 @@ aucune bibliothèque pour cela et ne sait même pas qu'on l'habille.
 
 Une **route d'API** est appelée par un programme : il n'y a rien à habiller. À
 la place, elle reçoit dans un en-tête un jeton signé - qui appelle, avec quels
-rôles, dans quelle organisation - et n'authentifie personne. Tout l'intérêt est
+rôles, dans quel tenant - et n'authentifie personne. Tout l'intérêt est
 là : vos services n'ont plus à porter ni page de connexion ni table
 d'utilisateurs.
 

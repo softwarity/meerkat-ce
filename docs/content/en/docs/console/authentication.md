@@ -12,7 +12,7 @@ gateway holds, and the identity providers and directories it delegates to.
 
 An authority proves who someone is. It never decides what they may do: a first
 sign-in creates an account that reaches nothing until an administrator places it
-in an organisation and grants roles. Switch every authority off and nobody signs
+in a tenant and grants roles. Switch every authority off and nobody signs
 in to the data plane, which is what a gateway serving only public routes may
 want.
 
@@ -111,7 +111,7 @@ zone at the bottom.
 
 ## Traps
 
-- **A first sign-in grants nothing.** It creates an account with no organisation
+- **A first sign-in grants nothing.** It creates an account with no tenant
   and no role. Either place people by hand on
   [Members](/docs/console/organisation), or write group rules.
 - **Empty allow-lists are open doors.** GitHub with no organisation named lets

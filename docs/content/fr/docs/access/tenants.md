@@ -1,60 +1,60 @@
 ---
-title: Organisations
+title: Tenants
 section: Contrôle d'accès
 order: 138
-summary: Les appartenances, le choix à la connexion, le propriétaire, et les réglages qu'une organisation peut surcharger.
+summary: Les appartenances, le choix à la connexion, le propriétaire, et les réglages qu'un tenant peut surcharger.
 ---
 
-# Organisations
+# Tenants
 
-Une organisation - le tenant des URL et de l'API - est ce au nom de quoi une
-personne travaille. C'est le périmètre dans lequel vivent les rôles : les
-groupes appartiennent à une organisation, et une session sans organisation
-active ne détient aucun rôle.
+Un tenant est une organisation servie par la passerelle : un client, une
+filiale, un service. C'est ce au nom de quoi une personne travaille, et le
+périmètre dans lequel vivent les rôles : les groupes appartiennent à un tenant,
+et une session sans tenant actif ne détient aucun rôle.
 
-Toute installation en possède une dès son premier démarrage, et bien souvent
-elle n'en aura jamais besoin d'une autre.
+Toute installation en possède un dès son premier démarrage, et bien souvent
+elle n'en aura jamais besoin d'un autre.
 
 > [!NOTE] **Édition Enterprise.**
-> Disposer de plusieurs organisations fait partie de l'édition Enterprise.
-> L'image Community sert une **seule** organisation, qu'aucun écran ne nomme
+> Disposer de plusieurs tenants fait partie de l'édition Enterprise.
+> L'image Community sert un **seul** tenant, qu'aucun écran ne nomme
 > jamais : ses groupes, ses membres et ses règles s'administrent depuis
 > **Application**, et la notion n'apparaît nulle part ailleurs. Le passage au
-> mode multi-organisation est une décision du compte root, sur une image
+> mode multi-tenant est une décision du compte root, sur une image
 > Enterprise.
 
-Revenir au mode à une seule organisation ne supprime rien : les autres
-organisations cessent simplement d'être servies, et celle qui reste servie est
-la plus ancienne.
+Revenir au mode à un seul tenant ne supprime rien : les autres
+tenants cessent simplement d'être servis, et celui qui reste servi est
+le plus ancien.
 
 ## Les membres
 
-Une appartenance, c'est une personne dans une organisation, de type **ADMIN**
+Une appartenance, c'est une personne dans un tenant, de type **ADMIN**
 ou **USER**, active ou non. L'énumération s'arrête là : il n'existe pas
 d'appartenance OWNER.
 
-**La propriété est un attribut de l'organisation**, pas une appartenance : une
-organisation a toujours un propriétaire, la propriété peut être transférée, et
-le propriétaire n'est pas obligatoirement membre. Qui crée une organisation en
+**La propriété est un attribut du tenant**, pas une appartenance : un
+tenant a toujours un propriétaire, la propriété peut être transférée, et
+le propriétaire n'est pas obligatoirement membre. Qui crée un tenant en
 est le propriétaire.
 
 Une appartenance **ADMIN**, ou la qualité de propriétaire, permet à une
-personne d'administrer cette organisation depuis la console : l'organisation
-elle-même, ses membres, ses groupes, ses règles de groupe, la réinitialisation
+personne d'administrer ce tenant depuis la console : le tenant
+lui-même, ses membres, ses groupes, ses règles de groupe, la réinitialisation
 du mot de passe d'un membre, la lecture de l'historique de connexion d'un
-membre. Elle n'accorde rien en dehors de cette organisation, et notamment pas
+membre. Elle n'accorde rien en dehors de ce tenant, et notamment pas
 le catalogue global des rôles.
 
-Une personne peut aussi **quitter** l'organisation dans laquelle elle se
-trouve, depuis son profil : *Quitter cette organisation*, à côté de son nom,
+Une personne peut aussi **quitter** le tenant dans lequel elle se
+trouve, depuis son profil : *Quitter ce tenant*, à côté de son nom,
 puis une confirmation précisant que seul un administrateur pourra l'y rajouter.
-L'appartenance disparaît, la session cesse aussitôt de porter l'organisation,
+L'appartenance disparaît, la session cesse aussitôt de porter le tenant,
 et la ligne `member.leave` s'inscrit dans le [journal
-d'audit](/docs/operations/audit) de l'organisation. Cela ne concerne que les
-installations multi-organisations : quand il n'y en a qu'une, il n'y a rien à
+d'audit](/docs/operations/audit) du tenant. Cela ne concerne que les
+installations multi-tenant : quand il n'y en a qu'un, il n'y a rien à
 quitter.
 
-![Les membres d'une organisation, et ce que chacun y est](img/console/members.webp)
+![Les membres d'un tenant, et ce que chacun y est](img/console/members.webp)
 
 ## Le choix à la connexion
 
@@ -62,23 +62,23 @@ Une fois le premier et le second facteur validés :
 
 | Appartenances | Ce qui se passe |
 |---|---|
-| aucune | la session est émise sans organisation. Une personne qui n'administre rien arrive sur `/account-pending`, la salle d'attente |
+| aucune | la session est émise sans tenant. Une personne qui n'administre rien arrive sur `/account-pending`, la salle d'attente |
 | une seule | elle est inscrite dans la session, sans rien demander |
 | plusieurs | la personne choisit, sur `/select-tenant` |
 
-Seules comptent les appartenances actives dans des organisations actives.
+Seules comptent les appartenances actives dans des tenants actifs.
 
-Une session sans organisation, dont le titulaire obtient par la suite
-exactement une appartenance, l'adopte à la requête suivante : l'ajout à une
-organisation prend effet sans qu'il faille se déconnecter.
+Une session sans tenant, dont le titulaire obtient par la suite
+exactement une appartenance, l'adopte à la requête suivante : l'ajout à un
+tenant prend effet sans qu'il faille se déconnecter.
 
-Le changement d'organisation se fait ensuite depuis le bouton utilisateur, et
-rejoue l'étape du groupe : la nouvelle organisation peut avoir un autre mode de
+Le changement de tenant se fait ensuite depuis le bouton utilisateur, et
+rejoue l'étape du groupe : le nouveau tenant peut avoir un autre mode de
 groupe et d'autres groupes.
 
 ## Heures ouvrées
 
-Une organisation peut restreindre les moments où ses membres peuvent entrer :
+Un tenant peut restreindre les moments où ses membres peuvent entrer :
 jours de la semaine, plages horaires, dates de début et de fin, dans un fuseau
 horaire nommé.
 
@@ -87,31 +87,31 @@ horaire nommé.
 
 Les heures qui s'appliquent viennent du niveau le plus précis qui en définit,
 et s'appliquent **entières** : l'appartenance, puis le groupe, puis le compte,
-puis l'organisation, puis l'installation. Les heures d'un groupe ne comptent que
-dans une organisation en mode de groupe **exclusif**, où un seul groupe est
+puis le tenant, puis l'installation. Les heures d'un groupe ne comptent que
+dans un tenant en mode de groupe **exclusif**, où un seul groupe est
 choisi par session (équipe de jour, équipe de nuit) ; en mode cumulatif une
 personne a plusieurs groupes à la fois, et un groupe n'y a donc pas d'heures
 propres. Des heures posées à un niveau sont une autre
 règle pour les personnes qu'il couvre, pas une règle plus étroite : un membre à
-qui l'on donne ses soirées entre à 20:00 même si l'organisation ferme à 18:00.
+qui l'on donne ses soirées entre à 20:00 même si le tenant ferme à 18:00.
 Les dates de début et de fin de l'appartenance s'appliquent quel que soit le
 niveau d'où viennent les heures. La valeur par défaut ouvre tous les jours,
 24 heures sur 24.
 
 Les heures du compte sont posées par l'administrateur de l'application, sur le
-compte ; celles de l'appartenance par l'administrateur de l'organisation, dans
-le tiroir du membre. Sans organisation, ce sont celles du compte, sinon celles
+compte ; celles de l'appartenance par l'administrateur du tenant, dans
+le tiroir du membre. Sans tenant, ce sont celles du compte, sinon celles
 de l'installation. Root n'est jamais soumis à des heures : la personne qui répare
 la gateway n'en est jamais exclue.
 
-Avec plusieurs organisations, l'écran de choix montre grisées celles dont les
+Avec plusieurs tenants, l'écran de choix montre grisés ceux dont les
 heures sont fermées pour cette personne, avec la mention *Hors horaires
-d'accès* ; une connexion alors qu'elles sont toutes fermées est refusée. Le choix
+d'accès* ; une connexion alors qu'ils sont tous fermés est refusée. Le choix
 du groupe fait de même avec les groupes fermés, et la session est alors bornée
 par les heures du groupe choisi.
 
 Les heures sont vérifiées à la connexion et à l'entrée ou au changement
-d'organisation, et la session **se termine à leur fermeture** : ouverte à 17:55
+de tenant, et la session **se termine à leur fermeture** : ouverte à 17:55
 dans une plage qui ferme à 18:00, elle prend fin à 18:01, la minute 18:00
 faisant partie de la plage, quelle que soit sa durée de vie. La page revient à
 la connexion, qui dit alors que les heures sont fermées. Des heures modifiées en
@@ -120,17 +120,17 @@ cours de journée s'appliquent à la connexion suivante.
 Un refus pour cause d'horaires le dit clairement : il ne ressemble jamais à un
 mot de passe erroné.
 
-## Ce qu'une organisation peut surcharger
+## Ce qu'un tenant peut surcharger
 
 | Réglage | Niveaux, du plus précis au plus général | Où il se modifie |
 |---|---|---|
-| Durée de vie de la session | appartenance, organisation, installation | l'installation dans la console ; les deux autres par l'API d'administration |
-| Heures ouvrées | appartenance, groupe (mode exclusif), compte, organisation, installation | toutes dans la console : le tiroir du membre, le tiroir du groupe, le tiroir du compte (Security), l'organisation, Application, General |
-| Mode de groupe | organisation uniquement | l'écran de l'organisation |
+| Durée de vie de la session | appartenance, tenant, installation | l'installation dans la console ; les deux autres par l'API d'administration |
+| Heures ouvrées | appartenance, groupe (mode exclusif), compte, tenant, installation | toutes dans la console : le tiroir du membre, le tiroir du groupe, le tiroir du compte (Security), le tenant, Application, General |
+| Mode de groupe | tenant uniquement | l'écran du tenant |
 | Second facteur | **compte, puis installation** | les deux dans la console |
 
-Le second facteur n'a volontairement **aucun niveau organisation** : il est
-demandé avant que l'organisation soit connue, et une règle par organisation ne
+Le second facteur n'a volontairement **aucun niveau tenant** : il est
+demandé avant que le tenant soit connu, et une règle par tenant ne
 pourrait donc pas être lue à temps.
 
 Tout le reste - la politique de mot de passe, la limitation des tentatives, les
@@ -139,14 +139,14 @@ l'installation.
 
 ## Isolation
 
-Chaque requête porte l'organisation dans laquelle elle est faite, et c'est à
-elle que sont confrontées les règles de route, les règles d'endpoint et
-l'identité transmise à l'upstream. Votre service reçoit l'organisation comme un
+Chaque requête porte le tenant dans lequel elle est faite, et c'est à
+lui que sont confrontées les règles de route, les règles d'endpoint et
+l'identité transmise à l'upstream. Votre service reçoit le tenant comme un
 fait établi au sujet de l'appelant, et non comme une demande de sa part.
 
-Un point à connaître : **désactiver une organisation, ou une appartenance, ne
+Un point à connaître : **désactiver un tenant, ou une appartenance, ne
 met pas fin aux sessions qui y travaillent déjà.** Cela empêche les nouvelles
-connexions de l'adopter, mais une session qui porte déjà cette organisation la
+connexions de l'adopter, mais une session qui porte déjà ce tenant le
 conserve, avec les rôles qu'elle y détient, jusqu'à son expiration.
 
 Ce qui prend effet immédiatement, en revanche, c'est le retrait d'une personne

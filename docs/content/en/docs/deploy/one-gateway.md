@@ -288,4 +288,4 @@ from staging carries their capabilities along.
 | `MEERKAT_PLUG_ADDR` | `:22222` | Moves the developer tunnel's port. It does not turn it off: the **Infra, Plug** switch does, and so does closing the developer surface. |
 | `MEERKAT_PRODUCTION` | - | No longer read: set, it only logs a warning. The developer surface is switched in the console - see [The developer surface in production](#the-developer-surface-in-production). |
 | `MEERKAT_TRUSTED_PROXIES` | - | No longer read: set, it only logs a warning. Whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed is said plane by plane on **Infra > Domains & TLS** - see [Behind a proxy or a load balancer](#behind-a-proxy-or-a-load-balancer). |
-| `MEERKAT_TENANCY` | `single` | One implicit organisation, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |
+| `MEERKAT_TENANCY` | `single` | One implicit tenant, or several (Enterprise). Chosen once, at the first start; the console owns it afterwards. |

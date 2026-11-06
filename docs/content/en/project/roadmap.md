@@ -24,8 +24,8 @@ transform it, an access rule decides, and what happened is visible afterwards.
 - **Identity**: local accounts, OpenID Connect, SAML 2.0, LDAP and Active
   Directory, GitHub - all tested against real servers. Sessions, API tokens, signed
   tokens to upstreams.
-- **Access**: a hierarchical role catalogue, groups per organisation,
-  organisations themselves, a rule per route, and per-endpoint security read
+- **Access**: a hierarchical role catalogue, groups per tenant,
+  tenants themselves, a rule per route, and per-endpoint security read
   from a service's OpenAPI description.
 - **Two-factor**: TOTP with trusted browsers, and passkeys.
 - **The vault**: secrets sealed at rest and plain values, both referenced by
@@ -74,7 +74,7 @@ line, what is missing from each.
   collector. What is missing is the gateway declaring itself in `tracestate`
   and `baggage`, and a link from an audit line to its trace.
 - **Quotas** - they are set per route, per endpoint and per consumer - user,
-  token, organisation, address - and going over answers 429 with the standard
+  token, tenant, address - and going over answers 429 with the standard
   headers. What is missing is the screen that shows consumption, throttling
   rather than refusing, and counters that stay right across a cluster.
 - **Notifying your users** (Enterprise) - a service publishes, its users see it
@@ -111,8 +111,8 @@ line, what is missing from each.
   rewritten.
 - **gRPC properly**: per-method security, and gRPC-Web. The counters already
   read `grpc-status`.
-- **A per-organisation portal**: each customer's own icon, title and
-  arrangement. It would be the product's first per-organisation visual override.
+- **A per-tenant portal**: each customer's own icon, title and
+  arrangement. It would be the product's first per-tenant visual override.
 - **HTTP/3**, once the gain can be measured rather than described.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets and Docker
   secrets, for installations that already run one and do not want a second.

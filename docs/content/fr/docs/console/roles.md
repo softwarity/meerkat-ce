@@ -9,7 +9,7 @@ summary: Le catalogue global des rôles, sa hiérarchie et les tags qui le rende
 
 **Application > Roles.** Un seul catalogue pour toute la gateway : ce sont les noms
 qu'emploient vos règles d'accès et vos services. Les rôles sont globaux ; c'est un
-[groupe](/docs/console/organisation), au sein d'une organisation, qui en attribue à
+[groupe](/docs/console/organisation), au sein d'un tenant, qui en attribue à
 une personne.
 
 ![L'écran Roles : le catalogue présenté en arbre sous une ligne All roles, avec les descriptions et les tags](img/console/roles.webp)
@@ -40,14 +40,14 @@ rôle rattaché directement à la racine est un rôle de premier niveau.
 
 La hiérarchie n'est pas là pour faire joli : **un parent implique ses enfants**.
 Cocher un parent dans la matrice des groupes coche tout ce qui en dépend. Un catalogue
-calqué sur votre organisation s'attribue donc en un clic.
+calqué sur votre entreprise s'attribue donc en un clic.
 
 ## L'éditeur
 
 - **Role name** - le nom technique, celui que lit une règle ou un service. Il est fixé
   à la création du rôle et ne peut plus être modifié ensuite.
 - **Description** - la phrase, écrite pour un humain, que mettent en avant les écrans
-  d'organisation. Prenez le temps de la rédiger : la personne qui attribue les rôles
+  de tenant. Prenez le temps de la rédiger : la personne qui attribue les rôles
   lit cette phrase, pas le nom.
 - **Tags** - des étiquettes libres. Le champ suggère celles que le catalogue utilise
   déjà, pour éviter qu'une seconde orthographe ne s'installe. La matrice des groupes et

@@ -8,7 +8,7 @@ summary: Send people to your company identity provider - Keycloak, Entra ID, Okt
 # OpenID Connect
 
 An OIDC authority delegates the **first factor** to an identity provider your
-organisation already runs. The browser leaves for the provider, comes back with
+company already runs. The browser leaves for the provider, comes back with
 a code, and Meerkat exchanges it for an identity token it verifies against the
 provider's published keys. Nothing is taken on trust.
 
@@ -114,15 +114,15 @@ An identity from a provider is resolved to a local account in this order:
 3. a new account, if this authority is allowed to create one.
 
 The link is recorded per authority, so someone who signed up with a local
-password and later moves to SSO keeps their account, their organisations and
+password and later moves to SSO keeps their account, their tenants and
 their roles. There is no *source* column on an account: an account can be known
 by several authorities at once, and someone may sign in through any of them.
 
 A freshly created account reaches **nothing**. It lands in the waiting room
-until an administrator places it in an organisation and grants roles.
+until an administrator places it in a tenant and grants roles.
 
 The groups the provider reports are recorded on the link. They turn into
-memberships and roles only through a **group rule** on an organisation.
+memberships and roles only through a **group rule** on a tenant.
 
 > [!NOTE] **Enterprise edition.**
 > Writing group rules - what turns a claim into a membership and roles - is part

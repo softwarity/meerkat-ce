@@ -8,7 +8,7 @@ summary: Envoyer les personnes vers le fournisseur d'identité de votre entrepri
 # OpenID Connect
 
 Une autorité OIDC délègue le **premier facteur** à un fournisseur d'identité que votre
-organisation exploite déjà. Le navigateur part chez le fournisseur, revient avec un code,
+entreprise exploite déjà. Le navigateur part chez le fournisseur, revient avec un code,
 et Meerkat l'échange contre un jeton d'identité qu'il vérifie avec les clés publiées par le
 fournisseur. Rien n'est cru sur parole.
 
@@ -114,17 +114,17 @@ Une identité venue d'un fournisseur est rapprochée d'un compte local dans cet 
 3. un nouveau compte, si cette autorité est autorisée à en créer.
 
 Le lien est enregistré par autorité : une personne qui s'est inscrite avec un mot de passe
-local et qui passe ensuite au SSO conserve donc son compte, ses organisations et ses rôles.
+local et qui passe ensuite au SSO conserve donc son compte, ses tenants et ses rôles.
 Un compte n'a pas de colonne *source* : il peut être connu de plusieurs autorités à la
 fois, et la personne peut se connecter par n'importe laquelle.
 
 Un compte tout juste créé n'a accès à **rien**. Il arrive dans la salle d'attente et y
-reste jusqu'à ce qu'un administrateur le rattache à une organisation et lui attribue des
+reste jusqu'à ce qu'un administrateur le rattache à un tenant et lui attribue des
 rôles.
 
 Les groupes que rapporte le fournisseur sont enregistrés sur le lien. Ils ne deviennent des
 appartenances et des rôles que par l'intermédiaire d'une **règle de groupe** définie sur
-une organisation.
+un tenant.
 
 > [!NOTE] **Édition Enterprise.**
 > L'écriture des règles de groupe - ce qui transforme un claim en appartenance et en

@@ -38,19 +38,19 @@ Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 - **Jetons d'API**, personnels ou de machine à machine, dont le secret n'est affiché qu'une fois.
 - **Comptes** avec une durée de validité en jours, des champs personnalisés propres à votre métier et transmis aux applications, et une alerte par e-mail lors d'une connexion depuis un nouveau navigateur.
 
-## Accès et organisations
+## Accès et tenants
 
 Qui accède à quoi se décide à la porte, jamais dans chaque application.
 
 Pour en savoir plus : [Authentifier et autoriser](/docs/access/overview).
 
-- **Rôles hiérarchiques** et groupes de rôles par organisation, cumulés ou choisis à la connexion.
-- **Organisations clientes** isolées par la gateway, membres administrateurs ou utilisateurs, organisation choisie à la connexion. Le mode à une seule organisation est gratuit, le mode à plusieurs organisations relève d'Enterprise. **Enterprise**
-- **Accès par route** selon l'organisation, le rôle et le compte ; un refus aboutit à une page qui explique, jamais à une ligne de texte.
+- **Rôles hiérarchiques** et groupes de rôles par tenant, cumulés ou choisis à la connexion.
+- **Tenants clients** isolés par la gateway, membres administrateurs ou utilisateurs, tenant choisi à la connexion. Le mode à un seul tenant est gratuit, le mode à plusieurs tenants relève d'Enterprise. **Enterprise**
+- **Accès par route** selon le tenant, le rôle et le compte ; un refus aboutit à une page qui explique, jamais à une ligne de texte.
 - **Sécurité par endpoint** déduite de la spécification OpenAPI du service, et modifiée dans une console à la manière de Swagger.
 - **Les rôles que l'application déclare**, lus dans sa propre spec, affichés par opération, importés au catalogue en un clic et transmis sous les noms de l'application, à ceux seulement qui les détiennent.
-- **Administration déléguée, aux frontières nettes** : super-administrateur, administrateur de l'infrastructure, administrateur des applications, administrateur d'organisation, et libre-service pour chaque utilisateur.
-- **Plages horaires d'accès** par organisation, selon le jour, la date et le fuseau horaire. **Enterprise** *en partie*
+- **Administration déléguée, aux frontières nettes** : super-administrateur, administrateur de l'infrastructure, administrateur des applications, administrateur de tenant, et libre-service pour chaque utilisateur.
+- **Plages horaires d'accès** par tenant, selon le jour, la date et le fuseau horaire. **Enterprise** *en partie*
 - **Identité transmise à vos services** sous forme d'en-têtes, de REMOTE_USER ou d'un JWT signé (ES256, EdDSA, RS256), avec des clés publiées qui changent sans interruption ; vous choisissez les rôles que reçoit chaque service.
 
 ## Appels planifiés
@@ -89,7 +89,7 @@ requête dans [Performance](/product/performance).
 
 - **Routes modifiées à chaud**, sans redémarrage, et propagées à tous les nœuds en moins d'une seconde.
 - **11 prédicats et 34 filtres** : chemin, hôte, en-tête, cookie, méthode, poids pour les déploiements canari, fenêtre horaire ; réécriture de la requête et de la réponse.
-- **Limites de débit** par route, utilisateur, jeton, organisation ou adresse, avec plusieurs limites à la fois ; **quotas par endpoint** ; réponse 429 standard. En cluster, chaque nœud compte encore de son côté. *en partie*
+- **Limites de débit** par route, utilisateur, jeton, tenant ou adresse, avec plusieurs limites à la fois ; **quotas par endpoint** ; réponse 429 standard. En cluster, chaque nœud compte encore de son côté. *en partie*
 - **Disjoncteur, timeouts** à trois niveaux, et santé des services dans la console : un cœur par route, d'après la découverte ou un test TCP, et d'après le trafic réel.
 - **WebSocket, gRPC et diffusion des corps en flux** de bout en bout ; un appel gRPC est compté d'après son `grpc-status`, et non d'après le 200 qui le transporte. *en partie*
 - **Découverte des services** pour Docker, Swarm et Kubernetes, à la création d'une route. *en partie*
@@ -104,7 +104,7 @@ Ce que la gateway ajoute aux pages qu'elle sert.
 
 Pour en savoir plus : [Ce que la gateway injecte](/docs/concepts/data-plane-chrome).
 
-- **Bouton utilisateur injecté** : profil, déconnexion, changement d'organisation, langue, mode clair ou sombre.
+- **Bouton utilisateur injecté** : profil, déconnexion, changement de tenant, langue, mode clair ou sombre.
 - **Menu des applications** dans le bouton utilisateur, regroupé par conteneur, qui ne montre que ce qu'autorisent les droits d'accès.
 - **Portail de navigation** entre vos applications, en barre ou en rail. **Enterprise**
 - **Masquage de l'interface selon le rôle**, en CSS pur : les rôles sont inscrits dans la page côté serveur.
@@ -176,9 +176,9 @@ Pour en savoir plus : [Le point d'entrée des agents](/docs/agent/overview).
 ## Une app-gateway, et ce qui en découle
 
 Meerkat sert **une** application composée de nombreux services : des
-utilisateurs qui ont un nom, des rôles, une organisation, et une seule porte
+utilisateurs qui ont un nom, des rôles, un tenant, et une seule porte
 devant l'ensemble. Cette décision explique tout le reste - pourquoi l'identité,
-les rôles, les organisations et les pages de connexion sont dans le produit
+les rôles, les tenants et les pages de connexion sont dans le produit
 plutôt qu'à côté, et pourquoi la console est un outil d'exploitant plutôt qu'un
 éditeur de YAML.
 
@@ -194,11 +194,11 @@ travail d'une API gateway, et le dire ici vous fait gagner du temps.
 
 ## Quatre éditions
 
-Community, la gratuite, est toute la gateway pour une organisation sur une
+Community, la gratuite, est toute la gateway pour un tenant sur une
 instance. Enterprise est ce dont une installation a besoin dès qu'elle
-grandit : plusieurs organisations, votre annuaire d'entreprise, plusieurs
+grandit : plusieurs tenants, votre annuaire d'entreprise, plusieurs
 instances de la gateway derrière un même point d'entrée. Team, c'est
-Enterprise pour une organisation sur une instance, et l'édition d'évaluation, c'est Enterprise avec une
+Enterprise pour un tenant sur une instance, et l'édition d'évaluation, c'est Enterprise avec une
 mention affichée, gratuite, pour tout essayer d'abord.
 
 La règle qui dit ce qui va de chaque côté tient en une ligne, et c'est elle

@@ -2,14 +2,14 @@
 title: Contrôle d'accès
 section: Concepts
 order: 23
-summary: Les rôles, les groupes et les organisations, et la manière dont la règle d'une route les lit pour décider si une requête passe.
+summary: Les rôles, les groupes et les tenants, et la manière dont la règle d'une route les lit pour décider si une requête passe.
 ---
 
 # Contrôle d'accès
 
 Savoir qui appelle est une question ; savoir s'il peut passer en est une autre.
 Meerkat répond à la seconde avec quatre éléments : un catalogue de rôles, des
-groupes qui distribuent ces rôles, des organisations qui délimitent les
+groupes qui distribuent ces rôles, des tenants qui délimitent les
 groupes, et sur chaque route une règle qui lit le résultat.
 
 ## Les rôles
@@ -24,17 +24,17 @@ autoriser. Les rôles marqués comme rôles système ne peuvent pas être
 supprimés ; supprimer un rôle ordinaire fait remonter ses enfants au premier
 niveau au lieu de les supprimer.
 
-Le catalogue est global à dessein. Ce qui change d'une organisation à l'autre,
+Le catalogue est global à dessein. Ce qui change d'un tenant à l'autre,
 c'est qui détient quoi - pas le sens des mots.
 
 ## Les groupes
 
-Un groupe appartient à une **organisation** et réunit des rôles du catalogue.
-Les groupes sont attribués aux personnes organisation par organisation : c'est
-ce qui permet à un même compte d'être administrateur dans l'une et simple
-lecteur dans une autre.
+Un groupe appartient à un **tenant** et réunit des rôles du catalogue.
+Les groupes sont attribués aux personnes tenant par tenant : c'est
+ce qui permet à un même compte d'être administrateur dans l'un et simple
+lecteur dans un autre.
 
-Chaque organisation choisit la manière dont ses groupes s'additionnent :
+Chaque tenant choisit la manière dont ses groupes s'additionnent :
 
 | Mode | Signification |
 |---|---|
@@ -44,26 +44,26 @@ Chaque organisation choisit la manière dont ses groupes s'additionnent :
 `MULTIPLE` est la valeur par défaut. En mode `SINGLE`, une session pour
 laquelle aucun groupe n'a été choisi n'a aucun rôle.
 
-## Les organisations
+## Les tenants
 
-Une organisation - le tenant des URL et de l'API - rassemble des personnes et
+Un tenant rassemble des personnes et
 les groupes auxquels elles appartiennent. Une appartenance est de type `ADMIN` ou `USER`. La
-propriété est un champ distinct de l'organisation, toujours renseigné,
+propriété est un champ distinct du tenant, toujours renseigné,
 transférable et indépendant de l'appartenance : le propriétaire n'est pas
 nécessairement membre.
 
-Un membre porte ses propres surcharges, qui s'ajoutent à celles de
-l'organisation : son activation, sa fenêtre d'accès, la durée de vie de sa
+Un membre porte ses propres surcharges, qui s'ajoutent à celles du
+tenant : son activation, sa fenêtre d'accès, la durée de vie de sa
 session.
 
 > [!NOTE]
-> Édition Enterprise, au-delà d'une organisation. Une installation Community
-> en sert exactement une, que la console ne nomme jamais : les écrans agissent
-> simplement sur elle.
+> Édition Enterprise, au-delà d'un tenant. Une installation Community
+> en sert exactement un, que la console ne nomme jamais : les écrans agissent
+> simplement sur lui.
 
 ## La chaîne d'héritage
 
-Deux réglages se résolvent dans l'ordre **membre, puis organisation, puis
+Deux réglages se résolvent dans l'ordre **membre, puis tenant, puis
 installation**, le plus précis l'emportant :
 
 - la durée de vie de la session ;
@@ -72,8 +72,8 @@ installation**, le plus précis l'emportant :
 > [!WARNING]
 > Cette chaîne compte exactement deux réglages. Le second facteur n'en fait
 > **pas** partie : il se résout au niveau du compte, puis de l'installation,
-> sans niveau organisation, parce que l'étape MFA s'exécute avant qu'une
-> organisation ait été choisie. Une règle par organisation n'aurait encore rien
+> sans niveau tenant, parce que l'étape MFA s'exécute avant qu'un
+> tenant ait été choisi. Une règle par tenant n'aurait encore rien
 > à lire.
 
 Une troisième chaîne, distincte, existe par autorité d'authentification, pour
@@ -95,9 +95,9 @@ l'usage d'une application.
 | `infraAdmin` | le côté routage : routes, TLS, autorités, relais de messagerie |
 | `appAdmin` | le côté application : comptes, rôles, réglages globaux, pages intégrées |
 | `dev` | l'outillage développeur sur les applications servies (root l'a toujours) |
-| `tenantCreator` | peut créer des organisations |
+| `tenantCreator` | peut créer des tenants |
 
-Administrer une organisation n'est volontairement **pas** un indicateur : il
+Administrer un tenant n'est volontairement **pas** un indicateur : il
 faut en être membre `ADMIN`, ou en être le propriétaire.
 
 ## La règle d'une route
@@ -111,15 +111,15 @@ Le premier axe est le type d'appartenance exigé :
 |---|---|
 | *(vide)* | tout le monde - la route ne demande rien et l'upstream décide |
 | `auth` | tout compte connecté |
-| `tenant` | un compte connecté qui a une organisation active |
-| `tenants` | ...et cette organisation fait partie de celles qui sont nommées |
+| `tenant` | un compte connecté qui a un tenant actif |
+| `tenants` | ...et ce tenant fait partie de ceux qui sont nommés |
 | `deny` | personne |
 
-Le second axe, ce sont les rôles que l'appelant détient **dans son organisation
-active**.
+Le second axe, ce sont les rôles que l'appelant détient **dans son tenant
+actif**.
 
-Ainsi, `roles: [admin]` seul désigne un administrateur de n'importe quelle
-organisation, tandis que `tenants: [acme]` avec `roles: [admin]` désigne un
+Ainsi, `roles: [admin]` seul désigne un administrateur de n'importe quel
+tenant, tandis que `tenants: [acme]` avec `roles: [admin]` désigne un
 administrateur d'Acme. On peut y ajouter une liste de comptes nommés, et elle
 est lue en premier : une personne nommée passe quel que soit le niveau exigé,
 `deny` compris.
@@ -134,7 +134,7 @@ dans cet ordre :
 | Pas de session, et il s'agit d'une navigation | la page de connexion, qui retient la destination |
 | Pas de session, et il s'agit d'un appel d'API | 401 avec `WWW-Authenticate: Session` |
 | Une étape de connexion reste à franchir | cette étape |
-| Changer d'organisation débloquerait la situation | le choix de l'organisation, avec l'explication |
+| Changer de tenant débloquerait la situation | le choix du tenant, avec l'explication |
 | Aucune appartenance | la salle d'attente |
 | Tout autre cas, sur une route UI | `/refused`, qui nomme la règle à l'origine du refus et propose ce que cette session peut ouvrir |
 | Tout autre cas, sur une route de service | un simple 403 - personne ne lit un 403 dans un navigateur |

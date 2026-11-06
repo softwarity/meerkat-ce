@@ -1,6 +1,6 @@
 ---
 title: Authentication proxy and API gateway for internal applications
-summary: Meerkat puts sign-in, access control, organisations, routing, quotas and audit in front of your internal applications, in place of an authentication proxy, an identity server and an API gateway. One binary, no dependency.
+summary: Meerkat puts sign-in, access control, tenants, routing, quotas and audit in front of your internal applications, in place of an authentication proxy, an identity server and an API gateway. One binary, no dependency.
 layout: wide
 ---
 
@@ -10,7 +10,7 @@ layout: wide
 Meerkat is an **authentication proxy and API gateway** that puts access
 control in front of the internal applications your teams build. It replaces
 the oauth2-proxy, Keycloak and Kong usually assembled around them: sign-in,
-access rules, organisations, routing, quotas, audit. One image, zero
+access rules, tenants, routing, quotas, audit. One image, zero
 dependency.
 
 - [Get started](/docs/start/quick-start)
@@ -37,7 +37,7 @@ CPU, with [the figures](/product/performance) kept current by the CI.
 
 ::: lead
 Your services receive requests that are already authenticated, carrying a
-signed token with an identity, roles and an organisation. They stop shipping a
+signed token with an identity, roles and a tenant. They stop shipping a
 login page, a role model and a user table, and go back to being the thing you
 actually sell.
 
@@ -57,7 +57,7 @@ gateway is one binary with embedded storage.
 
 ### Identity is part of the product
 
-Accounts, roles, groups, organisations and the sign-in pages are in the
+Accounts, roles, groups, tenants and the sign-in pages are in the
 gateway, not beside it. Your corporate directory - OpenID Connect, GitHub, and
 with Enterprise SAML, LDAP or Active Directory - signs people in, and in
 Enterprise its groups can grant roles.
@@ -122,16 +122,16 @@ in about five minutes.
 ::: cta
 ### Free, and not a trial
 
-The community edition is the whole gateway for one organisation on one
+The community edition is the whole gateway for one tenant on one
 instance - in production, in a company, commercially, at no cost. It is
 source-available under the Functional Source License: read the code, change it, ship it inside your own product; two years after each release,
 that version becomes plain Apache 2.0.
 
 Enterprise is what you need once the installation grows: several
-organisations, SAML, LDAP and Active Directory, the OpenID provider of your
+tenants, SAML, LDAP and Active Directory, the OpenID provider of your
 other tools, several instances of the gateway behind one entry point. Never
 a security primitive - TLS, two-factor, passkeys, the vault and the audit trail
-are free and stay free. Team is Enterprise for one organisation on one instance, and
+are free and stay free. Team is Enterprise for one tenant on one instance, and
 the evaluation edition is Enterprise with a notice on it, free, to try all of
 it first.
 

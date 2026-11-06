@@ -26,7 +26,7 @@ password is a door that bypasses them.
 One policy for the whole installation, in **Application > Security**. A
 password is checked where it is typed, and the places it is typed - the sign-up
 form, the forced change at a first sign-in, the profile, a reset link - know
-nothing about organisations.
+nothing about tenants.
 
 | Field | What it asks | Ships as |
 |---|---|---|
@@ -167,7 +167,7 @@ Four things must all hold for that page to exist at all:
 
 What a sign-up produces is deliberately useless: the account exists, it is
 unusable until the address is confirmed, and it reaches nothing until an
-administrator places it in an organisation and grants roles. The confirmation
+administrator places it in a tenant and grants roles. The confirmation
 link is a one-shot token valid for 24 hours, 48 hours or 7 days - **Confirmation
 links valid for**, beside the self-registration switch. Someone who signs in
 before confirming gets the link sent again rather than an explanation.

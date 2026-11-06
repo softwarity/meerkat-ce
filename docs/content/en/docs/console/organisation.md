@@ -2,19 +2,19 @@
 title: Groups, Members and Group rules
 section: The console
 order: 172
-summary: Binding people to roles - the groups of an organisation, who is in them, and the rules that fill them from a directory.
+summary: Binding people to roles - the groups of a tenant, who is in them, and the rules that fill them from a directory.
 ---
 
 # Groups, Members and Group rules
 
-Three screens that administer **the organisation being served**. In
-single-organisation mode they live under **Application**, because there is one
-organisation and nobody names it. With several, the same screens are reached per
-organisation from [Tenants](/docs/console/tenants), where the question *which
+Three screens that administer **the tenant being served**. In
+single-tenant mode they live under **Application**, because there is one
+tenant and nobody names it. With several, the same screens are reached per
+tenant from [Tenants](/docs/console/tenants), where the question *which
 one* is asked.
 
 The chain is short: a **role** is global, a **group** is a bag of roles inside one
-organisation, and a **membership** puts a person in groups.
+tenant, and a **membership** puts a person in groups.
 
 ## Groups
 
@@ -24,7 +24,7 @@ Three groups - Finance, Support, Warehouse - against the catalogue. Each row
 shows the role's description over its technical name, and the *Whole column* row
 sits just under the headers.
 
-A matrix: the **role catalogue** down the side, this organisation's **groups**
+A matrix: the **role catalogue** down the side, this tenant's **groups**
 across the top, a tick where a role belongs to a group.
 
 - **Ticking a parent role ticks what hangs under it.** The catalogue's hierarchy
@@ -48,40 +48,40 @@ Above the matrix, **Group mode** decides how a person's groups combine:
 On the Groups screen, a group's name (its column header, a tonal button) opens
 **its drawer**: name, description and,
 in exclusive mode only, its **working hours** (Enterprise), which replace the
-account's and the organisation's for whoever signs in with that group. Save
+account's and the tenant's for whoever signs in with that group. Save
 applies; deleting it is in the drawer's danger zone, after a confirmation.
 
 ## Members
 
 ![The Members screen: the accounts down the side, the same three group columns, and the last connection](img/console/members.webp)
 
-The same installation in single-organisation mode: the same matrix as an
-organisation's, membership and admin badge included - one organisation is still
-an organisation.
+The same installation in single-tenant mode: the same matrix as a
+tenant's, membership and admin badge included - one tenant is still
+a tenant.
 
-A matrix again: the accounts down the side, this organisation's groups across the
+A matrix again: the accounts down the side, this tenant's groups across the
 top.
 
 - The **first column** is membership itself, in both modes: the tick joins or
   leaves, and the **admin** badge beside it promotes a member to administrator of
-  the organisation. The owner shows a read-only **owner** badge instead, and
-  ownership is transferred in the organisation's Danger zone.
+  the tenant. The owner shows a read-only **owner** badge instead, and
+  ownership is transferred in the tenant's Danger zone.
 - Ticking a group for somebody who is not a member yet makes them one; the
   whole-column box acts on the members on screen.
 - The last column shows the last connection and carries the password reset, scoped
-  to this organisation: a temporary password shown once, or a link mailed to the
+  to this tenant: a temporary password shown once, or a link mailed to the
   member to choose a new one.
 - Two buttons on a member's row open **its drawer**, each on its own page: the
-  clock on its **working hours** in this organisation (Enterprise), its own or
+  clock on its **working hours** in this tenant (Enterprise), its own or
   inherited, and the dates its access runs between, which hold either way; the
-  history on its **sign-in history** into this organisation.
+  history on its **sign-in history** into this tenant.
 
 Members and [Users](/docs/console/users) answer two different questions and stay
 apart: Users is the account, this is the assignment.
 
 ## Group rules
 
-![A group rule open in its drawer: the authority, the upstream group, and the group of the organisation it grants](img/console/group-rules.webp)
+![A group rule open in its drawer: the authority, the upstream group, and the group of the tenant it grants](img/console/group-rules.webp)
 
 What an **authority** says, turned into membership and groups here. A GitHub
 organisation or team, an LDAP group, a claim from an identity provider: a rule
@@ -104,8 +104,8 @@ Two things about rules that surprise people:
 
 ## Traps
 
-- **In several-organisations mode these entries disappear from Application.** They
-  are per organisation, under Tenants.
+- **In several-tenants mode these entries disappear from Application.** They
+  are per tenant, under Tenants.
 - **Exclusive mode changes what people see at sign-in**: they are asked which
   group. Do not switch it on a live installation without telling anyone.
 - **A group with no roles grants nothing**, and a role in no group reaches nobody.

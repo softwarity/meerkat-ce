@@ -37,7 +37,7 @@ your product's surface.
 
 ## What is not customisable
 
-- **Per organisation.** There is no per-tenant theme, branding or portal. That would be the
+- **Per tenant.** There is no per-tenant theme, branding or portal. That would be the
  product's first per-tenant visual override: it is planned, and written down rather than
  half-built.
 - **Per application.** A group of routes sharing their own branding and locales does not exist:

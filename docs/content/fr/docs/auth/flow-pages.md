@@ -2,7 +2,7 @@
 title: Les pages servies par la gateway
 section: Authentification
 order: 120
-summary: Connexion, second facteur, changement de mot de passe, choix de l'organisation - les pages que Meerkat affiche lui-même, et jusqu'où vous pouvez les personnaliser.
+summary: Connexion, second facteur, changement de mot de passe, choix du tenant - les pages que Meerkat affiche lui-même, et jusqu'où vous pouvez les personnaliser.
 ---
 
 # Les pages servies par la gateway
@@ -28,11 +28,11 @@ ne doit jamais séjourner dans un cache partagé.
 | `/forgot-password`, `/reset-password` | la récupération par e-mail, et la page où mène le lien |
 | `/register`, `/confirm` | l'auto-inscription et la confirmation de l'adresse |
 | `/confirm-email` | le lien qui confirme une nouvelle adresse, modifiée depuis le profil |
-| `/select-tenant` | le choix de l'organisation dans laquelle travaille cette session |
+| `/select-tenant` | le choix du tenant dans lequel travaille cette session |
 | `/select-group` | le choix du groupe, en mode groupe exclusif |
 | `/account-pending` | la salle d'attente : un compte qui existe mais auquel rien n'a encore été accordé |
 | `/refused` | la personne est connectée, mais refusée. La page nomme la règle qui a refusé et propose ce que cette session *peut* ouvrir |
-| `/profile/...` | les pages personnelles : identité, mot de passe, second facteur, passkeys, autorités, historique des connexions, sessions actives, jetons d'API, départ d'une organisation |
+| `/profile/...` | les pages personnelles : identité, mot de passe, second facteur, passkeys, autorités, historique des connexions, sessions actives, jetons d'API, départ d'un tenant |
 | `/meerkat/notifications` | les notifications de la personne, de tous ses tenants. Enterprise : voir [Notifier vos utilisateurs](/docs/operations/notifications) |
 
 La page d'indisponibilité n'a pas de chemin propre : pendant une maintenance, elle répond

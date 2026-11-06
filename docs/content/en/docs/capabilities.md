@@ -21,7 +21,7 @@ What the assembled alternatives cost is in [the case for Meerkat](/product/the-c
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
 | [Your services' APIs through MCP](/docs/agent/overview#calling-the-services-behind-the-routes) | Any assistant connected to the gateway reads the OpenAPI of the service behind a route, then calls it for real through the gateway, its rules and the identity it forwards, as any user or role. Every call is audited. | An MCP server inside **each** service, its own authentication and token handling, and its port exposed on the cluster - per service, per language. | Community |
-| [The gateway itself through MCP](/docs/agent/overview) | Everything the console does, done by an assistant through the same endpoints and under the rules a person gets: routes, roles, organisations, themes, settings, OIDC clients, whole configurations and their history. A read-only token stays read-only, a restore point comes before every change, and the few things closed to agents - private keys, vault values, TLS doors - say why. | Community MCP servers for each tool, or a vendor's hosted one, and no common audit. | Community |
+| [The gateway itself through MCP](/docs/agent/overview) | Everything the console does, done by an assistant through the same endpoints and under the rules a person gets: routes, roles, tenants, themes, settings, OIDC clients, whole configurations and their history. A read-only token stays read-only, a restore point comes before every change, and the few things closed to agents - private keys, vault values, TLS doors - say why. | Community MCP servers for each tool, or a vendor's hosted one, and no common audit. | Community |
 | [Agent connection](/docs/console/access-and-agents) | OAuth with no secret to copy, or a token scoped to a perimeter and network ranges, revoked in one click. | A credential per tool, stored in each assistant's configuration. | Community |
 
 ## Sign-in and identity
@@ -50,24 +50,24 @@ The ways in, all served by the gateway in your colours, in 21 languages.
 | [Applications with no login of their own](/docs/auth/connect-an-application) | Put behind a route, they are signed in by the gateway. | oauth2-proxy or Pomerium in front of each one. | Community |
 | [Single sign-on into third-party UIs](/docs/auth/oidc-provider) | A broker's console, a database UI, any application that speaks OpenID Connect signs its people in through the gateway: no consent screen, the route decides who and with which roles. | A Keycloak realm and a client per application, roles mapped there by hand. | Enterprise |
 
-## Access and organisations
+## Access and tenants
 
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
-| [Roles and groups](/docs/access/roles) | A hierarchical role catalogue, groups per organisation, cumulative or picked at sign-in. | Role tables in each service, or an identity server's roles mapped by hand into each one. | Community |
-| [Organisations](/docs/access/tenants) | Customer organisations isolated by the gateway, with their members and admins. | Admin screens to build, or WorkOS, Frontegg. | single organisation Community, several Enterprise |
-| [A route's access rule](/docs/access/route-access) | Who reaches an application - signed in, organisation, roles, named people - decided at the door; a refusal lands on a page that explains. | A check in each application, written again per framework. | Community |
+| [Roles and groups](/docs/access/roles) | A hierarchical role catalogue, groups per tenant, cumulative or picked at sign-in. | Role tables in each service, or an identity server's roles mapped by hand into each one. | Community |
+| [Tenants](/docs/access/tenants) | Customer tenants isolated by the gateway, with their members and admins. | Admin screens to build, or WorkOS, Frontegg. | single tenant Community, several Enterprise |
+| [A route's access rule](/docs/access/route-access) | Who reaches an application - signed in, tenant, roles, named people - decided at the door; a refusal lands on a page that explains. | A check in each application, written again per framework. | Community |
 | [Per-endpoint security](/docs/access/endpoint-security) | Rules per operation, posed on the route's OpenAPI, refused before the service is called. | Code in the service, or a gateway policy written by hand per path. | Community |
 | [The roles an application declares](/docs/access/endpoint-security#the-roles-the-application-declares) | Read from its own spec, shown per operation, imported into the catalogue, and forwarded under the application's names to those who hold them. | Roles copied by hand between the code and the identity server, and kept in step. | Community |
 | [Identity passed to your services](/docs/auth/service-jwt) | Headers, REMOTE_USER or a signed JWT with published, rotating keys; you choose the roles each service receives and their shape. | Each service validates a token and maps the claims itself. | Community |
-| [Delegated administration](/docs/access/capabilities) | Super-admin, infrastructure, application and organisation admins, each with clear limits. | Rights on each tool, managed tool by tool. | Community |
+| [Delegated administration](/docs/access/capabilities) | Super-admin, infrastructure, application and tenant admins, each with clear limits. | Rights on each tool, managed tool by tool. | Community |
 
 ## Routing and traffic
 
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
 | [Routes](/docs/concepts/routes) | Changed live from the console, on every node within a second; 11 [predicates](/docs/predicates/overview), 34 [filters](/docs/filters/overview). | Kong, APISIX, Traefik or Envoy Gateway, configured in files and redeployed. | Community |
-| [Rate limits and quotas](/docs/operations/rate-limits) | Per route, user, token, organisation or address, and per endpoint. | A plugin per gateway, often in its paid edition. | Community, *partly* |
+| [Rate limits and quotas](/docs/operations/rate-limits) | Per route, user, token, tenant or address, and per endpoint. | A plugin per gateway, often in its paid edition. | Community, *partly* |
 | [Upstream health](/docs/operations/upstream-health) | Circuit breaker, timeouts at three levels, a heart per route from discovery and real traffic. | Mesh or gateway configuration, plus a dashboard to read it. | Community |
 | WebSocket, gRPC, streaming | End to end; a gRPC call counted by its `grpc-status`. | Proxy tuning per protocol. | Community, *partly* |
 | [Answers and files from the gateway](/docs/filters/respond) | A route answers by itself from a template, or serves the files you upload. | A small service deployed for each of them. | Community |
@@ -77,7 +77,7 @@ The ways in, all served by the gateway in your colours, in 21 languages.
 
 | Capability | What Meerkat does | Without Meerkat | Edition |
 |---|---|---|---|
-| [User button and portal](/docs/concepts/data-plane-chrome) | Profile, sign-out, organisation, language, light or dark, and the navigation across your applications, added to the pages the gateway serves. | To build in each application. No product does it. | Community, navigation bar Enterprise |
+| [User button and portal](/docs/concepts/data-plane-chrome) | Profile, sign-out, tenant, language, light or dark, and the navigation across your applications, added to the pages the gateway serves. | To build in each application. No product does it. | Community, navigation bar Enterprise |
 | [Per-role CSS, your CSS and JavaScript](/docs/customise/injections) | Roles stamped on the page server-side, and your own code per route. | Front-end code in each application. | Community |
 | [Notifying your users](/docs/operations/notifications) | A service sends one request; its users see it in whichever application they have open, with a count, a snackbar, a desktop notification, a mail if asked, and an acknowledgement when it matters. | A notification service and its inbox widget in every application, or Novu, Knock, Courier. | Enterprise, *partly* |
 | Issue reporting | A screenshot and its technical context, tracked in the console. | Sentry self-hosted, or Marker.io, Jam, Userback. | Community |
@@ -121,7 +121,7 @@ Planned, and not built yet (the detail is on the [roadmap](/project/roadmap)):
 - **A response cache.**
 - **Serving an application under a sub-path without rebuilding it.**
 - **gRPC properly**: per-method security, and gRPC-Web.
-- **A per-organisation portal**: each customer's own icon, title and arrangement.
+- **A per-tenant portal**: each customer's own icon, title and arrangement.
 - **HTTP/3**, once the gain can be measured.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets, Docker secrets.
 - **Issues pushed to GitHub, GitLab or Jira.**

@@ -2,7 +2,7 @@
 title: The pages the gateway serves
 section: Authentication
 order: 120
-summary: Sign-in, second factor, password change, organisation choice - the pages Meerkat draws itself, and how far you can restyle them.
+summary: Sign-in, second factor, password change, tenant choice - the pages Meerkat draws itself, and how far you can restyle them.
 ---
 
 # The pages the gateway serves
@@ -28,11 +28,11 @@ never sit in a shared cache.
 | `/forgot-password`, `/reset-password` | recovery by e-mail, and the page the link lands on |
 | `/register`, `/confirm` | self-registration and address confirmation |
 | `/confirm-email` | the link confirming a new address changed from the profile |
-| `/select-tenant` | which organisation this session works in |
+| `/select-tenant` | which tenant this session works in |
 | `/select-group` | which group, in exclusive-group mode |
 | `/account-pending` | the waiting room: an account that exists and has been granted nothing yet |
 | `/refused` | signed in, and turned away. It names the rule that refused and offers what this session *can* open |
-| `/profile/...` | the person's own pages: identity, password, second factor, passkeys, authorities, sign-in history, active sessions, API tokens, leaving an organisation |
+| `/profile/...` | the person's own pages: identity, password, second factor, passkeys, authorities, sign-in history, active sessions, API tokens, leaving a tenant |
 | `/meerkat/notifications` | the person's notifications, from all their tenants. Enterprise: see [Notifying your users](/docs/operations/notifications) |
 
 The unavailability page has no path of its own: it answers **any** path with

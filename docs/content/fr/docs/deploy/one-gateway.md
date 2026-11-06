@@ -298,4 +298,4 @@ préproduction emporte leurs capacités avec eux.
 | `MEERKAT_PLUG_ADDR` | `:22222` | Change le port du tunnel développeur. Elle ne le désactive pas : c'est le rôle de l'interrupteur **Infra, Plug**, ou de la fermeture de la surface développeur. |
 | `MEERKAT_PRODUCTION` | - | N'est plus lue : posée, elle ne fait qu'écrire un avertissement. La surface développeur s'active dans la console - voir [La surface développeur en production](#la-surface-dveloppeur-en-production). |
 | `MEERKAT_TRUSTED_PROXIES` | - | N'est plus lue : posée, elle ne fait que journaliser un avertissement. De qui `X-Forwarded-For` et `X-Forwarded-Proto` sont crus se dit plan par plan dans **Infra > Domains & TLS** - voir [Derrière un proxy ou un load balancer](#derrire-un-proxy-ou-un-load-balancer). |
-| `MEERKAT_TENANCY` | `single` | Une seule organisation implicite, ou plusieurs (Enterprise). Se choisit une fois, au premier démarrage ; c'est ensuite la console qui en décide. |
+| `MEERKAT_TENANCY` | `single` | Un seul tenant implicite, ou plusieurs (Enterprise). Se choisit une fois, au premier démarrage ; c'est ensuite la console qui en décide. |

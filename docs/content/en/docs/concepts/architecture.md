@@ -36,7 +36,7 @@ and does not know it is being dressed.
 
 An **API route** is called by a program, so there is nothing to dress. What it
 gets instead is a signed token in a header - who is calling, their roles, their
-organisation - and it authenticates nobody. That is the whole point: your
+tenant - and it authenticates nobody. That is the whole point: your
 services stop carrying a login page and a user table.
 
 A service can be both, and often is: the same application serving its pages and

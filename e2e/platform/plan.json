@@ -120,8 +120,8 @@
     "CE",
     "EE"
    ],
-   "en": "Step ordering (password, code, organisation) on the image; a pending step cannot be skipped by URL.",
-   "fr": "Ordre des étapes (mot de passe, code, organisation) sur l'image ; une étape en attente ne peut pas être sautée en modifiant l'URL."
+   "en": "Step ordering (password, code, tenant) on the image; a pending step cannot be skipped by URL.",
+   "fr": "Ordre des étapes (mot de passe, code, tenant) sur l'image ; une étape en attente ne peut pas être sautée en modifiant l'URL."
   },
   {
    "id": "AUTH-06",
@@ -525,8 +525,8 @@
     "CE",
     "EE"
    ],
-   "en": "Per-organisation groups do not leak across organisations.",
-   "fr": "Les groupes propres à une organisation ne débordent pas sur une autre."
+   "en": "Per-tenant groups do not leak across tenants.",
+   "fr": "Les groupes propres à un tenant ne débordent pas sur un autre."
   },
   {
    "id": "RBAC-04",
@@ -569,8 +569,8 @@
     "CE",
     "EE"
    ],
-   "en": "Route access levels (public, signed in, organisation, role) on the data plane of the image.",
-   "fr": "Les niveaux d'accès d'une route (public, connecté, organisation, rôle) sur le plan de données de l'image."
+   "en": "Route access levels (public, signed in, tenant, role) on the data plane of the image.",
+   "fr": "Les niveaux d'accès d'une route (public, connecté, tenant, rôle) sur le plan de données de l'image."
   },
   {
    "id": "RBAC-07",
@@ -685,7 +685,7 @@
     "EE"
    ],
    "en": "A tenant field set by root reaches the upstream of a route that names it; a tenant admin cannot change it.",
-   "fr": "Un champ d'organisation posé par root arrive à l'amont d'une route qui le nomme ; un administrateur de l'organisation ne peut pas le changer."
+   "fr": "Un champ de tenant posé par root arrive à l'amont d'une route qui le nomme ; un administrateur du tenant ne peut pas le changer."
   },
   {
    "id": "TENANT-01",
@@ -699,8 +699,8 @@
     "CE",
     "EE"
    ],
-   "en": "Organisations: CE has one, EE several (multi mode switch refused on CE).",
-   "fr": "Organisations : une seule en CE, plusieurs en EE (le passage en mode multi-organisation est refusé en CE)."
+   "en": "Tenants: CE has one, EE several (multi mode switch refused on CE).",
+   "fr": "Tenants : un seul en CE, plusieurs en EE (le passage en mode multi-tenant est refusé en CE)."
   },
   {
    "id": "TENANT-02",
@@ -726,8 +726,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Organisation chooser at sign-in, active organisation in the JWT.",
-   "fr": "Choix de l'organisation à la connexion, organisation active dans le JWT."
+   "en": "Tenant chooser at sign-in, active tenant in the JWT.",
+   "fr": "Choix du tenant à la connexion, tenant actif dans le JWT."
   },
   {
    "id": "TENANT-04",
@@ -739,8 +739,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Working hours refuse outside the window (clock injected), a session ends when its window closes, the most precise window set wins whole (member, group in exclusive mode, account, organisation, gateway), a closed group is greyed out on the group chooser, the chooser greys out a closed organisation, a member's dates hold when it inherits the hours; ignored on CE.",
-   "fr": "Les heures ouvrées refusent l'accès hors de la plage (horloge injectée), une session se termine à la fermeture de sa plage, la plage la plus précise l'emporte entière (membre, groupe en mode exclusif, compte, organisation, gateway), un groupe fermé est grisé au choix du groupe, l'écran de choix grise une organisation fermée, les dates d'un membre valent quand il hérite des heures ; elles sont ignorées en CE."
+   "en": "Working hours refuse outside the window (clock injected), a session ends when its window closes, the most precise window set wins whole (member, group in exclusive mode, account, tenant, gateway), a closed group is greyed out on the group chooser, the chooser greys out a closed tenant, a member's dates hold when it inherits the hours; ignored on CE.",
+   "fr": "Les heures ouvrées refusent l'accès hors de la plage (horloge injectée), une session se termine à la fermeture de sa plage, la plage la plus précise l'emporte entière (membre, groupe en mode exclusif, compte, tenant, gateway), un groupe fermé est grisé au choix du groupe, l'écran de choix grise un tenant fermé, les dates d'un membre valent quand il hérite des heures ; elles sont ignorées en CE."
   },
   {
    "id": "TENANT-05",
@@ -753,8 +753,8 @@
     "CE",
     "EE"
    ],
-   "en": "Session TTL per organisation.",
-   "fr": "Durée de vie de session propre à chaque organisation."
+   "en": "Session TTL per tenant.",
+   "fr": "Durée de vie de session propre à chaque tenant."
   },
   {
    "id": "TENANT-06",
@@ -766,8 +766,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Tenant isolation: an organisation's admin cannot read or write another's objects (matrix).",
-   "fr": "Isolation des organisations : l'administrateur d'une organisation ne peut ni lire ni modifier les objets d'une autre (matrice)."
+   "en": "Tenant isolation: a tenant's admin cannot read or write another's objects (matrix).",
+   "fr": "Isolation des tenants : l'administrateur d'un tenant ne peut ni lire ni modifier les objets d'un autre (matrice)."
   },
   {
    "id": "TENANT-07",
@@ -780,8 +780,8 @@
     "CE",
     "EE"
    ],
-   "en": "Export carries organisations as documented.",
-   "fr": "L'export contient les organisations, comme documenté."
+   "en": "Export carries tenants as documented.",
+   "fr": "L'export contient les tenants, comme documenté."
   },
   {
    "id": "TENANT-08",
@@ -794,7 +794,7 @@
     "EE"
    ],
    "en": "Single/multi mode switch, and CE stays single.",
-   "fr": "Bascule entre le mode mono-organisation et le mode multi-organisation ; CE reste en mono-organisation."
+   "fr": "Bascule entre le mode mono-tenant et le mode multi-tenant ; CE reste en mono-tenant."
   },
   {
    "id": "ROUTE-01",
@@ -2839,8 +2839,8 @@
     "CE",
     "EE"
    ],
-   "en": "Quotas count per caller (route, user, token, organisation, address), per node (sharing them across nodes is QUOTA-04).",
-   "fr": "Les quotas comptent par appelant (route, utilisateur, jeton, organisation, adresse), par nœud (leur partage entre nœuds est QUOTA-04)."
+   "en": "Quotas count per caller (route, user, token, tenant, address), per node (sharing them across nodes is QUOTA-04).",
+   "fr": "Les quotas comptent par appelant (route, utilisateur, jeton, tenant, adresse), par nœud (leur partage entre nœuds est QUOTA-04)."
   },
   {
    "id": "QUOTA-02",
@@ -3155,8 +3155,8 @@
     "CE",
     "EE"
    ],
-   "en": "An agent creates an organisation and edits a theme through call_admin_api: the endpoint's guard decides (403 for an account that administers nothing), a read-only token is refused a write, the trail names the token; a closed endpoint (the vault, the TLS doors) is refused with its reason, and a document changing the TLS setting is refused to an agent whichever way it is applied.",
-   "fr": "Un agent crée une organisation et modifie un thème par call_admin_api : la garde de l'endpoint décide (403 pour un compte qui n'administre rien), un jeton en lecture seule se voit refuser une écriture, le journal nomme le jeton ; un endpoint fermé (le coffre, les portes TLS) est refusé avec sa raison, et un document qui change le réglage TLS est refusé à un agent par quelque chemin qu'il s'applique."
+   "en": "An agent creates a tenant and edits a theme through call_admin_api: the endpoint's guard decides (403 for an account that administers nothing), a read-only token is refused a write, the trail names the token; a closed endpoint (the vault, the TLS doors) is refused with its reason, and a document changing the TLS setting is refused to an agent whichever way it is applied.",
+   "fr": "Un agent crée un tenant et modifie un thème par call_admin_api : la garde de l'endpoint décide (403 pour un compte qui n'administre rien), un jeton en lecture seule se voit refuser une écriture, le journal nomme le jeton ; un endpoint fermé (le coffre, les portes TLS) est refusé avec sa raison, et un document qui change le réglage TLS est refusé à un agent par quelque chemin qu'il s'applique."
   },
   {
    "id": "SEC-01",

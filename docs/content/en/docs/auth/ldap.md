@@ -80,7 +80,7 @@ adopt an existing local account holding the same address.
 
 Group names are the leaf of the DN, not the DN: `cn=developer,ou=groups,dc=acme,dc=io`
 is reported as `developer`. They become memberships and roles through a group
-rule on an organisation.
+rule on a tenant.
 
 ## TLS
 

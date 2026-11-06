@@ -128,7 +128,7 @@ and places what it adds on that plane:
 The entries:
 
 1. **Generate a self-signed one** - the names (separated by spaces or commas:
-   host names, a wildcard, IP addresses), organisation, key type (ECDSA P-256 or
+   host names, a wildcard, IP addresses), tenant, key type (ECDSA P-256 or
    P-384, RSA 2048 or 4096) and validity in days. Good for a lab, and browsers
    will warn. `localhost` also carries `127.0.0.1` and `::1`.
 2. **Import a PEM pair** - the certificate (then its intermediates) and its

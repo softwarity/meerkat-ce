@@ -34,13 +34,19 @@
               class="beside-head"
               [routerLink]="path(section.pages[0].slug)" [queryParams]="langQuery()"
               [class.open]="section.name === openSection()"
-              >{{ section.name }}<span class="beside-count">{{ section.pages.length }}</span></a
+              [attr.aria-expanded]="section.name === openSection()"
+              >{{ section.name }}<span class="beside-count">{{ section.pages.length }}</span
+              ><mat-icon class="beside-caret" aria-hidden="true">expand_more</mat-icon></a
             >
           }
           @if (section.name === openSection() || siblings().length === 1) {
-            @for (item of section.pages; track item.slug) {
-              <a [routerLink]="path(item.slug)" [queryParams]="langQuery()" [class.on]="item.slug === p.slug">{{ item.title }}</a>
-            }
+            <!-- A section's pages sit indented under its name, on a guide line:
+                 they read as its children, not as more sections. -->
+            <div class="beside-pages" [class.nested]="section.name && siblings().length > 1">
+              @for (item of section.pages; track item.slug) {
+                <a [routerLink]="path(item.slug)" [queryParams]="langQuery()" [class.on]="item.slug === p.slug">{{ item.title }}</a>
+              }
+            </div>
           }
         }
       </nav>

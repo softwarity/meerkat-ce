@@ -10,7 +10,7 @@ summary: The two screens read after the fact - who changed what, who signed in, 
 Two transverse screens, side by side in the rail, both read after the fact and
 both scoped server-side to what the caller administers: root sees everything, an
 infra admin the routing plane, an app admin the identity, a tenant admin their own
-organisations.
+tenants.
 
 ## Audit
 
@@ -74,7 +74,7 @@ drawer is in the URL, so a refresh lands back on it. A report carries:
 
 - Its **status** - open, in progress, closed - changed from the drawer, and a
   filter on the list.
-- Who reported it, from which organisation, and when.
+- Who reported it, from which tenant, and when.
 - The **URL**, the viewport and pixel ratio, the language, the user agent.
 - The **screenshot**, clickable to open full size.
 - The **console output** the page had captured, with each line's level.

@@ -33,7 +33,7 @@ does not even know.
 
 An **API route** is called by a program, so there is nothing to add. It
 receives a signed token saying who is calling, with their roles and their
-organisation, and it authenticates nobody. A service is often both: its pages
+tenant, and it authenticates nobody. A service is often both: its pages
 behind a UI route, its own API behind an API route.
 
 ## In the cluster
@@ -70,7 +70,7 @@ has one any more.
 
 ### The user table
 
-Accounts, roles, groups and organisations are in the gateway. Your services no
+Accounts, roles, groups and tenants are in the gateway. Your services no
 longer store identities and no longer have to keep them agreeing with each
 other.
 

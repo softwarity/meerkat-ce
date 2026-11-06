@@ -8,7 +8,7 @@ summary: One entry point in front of your internal applications, which takes car
 # What Meerkat is
 
 Meerkat is an **authentication proxy and API gateway**: a single door, with
-access control, in front of the applications your organisation runs. It takes
+access control, in front of the applications your company runs. It takes
 the place of the authentication proxy, the identity server and the API gateway
 usually assembled for them. Requests arrive at Meerkat, it decides what to do
 with them, and passes them on. Softwarity calls this an app-gateway.
@@ -16,7 +16,7 @@ with them, and passes them on. Softwarity calls this an app-gateway.
 What it takes care of, so your services do not have to:
 
 - **Who is calling** - sign-in pages, SSO, multi-factor, API tokens, sessions.
-- **Who may pass** - roles, groups, organisations, per-route and per-endpoint rules.
+- **Who may pass** - roles, groups, tenants, per-route and per-endpoint rules.
 - **How the request travels** - routing, rewriting, headers, rate limits, TLS.
 - **What is happening** - traffic, audit trail, metrics, the health of your services.
 

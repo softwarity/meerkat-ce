@@ -35,7 +35,7 @@ n'embarque rien pour cela, et ne sait même pas qu'on l'habille.
 
 Une **route API** est appelée par un programme : il n'y a donc rien à
 habiller. Elle reçoit un jeton signé qui dit qui appelle, avec ses rôles et son
-organisation, et elle n'authentifie personne. Un service est souvent les deux à
+tenant, et elle n'authentifie personne. Un service est souvent les deux à
 la fois : ses pages derrière une route UI, son API derrière une route API.
 
 ## Dans le cluster
@@ -74,7 +74,7 @@ vos services n'en a une.
 
 ### La table des utilisateurs
 
-Les comptes, les rôles, les groupes et les organisations sont dans la
+Les comptes, les rôles, les groupes et les tenants sont dans la
 gateway. Vos services ne stockent plus d'identités, et n'ont plus à les
 maintenir cohérentes entre eux.
 

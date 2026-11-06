@@ -66,7 +66,7 @@ not be matched against an existing local account. That is deliberate: matching
 on an unverified address is an account takeover.
 
 Groups are fetched only when you named organisations. They become memberships
-and roles through a group rule on an organisation.
+and roles through a group rule on a tenant.
 
 ## How the organisation restriction behaves
 

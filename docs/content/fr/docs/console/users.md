@@ -30,11 +30,11 @@ accorde ou retire la capacité sans ouvrir le tiroir.
 
 | Capacité | Ce qu'elle ouvre |
 |---|---|
-| `root` | Toute la gateway : routes, utilisateurs, organisations, réglages |
+| `root` | Toute la gateway : routes, utilisateurs, tenants, réglages |
 | `infra admin` | Le plan de routage : les routes et les pages intégrées |
 | `app admin` | L'identité applicative : utilisateurs, rôles, réglages |
 | `dev` | L'outillage développeur sur les applications servies |
-| `tenant creator` | La création d'organisations (en mode multi-organisation uniquement) |
+| `tenant creator` | La création de tenants (en mode multi-tenant uniquement) |
 
 Les actions de ligne activent et désactivent un compte. Vous ne pouvez pas retirer
 votre propre capacité `root`, ni désactiver ou supprimer votre propre compte.
@@ -77,7 +77,7 @@ Trois pages dans un même tiroir, dont la première est la seule que vous
 - **Two-factor** - le second facteur est exigé, facultatif, ou hérité de la politique
   de l'application ; le libellé précise ce que donne l'héritage en ce moment.
 - **Working hours** (Enterprise) - les heures propres du compte : posées, elles
-  remplacent pour cette personne celles de l'installation et de ses organisations,
+  remplacent pour cette personne celles de l'installation et de ses tenants,
   sauf si une appartenance définit les siennes. Absent d'un compte root, qui n'est
   jamais soumis à des heures.
 - **Password** - *Reset password* demande comment : un mot de passe temporaire à
@@ -127,8 +127,8 @@ bouton pour toute la liste.
 - **Une capacité n'est pas un rôle.** Les capacités servent à administrer *cette
   console* ; les rôles sont ce que lisent vos applications. Accorder `app admin` ne
   donne aucun droit dans une application exposée par la gateway.
-- **Un compte sans organisation n'a accès à rien.** Créez-le ici, puis rattachez-le à
-  une organisation sur l'écran [Members](/docs/console/organisation).
+- **Un compte sans tenant n'a accès à rien.** Créez-le ici, puis rattachez-le à
+  un tenant sur l'écran [Members](/docs/console/organisation).
 - **Une valeur absente de la liste d'un champ de type choix est refusée**, par un
   message qui nomme les valeurs permises. Il en va de même d'une route qui transmet un
   champ que le modèle ne définit pas.

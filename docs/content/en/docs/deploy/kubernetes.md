@@ -23,7 +23,7 @@ The one thing a per-pod volume would carry is the embedded storage - and a datab
 
 ## No session affinity to ask for
 
-Sessions live in the database, not in a pod. Each node keeps a five-second cache to answer fast, and that cache is invalidated through the same bus, so a revocation or an organisation just chosen on node A is not served stale by node B. A request can therefore land on any replica, which is what makes a rolling update uneventful: a pod that goes takes no session with it.
+Sessions live in the database, not in a pod. Each node keeps a five-second cache to answer fast, and that cache is invalidated through the same bus, so a revocation or a tenant just chosen on node A is not served stale by node B. A request can therefore land on any replica, which is what makes a rolling update uneventful: a pod that goes takes no session with it.
 
 The brute-force counter is in the database too, one row per failed attempt, and that matters more than it looks. A limit of five attempts used to be five PER GATEWAY: an attacker spraying the load balancer got the limit multiplied by the very thing that was supposed to make the service sturdier. Five attempts are now five for the installation wherever they land, and a successful sign-in forgives on every node. A test says exactly that, and it is the reason nothing here asks your load balancer for sticky sessions.
 
