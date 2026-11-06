@@ -94,6 +94,8 @@
         <!-- A route is a hundred endpoints, and "this route is slow" is where
          the question starts. The row opens on the answer to the next one. -->
         <tr
+          matRipple
+          [matRippleDisabled]="!named().has(r.id)"
           class="route"
           [class.open]="open() === r.id"
           [class.named]="named().has(r.id)"

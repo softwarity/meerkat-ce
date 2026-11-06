@@ -6,6 +6,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
@@ -31,6 +32,7 @@ import { RuleEditorComponent } from './rule-editor.component';
 @Component({
   selector: 'app-tenant-rules',
   imports: [
+    MatRippleModule,
     MatButtonModule,
     MatIconModule,
     MatSidenavModule,

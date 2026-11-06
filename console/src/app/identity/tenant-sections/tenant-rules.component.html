@@ -70,6 +70,7 @@
 
         <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
         <mat-row
+          matRipple
           *matRowDef="let r; columns: columns"
           class="clickable"
           [class.selected]="editingRule()?.id === r.id"

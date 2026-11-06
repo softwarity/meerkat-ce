@@ -11,6 +11,7 @@ import { MatSlideToggleModule } from "@angular/material/slide-toggle";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatRippleModule } from "@angular/material/core";
 import {
   ApiService,
   NotificationReader,
@@ -53,6 +54,7 @@ interface Box {
 @Component({
   selector: "app-notifications-page",
   imports: [
+    MatRippleModule,
     ZonedDatePipe,
     FormField,
     MatButtonModule,

@@ -9,6 +9,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { ApiService, AuthProvider, Settings } from '../../api.service';
@@ -24,6 +25,7 @@ import { LiveChangesService } from '../../shared/live-changes.service';
 @Component({
   selector: 'app-auth-providers-page',
   imports: [
+    MatRippleModule,
     MatButtonModule,
     MatFormFieldModule,
     MatSelectModule,

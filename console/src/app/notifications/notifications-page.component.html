@@ -87,6 +87,7 @@
             </ng-container>
             <mat-header-row *matHeaderRowDef="columns(); sticky: true"></mat-header-row>
             <mat-row
+              matRipple
               *matRowDef="let n; columns: columns()"
               (click)="open(n)"
               [class.off]="state(n) !== 'live'"

@@ -7,6 +7,7 @@ import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatRippleModule } from "@angular/material/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { LoadingIndicatorComponent } from "@softwarity/loading-indicator";
@@ -38,6 +39,7 @@ function mfaText(required: boolean): string {
   selector: "app-users-page",
   providers: [PresenceService],
   imports: [
+    MatRippleModule,
     PresenceComponent,
     MatButtonModule,
     MatFormFieldModule,

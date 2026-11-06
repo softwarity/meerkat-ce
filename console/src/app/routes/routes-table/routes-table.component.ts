@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { RowActionsDirective } from '@softwarity/row-actions';
 import { Route, RouteHealth, RuntimeImage } from '../../api.service';
 import { AccessBadgesComponent } from '../endpoint-security/access-badges.component';
@@ -14,6 +15,7 @@ import { AccessState, emptyAccess, isEmpty } from '../endpoint-security/access-e
 @Component({
   selector: 'app-routes-table',
   imports: [
+    MatRippleModule,
     DragDropModule,
     MatButtonModule,
     MatIconModule,

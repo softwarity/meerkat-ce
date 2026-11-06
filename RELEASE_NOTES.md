@@ -2,6 +2,8 @@
 
 ## NEXT RELEASE
 
+- **A table row that opens something answers the click with a ripple,** as Material's rows do: the
+  console's lists, the vault, the scheduler, the routes, and the routes of Metrics that unfold.
 - **An account that administers nothing opens the console on License.** It landed on Tenants, an
   entry its rail does not show, reading "No tenant yet" about the tenant it belongs to.
 - **A tenant's screens open only for whoever may read that tenant.** An infrastructure or an

@@ -97,6 +97,7 @@
                  to reach, but they do decide whether someone may sign themselves
                  up, and whether that form is guarded. -->
             <mat-row
+              matRipple
               *matRowDef="let p; columns: columns"
               class="clickable"
               [class.selected]="editingProvider()?.id === p.id"

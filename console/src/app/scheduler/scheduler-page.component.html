@@ -316,6 +316,7 @@
               *matHeaderRowDef="columns; sticky: true"
             ></mat-header-row>
             <mat-row
+              matRipple
               *matRowDef="let row; columns: columns"
               class="clickable"
               (click)="open(row)"

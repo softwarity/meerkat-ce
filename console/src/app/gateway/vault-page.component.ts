@@ -6,6 +6,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
 import { ApiService, VaultEntry } from '../api.service';
@@ -30,6 +31,7 @@ const SHOWN_USES = 3;
 @Component({
   selector: 'app-vault-page',
   imports: [
+    MatRippleModule,
     MatButtonModule,
     MatIconModule,
     MatSidenavModule,

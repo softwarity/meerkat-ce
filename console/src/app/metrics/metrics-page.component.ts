@@ -4,6 +4,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { LiveWindowDataSource } from '@softwarity/livewire';
 import { throttleTime } from 'rxjs';
 import type { EChartsCoreOption } from 'echarts/core';
@@ -31,6 +32,7 @@ import { zoned } from '../shared/zoned-date.pipe';
 @Component({
   selector: 'app-metrics-page',
   imports: [
+    MatRippleModule,
     ChartComponent,
     DecimalPipe,
     MatButtonToggleModule,

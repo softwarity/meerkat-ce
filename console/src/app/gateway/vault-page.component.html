@@ -178,6 +178,7 @@
 
         <mat-header-row *matHeaderRowDef="columns; sticky: true"></mat-header-row>
         <mat-row
+          matRipple
           *matRowDef="let row; columns: columns"
           class="clickable"
           [class.attention]="issue(row) !== null"

@@ -18,6 +18,7 @@ import { DialogsService } from "../shared/dialogs.service";
 import { MatSelectModule } from "@angular/material/select";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatRippleModule } from "@angular/material/core";
 import { LiveWindowDataSource } from "@softwarity/livewire";
 import { RowActionsDirective } from "@softwarity/row-actions";
 import { ApiService } from "../api.service";
@@ -47,6 +48,7 @@ import {
 @Component({
   selector: "app-scheduler-page",
   imports: [
+    MatRippleModule,
     FormField,
     FormFieldComponent,
     KeyValuePipe,

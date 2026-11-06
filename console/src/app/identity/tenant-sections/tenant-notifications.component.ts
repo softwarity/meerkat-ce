@@ -5,6 +5,7 @@ import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/sl
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { RowActionsDirective } from '@softwarity/row-actions';
 import { ApiService, SentNotification, TenantNotify } from '../../api.service';
 import { MeService } from '../../me.service';
@@ -22,6 +23,7 @@ import { TenantScope } from '../tenant-scope';
 @Component({
   selector: 'app-tenant-notifications',
   imports: [
+    MatRippleModule,
     MatButtonModule,
     MatIconModule,
     MatSlideToggleModule,

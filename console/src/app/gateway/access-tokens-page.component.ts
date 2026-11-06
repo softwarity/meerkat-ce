@@ -18,6 +18,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatRippleModule } from '@angular/material/core';
 import { ActivatedRoute } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { DateTime } from 'luxon';
@@ -50,6 +51,7 @@ type TokenRow = (AdminToken | DataToken) & {
 @Component({
   selector: 'app-access-tokens-page',
   imports: [
+    MatRippleModule,
     MatButtonModule,
     MatButtonToggleModule,
     MatIconModule,

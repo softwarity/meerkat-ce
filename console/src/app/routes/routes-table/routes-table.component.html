@@ -157,6 +157,7 @@
          up over every badge that has something of its own to say, and the
          cursor already says the row is clickable. -->
     <mat-row
+      matRipple
       *matRowDef="let row; columns: columns"
       cdkDrag
       [cdkDragDisabled]="!reorderable()"

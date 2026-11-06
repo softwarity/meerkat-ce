@@ -10,6 +10,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRippleModule } from '@angular/material/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
 import { RowActionsDirective } from '@softwarity/row-actions';
@@ -49,6 +50,7 @@ interface RoleNode {
 @Component({
   selector: 'app-roles-page',
   imports: [
+    MatRippleModule,
     DragDropModule,
     MatButtonModule,
     MatFormFieldModule,

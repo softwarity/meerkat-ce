@@ -106,6 +106,7 @@
             </ng-container>
             <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
             <mat-row
+              matRipple
               *matRowDef="let row; columns: columns"
               class="clickable"
               [class.selected]="selected()?.id === row.id"
