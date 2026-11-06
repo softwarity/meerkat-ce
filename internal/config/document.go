@@ -107,13 +107,17 @@ type OIDCClient struct {
 	// the secret already in place, or creates the client without one.
 	SecretPrefix string `json:"secretPrefix,omitempty"`
 	SecretHash   string `json:"secretHash,omitempty"`
+	// SecretRef is where the secret is read instead, namespace/name/key of a
+	// Kubernetes Secret: public, it names the Secret and not its value, and an
+	// import on another cluster reads that cluster's. Exclusive of the hash.
+	SecretRef string `json:"secretRef,omitempty"`
 }
 
 // oidcClientOf is a stored client as a document carries it.
 func oidcClientOf(c store.OIDCClient) OIDCClient {
 	return OIDCClient{
 		ID: c.ID, Confidential: c.Confidential, Audience: c.Audience, TokenTTL: c.TokenTTL,
-		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash,
+		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash, SecretRef: c.SecretRef,
 	}
 }
 
@@ -121,7 +125,7 @@ func oidcClientOf(c store.OIDCClient) OIDCClient {
 func (c OIDCClient) stored() store.OIDCClient {
 	return store.OIDCClient{
 		ID: c.ID, Confidential: c.Confidential, Audience: c.Audience, TokenTTL: c.TokenTTL,
-		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash,
+		SecretPrefix: c.SecretPrefix, SecretHash: c.SecretHash, SecretRef: c.SecretRef,
 	}
 }
 

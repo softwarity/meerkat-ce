@@ -770,6 +770,31 @@
           </div>
         }
 
+        @if (draft().identityMechanism === 'jwt' || draft().identityMechanism === 'signed-jwt' || draft().identityMechanism === 'oidc') {
+          <!-- The tokens' iss. Empty, the gateway's own: the internal issuer,
+               which a service inside the cluster reads in the internal
+               discovery (and an OIDC token asked on the application plane gets
+               the public one). Written, it is for an application that expects
+               a value of its own configuration. -->
+          <h3 class="sub" i18n="@@Token_issuer">Issuer</h3>
+          <p class="section-hint id-hint" i18n="@@Token_issuer_hint">
+            The token's <code>iss</code>. Empty, the gateway's internal issuer, the one the internal discovery names; set it if the application expects another value.
+          </p>
+          <div class="ttl-row">
+            <mat-form-field class="position-field" subscriptSizing="dynamic">
+              <mat-label i18n="@@Issuer">Issuer</mat-label>
+              <input
+                matInput
+                spellcheck="false"
+                autocapitalize="off"
+                [placeholder]="defaultIssuer()"
+                [value]="draft().identityIssuer"
+                (input)="patch('identityIssuer', $any($event.target).value)"
+              />
+            </mat-form-field>
+          </div>
+        }
+
         @if (draft().identityMechanism) {
           <!-- The roles, and only here: the expression shapes a HEADER or a
                claim, which is a question about sending rather than about what

@@ -190,13 +190,18 @@ type discoveryDocument struct {
 	Subjects              []string `json:"subject_types_supported"`
 }
 
-// serveDiscovery answers with the issuer the gateway signs with, and the JWKS
-// at the address the caller used to get here: inside a cluster that is the
-// gateway's name there, which is the one a service can reach.
+// serveDiscovery answers with the INTERNAL issuer - the internal plane's full
+// name, the one the OIDC / JWT drawer shows, whatever name the caller used:
+// it is what a route's JWT carries and an OIDC token asked here carries, so
+// every service learns the same one - and the JWKS at the address the caller
+// used to get here: inside a cluster that is the gateway's name there, which
+// is the one a service can reach. A library that compares the issuer to the
+// address it was given (go-oidc, Argo CD) is given that full name.
 func (a *API) serveDiscovery(w http.ResponseWriter, r *http.Request) {
 	base := filters.Scheme(r) + "://" + r.Host
+	a.internalOf(r.Context()) // keeps the router's internal issuer current
 	doc := discoveryDocument{
-		Issuer:     a.router.Issuer(),
+		Issuer:     a.router.InternalIssuer(),
 		JWKSURI:    base + gateway.JWKSPath,
 		Algorithms: signing.Algorithms,
 		Subjects:   []string{"public"},
@@ -274,7 +279,21 @@ func (a *API) internalOf(ctx context.Context) discovery.Internal {
 			in.Origin = strings.Replace(in.Origin, "://"+in.Names[0]+":", "://"+n+":", 1)
 		}
 	}
+	// The internal issuer IS this address: what the internal discovery names,
+	// what a route's JWT carries. Only an answer replaces it: a runtime that
+	// does not answer for a moment must not turn every route's JWT to another
+	// issuer, which the services would refuse.
+	if a.router != nil && in.Origin != "" {
+		a.router.SetInternalIssuer(in.Origin)
+	}
 	return in
+}
+
+// InternalIssuer learns the internal plane's address from the runtime and
+// hands it to the router, before the first route's JWT is signed. Called once
+// the planes are up; screens and the internal discovery keep it current.
+func (a *API) InternalIssuer(ctx context.Context) string {
+	return a.internalOf(ctx).Origin
 }
 
 // presentedName is the first of names the internal plane's certificate

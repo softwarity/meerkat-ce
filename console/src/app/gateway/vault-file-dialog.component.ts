@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -112,14 +112,24 @@ export interface VaultFileDialogData {
       <div class="row">
         <mat-form-field>
           <mat-label i18n="@@Passphrase">Passphrase</mat-label>
-          <input
+          <!-- The vault file's passphrase, not the person's login: a one-line
+               textarea masked in CSS, out of the password managers' reach
+               (see CLAUDE.md). -->
+          <textarea
+            #passphraseBox
             matInput
-            [type]="reveal() ? 'text' : 'password'"
+            rows="1"
+            class="oneline"
             [value]="passphrase()"
             (input)="passphrase.set($any($event.target).value)"
+            (keydown.enter)="$event.preventDefault()"
             autocomplete="off"
+            data-bwignore="true"
+            data-1p-ignore="true"
+            data-lpignore="true"
             spellcheck="false"
-          />
+            autocapitalize="off"
+          ></textarea>
           <!-- One root node, no surrounding whitespace: an indented @if is several
                nodes and the hint never reaches its slot (NG8011). -->
           @if (data.mode === 'export') {<mat-hint align="end" i18n="@@Passphrase_hint">At least 12 characters</mat-hint>}
@@ -220,6 +230,18 @@ export class VaultFileDialogComponent {
 
   protected readonly passphrase = signal('');
   protected readonly reveal = signal(false);
+
+  // The passphrase is masked in CSS (a textarea has no password type), set
+  // from here: a template binding does not carry a vendor-prefixed property
+  // like -webkit-text-security.
+  private readonly passphraseBox = viewChild<ElementRef<HTMLTextAreaElement>>('passphraseBox');
+  private readonly masking = effect(() => {
+    const el = this.passphraseBox()?.nativeElement;
+    if (!el) return;
+    const hide = this.reveal() ? 'none' : 'disc';
+    el.style.setProperty('-webkit-text-security', hide);
+    el.style.setProperty('text-security', hide);
+  });
   protected readonly busy = signal(false);
   protected readonly overwrite = signal(false);
   protected readonly file = signal('');

@@ -429,3 +429,34 @@ subjects:
     name: {{ include "meerkat.fullname" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
+{{- if ne ((.Values.rbac | default dict).readSecrets) false }}
+---
+# The Secrets of the cluster, read (rbac.readSecrets, on unless false): an
+# OIDC client's secret is read where the application's chart writes it, at
+# each sign-in, and the keys of a Secret a route's pods load whole are read to
+# offer them. `get` only: the console's offer comes from the pods behind the
+# routes, so no Secret is ever listed.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-read-secrets
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-read-secrets
+  labels: {{- include "meerkat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ include "meerkat.fullname" . }}-read-secrets
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meerkat.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

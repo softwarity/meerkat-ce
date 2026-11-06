@@ -31,7 +31,10 @@ func (a *API) oidcTools() []mcp.Tool {
 				"tokens, the start of its secret, and the routes bound to it. A route binds to a " +
 				"client with identity mechanism 'oidc'; its access rule decides who may sign in, " +
 				"and the first route in routing order that grants the person wins. The secret " +
-				"itself is never readable. The provider lives at the gateway's issuer, one of the " +
+				"itself is never readable; a client may read it instead from a key of a Kubernetes " +
+				"Secret its application's deployment writes (secretRef, namespace/name/key) - " +
+				"readableSecrets lists the Secret keys the applications behind the routes read (each with those routes); any other namespace/name/key can be given too. " +
+				"The provider lives at the gateway's issuer, one of the " +
 				"application plane's public names declared in Domains & TLS (https://<name>), and " +
 				"answers nothing while none is declared.",
 			Schema: noArgs(),
@@ -60,6 +63,9 @@ func (a *API) oidcTools() []mcp.Tool {
 				"secret": str("A NEW confidential client only: the application's own secret, 16 to 256 characters, " +
 					"no spaces, when it imposes one. Omitted: one is drawn and shown once. An existing client's " +
 					"secret changes with regenerate_oidc_client_secret."),
+				"secretRef": str("A NEW confidential client only, instead of secret: the key of a Kubernetes Secret " +
+					"the application's deployment writes, namespace/name/key, read at each sign-in - one of " +
+					"list_oidc_clients' readableSecrets."),
 			}, "id"),
 			Call: a.toolSaveOIDCClient,
 		},
@@ -75,6 +81,8 @@ func (a *API) oidcTools() []mcp.Tool {
 				"id": str("The client id, as list_oidc_clients spells it."),
 				"secret": str("The application's own secret, 16 to 256 characters, no spaces, when it " +
 					"imposes one. Omitted: one is drawn."),
+				"secretRef": str("Instead of secret: the key of a Kubernetes Secret the application's deployment " +
+					"writes, namespace/name/key, read at each sign-in - one of list_oidc_clients' readableSecrets."),
 			}, "id"),
 			Call: a.toolRegenerateOIDCSecret,
 		},
@@ -117,7 +125,11 @@ func (a *API) toolListOIDCClients(ctx context.Context, _ json.RawMessage) (any, 
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"clients": views}, nil
+	offers, err := a.oidcSecretOffers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"clients": views, "readableSecrets": offers}, nil
 }
 
 func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any, error) {
@@ -132,6 +144,7 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 		Audience     string   `json:"audience"`
 		TokenTTL     string   `json:"tokenTtl"`
 		Secret       string   `json:"secret"`
+		SecretRef    string   `json:"secretRef"`
 	}
 	if err := decode(args, &in); err != nil {
 		return nil, err
@@ -141,7 +154,7 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 		return nil, fmt.Errorf("which client: pass its id, the client_id the application's configuration spells")
 	}
 	body := oidcClientIn{ID: in.ID, Confidential: in.Confidential, RedirectURIs: in.RedirectURIs,
-		Audience: in.Audience, TokenTTL: in.TokenTTL, Secret: in.Secret}
+		Audience: in.Audience, TokenTTL: in.TokenTTL, Secret: in.Secret, SecretRef: in.SecretRef}
 	if _, err := a.st.GetOIDCClient(ctx, in.ID); err == nil {
 		view, err := a.updateOIDCClient(ctx, mcpActor(ctx), body, given)
 		if err != nil {
@@ -157,6 +170,8 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 	if out.Secret != "" {
 		res["secret"] = out.Secret
 		res["note"] = "the secret is shown this once: put it in the application's configuration now"
+	} else if in.SecretRef != "" {
+		res["note"] = "the secret is read from the Secret " + in.SecretRef + " at each sign-in: nothing to copy"
 	} else if in.Secret != "" {
 		res["note"] = "the application's secret is kept, as a hash: nothing to copy"
 	}
@@ -165,8 +180,9 @@ func (a *API) toolSaveOIDCClient(ctx context.Context, args json.RawMessage) (any
 
 func (a *API) toolRegenerateOIDCSecret(ctx context.Context, args json.RawMessage) (any, error) {
 	var in struct {
-		ID     string `json:"id"`
-		Secret string `json:"secret"`
+		ID        string `json:"id"`
+		Secret    string `json:"secret"`
+		SecretRef string `json:"secretRef"`
 	}
 	if err := decode(args, &in); err != nil {
 		return nil, err
@@ -175,9 +191,15 @@ func (a *API) toolRegenerateOIDCSecret(ctx context.Context, args json.RawMessage
 	if id == "" {
 		return nil, fmt.Errorf("which client: pass its id, as list_oidc_clients spells it")
 	}
-	out, err := a.regenerateOIDCSecret(ctx, mcpActor(ctx), id, in.Secret)
+	out, err := a.regenerateOIDCSecret(ctx, mcpActor(ctx), id, in.Secret, in.SecretRef)
 	if err != nil {
 		return nil, oidcToolErr(id, err)
+	}
+	if in.SecretRef != "" {
+		return map[string]any{
+			"client": out.Client,
+			"note":   "the old secret no longer works; the one in the Secret " + in.SecretRef + " is read at each sign-in",
+		}, nil
 	}
 	if in.Secret != "" {
 		return map[string]any{

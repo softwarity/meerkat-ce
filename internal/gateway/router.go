@@ -58,6 +58,8 @@ type Router struct {
 	// Choosing it, or changing those names, reloads the router, so every node
 	// signs with the new one from its next request.
 	issuer atomic.Value
+	// internalIssuer is the internal plane's address (SetInternalIssuer).
+	internalIssuer atomic.Value
 
 	// metrics counts what passes through (OBS-01). Each compiled route holds a
 	// pointer into it, so the request path never looks anything up.
@@ -1387,6 +1389,14 @@ func validateRouteType(r store.Route) error {
 				return fmt.Errorf("identity %w", err)
 			}
 		}
+		if id.Issuer != "" {
+			if id.Mechanism == "headers" {
+				return errors.New("identity mechanism \"headers\" takes no issuer: only the jwt, signed-jwt and oidc tokens carry one")
+			}
+			if err := store.CheckTokenIssuer(id.Issuer); err != nil {
+				return fmt.Errorf("identity %w", err)
+			}
+		}
 		if id.Mechanism != store.IdentityOIDC && (id.Client != "" || len(id.Claims) > 0) {
 			return fmt.Errorf("identity mechanism %q takes no client and no claims: they belong to the oidc mechanism", id.Mechanism)
 		}
@@ -2630,13 +2640,42 @@ func stripPrefixCount(filters []routing.Spec) int {
 	return n
 }
 
-// Issuer is the "iss" this gateway signs with, as the last reload read it -
-// what both discovery documents name, and where the OpenID provider lives.
+// Issuer is the PUBLIC "iss" this gateway signs with, as the last reload read
+// it: what the application plane's discovery document names, and where the
+// OpenID provider lives for a browser.
 func (rt *Router) Issuer() string {
 	if v, ok := rt.issuer.Load().(string); ok && v != "" {
 		return v
 	}
 	return store.DefaultJWTIssuer
+}
+
+// SetInternalIssuer records the internal plane's address as its runtime names
+// it (the Service in front of it, in full): the "iss" a service inside the
+// cluster is told by the internal discovery document. Empty when the runtime
+// cannot tell, and the public issuer stands in.
+func (rt *Router) SetInternalIssuer(origin string) {
+	rt.internalIssuer.Store(strings.TrimSuffix(origin, "/"))
+}
+
+// InternalIssuer is the "iss" of the internal plane: the one its discovery
+// document names, a route's JWT carries and an OIDC token asked there carries.
+// The public issuer when the internal plane's address is not known.
+func (rt *Router) InternalIssuer() string {
+	if v, ok := rt.internalIssuer.Load().(string); ok && v != "" {
+		return v
+	}
+	return rt.Issuer()
+}
+
+// RouteIssuer is the "iss" of a route's JWT: the route's own when it writes
+// one, else the internal issuer - a route's JWT goes to a service that reads
+// the keys on the internal plane, and learns the issuer there.
+func (rt *Router) RouteIssuer(id store.IdentityForward) string {
+	if id.Issuer != "" {
+		return id.Issuer
+	}
+	return rt.InternalIssuer()
 }
 
 // identityForwardFilter sends the signed-in caller upstream, per the mechanism.
@@ -2670,7 +2709,7 @@ func (rt *Router) identityForwardFilter(cfg store.IdentityForward, routeName str
 				return
 			}
 			d.Declared = declared
-			claims := identityClaims(cfg, routeName, rt.Issuer(), d)
+			claims := identityClaims(cfg, routeName, rt.RouteIssuer(cfg), d)
 			var tok string
 			if signed {
 				set := rt.currentSigning()

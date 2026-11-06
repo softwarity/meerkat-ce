@@ -267,6 +267,17 @@ pre.pem {
   font-size: 0.75rem;
   color: var(--mat-sys-on-surface-variant);
 }
+/* An id is short; what names a secret is not - a Secret's namespace/name/key
+   is the longest thing on the line, so it gets the room. */
+.clients .mat-column-id {
+  flex: 0.6;
+}
+.clients .mat-column-secret {
+  flex: 1.6;
+}
+.clients .ref {
+  font-family: var(--mk-mono);
+}
 .clients .no-secret {
   color: var(--mat-sys-error);
 }

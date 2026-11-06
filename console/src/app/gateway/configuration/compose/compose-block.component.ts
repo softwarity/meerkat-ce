@@ -896,7 +896,8 @@ export class ComposeBlockComponent {
       case 'group':
         return `${o['tenantId'] ?? ''}: ${(Array.isArray(o['roles']) ? o['roles'] : []).join(', ')}`;
       case 'oidcClient':
-        return o['confidential'] ? 'confidential' : 'public';
+        if (!o['confidential']) return 'public';
+        return typeof o['secretRef'] === 'string' && o['secretRef'] ? `confidential, secret read from ${o['secretRef']}` : 'confidential';
       default:
         return typeof o['description'] === 'string' ? (o['description'] as string) : short(o).slice(0, 80);
     }
@@ -947,12 +948,28 @@ export class ComposeBlockComponent {
     return `el ${el.inRes ? 'in' : 'out'} ${where}`;
   }
 
-  // What names an element that is an object: its label, name, title,
-  // description or id; a brick by its type and first argument; else its JSON.
+  // What names an element that is an object, and whether it is switched off:
+  // an element on both sides that differs only by its switch reads the same
+  // otherwise, and a long one is cut before the switch is reached.
   protected chipLabel(el: Element): string {
+    const v = el.val;
+    const name = this.chipName(el);
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return name;
+    const o = v as Record<string, unknown>;
+    return o['disabled'] === true || o['enabled'] === false ? `${name} (off)` : name;
+  }
+
+  // Its label, name, title, description or id; a brick by its type and first
+  // argument; a block of a route's own code by its kind, file and place; else
+  // its JSON.
+  private chipName(el: Element): string {
     const v = el.val;
     if (!v || typeof v !== 'object' || Array.isArray(v)) return short(v);
     const o = v as Record<string, unknown>;
+    if ((o['kind'] === 'css' || o['kind'] === 'js') && typeof o['position'] === 'string') {
+      const what = typeof o['file'] === 'string' && o['file'] ? o['file'] : 'code';
+      return `${(o['kind'] as string).toUpperCase()} ${what}, ${o['position']}`;
+    }
     for (const k of ['label', 'name', 'title', 'description', 'id']) {
       if (typeof o[k] === 'string' && o[k]) return o[k] as string;
     }

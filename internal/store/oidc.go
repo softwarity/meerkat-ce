@@ -45,6 +45,12 @@ type OIDCClient struct {
 	// SecretPrefix is the start of the secret, to recognise which one an
 	// application holds without being able to use it.
 	SecretPrefix string `json:"secretPrefix"`
+	// SecretRef is where the secret is read instead of kept: a key of a
+	// Kubernetes Secret the application's deployment writes, namespace/name/key.
+	// Set, it replaces the hash and the prefix (both empty): the provider reads
+	// the key at each authentication, so the application rotating its secret
+	// is all a rotation takes. Public - it names the Secret, not its value.
+	SecretRef string `json:"secretRef,omitempty"`
 	// No redirect uri is declared: an application is served behind its
 	// routes, and a code goes back to an address under the routes bound to
 	// the client (gateway.OIDCReturns), nowhere else. The redirect_uris
@@ -113,6 +119,16 @@ func CheckAudience(aud string) error {
 	return nil
 }
 
+// CheckTokenIssuer is the rule for an "iss" a route writes over the gateway's
+// own: any text up to 255 characters, as RFC 7519 allows, with no space or
+// control character - an application compares it as it was typed.
+func CheckTokenIssuer(iss string) error {
+	if len(iss) > 255 || strings.ContainsFunc(iss, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return fmt.Errorf("issuer %q is not allowed: up to 255 characters, no space and no control character", iss)
+	}
+	return nil
+}
+
 // AudienceOrID is the "aud" its access tokens carry.
 func (c OIDCClient) AudienceOrID() string {
 	if c.Audience != "" {
@@ -122,12 +138,38 @@ func (c OIDCClient) AudienceOrID() string {
 }
 
 // SecretMatches says whether secret is this client's, in constant time. A
-// public client has none, and nothing matches it.
+// public client has none, and nothing matches it; nor does a client whose
+// secret is read from a Secret (SecretRef) - SecretIs is the check then, with
+// the value read.
 func (c OIDCClient) SecretMatches(secret string) bool {
 	if !c.Confidential || c.SecretHash == "" || secret == "" {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(HashOIDCSecret(secret)), []byte(c.SecretHash)) == 1
+}
+
+// SecretIs compares a presented secret with the one read from the client's
+// Secret, in constant time. Both hashed first, so the comparison does not
+// leak the length either.
+func SecretIs(presented, read string) bool {
+	if presented == "" || read == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(HashOIDCSecret(presented)), []byte(HashOIDCSecret(read))) == 1
+}
+
+// oidcSecretRefOK is the shape of a SecretRef: a namespace, a Secret's name
+// and one of its keys, as Kubernetes spells each.
+var oidcSecretRefOK = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?/[a-z0-9]([-.a-z0-9]{0,251}[a-z0-9])?/[-._a-zA-Z0-9]{1,253}$`)
+
+// CheckOIDCSecretRef says whether ref is a Secret key, in the words the
+// console shows.
+func CheckOIDCSecretRef(ref string) error {
+	if !oidcSecretRefOK.MatchString(ref) {
+		return invalidf(fmt.Errorf("%q is not a key of a Kubernetes Secret: write namespace/name/key, "+
+			"as canopy/my-app-oidc/client-secret", ref))
+	}
+	return nil
 }
 
 // HashOIDCSecret is how a client secret is kept: sha256, hex, like the API
@@ -214,17 +256,24 @@ func SanitizeOIDCClient(c *OIDCClient) error {
 			return invalidf(fmt.Errorf("token lifetime %q is not allowed: from PT1M to PT24H", c.TokenTTL))
 		}
 	}
+	c.SecretRef = strings.TrimSpace(c.SecretRef)
 	if !c.Confidential {
+		c.SecretHash, c.SecretPrefix, c.SecretRef = "", "", ""
+	}
+	if c.SecretRef != "" {
+		if err := CheckOIDCSecretRef(c.SecretRef); err != nil {
+			return err
+		}
 		c.SecretHash, c.SecretPrefix = "", ""
 	}
 	return nil
 }
 
-const oidcClientCols = `id, confidential, secret_hash, secret_prefix, audience, token_ttl, created_at, updated_at`
+const oidcClientCols = `id, confidential, secret_hash, secret_prefix, secret_ref, audience, token_ttl, created_at, updated_at`
 
 func scanOIDCClient(row rowScanner) (OIDCClient, error) {
 	var c OIDCClient
-	err := row.Scan(&c.ID, &c.Confidential, &c.SecretHash, &c.SecretPrefix,
+	err := row.Scan(&c.ID, &c.Confidential, &c.SecretHash, &c.SecretPrefix, &c.SecretRef,
 		&c.Audience, &c.TokenTTL, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
@@ -239,9 +288,9 @@ func (s *Store) CreateOIDCClient(ctx context.Context, c OIDCClient) (OIDCClient,
 	now := time.Now().Unix()
 	c.CreatedAt, c.UpdatedAt = now, now
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO oidc_clients (`+oidcClientCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO oidc_clients (`+oidcClientCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO NOTHING`,
-		c.ID, c.Confidential, c.SecretHash, c.SecretPrefix,
+		c.ID, c.Confidential, c.SecretHash, c.SecretPrefix, c.SecretRef,
 		c.Audience, c.TokenTTL, c.CreatedAt, c.UpdatedAt)
 	if err != nil {
 		return c, fmt.Errorf("store: create oidc client %q: %w", c.ID, err)
@@ -261,15 +310,15 @@ func (s *Store) UpdateOIDCClient(ctx context.Context, c OIDCClient) (OIDCClient,
 	if err != nil {
 		return c, err
 	}
-	c.SecretHash, c.SecretPrefix, c.CreatedAt = old.SecretHash, old.SecretPrefix, old.CreatedAt
+	c.SecretHash, c.SecretPrefix, c.SecretRef, c.CreatedAt = old.SecretHash, old.SecretPrefix, old.SecretRef, old.CreatedAt
 	if err := SanitizeOIDCClient(&c); err != nil {
 		return c, err
 	}
 	c.UpdatedAt = time.Now().Unix()
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE oidc_clients SET confidential = ?, secret_hash = ?, secret_prefix = ?,
+		`UPDATE oidc_clients SET confidential = ?, secret_hash = ?, secret_prefix = ?, secret_ref = ?,
 		   audience = ?, token_ttl = ?, updated_at = ? WHERE id = ?`,
-		c.Confidential, c.SecretHash, c.SecretPrefix,
+		c.Confidential, c.SecretHash, c.SecretPrefix, c.SecretRef,
 		c.Audience, c.TokenTTL, c.UpdatedAt, c.ID)
 	if err != nil {
 		return c, fmt.Errorf("store: update oidc client %q: %w", c.ID, err)
@@ -281,11 +330,26 @@ func (s *Store) UpdateOIDCClient(ctx context.Context, c OIDCClient) (OIDCClient,
 }
 
 // SetOIDCClientSecret replaces a confidential client's secret: the old one
-// stops working at once.
+// stops working at once. A Secret it was read from is forgotten.
 func (s *Store) SetOIDCClientSecret(ctx context.Context, id, hash, prefix string) error {
+	return s.setOIDCSecret(ctx, id, hash, prefix, "")
+}
+
+// SetOIDCClientSecretRef makes a confidential client's secret the value of a
+// key of a Kubernetes Secret, read at each authentication: the hash kept so
+// far stops working at once.
+func (s *Store) SetOIDCClientSecretRef(ctx context.Context, id, ref string) error {
+	ref = strings.TrimSpace(ref)
+	if err := CheckOIDCSecretRef(ref); err != nil {
+		return err
+	}
+	return s.setOIDCSecret(ctx, id, "", "", ref)
+}
+
+func (s *Store) setOIDCSecret(ctx context.Context, id, hash, prefix, ref string) error {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE oidc_clients SET secret_hash = ?, secret_prefix = ?, updated_at = ? WHERE id = ? AND confidential = ?`,
-		hash, prefix, time.Now().Unix(), id, true)
+		`UPDATE oidc_clients SET secret_hash = ?, secret_prefix = ?, secret_ref = ?, updated_at = ? WHERE id = ? AND confidential = ?`,
+		hash, prefix, ref, time.Now().Unix(), id, true)
 	if err != nil {
 		return fmt.Errorf("store: set the secret of oidc client %q: %w", id, err)
 	}

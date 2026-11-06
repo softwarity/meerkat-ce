@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
+	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/oidcprovider"
 	"github.com/softwarity/meerkat/internal/store"
@@ -34,6 +37,9 @@ func (a *API) registerOIDC(mux Mux) {
 	mux.Handle("POST /api/oidc/clients", a.infraAdmin(a.postOIDCClient))
 	mux.Handle("PUT /api/oidc/clients/{id}", a.infraAdmin(a.putOIDCClient))
 	mux.Handle("POST /api/oidc/clients/{id}/secret", a.infraAdmin(a.postOIDCSecret))
+	// The Secrets a client's secret may be read from: those the applications
+	// behind the routes read, with their keys, never a value.
+	mux.Handle("GET /api/oidc/secrets", a.infraAdmin(a.listOIDCSecretSources))
 	mux.Handle("DELETE /api/oidc/clients/{id}", a.infraAdmin(a.deleteOIDCClient))
 	// A sign-in tried on someone's behalf: what the application would get.
 	mux.Handle("POST /api/oidc/clients/{id}/try", a.infraAdmin(a.postOIDCTry))
@@ -150,7 +156,12 @@ type oidcClientIn struct {
 	// generates it, its vendor fixed it): kept as a hash, never drawn. Empty
 	// on a new confidential client: one is drawn. Only on a creation - a
 	// client's secret changes through POST /api/oidc/clients/{id}/secret.
-	Secret       string          `json:"secret"`
+	Secret string `json:"secret"`
+	// SecretRef is where the secret is read instead (namespace/name/key of a
+	// Kubernetes Secret the application's deployment writes). Like Secret,
+	// only on a creation; on an edit it is the view's, sent back, and ignored
+	// unless it changes - which is refused there.
+	SecretRef    string          `json:"secretRef"`
 	SecretPrefix string          `json:"secretPrefix"`
 	CreatedAt    int64           `json:"createdAt"`
 	UpdatedAt    int64           `json:"updatedAt"`
@@ -277,9 +288,11 @@ func (a *API) putOIDCClient(w http.ResponseWriter, r *http.Request, actor store.
 }
 
 // oidcSecretIn is what POST /api/oidc/clients/{id}/secret accepts: nothing,
-// or null, to draw a secret; the application's own to keep that one.
+// or null, to draw a secret; the application's own to keep that one; or the
+// key of a Secret its deployment writes, to read it from there.
 type oidcSecretIn struct {
-	Secret string `json:"secret"`
+	Secret    string `json:"secret"`
+	SecretRef string `json:"secretRef"`
 }
 
 func (a *API) postOIDCSecret(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -288,12 +301,55 @@ func (a *API) postOIDCSecret(w http.ResponseWriter, r *http.Request, actor store
 		writeErr(w, http.StatusBadRequest, "malformed secret: "+err.Error()+` - send nothing to draw one, or {"secret": "..."} to keep the application's`)
 		return
 	}
-	out, err := a.regenerateOIDCSecret(r.Context(), actor, r.PathValue("id"), in.Secret)
+	out, err := a.regenerateOIDCSecret(r.Context(), actor, r.PathValue("id"), in.Secret, in.SecretRef)
 	if err != nil {
 		a.writeOIDCErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (a *API) listOIDCSecretSources(w http.ResponseWriter, r *http.Request, _ store.User) {
+	offers, err := a.oidcSecretOffers(r.Context())
+	if err != nil {
+		a.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, offers)
+}
+
+// oidcSecretOffers is what the applications behind the declared routes read
+// in Secrets: the offer for a client's secret. The notes (a namespace whose
+// pods cannot be read) go to the log, where an operator looks for them.
+func (a *API) oidcSecretOffers(ctx context.Context) ([]discovery.SecretOffer, error) {
+	routes, err := a.st.ListRoutes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	targets := make([]discovery.RouteTarget, 0, len(routes))
+	for _, r := range routes {
+		if u, err := url.Parse(r.Upstream); err == nil && u.Hostname() != "" {
+			targets = append(targets, discovery.RouteTarget{Route: r.Name, Host: u.Hostname()})
+		}
+	}
+	offers, notes := discovery.OfferSecrets(ctx, targets)
+	for _, n := range notes {
+		slog.Info("OIDC client secrets: a route's Secrets are not offered", "why", n)
+	}
+	return offers, nil
+}
+
+// readableSecretRef refuses a Secret key the gateway cannot read now: the
+// shape, then a read. Said at the moment it is chosen rather than at the
+// application's first sign-in, where it would read as a wrong secret.
+func readableSecretRef(ctx context.Context, id, ref string) error {
+	if err := store.CheckOIDCSecretRef(ref); err != nil {
+		return err
+	}
+	if _, err := discovery.ReadSecretKey(ctx, ref); err != nil {
+		return invalidErr(fmt.Errorf("the secret of client %q cannot be read from %s: %w", id, ref, err))
+	}
+	return nil
 }
 
 func (a *API) deleteOIDCClient(w http.ResponseWriter, r *http.Request, actor store.User) {
@@ -320,7 +376,19 @@ func (a *API) createOIDCClient(ctx context.Context, actor store.User, in oidcCli
 		Audience: in.Audience, TokenTTL: in.TokenTTL,
 	}
 	var secret string
+	in.SecretRef = strings.TrimSpace(in.SecretRef)
 	switch {
+	case in.SecretRef != "" && in.Secret != "":
+		return oidcClientIssued{}, invalidErr(fmt.Errorf("client %q is given a secret and a Secret to read it "+
+			"from: pass one of the two", c.ID))
+	case in.SecretRef != "" && !c.Confidential:
+		return oidcClientIssued{}, invalidErr(fmt.Errorf("client %q is public: it keeps no secret, and proves "+
+			"itself with PKCE - make it confidential to read its secret from a Secret", c.ID))
+	case in.SecretRef != "":
+		if err := readableSecretRef(ctx, c.ID, in.SecretRef); err != nil {
+			return oidcClientIssued{}, err
+		}
+		c.SecretRef = in.SecretRef
 	case in.Secret != "" && !c.Confidential:
 		return oidcClientIssued{}, invalidErr(fmt.Errorf("client %q is public: it keeps no secret, and proves "+
 			"itself with PKCE - make it confidential to give it the application's secret", c.ID))
@@ -345,6 +413,9 @@ func (a *API) createOIDCClient(ctx context.Context, actor store.User, in oidcCli
 	}
 	if in.Secret != "" {
 		kind += ", secret given"
+	}
+	if saved.SecretRef != "" {
+		kind += ", secret read from the Secret " + saved.SecretRef
 	}
 	a.auditEvent(ctx, actor, "oidc.client.create", "oidc-client", saved.ID, saved.ID, "", kind)
 	view, err := a.oidcView(ctx, saved)
@@ -389,6 +460,10 @@ func (a *API) updateOIDCClient(ctx context.Context, actor store.User, in oidcCli
 	if err != nil {
 		return oidcClientView{}, err
 	}
+	if ref := strings.TrimSpace(in.SecretRef); ref != "" && ref != old.SecretRef {
+		return oidcClientView{}, invalidErr(fmt.Errorf("an edit does not change where the secret of client %q "+
+			"is read: set it with POST /api/oidc/clients/%s/secret and {\"secretRef\": ...}", in.ID, in.ID))
+	}
 	passed := func(k string) bool {
 		if given == nil {
 			return true
@@ -418,12 +493,34 @@ func (a *API) updateOIDCClient(ctx context.Context, actor store.User, in oidcCli
 // the one given (the application's own): the old one stops working at once,
 // which is the point - this is what is done when a secret leaked, when a
 // client became confidential, or when the application's secret changed.
-func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id, given string) (oidcClientIssued, error) {
+func (a *API) regenerateOIDCSecret(ctx context.Context, actor store.User, id, given, ref string) (oidcClientIssued, error) {
 	if err := edition.Require(oidcEdition); err != nil {
 		return oidcClientIssued{}, invalidErr(err)
 	}
 	if _, err := a.st.GetOIDCClient(ctx, id); err != nil {
 		return oidcClientIssued{}, err
+	}
+	if ref = strings.TrimSpace(ref); ref != "" {
+		if given != "" {
+			return oidcClientIssued{}, invalidErr(fmt.Errorf("client %q is given a secret and a Secret to read it "+
+				"from: pass one of the two", id))
+		}
+		if err := readableSecretRef(ctx, id, ref); err != nil {
+			return oidcClientIssued{}, err
+		}
+		if err := a.st.SetOIDCClientSecretRef(ctx, id, ref); err != nil {
+			return oidcClientIssued{}, err
+		}
+		saved, err := a.st.GetOIDCClient(ctx, id)
+		if err != nil {
+			return oidcClientIssued{}, err
+		}
+		a.auditEvent(ctx, actor, "oidc.client.secret", "oidc-client", id, id, "", "secret read from the Secret "+ref)
+		view, err := a.oidcView(ctx, saved)
+		if err != nil {
+			return oidcClientIssued{}, err
+		}
+		return oidcClientIssued{Client: view}, nil
 	}
 	var secret, hash, prefix string
 	var err error

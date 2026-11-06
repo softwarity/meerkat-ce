@@ -244,6 +244,21 @@ export class FormFieldComponent {
     return this.formField().getConnectedOverlayOrigin();
   }
 
+  // The rest of what MatAutocompleteTrigger asks of the form field it finds:
+  // the label that names its panel, the theme colour and the control. Without
+  // getLabelId the panel throws on opening and never shows.
+  getLabelId(): string | null {
+    return this.formField().getLabelId();
+  }
+
+  get color() {
+    return this.formField().color;
+  }
+
+  get _control() {
+    return this.formField()._control;
+  }
+
   private get native(): HTMLInputElement | HTMLTextAreaElement | undefined {
     return this.controlRef()?.nativeElement;
   }

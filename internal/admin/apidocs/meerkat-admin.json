@@ -745,6 +745,10 @@
             "type": "string",
             "description": "jwt, signed-jwt: `aud`; default the route name."
           },
+          "issuer": {
+            "type": "string",
+            "description": "jwt, signed-jwt, oidc: `iss`, over the gateway's own. Default: the internal issuer (the internal plane's full name) for a route's JWT and an OIDC token asked on the internal plane, the public issuer for one asked on the application plane."
+          },
           "algorithm": {
             "type": "string",
             "description": "signed-jwt: algorithm, default ES256.",
@@ -7465,6 +7469,11 @@
             "type": "string",
             "description": "Start of the secret, to identify it. Empty for a public client"
           },
+          "secretRef": {
+            "type": "string",
+            "description": "Where the secret is read instead of kept: namespace/name/key of a Kubernetes Secret. Absent when the secret is kept as a hash",
+            "example": "apps/my-app-oidc/client-secret"
+          },
           "createdAt": {
             "type": "integer",
             "format": "int64",
@@ -7537,6 +7546,11 @@
             "description": "Creation only: your own secret (16 to 256 characters, no space). Empty generates one for a confidential client",
             "format": "password"
           },
+          "secretRef": {
+            "type": "string",
+            "description": "Creation only, instead of secret: namespace/name/key of a Kubernetes Secret the application's deployment writes, read at each sign-in. One of GET /api/oidc/secrets",
+            "example": "apps/my-app-oidc/client-secret"
+          },
           "redirectUris": {
             "type": "array",
             "items": {
@@ -7592,7 +7606,21 @@
             "type": "string",
             "description": "Your own secret (16 to 256 characters, no space). Absent generates one",
             "format": "password"
+          },
+          "secretRef": {
+            "type": "string",
+            "description": "Instead of secret: namespace/name/key of a Kubernetes Secret, read at each sign-in. One of GET /api/oidc/secrets",
+            "example": "apps/my-app-oidc/client-secret"
           }
+        }
+      },
+      "OIDCSecretSource": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "name": { "type": "string" },
+          "keys": { "type": "array", "items": { "type": "string" }, "description": "The keys the applications read in it. Never a value" },
+          "routes": { "type": "array", "items": { "type": "string" }, "description": "The routes whose applications read it" }
         }
       },
       "OIDCTrialRequest": {
@@ -18254,6 +18282,44 @@
           },
           "500": {
             "description": "Data plane unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oidc/secrets": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "List the Secret keys the routes' applications read",
+        "operationId": "listOIDCSecretSources",
+        "description": "The Kubernetes Secrets the applications behind the routes read (found in their pods), with the keys they read and those routes, never a value: what a client's secretRef is chosen from. Empty outside Kubernetes. Root or infra-admin.",
+        "responses": {
+          "200": {
+            "description": "The Secrets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OIDCSecretSource"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not root or infra-admin",
             "content": {
               "application/json": {
                 "schema": {

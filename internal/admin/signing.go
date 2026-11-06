@@ -93,7 +93,11 @@ func (a *API) identityPreview(ctx context.Context, req identityPreviewRequest) (
 	case "headers":
 		res.Headers = gateway.PreviewHeaders(cfg)
 	case "jwt", "signed-jwt":
-		claims := gateway.PreviewClaims(cfg, req.RouteName, a.st.JWTIssuer(ctx, a.DataAddr))
+		issuer := a.st.JWTIssuer(ctx, a.DataAddr)
+		if a.router != nil {
+			issuer = a.router.RouteIssuer(cfg)
+		}
+		claims := gateway.PreviewClaims(cfg, req.RouteName, issuer)
 		res.Claims = claims
 		if cfg.Mechanism == "jwt" {
 			tok, err := gateway.MintUnsignedJWT(claims)

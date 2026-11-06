@@ -861,6 +861,9 @@ CREATE TABLE IF NOT EXISTS oidc_clients (
   confidential  BOOLEAN NOT NULL DEFAULT TRUE,
   secret_hash   TEXT NOT NULL DEFAULT '',
   secret_prefix TEXT NOT NULL DEFAULT '',
+  -- namespace/name/key of a Kubernetes Secret the secret is read from instead
+  -- (v104): the application's deployment writes it, the hash is then empty.
+  secret_ref    TEXT NOT NULL DEFAULT '',
   -- One per line, compared exactly at authorisation.
   redirect_uris TEXT NOT NULL DEFAULT '',
   audience      TEXT NOT NULL DEFAULT '',
@@ -1512,7 +1515,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // given to nobody after its publication.
 // 102 has a step: a notification has one id for its sender, dedup_key
 // becomes ref.
-const schemaVersion = 103
+// 104 carries no step: oidc_clients.secret_ref is filled in by the additive
+// pass, empty - every client declared before keeps its secret as a hash.
+const schemaVersion = 104
 
 func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()
@@ -2211,6 +2216,12 @@ type IdentityForward struct {
 	// Claims are what the oidc tokens carry beyond the registered ones (oidc
 	// only), in order.
 	Claims []OIDCClaim `json:"claims,omitempty"`
+	// Issuer replaces the "iss" of this route's tokens (jwt, signed-jwt,
+	// oidc). Empty, the gateway's own: the internal issuer for a route's JWT
+	// and for an OIDC token asked on the internal plane, the public one for a
+	// token asked on the application plane. Set it for an application that
+	// expects a value written in its own configuration.
+	Issuer string `json:"issuer,omitempty"`
 }
 
 // IdentityOIDC is the mechanism that makes a route's application a client of

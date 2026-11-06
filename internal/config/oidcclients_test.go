@@ -343,3 +343,41 @@ func TestCompareNamesTheOIDCClients(t *testing.T) {
 		t.Errorf("want one OIDC client updated on tokenTtl, got %+v", changes)
 	}
 }
+
+// TestAClientReadingItsSecretFromASecretTravelsAsTheReference: the export
+// names the Secret and carries no hash; the import on another gateway reads
+// the same reference; a document giving both, or a reference to a public
+// client, is refused before anything is written.
+func TestAClientReadingItsSecretFromASecretTravelsAsTheReference(t *testing.T) {
+	if !edition.Enterprise {
+		t.Skip("the OIDC provider is Enterprise")
+	}
+	ctx := context.Background()
+	from := openTemp(t)
+	if _, err := from.CreateOIDCClient(ctx, store.OIDCClient{ID: "wiki", Confidential: true, SecretRef: "apps/wiki-oidc/client-secret"}); err != nil {
+		t.Fatal(err)
+	}
+	doc := travel(t, from)
+	if len(doc.OIDCClients) != 1 || doc.OIDCClients[0].SecretRef != "apps/wiki-oidc/client-secret" || doc.OIDCClients[0].SecretHash != "" {
+		t.Fatalf("exported: %+v", doc.OIDCClients)
+	}
+	to := openTemp(t)
+	confidentialClient(t, to, "wiki") // had a hash: the reference replaces it
+	if _, err := Apply(ctx, to, doc, false); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := to.GetOIDCClient(ctx, "wiki")
+	if got.SecretRef != "apps/wiki-oidc/client-secret" || got.SecretHash != "" {
+		t.Fatalf("imported: %+v", got)
+	}
+	for _, bad := range []OIDCClient{
+		{ID: "a", Confidential: true, SecretRef: "apps/a/k", SecretHash: strings.Repeat("a", 64)},
+		{ID: "b", SecretRef: "apps/b/k"},
+		{ID: "c", Confidential: true, SecretRef: "no-namespace/k"},
+	} {
+		d := &Document{OIDCClients: []OIDCClient{bad}}
+		if _, err := Apply(ctx, to, d, false); err == nil {
+			t.Errorf("%+v was accepted", bad)
+		}
+	}
+}

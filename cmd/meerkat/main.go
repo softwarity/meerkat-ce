@@ -1121,6 +1121,13 @@ func run(o options) error {
 	slog.Info("meerkat data plane listening", "addr", addr, "loopbackOnly", plains[certs.PlaneApp].Loopback())
 	slog.Info("meerkat control plane listening", "addr", adminAddr, "loopbackOnly", plains[certs.PlaneConsole].Loopback())
 	slog.Info("meerkat internal plane listening", "addr", o.internalAddr, "loopbackOnly", plains[certs.PlaneInternal].Loopback())
+	// The internal issuer, learnt from the runtime before the first route's
+	// JWT is signed: the internal plane's address, what its discovery names.
+	go func() {
+		if iss := adminAPI.InternalIssuer(ctx); iss != "" {
+			slog.Info("internal issuer", "iss", iss)
+		}
+	}()
 
 	select {
 	case err := <-errc:

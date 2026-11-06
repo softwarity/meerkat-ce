@@ -38,6 +38,20 @@
         <mat-icon>content_copy</mat-icon>
       </button>
     </div>
+    <!-- The issuer that document names: what a route's JWT carries, and what
+         an application inside the cluster is given when its library starts
+         from an issuer (Argo CD) - copied as it is, since it is compared to
+         the letter. -->
+    @if (d.internalOrigin; as iss) {
+      <div class="jwks">
+        <span class="lbl" i18n="@@Issuer_internal">Issuer (internal)</span>
+        <code class="path">{{ iss }}</code>
+        <span class="spacer"></span>
+        <button matIconButton (click)="copy(iss)" i18n-matTooltip="@@Copy" matTooltip="Copy">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+    }
     <!-- Enterprise, like the rest of the provider: the community image shows
          the line locked, never an address that would answer nothing. On the
          Enterprise image, only while the provider answers. -->
@@ -101,7 +115,7 @@
           type="button"
           class="field-info"
           i18n-matTooltip="@@Public_address_info"
-          matTooltip="The issuer (iss) of every token Meerkat signs, and where applications find its OpenID discovery"
+          matTooltip="The issuer (iss) of the tokens asked from outside the cluster, and where applications there find the OpenID discovery. Inside the cluster: the internal issuer above"
           matTooltipPositionAtOrigin
           i18n-aria-label="@@More_information"
           aria-label="More information"
@@ -250,7 +264,10 @@
           <mat-header-cell *matHeaderCellDef i18n="@@Secret">Secret</mat-header-cell>
           <mat-cell *matCellDef="let c">
             <span class="sub-line">
-              @if (c.confidential && c.secretPrefix?.startsWith('mko_')) {
+              @if (c.confidential && c.secretRef) {
+                <!-- Read from the Secret the application's deployment writes. -->
+                <ng-container i18n="@@Secret_SECRET_REF">Secret <span class="ref">{{ c.secretRef }}</span></ng-container>
+              } @else if (c.confidential && c.secretPrefix?.startsWith('mko_')) {
                 <ng-container i18n="@@Secret_PREFIX">secret {{ c.secretPrefix }}...</ng-container>
               } @else if (c.confidential && c.secretPrefix) {
                 <!-- The application's own: drawn neither here nor shown here. -->
@@ -299,7 +316,11 @@
               >
                 <mat-icon>edit</mat-icon>
               </button>
-              @if (c.confidential) {
+              <!-- Drawing a new secret is Meerkat's to do only when the secret
+                   is Meerkat's, or there is none yet: one the application
+                   gives, or a Secret it is read from, is rotated on the
+                   application's side - Edit changes it. -->
+              @if (c.confidential && !c.secretRef && (!c.secretPrefix || c.secretPrefix.startsWith('mko_'))) {
                 <button
                   matIconButton
                   (click)="regenerate(c)"

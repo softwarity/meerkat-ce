@@ -571,6 +571,11 @@
   },
   {
     "method": "GET",
+    "path": "/api/oidc/secrets",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/plug/developers",
     "guard": "appAdmin"
   },
@@ -757,12 +762,12 @@
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "serviceTokens"
+    "guard": "runReport"
   },
   {
     "method": "PATCH",
     "path": "/api/schedules/{id}/run",
-    "guard": "runReport"
+    "guard": "serviceTokens"
   },
   {
     "method": "POST",

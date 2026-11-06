@@ -240,9 +240,18 @@ securityContext:
 # that sends no token is named by its address, read from the pods of the
 # namespaces above - one elsewhere is unidentified. false refuses the cluster
 # token mode, and a ServiceAccount token is then not checked.
+#
+# readSecrets lets the gateway read the Secrets of the cluster (`get`, a
+# ClusterRole): an OIDC client's secret is then read where the application's
+# own chart writes it, at each sign-in. Nothing is declared, here or in the
+# application's chart. The console offers the Secrets the applications behind
+# the routes read - found in their pods, never by listing Secrets. It is a
+# read of any Secret whose name the gateway knows: set false where it must
+# not, and paste a client's secret instead.
 rbac:
   read: true
   watch: true
   clusterServices: true
   internalCallers: true
   watchNamespaces: []
+  readSecrets: true

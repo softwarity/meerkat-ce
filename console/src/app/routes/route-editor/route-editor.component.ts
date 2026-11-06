@@ -60,6 +60,7 @@ import {
   RateLimit,
   Role,
   Route,
+  SigningKeys,
   Tenant,
   User,
   USER_BUTTON_POSITIONS,
@@ -490,6 +491,7 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     identityMechanism: (r?.identity?.mechanism ?? "") as IdentityMechanism,
     identityTtl: r?.identity?.ttl || "PT2M",
     identityAudience: r?.identity?.audience ?? "",
+    identityIssuer: r?.identity?.issuer ?? "",
     identityAlgorithm: r?.identity?.algorithm || "ES256",
     // OIDC: the client the application signs in as, and what its tokens say.
     identityClient: r?.identity?.client ?? "",
@@ -816,6 +818,20 @@ export class RouteEditorComponent {
   private readonly customRes = httpResource<{ fields: { name: string }[] }>(
     () => "/api/model/user-fields",
   );
+  // The gateway's issuers, read only once a route sends a token: what a
+  // route's own issuer is written over, shown in its empty field.
+  private readonly signingRes = httpResource<SigningKeys>(() =>
+    ["jwt", "signed-jwt", "oidc"].includes(this.draft().identityMechanism)
+      ? "/api/identity/signing-keys"
+      : undefined,
+  );
+  // The issuer a route's token carries when it writes none: the internal
+  // plane's address (what a service inside the cluster reads in the internal
+  // discovery), the public issuer when the runtime cannot name it.
+  protected readonly defaultIssuer = computed(() => {
+    const k = this.signingRes.value();
+    return k?.internalOrigin || k?.issuer || "";
+  });
   // And the organisation's (MODEL-03), only where there are organisations to
   // tell apart. One namespace with the account's - the model refuses a name
   // on both lists - so they sit in the same pickers, marked.
@@ -2154,6 +2170,7 @@ export class RouteEditorComponent {
       | "upstream"
       | "identityTtl"
       | "identityAudience"
+      | "identityIssuer"
       | "identityAlgorithm"
       | "identityClient"
       | "btnPosition"
@@ -2495,6 +2512,10 @@ export class RouteEditorComponent {
     }
     if (d.identityMechanism === "signed-jwt" && d.identityAlgorithm) {
       identity.algorithm = d.identityAlgorithm;
+    }
+    // The tokens' iss, written over the gateway's own: jwt, signed-jwt, oidc.
+    if (d.identityMechanism !== "headers" && d.identityIssuer.trim()) {
+      identity.issuer = d.identityIssuer.trim();
     }
     // OIDC carries its client and its claims, and nothing of the token
     // settings above: the client holds the lifetime, the provider the keys.

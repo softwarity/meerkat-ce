@@ -300,3 +300,52 @@ func TestOIDCClientAudienceTakesASpaceInside(t *testing.T) {
 		t.Fatalf("audience = %q, want it trimmed", cl.Audience)
 	}
 }
+
+// TestOIDCClientSecretReadFromASecret: a client whose secret lives in a
+// Kubernetes Secret keeps the reference and no hash; an edit keeps it; setting
+// a hash forgets it and setting it again drops the hash; a public client keeps
+// neither; a malformed reference is refused in words that show the shape.
+func TestOIDCClientSecretReadFromASecret(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	c := oidcClient("wiki")
+	c.SecretRef = "apps/wiki-oidc/client-secret"
+	c.SecretHash, c.SecretPrefix = "ab", "x" // dropped: the reference wins
+	if _, err := s.CreateOIDCClient(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.GetOIDCClient(ctx, "wiki")
+	if got.SecretRef != "apps/wiki-oidc/client-secret" || got.SecretHash != "" || got.SecretPrefix != "" || got.SecretMatches("ab") {
+		t.Fatalf("created: %+v", got)
+	}
+	got.Audience = "wiki-api"
+	if _, err := s.UpdateOIDCClient(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.GetOIDCClient(ctx, "wiki"); got.SecretRef == "" {
+		t.Fatalf("an edit lost the reference: %+v", got)
+	}
+	if err := s.SetOIDCClientSecret(ctx, "wiki", HashOIDCSecret("a-secret-of-sixteen"), "sha256:x"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.GetOIDCClient(ctx, "wiki"); got.SecretRef != "" || !got.SecretMatches("a-secret-of-sixteen") {
+		t.Fatalf("a hash set kept the reference: %+v", got)
+	}
+	if err := s.SetOIDCClientSecretRef(ctx, "wiki", "apps/wiki-oidc/other"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.GetOIDCClient(ctx, "wiki"); got.SecretRef != "apps/wiki-oidc/other" || got.SecretHash != "" {
+		t.Fatalf("a reference set kept the hash: %+v", got)
+	}
+	if err := s.SetOIDCClientSecretRef(ctx, "wiki", "wiki-oidc/client-secret"); err == nil || !strings.Contains(err.Error(), "namespace/name/key") {
+		t.Fatalf("malformed: %v", err)
+	}
+	pub := oidcClient("spa")
+	pub.Confidential, pub.SecretRef = false, "apps/spa/k"
+	if saved, err := s.CreateOIDCClient(ctx, pub); err != nil || saved.SecretRef != "" {
+		t.Fatalf("public: %+v %v", saved, err)
+	}
+	if !SecretIs("same-value", "same-value") || SecretIs("same-value", "other") || SecretIs("", "") {
+		t.Fatal("SecretIs")
+	}
+}

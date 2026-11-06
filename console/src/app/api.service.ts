@@ -492,6 +492,8 @@ export interface IdentityForward {
   algorithm?: string;
   client?: string;
   claims?: OIDCClaim[];
+  // The tokens' iss (jwt, signed-jwt, oidc); absent means the gateway's own.
+  issuer?: string;
 }
 
 export type IdentityMechanism = '' | 'headers' | 'jwt' | 'signed-jwt' | 'oidc';
@@ -533,6 +535,9 @@ export interface OIDCClient {
   id: string;
   confidential: boolean;
   secretPrefix?: string;
+  // Where the secret is read instead of kept: namespace/name/key of a
+  // Kubernetes Secret the application's deployment writes.
+  secretRef?: string;
   audience?: string;
   tokenTtl?: string;
   createdAt?: number;
@@ -540,6 +545,15 @@ export interface OIDCClient {
   routes?: { id: string; name: string }[];
   acceptedUnder?: string[];
   wholeHostRoutes?: string[];
+}
+
+// A Secret the applications behind the routes read: the keys they read in
+// it, never a value, and those routes.
+export interface OIDCSecretSource {
+  namespace: string;
+  name: string;
+  keys: string[];
+  routes: string[];
 }
 
 // What creating a client or regenerating its secret answers: the client, and
@@ -2962,8 +2976,15 @@ export class ApiService {
     return this.http.put<OIDCClient>(`/api/oidc/clients/${encodeURIComponent(c.id)}`, c);
   }
 
-  regenerateOidcClientSecret(id: string, secret?: string): Observable<OIDCClientSecret> {
-    return this.http.post<OIDCClientSecret>(`/api/oidc/clients/${encodeURIComponent(id)}/secret`, secret ? { secret } : null);
+  // secretRef instead of secret: read from that key of a Kubernetes Secret.
+  regenerateOidcClientSecret(id: string, secret?: string, secretRef?: string): Observable<OIDCClientSecret> {
+    const body = secretRef ? { secretRef } : secret ? { secret } : null;
+    return this.http.post<OIDCClientSecret>(`/api/oidc/clients/${encodeURIComponent(id)}/secret`, body);
+  }
+
+  // The Secrets the applications behind the routes read, with their keys.
+  oidcSecretSources(): Observable<OIDCSecretSource[]> {
+    return this.http.get<OIDCSecretSource[]>('/api/oidc/secrets');
   }
 
   // A sign-in tried on someone's behalf, nothing issued: what the application

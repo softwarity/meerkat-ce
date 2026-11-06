@@ -337,6 +337,16 @@ func check(doc *Document) error {
 		}
 		seen[stored.ID] = true
 		switch {
+		case c.SecretRef != "" && c.SecretHash != "":
+			return fmt.Errorf("config: OIDC client %q carries a secretHash and a secretRef: its secret is "+
+				"kept as a hash or read from a Secret, not both - drop one", c.ID)
+		case c.SecretRef != "" && !c.Confidential:
+			return fmt.Errorf("config: OIDC client %q is public (confidential: false) and carries a "+
+				"secretRef: a public client keeps no secret - drop it, or make the client confidential", c.ID)
+		case c.SecretRef != "":
+			if err := store.CheckOIDCSecretRef(c.SecretRef); err != nil {
+				return fmt.Errorf("config: OIDC client %q: %w", c.ID, err)
+			}
 		case c.SecretHash == "" && c.SecretPrefix != "":
 			return fmt.Errorf("config: OIDC client %q carries a secretPrefix without its secretHash: "+
 				"give both, or neither to keep the secret the gateway already has", c.ID)
@@ -824,10 +834,10 @@ func importOIDCClients(ctx context.Context, st *store.Store, doc *Document, plan
 		}
 		seen[next.ID] = true
 		before, had := known[next.ID]
-		if next.Confidential && next.SecretHash == "" {
+		if next.Confidential && next.SecretHash == "" && next.SecretRef == "" {
 			next.SecretPrefix = ""
 			if had && before.Confidential {
-				next.SecretHash, next.SecretPrefix = before.SecretHash, before.SecretPrefix
+				next.SecretHash, next.SecretPrefix, next.SecretRef = before.SecretHash, before.SecretPrefix, before.SecretRef
 			}
 		}
 		action := decide(had, oidcClientOf(before), oidcClientOf(next))
@@ -849,8 +859,13 @@ func importOIDCClients(ctx context.Context, st *store.Store, doc *Document, plan
 		if _, err := st.UpdateOIDCClient(ctx, next); err != nil {
 			return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
 		}
-		if next.Confidential && next.SecretHash != "" &&
-			(next.SecretHash != before.SecretHash || next.SecretPrefix != before.SecretPrefix) {
+		switch {
+		case next.Confidential && next.SecretRef != "" && next.SecretRef != before.SecretRef:
+			if err := st.SetOIDCClientSecretRef(ctx, next.ID, next.SecretRef); err != nil {
+				return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
+			}
+		case next.Confidential && next.SecretHash != "" &&
+			(next.SecretHash != before.SecretHash || next.SecretPrefix != before.SecretPrefix || before.SecretRef != ""):
 			if err := st.SetOIDCClientSecret(ctx, next.ID, next.SecretHash, next.SecretPrefix); err != nil {
 				return fmt.Errorf("config: OIDC client %q: %w", next.ID, err)
 			}

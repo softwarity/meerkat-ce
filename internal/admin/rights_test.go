@@ -104,7 +104,12 @@ func TestTheRightsMatrixIsReadFromTheCode(t *testing.T) {
 		if found[i].Path != found[j].Path {
 			return found[i].Path < found[j].Path
 		}
-		return found[i].Method < found[j].Method
+		if found[i].Method != found[j].Method {
+			return found[i].Method < found[j].Method
+		}
+		// One pattern served on two planes: the guard settles the order, or
+		// the matrix would reshuffle at random each time an endpoint is added.
+		return found[i].Guard < found[j].Guard
 	})
 	got, err := json.MarshalIndent(found, "", "  ")
 	if err != nil {

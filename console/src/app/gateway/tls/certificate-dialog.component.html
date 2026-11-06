@@ -76,8 +76,23 @@
           <ng-container i18n="@@Choose_a_keystore">Choose a keystore</ng-container>
         </app-file-button>
       </div>
-      <app-form-field i18n-label="@@Keystore_password" label="Keystore password" revealable>
-        <input matInput type="password" [value]="password()" (input)="password.set($any($event.target).value)" />
+      <!-- A keystore's password, not the person's login: a one-line textarea
+           masked in CSS, out of the password managers' reach (see CLAUDE.md). -->
+      <app-form-field i18n-label="@@Keystore_password" label="Keystore password" masked revealable>
+        <textarea
+          matInput
+          rows="1"
+          class="oneline"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          data-bwignore="true"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          [value]="password()"
+          (input)="password.set($any($event.target).value)"
+          (keydown.enter)="$event.preventDefault()"
+        ></textarea>
       </app-form-field>
     }
     @default {

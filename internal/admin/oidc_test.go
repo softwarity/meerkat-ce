@@ -374,3 +374,31 @@ func TestATrialSaysWhoItCannotTry(t *testing.T) {
 		t.Fatalf("a plain account: %d", code)
 	}
 }
+
+// TestASecretToReadIsRefusedUntilItCanBeRead: a Secret key that cannot be
+// read is refused when it is chosen - here, off Kubernetes - rather than at the
+// application's first sign-in; so is a malformed one, and one given beside a
+// secret. Off Kubernetes, the list of Secrets is empty.
+func TestASecretToReadIsRefusedUntilItCanBeRead(t *testing.T) {
+	f := setupEE(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	for _, w := range []struct{ method, path, body, says string }{
+		{"POST", "/api/oidc/clients", `{"id": "wiki", "secretRef": "apps/wiki-oidc/client-secret"}`, "does not run in Kubernetes"},
+		{"POST", "/api/oidc/clients", `{"id": "wiki", "secretRef": "wiki-oidc/client-secret"}`, "namespace/name/key"},
+		{"POST", "/api/oidc/clients", `{"id": "wiki", "secretRef": "apps/w/k", "secret": "chart-generated-0123456789"}`, "one of the two"},
+		{"POST", "/api/oidc/clients", `{"id": "wiki", "confidential": false, "secretRef": "apps/w/k"}`, "is public"},
+	} {
+		if code, out := f.call(t, w.method, w.path, w.body, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, w.says) {
+			t.Fatalf("%s %s %s: %d %s", w.method, w.path, w.body, code, out)
+		}
+	}
+	if code, _ := f.call(t, "POST", "/api/oidc/clients", `{"id": "wiki"}`, f.rootC); code != http.StatusCreated {
+		t.Fatalf("create: %d", code)
+	}
+	if code, out := f.call(t, "POST", "/api/oidc/clients/wiki/secret", `{"secretRef": "apps/wiki-oidc/client-secret"}`, f.rootC); code != http.StatusUnprocessableEntity || !strings.Contains(out, "does not run in Kubernetes") {
+		t.Fatalf("set: %d %s", code, out)
+	}
+	if code, out := f.call(t, "GET", "/api/oidc/secrets", "", f.rootC); code != http.StatusOK || strings.TrimSpace(out) != "[]" {
+		t.Fatalf("sources: %d %s", code, out)
+	}
+}
