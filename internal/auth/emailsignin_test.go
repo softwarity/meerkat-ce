@@ -98,7 +98,10 @@ func TestEmailSigninDoesNotEnumerate(t *testing.T) {
 	if known.Code != unknown.Code {
 		t.Fatalf("known answered %d, unknown %d", known.Code, unknown.Code)
 	}
-	if bodyString(known) != bodyString(unknown) {
+	// Each page says back the address it was given - the visitor's own
+	// words - and nothing else may tell the two apart.
+	same := func(body, email string) string { return strings.ReplaceAll(body, email, "ADDRESS") }
+	if same(bodyString(known), "admin@example.com") != same(bodyString(unknown), "nobody@example.com") {
 		t.Fatalf("the two answers differ, which names the addresses that exist")
 	}
 	var cookies int

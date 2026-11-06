@@ -2720,6 +2720,9 @@ export interface Branding {
   // white-label feature grants the right to make - the server refuses it
   // without, rather than saving something that does nothing.
   hideMark?: boolean;
+  // How a person reaches the administrators: an e-mail address (stored as
+  // mailto:) or an http(s) address. Offered on the refused and waiting pages.
+  contact?: string;
   appName: string;
   tagline: string;
   logo: string;

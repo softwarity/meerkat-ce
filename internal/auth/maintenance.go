@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/softwarity/meerkat/internal/events"
 	"github.com/softwarity/meerkat/internal/store"
 )
 
@@ -86,6 +87,28 @@ const maintenanceBody = `    <p class="maint-lead">{{.T.maintenanceLead}}</p>
       <button type="submit">{{.T.signOut}}</button>
     </form>
     {{end}}
+    <script>
+    // The page comes back by itself: the gateway says on the live channel
+    // when the switch goes off, and a channel that drops and returns means
+    // the gateway restarted (an upgrade): either way, the page asked for is
+    // tried again. No timer re-reads anything - the pulsing dot is no longer
+    // a promise the page does not keep.
+    (() => {
+      if (!window.WebSocket) return;
+      const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/meerkat/events';
+      let wait = 1000, dropped = false;
+      const open = () => {
+        let s;
+        try { s = new WebSocket(url); } catch (e) { return; }
+        s.onopen = () => { if (dropped) location.reload(); wait = 1000; };
+        s.onmessage = (e) => {
+          try { if (JSON.parse(e.data).type === 'maintenance-over') location.reload(); } catch (err) { /* not ours */ }
+        };
+        s.onclose = () => { dropped = true; setTimeout(open, wait); wait = Math.min(wait * 2, 30000); };
+      };
+      open();
+    })();
+    </script>
 `
 
 // reasonKey maps a stored reason to its catalogue entry. An unknown one says
@@ -238,4 +261,10 @@ func inAnyEncoding(s string) string {
 		b.WriteString("&#" + strconv.Itoa(int(r)) + ";")
 	}
 	return b.String()
+}
+
+// MaintenanceOver tells every open page that the global maintenance switch went
+// off: the maintenance pages among them reload, everything else ignores it.
+func (h *Handler) MaintenanceOver() {
+	h.hub.Publish(events.TopicAll, events.Message{Type: "maintenance-over"})
 }

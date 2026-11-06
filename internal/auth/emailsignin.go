@@ -79,11 +79,15 @@ type signinSentData struct {
 	Next  string
 	Hint  string
 	Error string
+	// SentTo is the address the person typed, said back to them: it is
+	// theirs, so it tells nobody whether an account is behind it, and a typo
+	// is what they need to see when nothing arrives.
+	SentTo string
 }
 
 const signinCodeBody = `    <form method="post" action="/login/code">
-      <p class="lead">{{.T.signinCodeLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.signinCodeLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <p class="hint">{{.T.signinCodeHint}}</p>
       <label class="field">
         <span>{{.T.email}}</span>
@@ -96,17 +100,26 @@ const signinCodeBody = `    <form method="post" action="/login/code">
 `
 
 const signinSentBody = `    <form method="post" action="/login/code/verify">
-      <p class="lead">{{.T.registerSentLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+      ` + sentToLine + `
       <p class="hint">{{.Hint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
         <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
       </label>
       <input type="hidden" name="next" value="{{.Next}}">
+      <input type="hidden" name="email" value="{{.SentTo}}">
       <button type="submit">{{.T.signIn}}</button>
     </form>
-    <p class="back"><a href="/login/code">{{.T.signinCodeAgain}}</a></p>
+    {{if .SentTo}}<form method="post" action="/login/code" class="leave resend">
+      <p class="hint">{{.T.nothingReceived}}</p>
+      <input type="hidden" name="email" value="{{.SentTo}}">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <button type="submit">{{.T.sendAgain}}</button>
+    </form>{{end}}
+    <p class="back"><a href="/login/code">{{.T.useAnotherAddress}}</a></p>
+    <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
 
 // emailSigninOpen says whether the door is open at all. Four conditions, and
@@ -183,7 +196,8 @@ func (h *Handler) doEmailSignin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) renderSigninSent(w http.ResponseWriter, r *http.Request, next, errMsg string, status int) {
-	data := signinSentData{flowChrome: h.flowData(r, "titleSigninCode"), Next: next, Error: errMsg}
+	data := signinSentData{flowChrome: h.flowData(r, "titleSigninCode"), Next: next, Error: errMsg,
+		SentTo: strings.TrimSpace(r.PostFormValue("email"))}
 	data.Hint = fmt.Sprintf(data.T["signinCodeSentHint"], minutesLabel(data.T, signinCodeTTL))
 	writeFlow(w, signinSentPage, data, status)
 }

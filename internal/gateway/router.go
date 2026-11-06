@@ -97,6 +97,11 @@ type Router struct {
 	// installation uses it (ROUTE-10). Wired by main; nil, and for anything
 	// that is not a browser asking for a page, the plain 404 it always was.
 	NotFound func(w http.ResponseWriter, r *http.Request)
+	// MaintenanceOver is called when the global switch goes off, on every
+	// node as each reloads: the open maintenance pages are told, and go back
+	// to what they were asked for without anybody pressing reload. Wired by
+	// main; nil tells nobody.
+	MaintenanceOver func()
 	// Stripe is the reminder injected into every page seen through the
 	// maintenance door, translated like the page it lands on. Wired by main;
 	// nil falls back to the English block below it.
@@ -419,6 +424,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	rt.pruneOps(alive)
 
 	rt.mu.Lock()
+	over := rt.maintenance.Enabled && !maint.Enabled
 	rt.routes = compiled
 	rt.problems = problems
 	rt.assets = assets
@@ -429,6 +435,9 @@ func (rt *Router) Reload(ctx context.Context) error {
 		rt.simTokenKey = simKey
 	}
 	rt.mu.Unlock()
+	if over && rt.MaintenanceOver != nil {
+		rt.MaintenanceOver()
+	}
 	rt.loaded.Store(true)
 	select {
 	case rt.reloaded <- struct{}{}:

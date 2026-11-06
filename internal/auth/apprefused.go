@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"fmt"
+	"html/template"
 	"net/http"
 )
 
@@ -36,17 +38,46 @@ const (
 	AppRefusedUnreadable = "unreadable"
 )
 
+// appRefusedRefs are the references the page hands the person for their
+// administrator: one word per reason, the word the documentation's table and
+// the server log line are searched with. The fix itself (which screen of the
+// console) is the administrator's to read there, never the visitor's.
+var appRefusedRefs = map[string]string{
+	AppRefusedUnknown:     "unknown-client",
+	AppRefusedReturn:      "return-address",
+	AppRefusedUnavailable: "no-public-name",
+	AppRefusedUnreadable:  "unreadable-request",
+}
+
 type appRefusedData struct {
 	flowChrome
 	// Reason is the chosen sentence, already translated.
 	Reason string
+	// Ref is the sentence carrying the reference for the administrator.
+	Ref string
+	// The ways on, as on the not-found page: the applications this visitor
+	// may open, the profile or the sign-in, the page they came from.
+	Apps    []publicLink
+	SignIn  bool
+	Profile bool
+	Back    template.URL
 }
 
 const appRefusedBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.appRefusedLead}}</p>
+      <h2 class="lead">{{.T.appRefusedLead}}</h2>
       <p class="hint">{{.Reason}}</p>
       <p class="hint">{{.T.appRefusedHint}}</p>
+      <p class="hint ref">{{.Ref}}</p>
+      {{if .Apps}}<div class="public">
+        <nav class="public-links">
+          {{range .Apps}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
+        </nav>
+      </div>{{end}}
+      {{if .SignIn}}<a class="choice" href="/login">{{.T.signIn}}</a>{{end}}
     </form>
+    {{if .Brand.Contact}}<p class="back"><a href="{{.Brand.Contact}}">{{.T.contactAdmin}}</a></p>{{end}}
+    {{if .Back}}<p class="back"><a href="{{.Back}}">{{.T.back}}</a></p>{{end}}
+    {{if .Profile}}<p class="back"><a href="/profile">{{.T.profile}}</a></p>{{end}}
 `
 
 var appRefusedPage = flowPage("app-refused", appRefusedBody)
@@ -58,6 +89,10 @@ func (h *Handler) ServeAppRefused(w http.ResponseWriter, r *http.Request, why st
 	chrome := h.flowData(r, "titleAppRefused")
 	status := http.StatusBadRequest
 	key := "appRefusedUnreadable"
+	ref, ok := appRefusedRefs[why]
+	if !ok {
+		ref = appRefusedRefs[AppRefusedUnreadable]
+	}
 	switch why {
 	case AppRefusedUnknown:
 		key = "appRefusedUnknown"
@@ -66,6 +101,18 @@ func (h *Handler) ServeAppRefused(w http.ResponseWriter, r *http.Request, why st
 	case AppRefusedUnavailable:
 		key, status = "appRefusedUnavailable", http.StatusServiceUnavailable
 	}
+	ctx := r.Context()
+	sess, err := h.sm.Resolve(ctx, r)
+	signedIn := err == nil && sess.Pending == ""
+	data := appRefusedData{
+		flowChrome: chrome,
+		Reason:     chrome.T[key],
+		Ref:        fmt.Sprintf(chrome.T["appRefusedRef"], ref),
+		Apps:       h.openApps(r, h.visitorGrants(ctx, sess, signedIn)),
+		SignIn:     !signedIn,
+		Profile:    signedIn,
+		Back:       template.URL(backFromReferer(r)), //nolint:gosec // same-host path only, see backFromReferer
+	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	writeFlow(w, appRefusedPage, appRefusedData{flowChrome: chrome, Reason: chrome.T[key]}, status)
+	writeFlow(w, appRefusedPage, data, status)
 }

@@ -20,10 +20,15 @@ They are flags on the account, toggled from the row in **Application > Users**.
 | **infra admin** | the routing plane: routes, upstreams, authorities, TLS, the mail relay |
 | **app admin** | the application's identity: users, roles, settings, the served pages |
 | **dev** | the developer tooling: dev keys, substituting a service |
-| **tenant creator** | may create organisations, and owns the ones they create |
+| **tenant creator** | may create tenants, and owns the ones they create |
 
-*Tenant creator* only appears on installations with more than one organisation:
+*Tenant creator* only appears on installations with more than one tenant:
 where there is one and a second cannot be created, the badge would grant nothing.
+
+Each capability is described from its own side - what its holder sees, does,
+and leaves to others - in [Infrastructure administrator](/docs/access/infra-admin),
+[Application administrator](/docs/access/app-admin) and
+[Tenant administrator](/docs/access/tenant-admin).
 
 ## What each one opens in the console
 
@@ -42,13 +47,13 @@ where there is one and a second cannot be created, the badge would grant nothing
 - Users, and the global role catalogue
 - Security: the password policy, the throttle, two-factor, passkeys, tokens, the session lifetime
 - Built-in pages: theme, layout, branding - and the navigation portal
-- On a single-organisation installation, that organisation's groups, members and group rules
+- On a single-tenant installation, that tenant's groups, members and group rules
 
 **root only**, on top of both:
 
 - Access tokens for the control plane, and connecting an agent
 - The configuration: export, import, restore points, history, backup
-- The switch between one and several organisations
+- The switch between one tenant and several
 - Forcing a password change on every account at once
 - Granting or revoking **root**, and editing a root account at all
 
@@ -65,20 +70,20 @@ server-side rather than the page being hidden:
 | Section | Who may open it | What they see |
 |---|---|---|
 | Vault | root, infra admin, app admin | the entries of the plane they administer |
-| Audit trail | root, infra admin, app admin, an organisation's admin | the events of their own domain |
-| Anomalies | the same | the reports of their own domain |
+| Audit trail | root, infra admin, app admin, a tenant's admin | the events of their own domain |
+| Issues | the same | the reports of their own domain |
 | API docs | root, infra admin, app admin | the specs they may read |
 | Metrics | root, infra admin | everything that passed through |
-| Organisations | any signed-in console user | the organisations they administer |
-| Licence | everybody | the edition, and what it unlocks |
+| Tenants | root, a tenant's admin, a tenant creator | the tenants they administer |
+| Licence | everybody - and all an account that administers nothing sees | the edition, and what it unlocks |
 
-## Administering one organisation is not a capability
+## Administering one tenant is not a capability
 
-There is no *tenant admin* flag. Somebody administers an organisation when they
+There is no *tenant admin* flag. Somebody administers a tenant when they
 **own** it, or hold an enabled **ADMIN** membership in it - see
-[Organisations](/docs/access/tenants). The console computes that server-side and
-shows them the organisation sections for the organisations concerned, and nothing
-else.
+[Tenants](/docs/access/tenants). The console computes that server-side and
+shows them the sections of the tenants concerned, and nothing else - see
+[Tenant administrator](/docs/access/tenant-admin).
 
 ## Navigation is comfort, the API is the contract
 

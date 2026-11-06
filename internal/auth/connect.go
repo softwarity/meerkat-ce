@@ -224,7 +224,7 @@ const profileAuthoritiesBody = `    <style>
     <div class="panel">
       <h2>{{.T.authorities}}</h2>
       <p class="panel-hint">{{.T.authoritiesHint}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <div class="rows">
       {{range .Authorities}}
       <div class="row">

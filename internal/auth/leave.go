@@ -36,7 +36,7 @@ const profileLeaveBody = `    <style>
     </style>
     <div class="panel">
       <h2>{{.T.leaveOrganisation}}</h2>
-      <p class="lead">{{printf .T.leaveBody .TenantName}}</p>
+      <p class="warn-line">{{printf .T.leaveBody .TenantName}}</p>
       <form method="post" action="/profile/leave">
         <button type="submit" class="danger">{{.T.leaveConfirm}}</button>
       </form>

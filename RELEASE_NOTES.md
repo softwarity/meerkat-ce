@@ -2,6 +2,79 @@
 
 ## NEXT RELEASE
 
+- **An account that administers nothing opens the console on License.** It landed on Tenants, an
+  entry its rail does not show, reading "No tenant yet" about the tenant it belongs to.
+- **A tenant's screens open only for whoever may read that tenant.** An infrastructure or an
+  application administrator, or another tenant's administrator, who typed the address of one
+  stayed on a tenant page whose every request was refused; they now go back to their own screens.
+  The tenant list likewise opens for root, tenants' administrators and whoever may create one.
+- **On the community image, Data plane's Notifications is shown locked,** with what it would bring,
+  instead of opening a screen the image cannot serve.
+- **A backup code can be typed on a phone.** The two-factor field asked for the numeric keypad,
+  and a backup code has letters: whoever had lost their authenticator could not type theirs. A
+  code typed in groups or pasted with spaces is accepted too.
+- **The page an application's sign-in lands on when it is refused speaks to the person.** It
+  said which screen of the console held the fix; it now says what is wrong in plain words, gives a
+  reference to pass on to the administrator (`unknown-client`, `return-address`, `no-public-name`,
+  `unreadable-request`, the documentation's table says what each one wants) and a way on: the
+  applications open to them, the profile or the sign-in.
+- **Security no longer offers a password change to an account without a password.** An account
+  that signs in through an authority alone landed on a form asking for a current password it never
+  had.
+- **Removing a passkey asks first.** The cross removed it at once; it now asks in the passkey's own
+  row, and only the button there removes it.
+- **The page shown while an application is served from a developer's machine speaks the
+  reader's language, and says what it changes:** what they open runs that machine's code, not the
+  deployed version. Testers meet it, not only developers.
+- **The split and drawer page layouts are drawn as described again.** The split's brand half
+  had shrunk to a strip in its middle, and the drawer stood in the centre of the screen instead of
+  against its edge; the "Powered by" mark sat astride the seam. Each now keeps its half or its
+  edge, and the mark sits under the form.
+- **The developer's pages speak the reader's language too:** the Developer page, the plug key
+  page, the Developer entries of the user menu, the UI test bar and the banner every page shows
+  while a service is plugged. They were English everywhere.
+- **Every built-in page has a real title.** What a page asks ("Two-factor authentication",
+  "Check your inbox") was its smallest text, in spaced capitals; it is now a heading, the largest
+  words of the card, in the theme's display face and primary colour. Spaced capitals stay for the
+  labels over a group, and go back to normal letter spacing in Arabic, Hindi and Thai, whose
+  letters join or stack.
+- **The one action of a page that is a link is a filled button:** "Sign in" once a password is
+  reset or an account confirmed. A test now measures every text of every built-in page against
+  what is behind it, in light and dark, under the default palette and an inverted one.
+- **The two-factor page is one card.** The code by e-mail sits under Verify, and the second
+  "Sign out" is gone: the one at the foot remains.
+- **Error messages are announced** to screen readers as they appear.
+- **Leaving a tenant reads as a warning,** not as a title.
+- **The pages that wait for a mail say where it went** ("Sent to alice@acme.example": the
+  visitor's own words, so nothing about an account is told) and offer to send it again, to use
+  another address, or to go back to the sign-in. The forgotten password page says it will send a
+  code, and to keep the page open, when the gateway mails a code rather than a link; the
+  confirmation page gives the link's real lifetime instead of an always "24 hours".
+- **A link that no longer works has a title and one button:** ask for a new link, sign in, or
+  back to the profile, with "Already used it? Sign in" under a spent reset link. It was a red line
+  in an empty card.
+- **The group in use is marked "Current"** in the group chooser, instead of looking refused,
+  and why a tenant or a group is closed reads at body size.
+- **The issue report no longer attaches the console by default.** It can hold personal data;
+  the reporter ticks it when it helps.
+- **The sign-in page puts its other ways in together.** Under the form, one column of alike
+  buttons: the passkey first, the authorities, then a code by e-mail; "Forgot your password?" sits
+  beside the password label, and "New here? Create an account" at the foot. Where the browser can,
+  the passkey is offered in the username field's autofill as well.
+- **The maintenance page comes back by itself.** When the switch goes off, every open
+  maintenance page is told on the live channel and loads what was asked for; one whose gateway
+  restarted (an upgrade) does the same when the channel returns. No page re-reads anything on a
+  timer.
+- **The account's Security page is in two groups:** how one signs in (password, two-factor,
+  passkeys, connected accounts, API tokens) and where one is signed in (active sessions, sign-in
+  history). "Leave this tenant" moved from the identity to the foot of the profile, where a stray
+  click on a fact cannot find it, and cancelling a password change goes back to Security.
+- **An administrator contact in the branding.** An e-mail or a web address, offered as "Contact
+  your administrator" on the pages that tell somebody to ask one: refused, the waiting room, an
+  application's refused sign-in. Also in the configuration export and the `save_branding` tool.
+- **The refused and waiting pages no longer say "continue without signing in"** to someone who
+  is signed in: the links under them are "open to you meanwhile".
+
 ---
 
 ## 1.23.0

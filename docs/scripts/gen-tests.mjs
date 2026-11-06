@@ -15,12 +15,13 @@ const CONTENT = join(here, '..', 'content');
 const DOMAINS = {
   gateway: { en: 'Gateway scope', fr: 'Périmètre de la gateway' },
   application: { en: 'Application scope', fr: "Périmètre de l'application" },
-  tenant: { en: 'Tenant scope', fr: "Périmètre d'une organisation" },
+  tenant: { en: 'Tenant scope', fr: "Périmètre d'un tenant" },
   console: { en: 'Console navigation', fr: 'Navigation dans la console' },
   auth: { en: 'Sign-in and profile flows', fr: 'Parcours de connexion et de profil' },
   infra: { en: 'Infrastructure scope', fr: "Périmètre de l'infrastructure" },
   app: { en: 'Application screens', fr: "Écrans de l'application" },
   dataplane: { en: 'Data plane', fr: 'Plan de données' },
+  access: { en: 'What each capability opens', fr: 'Ce que chaque capacité ouvre' },
 };
 
 const HEAD = {

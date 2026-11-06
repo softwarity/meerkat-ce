@@ -173,7 +173,7 @@ var previewErrors = map[string][]string{
 	"profile-password":    {"errPwCurrentWrong", "errPwPolicy", "errPwMismatch", "errPwReused"},
 	"profile-authorities": {"errSignInUnavailable", "errIdentityTaken", "errLastWayIn"},
 	"profile-tokens":      {"errTokenName"},
-	"profile-dev-key":     {"errBadKey"},
+	"profile-dev-key":     {"errBadKey", "errDevKeyTaken"},
 	"profile-mfa":         {"errMfaRequiredOff", "errBadCode", "errTooManyAttempts"},
 	// A mailed link that can no longer do its job. These were plain text
 	// once, with no screen to read them on.
@@ -230,6 +230,7 @@ var PreviewPages = []PreviewPage{
 	}},
 	{"signin-sent", cSignIn, "Sign-in code sent", "titleSigninCode", func(c flowChrome) (*template.Template, any) {
 		return signinSentPage, signinSentData{
+			SentTo:     "alice@acme.example",
 			flowChrome: c, Next: "/", Error: c.PreviewErrors,
 			Hint: fmt.Sprintf(c.T["signinCodeSentHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
@@ -269,12 +270,13 @@ var PreviewPages = []PreviewPage{
 		return forgotPage, forgotData{flowChrome: c, Error: c.PreviewErrors}
 	}},
 	{"forgot-sent", cSignIn, "Reset link sent", "titleForgot", func(c flowChrome) (*template.Template, any) {
-		return forgotSentPage, struct{ flowChrome }{c}
+		return forgotSentPage, sentData{flowChrome: c, SentTo: "alice@acme.example"}
 	}},
 	// Where the mail carries a code rather than a link: no certificate on this
 	// door vouches for the address a link would point at (mailcode.go).
 	{"forgot-code", cSignIn, "Reset code sent", "titleForgot", func(c flowChrome) (*template.Template, any) {
 		return forgotCodePage, codeData{
+			SentTo:     "alice@acme.example",
 			flowChrome: c, Error: c.PreviewErrors,
 			Hint: fmt.Sprintf(c.T["signinCodeSentHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
@@ -306,10 +308,11 @@ var PreviewPages = []PreviewPage{
 		return registerPage, d
 	}},
 	{"register-sent", cSignIn, "Confirmation sent", "titleRegister", func(c flowChrome) (*template.Template, any) {
-		return registerSentPage, struct{ flowChrome }{c}
+		return registerSentPage, registerSentData{flowChrome: c, SentTo: "alice@acme.example", Validity: linkValidity(c.T, store.DefaultConfirmHours)}
 	}},
 	{"register-code", cSignIn, "Confirmation code sent", "titleRegister", func(c flowChrome) (*template.Template, any) {
 		return registerCodePage, codeData{
+			SentTo:     "alice@acme.example",
 			flowChrome: c, Error: c.PreviewErrors,
 			Hint: fmt.Sprintf(c.T["registerCodeHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
@@ -318,9 +321,10 @@ var PreviewPages = []PreviewPage{
 		return confirmedPage, struct{ flowChrome }{c}
 	}},
 	{"link-dead", cSignIn, "Expired link", "titleRegister", func(c flowChrome) (*template.Template, any) {
-		return linkDeadPage, linkDeadData{flowChrome: c, Error: c.PreviewErrors, Back: "/login", BackLabel: c.T["backToLogin"]}
+		return linkDeadPage, linkDeadData{flowChrome: c, Error: c.PreviewErrors, Back: "/forgot-password", BackLabel: c.T["askNewLink"], Used: true}
 	}},
 	{"account-pending", cSignIn, "Waiting room", "titlePending", func(c flowChrome) (*template.Template, any) {
+		c = withSampleContact(c)
 		return pendingPage, pendingData{flowChrome: c, Public: samplePublicLinks()}
 	}},
 	{"signout-confirm", cSignIn, "Sign-out confirmation", "titleSignOut", func(c flowChrome) (*template.Template, any) {
@@ -339,7 +343,8 @@ var PreviewPages = []PreviewPage{
 	}},
 	{"profile-security", cAccount, "Security", "titleSecurity", func(c flowChrome) (*template.Template, any) {
 		return profileSecurityPage, profileSecurityData{
-			flowChrome: c, MFAEnrolled: true, PasskeysAllowed: true, APITokens: true,
+			HasPassword: true,
+			flowChrome:  c, MFAEnrolled: true, PasskeysAllowed: true, APITokens: true,
 			Passkeys:       samplePasskeys(),
 			Authorities:    sampleAuthorities(),
 			ConnectedCount: 1,
@@ -347,6 +352,7 @@ var PreviewPages = []PreviewPage{
 	}},
 	{"email-change-code", cAccount, "Address change code sent", "titleProfile", func(c flowChrome) (*template.Template, any) {
 		return emailChangeCodePage, codeData{
+			SentTo:     "alice@acme.example",
 			flowChrome: c, Error: c.PreviewErrors,
 			Hint: fmt.Sprintf(c.T["emailChangeCodeHint"], minutesLabel(c.T, signinCodeTTL)),
 		}
@@ -372,7 +378,10 @@ var PreviewPages = []PreviewPage{
 		}
 	}},
 	{"profile-passkeys", cAccount, "Passkeys", "titlePasskeys", func(c flowChrome) (*template.Template, any) {
-		return profilePasskeysPage, profilePasskeysData{flowChrome: c, Passkeys: samplePasskeys()}
+		// The second one with its removal asked: the question is a wording a
+		// translator has to see somewhere.
+		keys := samplePasskeys()
+		return profilePasskeysPage, profilePasskeysData{flowChrome: c, Passkeys: keys, Confirm: keys[len(keys)-1].ID}
 	}},
 	{"profile-mfa", cAccount, "Two-factor settings", "titleTwoFactor", func(c flowChrome) (*template.Template, any) {
 		return profileMFAManagePage, profileMFAManageData{
@@ -527,6 +536,7 @@ var PreviewPages = []PreviewPage{
 	// what turned the caller away, so a preview of one leaves four on no
 	// screen - the same call as the sign-in page's two refusals.
 	{"refused", cRefused, "Refused", "titleRefused", func(c flowChrome) (*template.Template, any) {
+		c = withSampleContact(c)
 		return refusedPage, refusedData{
 			flowChrome: c,
 			Reason:     stack(c, "refusedRoles", "refusedTenant", "refusedUser", "refusedApps", "refusedOther"),
@@ -548,9 +558,13 @@ var PreviewPages = []PreviewPage{
 	// Every reason again: the provider names one of four, and each is a
 	// sentence a translator has to see somewhere.
 	{"app-refused", cRefused, "Application sign-in refused", "titleAppRefused", func(c flowChrome) (*template.Template, any) {
+		c = withSampleContact(c)
 		return appRefusedPage, appRefusedData{
 			flowChrome: c,
 			Reason:     stack(c, "appRefusedUnknown", "appRefusedReturn", "appRefusedUnavailable", "appRefusedUnreadable"),
+			Ref:        fmt.Sprintf(c.T["appRefusedRef"], appRefusedRefs[AppRefusedUnknown]),
+			Apps:       samplePublicLinks(),
+			SignIn:     true,
 		}
 	}},
 	// As a visitor who is not signed in meets it without the portal: the
@@ -749,4 +763,14 @@ func sampleDurations(c flowChrome) []durationOption {
 		out = append(out, durationOption{Days: d.Days, Label: c.T[d.Label]})
 	}
 	return out
+}
+
+// withSampleContact gives the preview an administrators' contact when the
+// installation has none yet: the line it draws is a wording a translator has to
+// see, and an integrator choosing whether to set one.
+func withSampleContact(c flowChrome) flowChrome {
+	if c.Brand.Contact == "" {
+		c.Brand.Contact = "mailto:it@acme.example"
+	}
+	return c
 }

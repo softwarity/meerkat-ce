@@ -298,15 +298,18 @@ rien dans l'application » avant de lui demander de se reconnecter.
 ## Quand ça ne marche pas
 
 Ce que voient la personne ou l'application, et la ligne que journalise la gateway
-(`OIDC sign-in refused`, avec le client et la raison, jamais un secret ni un jeton) :
+(`OIDC sign-in refused`, avec le client et la raison, jamais un secret ni un jeton).
+La page où arrive la personne dit ce qui ne va pas avec ses mots à elle, et lui donne
+une référence à transmettre : c'est la référence de la première colonne.
 
 | Symptôme | Cause |
 |---|---|
-| une page : *asked to sign in as client ..., which this gateway does not know* | l'identifiant du client n'est pas déclaré, ou mal écrit |
-| une page : *demande à vous ramener à une adresse qu'elle n'a pas le droit d'utiliser* | l'adresse n'est sous aucune route active liée au client : liez la route de l'application au client. La ligne de journal nomme ce qui est arrivé (`redirect_uri`) et ce qui aurait été accepté (`accepted_under`) |
+| une page, référence `unknown-client` | l'identifiant du client n'est pas déclaré, ou mal écrit : déclarez-le dans Routes, **OIDC / JWT** |
+| une page, référence `return-address` | l'adresse n'est sous aucune route active liée au client : liez la route de l'application au client. La ligne de journal nomme ce qui est arrivé (`redirect_uri`) et ce qui aurait été accepté (`accepted_under`) |
 | `unauthorized_client` | aucune route active n'est liée au client par le mécanisme OIDC |
 | la page de refus, ou `access_denied` avec `prompt=none` | aucune route liée au client ne laisse entrer cette personne |
-| `temporarily_unavailable` avec une phrase sur l'émetteur | le plan Application n'a pas de nom public : déclarez-en un dans Domains & TLS, onglet Application |
+| une page, référence `no-public-name`, ou `temporarily_unavailable` | le plan Application n'a pas de nom public : déclarez-en un dans Domains & TLS, onglet Application |
+| une page, référence `unreadable-request` | l'application n'a pas envoyé une demande d'autorisation OpenID Connect valide |
 | `invalid_client` | un secret faux, ou un secret envoyé par un client déclaré sans |
 | `invalid_grant` sur un refresh | la session de la gateway est finie (déconnexion, expiration), ou plus aucune route n'accorde la personne |
 | l'application refuse l'audience du jeton | l'audience qu'elle attend n'est pas l'**Audience** du client |

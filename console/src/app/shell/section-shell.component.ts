@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { EeLockComponent } from '../shared/ee-lock.component';
 import { InfrastructureService } from '../shared/infrastructure.service';
 import { UpdatesService } from '../shared/updates.service';
 
@@ -21,6 +22,11 @@ interface SectionLink {
   // plugOnly: shown while the developer tunnel is open (Enterprise image, the
   // `plug-open` class stamped by the gateway) - see _modes.scss.
   plugOnly?: boolean;
+  // ee: an Enterprise feature. On the community image the entry stays in the
+  // menu, locked, its badge saying what it would bring - the console's rule
+  // for what the image does not carry (see _modes.scss). It led to a screen
+  // whose every request was refused.
+  ee?: { feature: string; why: string };
   // updates: carries how many releases are ahead of this gateway.
   updates?: boolean;
   // infra: carries what on the Infrastructure screen wants a look.
@@ -126,6 +132,10 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
         label: $localize`:@@Notifications:Notifications`,
         icon: 'notifications',
         roles: 'root app-admin',
+        ee: {
+          feature: 'notifications',
+          why: $localize`:@@Notifications_ee_why:Tell the users of your applications something, in the application they have open.`,
+        },
       },
       { path: 'metrics', label: $localize`:@@Metrics:Metrics`, icon: 'monitoring', roles: 'root infra-admin' },
       {
@@ -184,7 +194,7 @@ const PLANES: Record<string, { title: string; links: SectionLink[] }> = {
 // So does a tenant, which brings its own nav.
 @Component({
   selector: 'app-section-shell',
-  imports: [MatBadgeModule, MatIconModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [MatBadgeModule, MatIconModule, RouterLink, RouterLinkActive, RouterOutlet, EeLockComponent],
   styleUrl: './section-shell.component.scss',
   templateUrl: './section-shell.component.html',
 })

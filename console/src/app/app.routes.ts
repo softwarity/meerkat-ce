@@ -12,6 +12,8 @@ import {
   schedulerAccess,
   issuesAccess,
   multiTenantOnly,
+  tenantsAccess,
+  tenantAccess,
   singleTenantOnly,
   vaultAccess,
   metricsAccess,
@@ -361,14 +363,14 @@ export const routes: Routes = [
   // themselves per caller), and a tenant brings its own left nav.
   {
     path: 'tenants',
-    canActivate: [multiTenantOnly, firstTenantRedirect],
+    canActivate: [multiTenantOnly, tenantsAccess, firstTenantRedirect],
     loadComponent: () => import('./identity/no-tenant.component').then((m) => m.NoTenantComponent),
   },
   // Every tenant section is a child ROUTE of the tenant layout: deep links
   // work, and the left nav's active state is plain routerLinkActive.
   {
     path: 'tenants/:id',
-    canActivate: [multiTenantOnly],
+    canActivate: [multiTenantOnly, tenantAccess],
     loadComponent: () =>
       import('./identity/tenant-page/tenant-page.component').then((m) => m.TenantPageComponent),
     children: [

@@ -210,7 +210,7 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
   await page.fill('input[name=password]', 'brand-new-pass-1');
   await page.fill('input[name=confirm]', 'brand-new-pass-1');
   await page.click('button[type=submit]');
-  await expect(page.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+  await expect(page.locator('.lead').first()).toContainText(/inbox|boîte/i);
   await expect(page.locator('input[name=code]')).toBeVisible();
 
   // The confirmation mail lands in the sink, a code and no link; before it is
@@ -228,7 +228,7 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
 
   await page.fill('input[name=code]', latestCode('newcomer@e2e.test'));
   await page.click('button[type=submit]');
-  await expect(page.locator('p.lead').first()).toContainText(/confirmed|confirmé/i);
+  await expect(page.locator('.lead').first()).toContainText(/confirmed|confirmé/i);
 
   // Admins got their notification.
   await expect.poll(() => findMail('admin@e2e.test', 'newcomer'), { timeout: 10_000 }).toBeTruthy();
@@ -239,7 +239,7 @@ test('flow-self-register: end to end through the mailed confirmation', async ({ 
   await page.fill('input[name=password]', 'brand-new-pass-1');
   await page.click('button[type=submit]');
   await expect(page).toHaveURL(DATA_URL + '/account-pending');
-  await expect(page.locator('p.lead').first()).toContainText(/awaiting|attente/i);
+  await expect(page.locator('.lead').first()).toContainText(/awaiting|attente/i);
   await root.dispose();
 });
 
@@ -254,7 +254,7 @@ test('flow-forgot-password: a mailed code resets the password', async ({ browser
   await fresh.click('a[href="/forgot-password"]');
   await fresh.fill('input[name=email]', 'newcomer@e2e.test');
   await fresh.click('button[type=submit]');
-  await expect(fresh.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+  await expect(fresh.locator('.lead').first()).toContainText(/inbox|boîte/i);
 
   await expect.poll(() => mailsTo('newcomer@e2e.test').length, { timeout: 10_000 }).toBe(before + 1);
   await fresh.fill('input[name=code]', latestCode('newcomer@e2e.test'));
@@ -262,7 +262,7 @@ test('flow-forgot-password: a mailed code resets the password', async ({ browser
   await fresh.fill('input[name=password]', 'reset-ted-pass-1');
   await fresh.fill('input[name=confirm]', 'reset-ted-pass-1');
   await fresh.click('button[type=submit]');
-  await expect(fresh.locator('p.lead').first()).toContainText(/updated|mis à jour/i);
+  await expect(fresh.locator('.lead').first()).toContainText(/updated|mis à jour/i);
 
   // The new password signs in (still no access: the waiting room).
   await fresh.goto(DATA_URL + '/login');
@@ -369,7 +369,7 @@ test.describe.serial('flow-email-signin', () => {
       await page.click('a[href^="/login/code"]');
       await page.fill('input[name=email]', address);
       await page.click('button[type=submit]');
-      await expect(page.locator('p.lead').first()).toContainText(/inbox|boîte/i);
+      await expect(page.locator('.lead').first()).toContainText(/inbox|boîte/i);
 
       const findCode = (): string | null => {
         if (!existsSync(mailDir)) return null;

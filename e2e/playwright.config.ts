@@ -34,7 +34,7 @@ export default defineConfig({
       use: { browserName: 'chromium' },
       dependencies: ['setup'],
       testMatch: /tests\/.*\.spec\.ts/,
-      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/, /tests\/oidc-provider\.spec\.ts/],
+      testIgnore: [/tests\/tenancy\.spec\.ts/, /tests\/portal\.spec\.ts/, /tests\/oidc-provider\.spec\.ts/, /tests\/user-flows\.spec\.ts/],
     },
     // The tenancy switch flips the WHOLE installation to single mode for a
     // moment. Run beside the rest, it made a landing test read the wrong mode
@@ -66,6 +66,14 @@ export default defineConfig({
       dependencies: ['portal'],
       testMatch: /tests\/oidc-provider\.spec\.ts/,
     },
+    {
+      // The end-user journeys, last and alone: they switch global settings
+      // (public pages, self-registration, maintenance) every other suite reads.
+      name: 'user-flows',
+      use: { browserName: 'chromium' },
+      dependencies: ['oidc-provider'],
+      testMatch: /tests\/user-flows\.spec\.ts/,
+    },
   ],
   webServer: [
     ...(SERVED
@@ -85,6 +93,15 @@ export default defineConfig({
       port: 12525,
       reuseExistingServer: true,
       timeout: 30_000,
+    },
+    {
+      // A real OIDC provider for the user flows' outside authority: Dex, its
+      // mock connector signing in without a form. The same config the
+      // directory tests run (test/ldap/dex).
+      command: `docker run --rm -p 5556:5556 -v ${__dirname}/../test/ldap/dex/config.yaml:/etc/dex/config.yaml:ro dexidp/dex:v2.41.1 dex serve /etc/dex/config.yaml`,
+      url: 'http://localhost:5556/dex/.well-known/openid-configuration',
+      reuseExistingServer: true,
+      timeout: 120_000,
     },
     {
       // The upstream the demo routes proxy to, run HERE rather than reached on

@@ -1527,6 +1527,21 @@
       }
     },
     {
+      "id": "flow-pages-contrast",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "flow-contrast",
+      "allowed": [],
+      "title": {
+        "en": "Every built-in page is readable, in both schemes and under any palette",
+        "fr": "Chaque page intégrée est lisible, dans les deux modes et avec n'importe quelle palette"
+      },
+      "description": {
+        "en": "Every visible text of every built-in page is measured against what is behind it (WCAG AA), in light and dark, under the default palette and one whose container text leans the other way.",
+        "fr": "Chaque texte visible de chaque page intégrée est mesuré contre ce qui est derrière lui (WCAG AA), en clair et en sombre, avec la palette par défaut et une palette dont le texte des conteneurs penche à l'inverse."
+      }
+    },
+    {
       "id": "flow-login-bad-password",
       "domain": "auth",
       "kind": "flow",
@@ -2064,6 +2079,456 @@
       "description": {
         "en": "Which HTTPS doors are open, and whether an ACME authority issues on its own. The external-account HMAC key follows the vault rule: a literal never travels back.",
         "fr": "Quelles portes HTTPS sont ouvertes, et si une autorité ACME émet de sa propre initiative. La clé HMAC du compte externe suit la règle du coffre : une valeur littérale ne revient jamais vers l'appelant."
+      }
+    },
+    {
+      "id": "uf-anon-public",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A visitor is offered the public pages, and only those open",
+        "fr": "Un visiteur voit les pages publiques, et seules celles-là s'ouvrent"
+      },
+      "description": {
+        "en": "A visitor is offered the public pages, and only those open.",
+        "fr": "La page de connexion propose les applications publiques ; une application publique répond sans compte, une application protégée renvoie vers la connexion en disant où revenir."
+      }
+    },
+    {
+      "id": "uf-anon-no-public",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "With no public page, the sign-in offers none",
+        "fr": "Sans page publique, la connexion n'en propose aucune"
+      },
+      "description": {
+        "en": "With no public page, the sign-in offers none.",
+        "fr": "Quand aucune application n'est publique, la page de connexion n'affiche pas la rubrique des pages ouvertes sans connexion."
+      }
+    },
+    {
+      "id": "uf-protected-page",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A protected page signs in first, then opens itself",
+        "fr": "Une page protégée fait se connecter, puis s'ouvre"
+      },
+      "description": {
+        "en": "A protected page signs in first, then opens itself.",
+        "fr": "Une adresse protégée mène à la connexion ; une fois connecté, on arrive sur l'adresse demandée au départ."
+      }
+    },
+    {
+      "id": "uf-login-logout",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Sign in, see the profile, sign out, and the session is gone",
+        "fr": "Connexion, profil, déconnexion : la session disparaît"
+      },
+      "description": {
+        "en": "Sign in, see the profile, sign out, and the session is gone.",
+        "fr": "Un mauvais mot de passe est refusé sans session ; le bon ouvre le profil ; la déconnexion demande confirmation et la session ne vaut plus."
+      }
+    },
+    {
+      "id": "uf-first-signin",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A one-time password must be changed before anything opens",
+        "fr": "Un mot de passe provisoire doit être changé avant tout"
+      },
+      "description": {
+        "en": "A one-time password must be changed before anything opens.",
+        "fr": "Le mot de passe donné par l'administrateur mène au changement obligatoire ; rien d'autre ne s'ouvre avant ; deux saisies différentes sont refusées ; l'ancien ne vaut plus."
+      }
+    },
+    {
+      "id": "uf-change-password",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "The current password is asked, then the old one no longer works",
+        "fr": "Changer son mot de passe demande l'actuel"
+      },
+      "description": {
+        "en": "The current password is asked, then the old one no longer works.",
+        "fr": "Un mot de passe actuel faux est refusé ; une fois changé, l'ancien ne connecte plus et le nouveau oui."
+      }
+    },
+    {
+      "id": "uf-totp",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Set up an authenticator, then sign in with a code and with a backup code",
+        "fr": "Double authentification : mise en place, code, code de secours"
+      },
+      "description": {
+        "en": "Set up an authenticator, then sign in with a code and with a backup code.",
+        "fr": "Mise en place depuis le profil, codes de secours affichés une fois ; la connexion demande le code, refuse un faux ; un code de secours tapé en majuscules avec un espace marche une fois, pas deux."
+      }
+    },
+    {
+      "id": "uf-totp-imposed",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "An account that must have a second factor sets it up at sign-in",
+        "fr": "Double authentification imposée : mise en place à la connexion"
+      },
+      "description": {
+        "en": "An account that must have a second factor sets it up at sign-in.",
+        "fr": "Un compte qui doit avoir un second facteur le met en place pendant la connexion, et ne peut pas le désactiver ensuite."
+      }
+    },
+    {
+      "id": "uf-passkey",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Add a passkey, sign in with it, and removing it asks first",
+        "fr": "Passkey : ajout, connexion sans mot de passe, retrait confirmé"
+      },
+      "description": {
+        "en": "Add a passkey, sign in with it, and removing it asks first.",
+        "fr": "Avec un authentificateur virtuel : la passkey s'ajoute, connecte seule (par l'autoremplissage ou le bouton), et son retrait demande une confirmation."
+      }
+    },
+    {
+      "id": "uf-choose-tenant",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A member of two tenants chooses where to work",
+        "fr": "Membre de deux tenants : il choisit où travailler"
+      },
+      "description": {
+        "en": "A member of two tenants chooses where to work.",
+        "fr": "Un compte membre de deux tenants passe par le choix du tenant, et son profil montre celui choisi."
+      }
+    },
+    {
+      "id": "uf-choose-group",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "The group in use is marked current when choosing again",
+        "fr": "Le groupe en cours est marqué « actuel »"
+      },
+      "description": {
+        "en": "The group in use is marked current when choosing again.",
+        "fr": "En mode groupe exclusif, la connexion demande le groupe ; en revenant au choix, le groupe en cours est marqué et non proposé."
+      }
+    },
+    {
+      "id": "uf-register-public",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Sign up, confirm with the mailed code, and wait with the public pages",
+        "fr": "Inscription, confirmation par code, attente avec les pages publiques"
+      },
+      "description": {
+        "en": "Sign up, confirm with the mailed code, and wait with the public pages.",
+        "fr": "Le code faux est refusé, le bon confirme ; le compte confirmé mais pas encore admis attend en salle d'attente, qui propose les pages publiques."
+      }
+    },
+    {
+      "id": "uf-register-no-public",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "With nothing open to an account that waits, the waiting room offers none",
+        "fr": "Sans rien d'ouvert, la salle d'attente ne propose rien"
+      },
+      "description": {
+        "en": "With nothing open to an account that waits, the waiting room offers none.",
+        "fr": "Quand aucune application n'est ouverte à un compte sans tenant, la salle d'attente n'affiche pas de liens."
+      }
+    },
+    {
+      "id": "uf-register-closed",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Closed, the sign-in offers no account and the page is not there",
+        "fr": "Inscription fermée : ni lien, ni page"
+      },
+      "description": {
+        "en": "Closed, the sign-in offers no account and the page is not there.",
+        "fr": "Quand l'autorité locale n'accepte pas d'inscription, la connexion n'offre pas de créer un compte et la page d'inscription n'existe pas."
+      }
+    },
+    {
+      "id": "uf-reset",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A mailed code resets the password; sent again on request; an unknown address is told the same",
+        "fr": "Mot de passe oublié : code, renvoi, adresse inconnue"
+      },
+      "description": {
+        "en": "A mailed code resets the password; sent again on request; an unknown address is told the same.",
+        "fr": "Le code envoyé réinitialise ; un renvoi remplace le code précédent ; une adresse inconnue reçoit la même page et aucun mail."
+      }
+    },
+    {
+      "id": "uf-refused",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A page a person may not open says so, and offers the contact",
+        "fr": "Une page interdite le dit, et propose le contact"
+      },
+      "description": {
+        "en": "A page a person may not open says so, and offers the contact.",
+        "fr": "Un membre qui n'a pas le rôle demandé arrive sur la page de refus, qui propose le contact de l'administrateur défini dans le branding."
+      }
+    },
+    {
+      "id": "uf-maintenance",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "The page that waits comes back by itself when the maintenance ends",
+        "fr": "La page de maintenance revient seule"
+      },
+      "description": {
+        "en": "The page that waits comes back by itself when the maintenance ends.",
+        "fr": "Une page en maintenance se recharge d'elle-même à la fin de la maintenance."
+      }
+    },
+    {
+      "id": "uf-oidc",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "An outside authority signs in and creates the account",
+        "fr": "Connexion par une autorité externe, compte créé"
+      },
+      "description": {
+        "en": "An outside authority signs in and creates the account.",
+        "fr": "Avec Dex, un vrai fournisseur OIDC : le bouton connecte et crée le compte, qui apparaît dans les comptes liés."
+      }
+    },
+    {
+      "id": "uf-edge-no-tenant",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "An account in no tenant waits, and what needs a tenant sends it to the waiting room",
+        "fr": "Sans tenant : la salle d'attente"
+      },
+      "description": {
+        "en": "An account in no tenant waits, and what needs a tenant sends it to the waiting room.",
+        "fr": "Un compte sans tenant attend en salle d'attente ; une page qui demande un tenant ou un rôle y renvoie."
+      }
+    },
+    {
+      "id": "uf-edge-no-role",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A member without the role a page needs is refused, saying why",
+        "fr": "Sans le rôle demandé : refusé, en disant pourquoi"
+      },
+      "description": {
+        "en": "A member without the role a page needs is refused, saying why.",
+        "fr": "Un membre ouvre les pages de son tenant ; une page qui demande un rôle qu'il n'a pas le refuse pour cette raison."
+      }
+    },
+    {
+      "id": "uf-edge-other-tenant",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A page of another tenant is refused for that reason",
+        "fr": "La page d'un autre tenant est refusée pour cette raison"
+      },
+      "description": {
+        "en": "A page of another tenant is refused for that reason.",
+        "fr": "Un membre d'un tenant est refusé sur une page réservée à un autre, avec la raison."
+      }
+    },
+    {
+      "id": "uf-edge-disabled",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A disabled account is told what a wrong password is told",
+        "fr": "Compte désactivé : la même réponse qu'un mauvais mot de passe"
+      },
+      "description": {
+        "en": "A disabled account is told what a wrong password is told.",
+        "fr": "Rien ne distingue un compte désactivé d'un mot de passe faux."
+      }
+    },
+    {
+      "id": "uf-edge-validity",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "An account outside its validity is told when it ended or when it opens",
+        "fr": "Hors de sa période de validité : dit quand elle finit ou commence"
+      },
+      "description": {
+        "en": "An account outside its validity is told when it ended or when it opens.",
+        "fr": "Un compte expiré dit la date de fin, un compte pas encore ouvert dit la date d'ouverture, sans session."
+      }
+    },
+    {
+      "id": "uf-edge-hours",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Outside the working hours sign-in is refused; with another tenant open, the closed one is shown, not offered",
+        "fr": "Hors des horaires : refusé, ou montré sans être proposé"
+      },
+      "description": {
+        "en": "Outside the working hours sign-in is refused; with another tenant open, the closed one is shown, not offered.",
+        "fr": "Seul tenant fermé : la connexion est refusée ; avec un autre ouvert, le choix montre le fermé désactivé."
+      }
+    },
+    {
+      "id": "uf-edge-membership-ended",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "A membership past its last day refuses the sign-in",
+        "fr": "Adhésion terminée : la connexion est refusée"
+      },
+      "description": {
+        "en": "A membership past its last day refuses the sign-in.",
+        "fr": "Une adhésion passée sa date de fin refuse la connexion."
+      }
+    },
+    {
+      "id": "uf-edge-no-group",
+      "domain": "auth",
+      "kind": "flow",
+      "spec": "user-flows",
+      "allowed": [],
+      "title": {
+        "en": "Exclusive groups, and the member in none signs in all the same",
+        "fr": "Groupes exclusifs, membre d'aucun : il entre quand même"
+      },
+      "description": {
+        "en": "Exclusive groups, and the member in none signs in all the same.",
+        "fr": "En mode groupe exclusif, un membre sans groupe se connecte sans choix de groupe et ouvre son tenant."
+      }
+    },
+    {
+      "id": "cap-menus",
+      "domain": "access",
+      "kind": "flow",
+      "spec": "capabilities",
+      "allowed": [],
+      "title": {
+        "en": "Each profile's menus list exactly the screens it may open",
+        "fr": "Les menus de chaque profil listent exactement les écrans qu'il peut ouvrir"
+      },
+      "description": {
+        "en": "For root, an infrastructure administrator alone, an application administrator alone, a tenant's administrator alone and an account with no capability: every section menu lists the screens screens.json grants it, no more and no fewer; on the community image, the Enterprise screens it would have are shown locked.",
+        "fr": "Pour root, un admin infra seul, un admin applicatif seul, un admin de tenant seul et un compte sans capacité : chaque menu de section liste les écrans que screens.json lui accorde, ni plus ni moins ; sur l'image communautaire, les écrans Enterprise qu'il aurait sont montrés verrouillés."
+      }
+    },
+    {
+      "id": "cap-refused",
+      "domain": "access",
+      "kind": "flow",
+      "spec": "capabilities",
+      "allowed": [],
+      "title": {
+        "en": "Every other screen turns a profile away, even typed into the address bar",
+        "fr": "Tout autre écran renvoie le profil ailleurs, même tapé dans la barre d'adresse"
+      },
+      "description": {
+        "en": "Each screen a profile may not open sends it back to one of its own when its address is typed, a tenant's screens included.",
+        "fr": "Chaque écran qu'un profil ne peut pas ouvrir le renvoie vers l'un des siens quand on en tape l'adresse, y compris les écrans d'un tenant."
+      }
+    },
+    {
+      "id": "cap-plain-account",
+      "domain": "access",
+      "kind": "flow",
+      "spec": "capabilities",
+      "allowed": [],
+      "title": {
+        "en": "An account that administers nothing lands on License",
+        "fr": "Un compte qui n'administre rien arrive sur License"
+      },
+      "description": {
+        "en": "With no capability, the console opens on License and the rail shows Meerkat alone.",
+        "fr": "Sans capacité, la console s'ouvre sur License et le rail ne montre que Meerkat."
+      }
+    },
+    {
+      "id": "cap-tenant-scope",
+      "domain": "access",
+      "kind": "flow",
+      "spec": "capabilities",
+      "allowed": [],
+      "title": {
+        "en": "A tenant's administrator reaches its own tenant and not another",
+        "fr": "L'admin d'un tenant atteint le sien et pas un autre"
+      },
+      "description": {
+        "en": "The API lists its own tenant only and refuses another one; the console opens its tenant's screens and sends it away from the other's; root reaches both.",
+        "fr": "L'API ne liste que son tenant et refuse l'autre ; la console ouvre les écrans de son tenant et l'éloigne de ceux de l'autre ; root atteint les deux."
       }
     }
   ]

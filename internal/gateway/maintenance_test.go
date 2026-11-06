@@ -425,3 +425,23 @@ func TestTheDoorIsTakenAgainAtEveryLogin(t *testing.T) {
 		t.Errorf("after signing in again the door was still open: %d", code)
 	}
 }
+
+// The end of a maintenance is announced, once, when the switch goes off: the
+// open maintenance pages reload on it. A reload that changes nothing, or one
+// that turns the switch on, announces nothing.
+func TestTheEndOfAMaintenanceIsAnnounced(t *testing.T) {
+	rt, st, _ := maintainable(t)
+	told := 0
+	rt.MaintenanceOver = func() { told++ }
+
+	switchOn(t, rt, st, store.Maintenance{Enabled: true, Reason: store.ReasonMaintenance})
+	switchOn(t, rt, st, store.Maintenance{Enabled: true, Reason: store.ReasonUpgrade})
+	if told != 0 {
+		t.Fatalf("announced %d times while the switch was on", told)
+	}
+	switchOn(t, rt, st, store.Maintenance{})
+	switchOn(t, rt, st, store.Maintenance{})
+	if told != 1 {
+		t.Fatalf("the end was announced %d times, want once", told)
+	}
+}

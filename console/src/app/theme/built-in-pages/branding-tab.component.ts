@@ -1,5 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { EeLockComponent } from '../../shared/ee-lock.component';
 import { BrandingCardComponent } from '../branding-card/branding-card.component';
@@ -10,7 +12,7 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
 // question rather than an identity one and keeps its own card.
 @Component({
   selector: 'app-branding-tab',
-  imports: [MatCardModule, MatSlideToggleModule, EeLockComponent, BrandingCardComponent],
+  imports: [MatCardModule, MatFormFieldModule, MatInputModule, MatSlideToggleModule, EeLockComponent, BrandingCardComponent],
   styles: [
     `
       /* See layout-tab: the panel's gap lands on this host, not between the
@@ -35,6 +37,9 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
         font-size: 0.8rem;
         line-height: 1.45;
       }
+      .wide {
+        width: 100%;
+      }
     `,
   ],
   template: `
@@ -52,6 +57,24 @@ import { BuiltInPagesScope } from './built-in-pages.scope';
       [(backgroundDimDark)]="scope.backgroundDimDark"
       (changed)="scope.brandingChanged()"
     />
+
+    <!-- The pages that tell a person to ask an administrator (refused, the
+         waiting room, an application's refused sign-in) link to this. -->
+    <mat-card appearance="outlined" class="mark-card">
+      <div class="title" i18n="@@Administrator_contact">Administrator contact</div>
+      <p class="hint text-muted" i18n="@@Administrator_contact_hint">
+        Offered on the pages that tell someone to ask an administrator. An e-mail address or a web address.
+      </p>
+      <mat-form-field class="wide" subscriptSizing="dynamic">
+        <mat-label i18n="@@Email_or_web_address">E-mail or web address</mat-label>
+        <input
+          matInput
+          [value]="scope.contact()"
+          (change)="scope.setContact($any($event.target).value)"
+          placeholder="it@acme.example"
+        />
+      </mat-form-field>
+    </mat-card>
 
     <mat-card appearance="outlined" class="mark-card" ee-feature="white-label">
       <div class="title">

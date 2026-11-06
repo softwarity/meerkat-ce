@@ -93,6 +93,15 @@ le mode de deux manières : par la préférence du système, et par une classe q
 appose quand un mode est imposé - celle-ci l'emporte sur la préférence, si bien que le choix
 du visiteur tient même contre celui de son système.
 
+## Le contact de l'administrateur
+
+**Administrator contact** prend une adresse e-mail ou une adresse web. Les pages qui disent à
+quelqu'un de s'adresser à un administrateur - une page qui lui est refusée, la salle d'attente d'un
+compte pas encore admis, la connexion refusée d'une application - proposent alors **Contact your
+administrator**, qui y mène. Une adresse e-mail est enregistrée en lien `mailto:`, une adresse
+sans schéma en `https://` ; tout autre schéma est refusé, puisque le lien est dessiné sur des pages
+servies à tout le monde. Vide, les pages ne proposent rien.
+
 ## La mention "powered by"
 
 Les pages servies portent une discrète ligne `powered by softwarity/meerkat`. Un interrupteur

@@ -68,7 +68,7 @@ const notFoundBody = `    <style>
       .nf .public-links { justify-content: flex-start; }
     </style>
     <div class="panel nf">
-      <p class="lead">{{.T.notFoundLead}}</p>
+      <h2 class="lead">{{.T.notFoundLead}}</h2>
       <p class="nf-path">{{.Path}}</p>
       <p class="hint">{{.T.notFoundHint}}</p>
       {{if .Way}}<p class="hint">{{.Way}}</p>{{end}}

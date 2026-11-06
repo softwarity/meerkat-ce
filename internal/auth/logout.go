@@ -41,7 +41,7 @@ import (
 var signOutPage = flowPage("signout-confirm", signOutBody)
 
 const signOutBody = `    <form method="post" action="/logout">
-      <p class="lead">{{.T.signOutAsk}}</p>
+      <h2 class="lead">{{.T.signOutAsk}}</h2>
       <p class="hint">{{.T.signOutLead}}</p>
       <button type="submit">{{.T.signOut}}</button>
     </form>

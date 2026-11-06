@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/softwarity/meerkat/internal/mail"
@@ -25,13 +26,15 @@ var emailChangeCodePage = flowPage("email-change-code", emailChangeCodeBody)
 // The page that waits for the code when the mail to the new address carried
 // one rather than a link (mailcode.go).
 const emailChangeCodeBody = `    <form method="post" action="/profile/email/code">
-      <p class="lead">{{.T.registerSentLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+      ` + sentToLine + `
       <p class="hint">{{.Hint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
         <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
       </label>
+      <input type="hidden" name="email" value="{{.SentTo}}">
       <button type="submit">{{.T.mailEmailChangeCta}}</button>
     </form>
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
@@ -111,7 +114,7 @@ func (h *Handler) doConfirmEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) renderEmailChangeCode(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
-	data := codeData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg}
+	data := codeData{flowChrome: h.flowData(r, "titleProfile"), Error: errMsg, SentTo: strings.TrimSpace(r.PostFormValue("email"))}
 	data.Hint = fmt.Sprintf(data.T["emailChangeCodeHint"], minutesLabel(data.T, signinCodeTTL))
 	writeFlow(w, emailChangeCodePage, data, status)
 }

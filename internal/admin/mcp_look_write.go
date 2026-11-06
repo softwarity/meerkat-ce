@@ -119,6 +119,7 @@ func brandingSchema() map[string]any {
 		"logoSize": str("How big the mark is drawn: \"\" (normal), \"large\" or \"xlarge\"."),
 		"logo":     str("The mark. " + image),
 		"favicon":  str("The browser-tab icon; empty falls back to the logo. " + image),
+		"contact":  str("How a person reaches the administrators: an e-mail address or an https address, offered on the pages that tell somebody to ask them (refused, waiting room). Empty offers nothing."),
 		"hideMark": map[string]any{"type": "boolean",
 			"description": "Remove the \"powered by Meerkat\" line. Enterprise only - refused without it."},
 		"background": map[string]any{"type": "object", "description": "The picture behind the built-in pages.",
@@ -188,6 +189,7 @@ func (a *API) toolSaveBranding(ctx context.Context, args json.RawMessage) (any, 
 		Logo       *string `json:"logo"`
 		Favicon    *string `json:"favicon"`
 		HideMark   *bool   `json:"hideMark"`
+		Contact    *string `json:"contact"`
 		Background *struct {
 			Image     *string `json:"image"`
 			Fit       *string `json:"fit"`
@@ -209,6 +211,7 @@ func (a *API) toolSaveBranding(ctx context.Context, args json.RawMessage) (any, 
 	set(&b.AppName, in.AppName)
 	set(&b.Tagline, in.Tagline)
 	set(&b.LogoSize, in.LogoSize)
+	set(&b.Contact, in.Contact)
 	if in.HideMark != nil {
 		b.HideMark = *in.HideMark
 	}

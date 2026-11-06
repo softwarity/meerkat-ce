@@ -148,8 +148,8 @@ const apiTokensBody = `    <style>
       }
       .tk-warn { margin: 0 0 4px; font-size: .76rem; color: var(--mk-on-surface-variant); text-align: start; }
     </style>
-    <p class="lead">{{.T.apiTokens}}</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <h2 class="lead">{{.T.apiTokens}}</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 
     <p class="tk-ctx">{{.T.tokenContext}} <strong>{{.Context}}</strong></p>
     {{if .NoTenant}}<p class="hint-line">{{.T.tokenNoTenant}}</p>{{end}}

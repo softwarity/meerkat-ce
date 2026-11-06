@@ -25,16 +25,17 @@ type refusedData struct {
 }
 
 const refusedBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.refusedLead}}</p>
+      <h2 class="lead">{{.T.refusedLead}}</h2>
       <p class="hint">{{.Reason}}</p>
       <p class="hint">{{.T.refusedHint}}</p>
     </form>
     {{if .Public}}<div class="public">
-      <p class="lead">{{.T.continueWithout}}</p>
+      <p class="eyebrow">{{.T.orOpenThese}}</p>
       <nav class="public-links">
         {{range .Public}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
     </div>{{end}}
+    {{if .Brand.Contact}}<p class="back"><a href="{{.Brand.Contact}}">{{.T.contactAdmin}}</a></p>{{end}}
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
 `
 

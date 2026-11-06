@@ -230,11 +230,9 @@ func userButtonLabels(t map[string]string) map[string]string {
 // userButtonMenuLabels is what the MENU draws: the rows, their submenus, and
 // the developer tools that hang off it.
 //
-// The developer rows are ENGLISH LITERALS, not catalogue lookups: the surfaces
-// they open - the test bar, the plug banner, the key page, the agent approval -
-// are a developer's tools, and a tool for whoever writes the service is not
-// addressed to the business. Keeping them translatable cost a translator a
-// tenth of the catalogue for screens they will never see.
+// The developer rows are translated like every other: the surfaces they open
+// - the test bar, the plug banner, the key page - are met by testers too, and
+// the plug banner by everybody while a service is plugged.
 //
 // Split from the issue panel's own strings because the two are previewed
 // apart. Eighteen strings of a report form listed under the bar that carries
@@ -250,10 +248,18 @@ func userButtonMenuLabels(t map[string]string) map[string]string {
 		"tenant":       t["tenant"],
 		"group":        t["group"],
 		"applications": t["applications"],
-		// The Developer submenu names itself in English, like everything it
-		// opens: see the note on userButtonMenuLabels.
-		"developer":   "Developer",
-		"apiDocs":     "OpenAPI docs",
+		// The Developer submenu, the UI test bar it opens, and the plug
+		// banner every page draws while a service is plugged.
+		"developer":   t["developer"],
+		"apiDocs":     t["apiDocs"],
+		"devKey":      t["devKey"],
+		"devTools":    t["devTools"],
+		"devUser":     t["devUser"],
+		"devRoles":    t["devRoles"],
+		"devApply":    t["devApply"],
+		"devExit":     t["devExit"],
+		"devNote":     t["devNote"],
+		"plugServed":  t["pluggedLead"],
 		"schemeAuto":  t["schemeAuto"],
 		"schemeLight": t["schemeLight"],
 		"schemeDark":  t["schemeDark"],
@@ -1457,15 +1463,15 @@ const userButtonJS = `(() => {
     const bar = document.createElement('div');
     bar.className = 'db' + (collapsed ? ' min' : '');
     bar.innerHTML =
-      '<button class="db-tab" title="' + esc('UI test mode') + '">' +
+      '<button class="db-tab" title="' + esc(lb('devTools', 'UI test mode')) + '">' +
       '<span class="db-badge">DEV</span><span class="db-chev">' + (collapsed ? '▾' : '▴') + '</span></button>' +
-      '<label><span>' + esc('User') + '</span>' +
+      '<label><span>' + esc(lb('devUser', 'User')) + '</span>' +
       '<input class="db-user" list="db-users" value="' + esc(active ? sim.user : (data.username || '')) + '"></label>' +
       '<datalist id="db-users"></datalist>' +
       '<div class="db-dd"><button class="db-roles-btn"></button><div class="db-pop"></div></div>' +
-      '<button class="db-apply">' + esc('Apply') + '</button>' +
-      '<button class="db-exit">' + esc(active ? 'Exit test' : lb('cancel', 'Cancel')) + '</button>' +
-      '<p class="db-note">' + esc('A developer lens, not a privilege: it needs the dev capability, applies only to your own session on this application, and every call is flagged as a test to the backend and logged under your real name.') +
+      '<button class="db-apply">' + esc(lb('devApply', 'Apply')) + '</button>' +
+      '<button class="db-exit">' + esc(active ? lb('devExit', 'Exit test') : lb('cancel', 'Cancel')) + '</button>' +
+      '<p class="db-note">' + esc(lb('devNote', 'A developer lens, not a privilege: it needs the developer capability, applies only to your own session on this application, and every call is flagged as a test to the backend and logged under your real name.')) +
       '</p><p class="db-err" hidden></p>';
     root.appendChild(bar);
     devBar = bar;
@@ -1473,7 +1479,7 @@ const userButtonJS = `(() => {
     const q = (s) => bar.querySelector(s);
     const err = (text) => { const e = q('.db-err'); e.textContent = text; e.hidden = !text; };
     const rolesLabel = () => {
-      q('.db-roles-btn').textContent = 'Roles' + ' (' + checked.size + ') ▾';
+      q('.db-roles-btn').textContent = lb('devRoles', 'Roles') + ' (' + checked.size + ') ▾';
     };
     // The role checklist: the catalog first, plus any checked stragglers
     // (a role of the running test that left the catalog stays visible).
@@ -1666,7 +1672,7 @@ const userButtonJS = `(() => {
       '<textarea class="ip-desc" rows="4" placeholder="' + esc(lb('issueDescription', 'Describe the problem')) + '"></textarea>' +
       '<div class="ip-stage"></div>' +
       '<div class="ip-tools"></div>' +
-      '<label class="ip-opt"><input type="checkbox" class="ip-console" checked><span>' +
+      '<label class="ip-opt"><input type="checkbox" class="ip-console"><span>' +
       esc(lb('issueIncludeConsole', 'Attach recent console output')) + '</span></label>' +
       '<p class="ip-note">' + esc(lb('issueContextNote', 'The page address and browser details are attached to your report.')) + '</p>' +
       '<p class="ip-msg" hidden></p>' +

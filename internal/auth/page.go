@@ -655,9 +655,9 @@ const pageJS = `(() => {
     const bar = stripRoot.lastElementChild;
     bar.className = 'pb' + (collapsed ? ' min' : '');
     bar.innerHTML =
-      '<button class="pb-tab" title="' + esc('Served from a developer machine') + '">' +
+      '<button class="pb-tab" title="' + esc(lb('plugServed', 'Served from a developer machine')) + '">' +
       '<span class="pb-badge">plug</span><span class="pb-chev">' + (collapsed ? '\u25b4' : '\u25be') + '</span></button>' +
-      '<span class="pb-title">' + esc('Served from a developer machine') + '</span>' +
+      '<span class="pb-title">' + esc(lb('plugServed', 'Served from a developer machine')) + '</span>' +
       '<ul class="pb-list">' + groups.map(([who, list]) =>
         '<li>' +
         (who ? '<span class="pb-who">' + esc(who) + '</span>' : '') +

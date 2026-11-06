@@ -157,3 +157,23 @@ func TestQRDataURI(t *testing.T) {
 		t.Fatalf("QR modules only in a corner (right=%v bottom=%v) - Scale not applied", rightHalf, bottomHalf)
 	}
 }
+
+// A code typed in groups or pasted with a stray space is still the code: the
+// six digits of the authenticator, a backup code with or without its dash.
+func TestCodesSurviveSpaces(t *testing.T) {
+	secret, err := NewSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	code, err := Code(secret, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Validate(secret, code[:3]+" "+code[3:], now) || !Validate(secret, " "+code+"\n", now) {
+		t.Fatalf("a spaced %q was refused", code)
+	}
+	if HashScratch("4f2k 8qw1") != HashScratch("4F2K-8QW1") || HashScratch(" 4f2k8qw1 ") != HashScratch("4f2k-8qw1") {
+		t.Fatal("a backup code typed with spaces or in capitals hashes differently")
+	}
+}

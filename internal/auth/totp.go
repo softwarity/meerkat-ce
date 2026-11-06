@@ -628,12 +628,12 @@ func writeFlow(w http.ResponseWriter, page *template.Template, data any, status 
 }
 
 const totpChallengeBody = `    <form method="post" action="/totp">
-      <p class="lead">{{.T.twoFactor}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.twoFactor}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <p class="hint">{{.T.challengeHint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
-        <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
+        <input name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" autofocus required>
       </label>
       {{if .AllowTrust}}
       <label class="trust">
@@ -642,24 +642,19 @@ const totpChallengeBody = `    <form method="post" action="/totp">
       </label>
       {{end}}
       <button type="submit">{{.T.verify}}</button>
-    </form>
-    {{if .EmailOTP}}
-    {{if .Sent}}
+      {{/* The other way to get a code, in the SAME card: its own form made a
+           second card, and a third one held a sign-out the foot already
+           offers. formaction sends it elsewhere; formnovalidate lets it go
+           without the code it is there to replace. */}}
+      {{if .EmailOTP}}{{if .Sent}}
       <p class="hint sent">{{.T.otpSent}}</p>
-    {{else}}
-      <form method="post" action="/totp/email" class="altmail">
-        <button class="choice" type="submit">{{.T.otpSendByEmail}}</button>
-      </form>
-    {{end}}
-    {{end}}
-    <form method="post" action="/logout" class="signout">
-      <button class="choice" type="submit">{{.T.signOut}}</button>
+      {{else}}
+      <button class="choice" type="submit" formaction="/totp/email" formnovalidate>{{.T.otpSendByEmail}}</button>
+      {{end}}{{end}}
     </form>
     <style>
       .hint { margin: 0; font-size: .82rem; color: var(--mk-on-surface-variant); }
-      form.signout { margin-top: 14px; }
-      form.altmail { margin-top: 12px; }
-      .hint.sent { margin-top: 12px; color: var(--mk-tertiary); }
+      .hint.sent { color: var(--mk-tertiary); }
       .trust { display: flex; align-items: center; gap: 9px; font-size: .82rem; color: var(--mk-on-surface-variant); cursor: pointer; }
       .trust input { width: auto; margin: 0; accent-color: var(--mk-secondary); }
     </style>
@@ -694,7 +689,7 @@ const totpEnrollBody = `    <style>
     </style>
     {{if .Scratch}}
     <form method="post" action="{{.Action}}">
-      <p class="lead">{{.T.saveBackupCodes}}</p>
+      <h2 class="lead">{{.T.saveBackupCodes}}</h2>
       <p class="hint">{{.T.backupHint}}</p>
       <ul class="codes" data-copy>{{range .Scratch}}<li>{{.}}</li>{{end}}</ul>
       <input type="hidden" name="step" value="ack">
@@ -702,8 +697,8 @@ const totpEnrollBody = `    <style>
     </form>
     {{else}}
     <form method="post" action="{{.Action}}">
-      <p class="lead">{{if .Mandatory}}{{.T.mfaRequiredLead}}{{else}}{{.T.setupLead}}{{end}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{if .Mandatory}}{{.T.mfaRequiredLead}}{{else}}{{.T.setupLead}}{{end}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <p class="hint">{{.T.scanHint}}</p>
       {{if .QR}}<img class="qr" src="{{.QR}}" alt="{{.T.qrAlt}}" width="200" height="200">{{end}}
       <p class="secret" data-copy aria-label="{{.T.setupKey}}">{{.Secret}}</p>
@@ -805,13 +800,13 @@ const profileMFAManageBody = `    <style>
       .tb-ra::before { display: none; }
     </style>
     <form class="mfa-action" method="post" action="/profile/mfa">
-      <p class="lead">{{.T.twoFactor}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.twoFactor}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <p class="status">{{.StatusLine}}</p>
       <p class="hint">{{.T.mfaManageCodeHint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
-        <input name="code" inputmode="numeric" autocomplete="one-time-code" required>
+        <input name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" required>
       </label>
       <button class="choice" type="submit" name="step" value="renew">{{.T.replaceAuth}}</button>
       <button class="choice" type="submit" name="step" value="regen">{{.T.regenCodes}}</button>

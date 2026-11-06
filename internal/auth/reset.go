@@ -33,47 +33,79 @@ var (
 type forgotData struct {
 	flowChrome
 	Error string
+	// Code says what the page will send: a code when the gateway cannot
+	// vouch for a link's address (mailcode.go), a link otherwise. The page
+	// promised a link in both cases, and a code arrived for someone who had
+	// already closed the page it is typed into.
+	Code bool
 }
 
 const forgotBody = `    <form method="post" action="/forgot-password">
-      <p class="lead">{{.T.forgotLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-      <p class="hint">{{.T.forgotHint}}</p>
+      <h2 class="lead">{{.T.forgotLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+      <p class="hint">{{if .Code}}{{.T.forgotHintCode}}{{else}}{{.T.forgotHint}}{{end}}</p>
       <label class="field">
         <span>{{.T.email}}</span>
         <input name="email" type="email" autocomplete="email" autofocus required>
       </label>
-      <button type="submit">{{.T.forgotCta}}</button>
+      <button type="submit">{{if .Code}}{{.T.forgotCtaCode}}{{else}}{{.T.forgotCta}}{{end}}</button>
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
 
 const forgotSentBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.registerSentLead}}</p>
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      ` + sentToLine + `
       <p class="hint">{{.T.forgotSentHint}}</p>
     </form>
+    {{if .SentTo}}<form method="post" action="/forgot-password" class="leave resend">
+      <p class="hint">{{.T.nothingReceived}}</p>
+      <input type="hidden" name="email" value="{{.SentTo}}">
+      <button type="submit">{{.T.sendAgain}}</button>
+    </form>{{end}}
+    <p class="back"><a href="/forgot-password">{{.T.useAnotherAddress}}</a></p>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
 
 // The same outcome when the mail carries a code rather than a link
 // (mailcode.go): the page waits for it, in this browser.
 const forgotCodeBody = `    <form method="post" action="/reset-password/code">
-      <p class="lead">{{.T.registerSentLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+      ` + sentToLine + `
       <p class="hint">{{.Hint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
         <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
       </label>
+      <input type="hidden" name="email" value="{{.SentTo}}">
       <button type="submit">{{.T.mailResetCta}}</button>
     </form>
-    <p class="back"><a href="/forgot-password">{{.T.signinCodeAgain}}</a></p>
+    {{if .SentTo}}<form method="post" action="/forgot-password" class="leave resend">
+      <p class="hint">{{.T.nothingReceived}}</p>
+      <input type="hidden" name="email" value="{{.SentTo}}">
+      <button type="submit">{{.T.sendAgain}}</button>
+    </form>{{end}}
+    <p class="back"><a href="/forgot-password">{{.T.useAnotherAddress}}</a></p>
+    <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
+
+// sentData is a "check your inbox" page that waits for nothing: the address
+// said back, and the way to ask again.
+type sentData struct {
+	flowChrome
+	SentTo string
+}
+
+// sentToLine says where the mail went, on every page that waits for one.
+const sentToLine = `{{if .SentTo}}<p class="sent-to">{{.T.sentTo}} <strong>{{.SentTo}}</strong></p>{{end}}`
 
 type codeData struct {
 	flowChrome
-	Hint  string
-	Error string
+	// SentTo: see signinSentData.
+	SentTo string
+	Hint   string
+	Error  string
 }
 
 type resetData struct {
@@ -83,8 +115,8 @@ type resetData struct {
 }
 
 const resetBody = `    <form method="post" action="/reset-password">
-      <p class="lead">{{.T.resetLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.resetLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.newPassword}}</span>
         <input name="password" type="password" autocomplete="new-password" autofocus required>
@@ -99,9 +131,9 @@ const resetBody = `    <form method="post" action="/reset-password">
 `
 
 const resetDoneBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.resetDoneLead}}</p>
+      <h2 class="lead">{{.T.resetDoneLead}}</h2>
       <p class="hint">{{.T.resetDoneHint}}</p>
-      <a class="choice" style="text-decoration:none" href="/login">{{.T.signIn}}</a>
+      <a class="primary" href="/login">{{.T.signIn}}</a>
     </form>
 `
 
@@ -110,7 +142,7 @@ func (h *Handler) showForgot(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeFlow(w, forgotPage, forgotData{flowChrome: h.flowData(r, "titleForgot")}, http.StatusOK)
+	writeFlow(w, forgotPage, forgotData{flowChrome: h.flowData(r, "titleForgot"), Code: h.linkOrigin(r) == ""}, http.StatusOK)
 }
 
 // forgotOpen: the reset flow needs working outbound mail, and a local password
@@ -173,11 +205,11 @@ func (h *Handler) doForgot(w http.ResponseWriter, r *http.Request) {
 		h.renderForgotCode(w, r, "", http.StatusOK)
 		return
 	}
-	writeFlow(w, forgotSentPage, struct{ flowChrome }{h.flowData(r, "titleForgot")}, http.StatusOK)
+	writeFlow(w, forgotSentPage, sentData{flowChrome: h.flowData(r, "titleForgot"), SentTo: email}, http.StatusOK)
 }
 
 func (h *Handler) renderForgotCode(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
-	data := codeData{flowChrome: h.flowData(r, "titleForgot"), Error: errMsg}
+	data := codeData{flowChrome: h.flowData(r, "titleForgot"), Error: errMsg, SentTo: strings.TrimSpace(r.PostFormValue("email"))}
 	data.Hint = fmt.Sprintf(data.T["signinCodeSentHint"], minutesLabel(data.T, signinCodeTTL))
 	writeFlow(w, forgotCodePage, data, status)
 }
@@ -273,7 +305,7 @@ func (h *Handler) showReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.st.PeekEmailToken(r.Context(), hashTrust(token), resetPurpose, time.Now().Unix()); err != nil {
-		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/forgot-password", "askNewLink", http.StatusUnprocessableEntity)
 		return
 	}
 	writeFlow(w, resetPage, resetData{
@@ -306,7 +338,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := h.st.TakeEmailToken(r.Context(), hashTrust(token), resetPurpose, time.Now().Unix())
 	if err != nil {
-		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/forgot-password", "askNewLink", http.StatusUnprocessableEntity)
 		return
 	}
 	// The reuse rule applies here too - a reset is where someone reaches for
@@ -325,7 +357,7 @@ func (h *Handler) doReset(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.st.SetUserPassword(r.Context(), userID, string(hash), false); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
+			h.renderLinkDead(w, r, "titleReset", "errResetExpired", "/forgot-password", "askNewLink", http.StatusUnprocessableEntity)
 			return
 		}
 		http.Error(w, "internal error", http.StatusInternalServerError)

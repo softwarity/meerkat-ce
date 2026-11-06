@@ -546,8 +546,8 @@ const consentBody = `
 <form method="post" action="/oauth/authorize" class="consent">
   <input type="hidden" name="request" value="{{.Query}}">
   <h1>Connect an agent</h1>
-  <p class="lead">This agent asks to act on the gateway as you: <strong>{{.ClientName}}</strong></p>
-  <p class="lead">Its answer goes to <strong>{{.RedirectHost}}</strong>. Connect only if that is the machine you are connecting from.</p>
+  <p class="hint">This agent asks to act on the gateway as you: <strong>{{.ClientName}}</strong></p>
+  <p class="hint">Its answer goes to <strong>{{.RedirectHost}}</strong>. Connect only if that is the machine you are connecting from.</p>
 
   <fieldset>
     <legend>What may it do?</legend>

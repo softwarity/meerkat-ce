@@ -222,8 +222,8 @@ func captchaField(refresh string) string {
 }
 
 var registerBody = `    <form method="post" action="/register">
-      <p class="lead">{{.T.registerLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.registerLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.username}}</span>
         <input name="username" autocomplete="username" value="{{.Username}}" autofocus required>
@@ -249,9 +249,18 @@ var registerBody = `    <form method="post" action="/register">
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
 
+// The link's lifetime is the policy's, said the way the mail says it: the
+// page wrote "24 hours" whatever the policy gave.
+type registerSentData struct {
+	flowChrome
+	SentTo   string
+	Validity string
+}
+
 const registerSentBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.registerSentLead}}</p>
-      <p class="hint">{{.T.registerSentHint}}</p>
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      ` + sentToLine + `
+      <p class="hint">{{.T.registerSentLink}} {{.Validity}}</p>
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
@@ -259,22 +268,24 @@ const registerSentBody = `    <form onsubmit="return false">
 // The same outcome when the mail carries a code rather than a link
 // (mailcode.go).
 const registerCodeBody = `    <form method="post" action="/confirm/code">
-      <p class="lead">{{.T.registerSentLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.registerSentLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+      ` + sentToLine + `
       <p class="hint">{{.Hint}}</p>
       <label class="field">
         <span>{{.T.authCode}}</span>
         <input name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
       </label>
+      <input type="hidden" name="email" value="{{.SentTo}}">
       <button type="submit">{{.T.mailConfirmCta}}</button>
     </form>
     <p class="back"><a href="/login">{{.T.backToLogin}}</a></p>
 `
 
 const confirmedBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.confirmedLead}}</p>
+      <h2 class="lead">{{.T.confirmedLead}}</h2>
       <p class="hint">{{.T.confirmedHint}}</p>
-      <a class="choice" style="text-decoration:none" href="/login">{{.T.signIn}}</a>
+      <a class="primary" href="/login">{{.T.signIn}}</a>
     </form>
 `
 
@@ -286,22 +297,35 @@ const confirmedBody = `    <form onsubmit="return false">
 type linkDeadData struct {
 	flowChrome
 	Error string
-	Back  string
-	// BackLabel is the link's text, already translated.
+	// Back is where the page sends on, as its one button: a new link asked
+	// for, the sign-in, the profile.
+	Back string
+	// BackLabel is the button's text, already translated.
 	BackLabel string
+	// Used offers the sign-in beside it: a link already followed once is
+	// spent, and whoever followed it may simply have nothing left to do.
+	Used bool
 }
 
+// A link that aged is an ordinary thing, not an alarm: a title, the reason in
+// the card's voice, and the one action that helps - not a red line in an
+// empty card.
 const linkDeadBody = `    <form onsubmit="return false">
-      <p class="error">{{.Error}}</p>
+      <h2 class="lead">{{.T.linkDeadLead}}</h2>
+      <p class="hint">{{.Error}}</p>
+      <a class="primary" href="{{.Back}}">{{.BackLabel}}</a>
     </form>
-    <p class="back"><a href="{{.Back}}">{{.BackLabel}}</a></p>
+    {{if .Used}}<p class="back">{{.T.linkDeadUsed}} <a href="/login">{{.T.signIn}}</a></p>{{end}}
 `
 
 // renderLinkDead answers a mailed link that is no use any more, under the
 // title of the journey it belonged to, with the status it always had.
 func (h *Handler) renderLinkDead(w http.ResponseWriter, r *http.Request, title, errKey, back, backKey string, status int) {
 	c := h.flowData(r, title)
-	writeFlow(w, linkDeadPage, linkDeadData{flowChrome: c, Error: c.T[errKey], Back: back, BackLabel: c.T[backKey]}, status)
+	writeFlow(w, linkDeadPage, linkDeadData{
+		flowChrome: c, Error: c.T[errKey], Back: back, BackLabel: c.T[backKey],
+		Used: back != "/login" && back != "/profile",
+	}, status)
 }
 
 type pendingData struct {
@@ -310,11 +334,12 @@ type pendingData struct {
 }
 
 const pendingBody = `    <form onsubmit="return false">
-      <p class="lead">{{.T.pendingLead}}</p>
+      <h2 class="lead">{{.T.pendingLead}}</h2>
       <p class="hint">{{.T.pendingHint}}</p>
     </form>
+    {{if .Brand.Contact}}<p class="back"><a href="{{.Brand.Contact}}">{{.T.contactAdmin}}</a></p>{{end}}
     {{if .Public}}<div class="public">
-      <p class="lead">{{.T.continueWithout}}</p>
+      <p class="eyebrow">{{.T.orOpenThese}}</p>
       <nav class="public-links">
         {{range .Public}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
@@ -467,11 +492,13 @@ func (h *Handler) mailConfirmation(w http.ResponseWriter, r *http.Request, u *st
 		h.renderRegisterCode(w, r, "", http.StatusOK)
 		return
 	}
-	writeFlow(w, registerSentPage, struct{ flowChrome }{h.flowData(r, "titleRegister")}, http.StatusOK)
+	sent := registerSentData{flowChrome: h.flowData(r, "titleRegister"), SentTo: strings.TrimSpace(r.PostFormValue("email"))}
+	sent.Validity = linkValidity(sent.T, h.st.GetRegistrationPolicy(r.Context()).ConfirmHours)
+	writeFlow(w, registerSentPage, sent, http.StatusOK)
 }
 
 func (h *Handler) renderRegisterCode(w http.ResponseWriter, r *http.Request, errMsg string, status int) {
-	data := codeData{flowChrome: h.flowData(r, "titleRegister"), Error: errMsg}
+	data := codeData{flowChrome: h.flowData(r, "titleRegister"), Error: errMsg, SentTo: strings.TrimSpace(r.PostFormValue("email"))}
 	data.Hint = fmt.Sprintf(data.T["registerCodeHint"], minutesLabel(data.T, signinCodeTTL))
 	writeFlow(w, registerCodePage, data, status)
 }
@@ -539,7 +566,7 @@ func (h *Handler) doConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := h.st.TakeEmailToken(r.Context(), hashTrust(token), confirmPurpose, time.Now().Unix())
 	if err != nil {
-		h.renderLinkDead(w, r, "titleRegister", "errConfirmExpired", "/login", "backToLogin", http.StatusUnprocessableEntity)
+		h.renderLinkDead(w, r, "titleRegister", "errConfirmExpired", "/login", "signIn", http.StatusUnprocessableEntity)
 		return
 	}
 	h.confirmed(w, r, userID)

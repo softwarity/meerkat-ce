@@ -225,9 +225,8 @@ func TestTheButtonOffersTheDeveloperKey(t *testing.T) {
 	devC := postLogin(t, mux, url.Values{"username": {"devon"}, "password": {"s3cret"}}).Result().Cookies()[0]
 	bobC := postLogin(t, mux, url.Values{"username": {"bob"}, "password": {"s3cret"}}).Result().Cookies()[0]
 
-	// The developer rows name themselves in English in the component - they
-	// open a developer's tools, which this product does not translate - so what
-	// travels is the STATE, not the wording: whether a key is deposited.
+	// What travels for the developer rows is their STATE beside their
+	// labels: whether a key is deposited.
 	body := bodyString(do(t, mux, "GET", "/meerkat/user-button.json", nil, devC))
 	if !strings.Contains(body, `"devDocs":true`) {
 		t.Fatalf("the developer submenu is not offered to a dev: %s", body)

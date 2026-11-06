@@ -62,12 +62,12 @@ type selectGroupData struct {
 }
 
 const selectGroupBody = `    <form method="post" action="/select-group">
-      <p class="lead">{{.T.chooseGroupLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.chooseGroupLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       {{range .Groups}}
-      <button class="choice" type="submit" name="group" value="{{.ID}}" {{if or (eq .ID $.Active) .Closed}}disabled{{end}}>
+      <button class="choice{{if eq .ID $.Active}} current{{end}}" type="submit" name="group" value="{{.ID}}" {{if or (eq .ID $.Active) .Closed}}disabled{{end}}{{if eq .ID $.Active}} aria-current="true"{{end}}>
         <span class="choice-name">{{.Name}}</span>
-        {{if .Closed}}<span class="choice-type">{{$.T.outsideHours}}</span>{{end}}
+        {{if eq .ID $.Active}}<span class="choice-type">{{$.T.currentChoice}}</span>{{else if .Closed}}<span class="choice-type">{{$.T.outsideHours}}</span>{{end}}
       </button>
       {{end}}
       <input type="hidden" name="next" value="{{.Next}}">

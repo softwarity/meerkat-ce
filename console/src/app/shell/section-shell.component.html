@@ -12,6 +12,7 @@
         [attr.any-role]="s.roles || null"
         [attr.single-tenant-only]="s.singleOnly ? '' : null"
         [attr.plug-open-only]="s.plugOnly ? '' : null"
+        [attr.ee-feature]="s.ee?.feature ?? null"
       >
         <mat-icon
           matBadgeSize="small"
@@ -20,6 +21,9 @@
           >{{ s.icon }}</mat-icon
         >
         <span>{{ s.label }}</span>
+        @if (s.ee) {
+          <app-ee-lock [feature]="s.ee.feature" [why]="s.ee.why" />
+        }
       </a>
     }
   </nav>

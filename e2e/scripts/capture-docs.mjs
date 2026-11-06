@@ -428,6 +428,27 @@ async function seedEverythingElse(api) {
     await plane.dispose();
   }
 
+  // The same people on the CONSOLE, for the shots of what each capability
+  // opens: Dmitri the infrastructure administrator, Carla the application
+  // administrator, Alice the administrator of Acme Logistics, Bob who
+  // administers nothing. Alice and Bob already chose their password above;
+  // Carla and Dmitri sign in for the first time here.
+  for (const name of ['alice', 'bob', 'carla', 'dmitri']) {
+    if (!oneTime[name]) continue;
+    const console = await request.newContext({ baseURL: ADMIN });
+    const first = ['carla', 'dmitri'].includes(name);
+    await soft(`console sign-in ${name}`, () => console.post('/login', {
+      form: { username: name, password: first ? oneTime[name] : 'Capture-User-Password-1' }, maxRedirects: 0 })
+      .then((r) => (r.status() === 303 ? null : r)));
+    if (first) {
+      await soft(`console password ${name}`, () => console.post('/update-password', {
+        form: { password: 'Capture-User-Password-1', confirm: 'Capture-User-Password-1' }, maxRedirects: 0 })
+        .then((r) => (r.status() === 303 ? null : r)));
+    }
+    await console.storageState({ path: `${tmp}/console-${name}.json` });
+    await console.dispose();
+  }
+
   // The role catalogue and a group of the organisation.
   for (const role of [
     { name: 'BILLING', description: 'Reads and issues invoices', tags: ['billing'] },
@@ -857,6 +878,19 @@ async function layNotifications(api) {
 // the page would show the line for a blocked browser instead of its button.
 // `as: 'visitor'` is somebody who has not signed in: no session at all.
 const readers = {};
+// A console page in somebody else's session than root's: the shots of what a
+// narrower capability opens.
+const consoles = {};
+async function consolePage(browser, who) {
+  if (!consoles[who]) {
+    const ctx = await browser.newContext({
+      viewport: VIEW, colorScheme: 'dark', deviceScaleFactor: 1, storageState: `${tmp}/console-${who}.json`,
+    });
+    consoles[who] = await ctx.newPage();
+  }
+  return consoles[who];
+}
+
 async function readerPage(browser, who) {
   if (!readers[who]) {
     const ctx = await browser.newContext({
@@ -1145,6 +1179,11 @@ const SHOTS = [
   // and a wall of red: the answer is completed here into the cluster the page
   // explains - three instances on PostgreSQL, the routes' own services, most
   // answering. The routes, their addresses and the schema stay the gateway's.
+  // ── What each capability opens: the console in a narrower session ──
+  { file: 'capability-infra-admin', path: '/infra/routes', console: 'dmitri', settle: 1800 },
+  { file: 'capability-app-admin', path: '/application/users', console: 'carla', settle: 1800 },
+  { file: 'capability-tenant-admin', path: () => TENANT && `/tenants/${TENANT}/members`, console: 'alice', settle: 1800 },
+  { file: 'capability-none', path: '/', console: 'bob', settle: 1800, blur: ['dl.license dd:nth-of-type(1)', 'dl.license dd:nth-of-type(2)'] },
   { file: 'topology', path: '/infra/topology', prepare: clusterTopology, cleanup: (page) => page.unroute('**/api/infrastructure') },
   // The license the capture ran with is ours: who holds it and its id are
   // blurred, the rest (edition, coverage, dates, features) is what to read.
@@ -1280,9 +1319,11 @@ async function shoot(storageState) {
     }
     // A shot `as` a reader is a page of the applications' side, on the data
     // plane, in that reader's session; the others are the console's.
-    const shotPage = s.as ? await readerPage(browser, s.as) : page;
+    const shotPage = s.as ? await readerPage(browser, s.as) : s.console ? await consolePage(browser, s.console) : page;
     if (s.as) {
       await shotPage.goto(DATA + path);
+    } else if (s.console) {
+      await shotPage.goto(ADMIN + path);
     } else {
       await page.goto(ADMIN + '#' + path).catch(() => {});
       await page.goto(ADMIN + path);

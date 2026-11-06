@@ -170,6 +170,10 @@ export class BuiltInPagesScope {
   readonly backgroundFitDark = signal<Fit>('cover');
   readonly backgroundDimDark = signal(0);
   readonly hideMark = signal(false);
+  // How a person reaches the administrators, offered on the pages that tell
+  // somebody to ask them. Saved when the field is left, not per keystroke: a
+  // half-typed address is not one, and the server says so.
+  readonly contact = signal('');
   readonly bg = computed<Background>(() => ({
     image: this.background(),
     fit: this.backgroundFit(),
@@ -238,6 +242,7 @@ export class BuiltInPagesScope {
         this.backgroundFitDark.set(b.background?.fitDark ?? 'cover');
         this.backgroundDimDark.set(b.background?.dimDark ?? 0);
         this.hideMark.set(b.hideMark ?? false);
+        this.contact.set(b.contact ?? '');
       },
     });
   }
@@ -400,6 +405,7 @@ export class BuiltInPagesScope {
               }
             : {},
         hideMark: this.hideMark(),
+        contact: this.contact().trim(),
       })
       .subscribe({
         // Silent on success: the preview already showed it.
@@ -413,6 +419,11 @@ export class BuiltInPagesScope {
   // stored with the branding, where the picture is: it must survive changing
   // arrangement, and travel with the logo in an exported configuration.
   // Written on the click, like the layout beside it: a toggle IS the setting.
+  setContact(value: string): void {
+    this.contact.set(value);
+    this.saveBranding();
+  }
+
   setLogoSize(size: LogoSize): void {
     this.logoSize.set(size);
     this.saveBranding();

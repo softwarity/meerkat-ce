@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/mail"
+	"net/url"
 	"slices"
 	"sort"
 	"strings"
@@ -193,6 +195,11 @@ type Branding struct {
 	// feature grants the right to make it, and an installation that never
 	// asked keeps the mark. Ignored - and refused on save - without it.
 	HideMark bool `json:"hideMark,omitempty"`
+	// Contact is how a person reaches whoever runs this installation: a
+	// mailto: or an http(s) address, offered as "Contact your administrator"
+	// on the pages that tell somebody to ask them - refused, the waiting room,
+	// an application's refused sign-in. Empty offers nothing.
+	Contact string `json:"contact,omitempty"`
 }
 
 // The two sizes past the normal one. Named here because the served pages turn
@@ -256,6 +263,11 @@ func DefaultBranding() Branding {
 func SanitizeBranding(b *Branding) error {
 	b.AppName = strings.TrimSpace(b.AppName)
 	b.Tagline = strings.TrimSpace(b.Tagline)
+	contact, err := CleanContact(b.Contact)
+	if err != nil {
+		return err
+	}
+	b.Contact = contact
 	if b.AppName == "" {
 		b.AppName = DefaultBranding().AppName
 	}
@@ -845,4 +857,39 @@ func (s *Store) DeleteTheme(ctx context.Context, id string) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// CleanContact turns what an administrator typed into the address the pages
+// link to: an e-mail address becomes a mailto:, a web address stays one. Any
+// other scheme is refused - the link is drawn on pages served to anyone, and a
+// javascript: or data: one there would run somebody else's code.
+func CleanContact(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", nil
+	}
+	if !strings.Contains(v, "://") && !strings.HasPrefix(strings.ToLower(v), "mailto:") {
+		if strings.Contains(v, "@") {
+			v = "mailto:" + v
+		} else {
+			v = "https://" + v
+		}
+	}
+	u, err := url.Parse(v)
+	if err != nil {
+		return "", fmt.Errorf("branding contact %q is not an address: give an e-mail address or a web address (https://...)", raw)
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "mailto":
+		if _, err := mail.ParseAddress(u.Opaque); err != nil || u.Opaque == "" {
+			return "", fmt.Errorf("branding contact %q is not an e-mail address: give one like it@acme.example, or a web address (https://...)", raw)
+		}
+	case "https", "http":
+		if u.Host == "" {
+			return "", fmt.Errorf("branding contact %q has no host: give a web address like https://help.acme.example, or an e-mail address", raw)
+		}
+	default:
+		return "", fmt.Errorf("branding contact %q: allowed are an e-mail address or an http(s) address, not a %s address", raw, u.Scheme)
+	}
+	return u.String(), nil
 }

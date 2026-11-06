@@ -341,6 +341,7 @@ func run(o options) error {
 	// Same wire for the page a browser gets where no route answers: the
 	// gateway decides who gets it, the flow chrome draws it (ROUTE-10).
 	router.NotFound = authHandler.ServeNotFound
+	router.MaintenanceOver = authHandler.MaintenanceOver
 	routing.SetMaintenanceHandler(authHandler.ServeMaintenance)
 
 	served := devtunnel.NewRegistry(authHandler.Events())

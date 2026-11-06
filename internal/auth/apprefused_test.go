@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -47,15 +48,31 @@ func TestTheAppRefusedPageIsADressedPage(t *testing.T) {
 			t.Errorf("%s: content type %q, want a page", c.why, ct)
 		}
 		for what, want := range map[string]string{
-			"the visitor's language": `lang="fr"`,
-			"the reason, translated": html.EscapeString(messages["fr"][c.key]),
-			"the lead":               html.EscapeString(messages["fr"]["appRefusedLead"]),
-			"the language switcher":  "lang-menu",
-			"the colour scheme":      "scheme-cycle",
+			"the visitor's language":        `lang="fr"`,
+			"the reason, translated":        html.EscapeString(messages["fr"][c.key]),
+			"the lead":                      html.EscapeString(messages["fr"]["appRefusedLead"]),
+			"the language switcher":         "lang-menu",
+			"the colour scheme":             "scheme-cycle",
+			"the administrator's reference": html.EscapeString(fmt.Sprintf(messages["fr"]["appRefusedRef"], refOf(c.why))),
+			"a way on, the sign-in":         `href="/login"`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("%s: %s is not on the page", c.why, what)
 			}
 		}
+		// The page speaks to the person: the screen of the console that holds
+		// the fix is the administrator's to read, in the log and the docs.
+		for _, console := range []string{"OIDC / JWT", "Domains &amp; TLS", "OpenID Connect"} {
+			if strings.Contains(body, console) {
+				t.Errorf("%s: the page names %q, a console screen or a protocol, to the visitor", c.why, console)
+			}
+		}
 	}
+}
+
+func refOf(why string) string {
+	if ref, ok := appRefusedRefs[why]; ok {
+		return ref
+	}
+	return appRefusedRefs[AppRefusedUnreadable]
 }

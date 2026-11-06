@@ -5,17 +5,18 @@ import { ApiService } from './api.service';
 import { MeService } from './me.service';
 
 // Where a user lands and falls back to (CONSOLE-02): an infra admin starts on
-// the routing plane, an app admin on the application, everyone else on Tenants
-// (any authenticated console user may open it - the API scopes the content).
-// These guards are navigation comfort; the admin API enforces the same scopes
-// server-side (RBAC-05).
+// the routing plane, an app admin on the application, a tenant's administrator
+// (or whoever may create one) on Tenants. These guards are navigation comfort;
+// the admin API enforces the same scopes server-side (RBAC-05).
 function landing(me: MeService): string {
   if (me.isInfraAdmin()) return '/infra/routes';
   if (me.isAppAdmin()) return '/application/general';
-  // /tenants does not exist in single-organisation mode, and License is the
-  // one screen no guard can bounce anyone off: it is the honest destination
-  // for someone who administers nothing here.
-  return me.multiTenant() ? '/tenants' : '/system/license';
+  if (me.multiTenant() && (me.isTenantAdmin() || me.isTenantCreator())) return '/tenants';
+  // License is the one screen no guard can bounce anyone off: the honest
+  // destination for someone who administers nothing here. A plain member
+  // used to land on Tenants, an entry their rail does not even show, reading
+  // "No tenant yet" about the tenant they belong to.
+  return '/system/license';
 }
 
 // bounce is how a guard refuses: it redirects, UNLESS that would send someone
@@ -81,6 +82,38 @@ export const singleTenantOnly: CanActivateFn = async (_route, state) => {
   const router = inject(Router);
   await me.ensureLoaded();
   return me.multiTenant() ? bounce(router, state, '/tenants') : true;
+};
+
+// tenantsAccess gates the tenant list: the people the Tenants rail entry is
+// for - root, a tenant's administrator, whoever may create one. Anybody else
+// read "No tenant yet" there, about installations full of them.
+export const tenantsAccess: CanActivateFn = async (_route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  await me.ensureLoaded();
+  const ok = me.isRoot() || me.isTenantAdmin() || me.isTenantCreator();
+  return ok ? true : bounce(router, state, landing(me));
+};
+
+// tenantAccess gates ONE tenant's screens (/tenants/:id/...). The console knows
+// whether someone administers a tenant, not which ones - so it asks the API,
+// which is the authority: the tenant opens for whoever may read it (root, its
+// owner, its administrators), and anyone else goes back to their own screens
+// rather than staring at a tenant page whose every request is refused.
+export const tenantAccess: CanActivateFn = async (route, state) => {
+  const me = inject(MeService);
+  const router = inject(Router);
+  const api = inject(ApiService);
+  await me.ensureLoaded();
+  if (me.isRoot()) return true;
+  const id = route.paramMap.get('id') ?? '';
+  const ok = await firstValueFrom(
+    api.getTenant(id).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    ),
+  );
+  return ok ? true : bounce(router, state, landing(me));
 };
 
 // vaultAccess gates the transverse Vault section: anyone administering a plane

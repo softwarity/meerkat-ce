@@ -27,3 +27,6 @@ staticClients:
     secret: meerkat-secret
     redirectURIs:
       - http://localhost:9099/login/dex/callback
+      # The end-user flows of the e2e suite (e2e/tests/user-flows.spec.ts):
+      # the gateway's data plane, signing in through this authority.
+      - http://localhost:18082/login/uf-dex/callback

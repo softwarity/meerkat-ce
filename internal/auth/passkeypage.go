@@ -18,6 +18,10 @@ type profilePasskeysData struct {
 	Signal        bool
 	UserHandle    string
 	CredentialIDs []string
+	// Confirm is the passkey whose removal is being asked: the cross only
+	// opens the question in its own row, the removal is the button there. A
+	// passkey removed by a stray click is a device that no longer signs in.
+	Confirm string
 }
 
 // The passkeys, on their own page. They were a section of Security, under the
@@ -46,6 +50,23 @@ const profilePasskeysBody = `    <style>
       }
       .pk-x:active { transform: none; }
       .hint-line { margin: 0; font-size: .74rem; color: var(--mk-on-surface-variant); }
+      a.pk-x { text-decoration: none; }
+      /* Inside the card's rows, which run out to its edges: set back in by
+         the card's own padding, and specific enough to win over the rule
+         that strips a form inside a card. */
+      .panel .rows form.pk-ask {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+        margin: 0 24px 10px; padding: 10px 12px; width: auto; border-radius: 10px;
+        background: color-mix(in srgb, var(--mk-error) 8%, transparent);
+        border: 1px solid color-mix(in srgb, var(--mk-error) 35%, transparent);
+      }
+      .pk-ask .hint-line { flex: 1 1 100%; font-size: .82rem; color: var(--mk-on-surface); }
+      .pk-yes {
+        margin: 0; width: auto; padding: 6px 14px;
+        background: var(--mk-error); color: var(--mk-on-error);
+        border: 0; border-radius: 999px; box-shadow: none; font-size: .82rem;
+      }
+      .pk-no { font-size: .82rem; color: var(--mk-primary); }
     </style>
     <div class="panel">
       <h2>{{.T.passkeys}}</h2>
@@ -55,11 +76,14 @@ const profilePasskeysBody = `    <style>
         <span class="pk-name">{{.Label}}</span>
         {{if .Current}}<span class="pk-this">{{$.T.thisBrowser}}</span>{{end}}
         <span class="pk-date">{{.Created.HTML}}</span>
-        <form method="post" action="/profile/passkeys/delete">
-          <input type="hidden" name="id" value="{{.ID}}">
-          <button class="pk-x" type="submit" title="{{$.T.passkeyRemove}}" aria-label="{{$.T.passkeyRemove}}"><svg viewBox="0 -960 960 960" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button>
-        </form>
+        {{if ne .ID $.Confirm}}<a class="pk-x" href="/profile/passkeys?remove={{.ID}}" title="{{$.T.passkeyRemove}}" aria-label="{{$.T.passkeyRemove}}"><svg viewBox="0 -960 960 960" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></a>{{end}}
       </div>
+      {{if eq .ID $.Confirm}}<form class="pk-ask" method="post" action="/profile/passkeys/delete">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <p class="hint-line">{{$.T.passkeyRemoveAsk}}</p>
+        <button class="pk-yes" type="submit" autofocus>{{$.T.passkeyRemove}}</button>
+        <a class="pk-no" href="/profile/passkeys">{{$.T.cancel}}</a>
+      </form>{{end}}
       {{end}}
       </div>
       <button type="button" class="choice" id="pk-add">{{.T.addPasskey}}</button>
@@ -128,7 +152,7 @@ func (h *Handler) showPasskeys(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data := profilePasskeysData{flowChrome: listChrome(h.flowData(r, "titlePasskeys"))}
+	data := profilePasskeysData{flowChrome: listChrome(h.flowData(r, "titlePasskeys")), Confirm: r.URL.Query().Get("remove")}
 	current := ""
 	if c, err := r.Cookie(passkeyCookie); err == nil {
 		current = c.Value

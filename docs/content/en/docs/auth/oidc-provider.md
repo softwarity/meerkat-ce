@@ -291,15 +291,17 @@ anyone asks them to sign in again.
 
 What the person or the application sees, and the line the gateway logs
 (`OIDC sign-in refused`, with the client and the reason, never a secret or a
-token):
+token). The page the person lands on says what is wrong in their words and
+gives them a reference to pass on: the reference is in the first column.
 
 | Symptom | Cause |
 |---|---|
-| a page: *asked to sign in as client ..., which this gateway does not know* | the client id is not declared, or misspelt |
-| a page: *asked to bring you back to an address it may not use* | the address is under no enabled route bound to the client: bind the application's route to the client. The log line names what came (`redirect_uri`) and what would have been taken (`accepted_under`) |
+| a page, reference `unknown-client` | the client id is not declared, or misspelt: declare it in Routes, **OIDC / JWT** |
+| a page, reference `return-address` | the address is under no enabled route bound to the client: bind the application's route to the client. The log line names what came (`redirect_uri`) and what would have been taken (`accepted_under`) |
 | `unauthorized_client` | no enabled route is bound to the client with the OIDC mechanism |
 | the refusal page, or `access_denied` with `prompt=none` | no route bound to the client lets this person in |
-| `temporarily_unavailable` with a sentence about the issuer | the application plane has no public name: declare one in Domains & TLS, Application tab |
+| a page, reference `no-public-name`, or `temporarily_unavailable` | the application plane has no public name: declare one in Domains & TLS, Application tab |
+| a page, reference `unreadable-request` | the application sent no valid OpenID Connect authorization request |
 | `invalid_client` | a wrong secret, or a secret sent by a client declared without one |
 | `invalid_grant` on a refresh | the gateway session ended (sign-out, expiry), or no route grants the person any more |
 | the application rejects the token's audience | its expected audience is not the client's **Audience** |

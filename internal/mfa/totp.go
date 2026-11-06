@@ -54,7 +54,7 @@ func Code(secret string, t time.Time) (string, error) {
 // one step of clock skew on either side (the usual ±30s window). The digit
 // comparison is constant-time.
 func Validate(secret, code string, now time.Time) bool {
-	code = strings.TrimSpace(code)
+	code = strings.Join(strings.Fields(code), "")
 	if len(code) != digits {
 		return false
 	}
@@ -120,11 +120,12 @@ func NewScratchCodes(n int) (plain, hashed []string, err error) {
 	return plain, hashed, nil
 }
 
-// HashScratch normalises a scratch code (lower-case, dashes stripped) and
+// HashScratch normalises a scratch code (lower-case, dashes and spaces
+// stripped: a code copied from a note or typed in groups is still the code) and
 // returns its SHA-256 hex digest - the form stored and compared. Codes are
 // high-entropy random strings, so a fast hash is adequate (no bcrypt needed).
 func HashScratch(code string) string {
-	norm := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+	norm := strings.ToLower(strings.ReplaceAll(strings.Join(strings.Fields(code), ""), "-", ""))
 	sum := sha256.Sum256([]byte(norm))
 	return hex.EncodeToString(sum[:])
 }

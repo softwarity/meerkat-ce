@@ -224,7 +224,7 @@ const previewLive = `    <script>
 // one honest screen, and together its elements already exercise every theme
 // token (fields, card, CTA, texts, outline, error, glow).
 const specimenBody = `    <form onsubmit="return false">
-      <p class="error">Access refused: outside your working hours.</p>
+      <p class="error" role="alert">Access refused: outside your working hours.</p>
       <label class="field">
         <span>Username</span>
         <input value="alice" readonly>
@@ -492,8 +492,8 @@ const flowTop = `<!doctype html>
     .panel > .rows .row form { width: auto; display: inline-grid; }
     /* A card's own heading: the same small caps the sections use, inside. */
     .panel > h2 {
-      margin: 0; font-family: var(--mk-display, var(--mk-mono)); font-size: .62rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--mk-primary); font-weight: 600;
+      margin: 0; font-family: var(--mk-display, inherit); font-size: 1.2rem; line-height: 1.3;
+      color: var(--mk-primary); font-weight: 600;
     }
     .panel > .panel-hint {
       margin: -8px 0 0; font-size: .76rem; color: var(--mk-on-surface-variant);
@@ -586,6 +586,17 @@ const flowTop = `<!doctype html>
     }
     button:hover { filter: brightness(1.06); box-shadow: 0 10px calc(30px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(40% * var(--mk-glow, 1)), transparent); }
     button:active { transform: translateY(1px); }
+    /* The page's one action when it is a LINK (go and sign in, once a
+       password is reset or an account confirmed): the same filled button. A
+       pale tonal one there read as switched off, on a page with nothing else
+       to do. */
+    a.primary {
+      display: block; margin-top: 4px; padding: 12px; border-radius: var(--mk-radius-small);
+      background: var(--mk-primary); color: var(--mk-on-primary); text-align: center; text-decoration: none;
+      font-size: .95rem; font-weight: 700; letter-spacing: .02em;
+      box-shadow: 0 8px calc(24px * var(--mk-glow, 1)) color-mix(in srgb, var(--mk-primary) calc(26% * var(--mk-glow, 1)), transparent);
+    }
+    a.primary:hover { filter: brightness(1.06); }
     .error {
       margin: 0; padding: 9px 12px; border-radius: var(--mk-radius-small);
       color: var(--mk-error); font-size: .82rem;
@@ -630,14 +641,50 @@ const flowTop = `<!doctype html>
     /* A page's title, and a card's: in the primary, as Material Theme
        Builder sets its headings - the one place where the theme's own colour
        is read as type rather than as a surface. */
+    /* A real heading, the largest words of the card: what the page asks is
+       read first. It was the SMALLEST text on the screen, in spaced capitals
+       a German title outgrew and an Arabic one could not join. The theme's
+       display face and primary colour stay its signature. */
     .lead {
+      margin: 0; font-family: var(--mk-display, inherit); font-size: 1.2rem; font-weight: 600;
+      line-height: 1.3; letter-spacing: 0; text-transform: none; color: var(--mk-primary);
+      overflow-wrap: anywhere;
+    }
+    /* A card's explanation under its title, for every page: each page used to
+       write its own, and one that forgot drew it as body text, as loud as the
+       title. A page's own rule still wins. */
+    .hint { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--mk-on-surface-variant); }
+    /* Where a mail went, said back: the one thing to check when none arrives. */
+    .sent-to { margin: 0; font-size: .9rem; color: var(--mk-on-surface); overflow-wrap: anywhere; }
+    /* "Nothing received?" under a card that waits for a mail: the sentence,
+       then the way to ask again, as a link-weight button. */
+    form.leave.resend { display: grid; gap: 4px; justify-items: center; margin-top: 14px; }
+    form.leave.resend .hint { font-size: .8rem; text-align: center; }
+    form.leave.resend button { color: var(--mk-primary); font-size: .86rem; }
+    /* The small spaced capitals stay for what is a LABEL over a group, never a
+       sentence: "or continue without signing in" over the public links. */
+    .eyebrow {
       margin: 0; font-family: var(--mk-display, var(--mk-mono)); font-size: .68rem;
       letter-spacing: .18em; text-transform: uppercase; color: var(--mk-primary);
     }
+    /* A warning sentence inside a card: read as a warning, not as a title. */
+    .warn-line {
+      margin: 0; padding: 10px 12px; border-radius: var(--mk-radius-small, 8px);
+      font-size: .9rem; line-height: 1.45; color: var(--mk-on-surface);
+      background: color-mix(in srgb, var(--mk-error) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--mk-error) 35%, transparent);
+    }
+    /* Scripts whose letters join or stack (Arabic, Devanagari, Thai) break
+       under letter-spacing: every spaced label goes back to normal there. */
+    html:lang(ar) *, html:lang(hi) *, html:lang(th) * { letter-spacing: normal !important; }
     /* An ALTERNATIVE action - another authority, a passkey, an organisation
        to pick, a second way to get a code: Material 3's filled tonal button,
        on the secondary container. The one filled primary button stays the
        page's main action; these sit beside it without competing. */
+    /* The palette's own pair, never a mix: a theme's on-container and the
+       page's text colour need not lean the same way (a dark word on a mid
+       fill in one scheme), and a mix of the two read as no colour at all.
+       The weight is what keeps the words from looking switched off. */
     button.choice, a.choice {
       margin: 0; padding: 13px 16px; display: flex; align-items: center; gap: 12px;
       background: var(--mk-secondary-container); color: var(--mk-on-secondary-container);
@@ -653,6 +700,10 @@ const flowTop = `<!doctype html>
        offered (TENANT-04). */
     button.choice:disabled { opacity: .55; cursor: not-allowed; transform: none; }
     button.choice:disabled:hover { border-color: transparent; background: var(--mk-secondary-container); }
+    /* The one already in use: not offered either, but it is not refused - it
+       is where the person stands. Full strength, an outline and a word. */
+    button.choice.current:disabled { opacity: 1; cursor: default; border-color: var(--mk-primary); }
+    button.choice.current:disabled:hover { border-color: var(--mk-primary); }
     a.choice { justify-content: center; text-decoration: none; border-radius: 10px; }
     /* Two authorities in a row are two buttons: on a filled ground, with no
        outline left to tell them apart, they need the gap the grid of a card
@@ -700,9 +751,9 @@ const flowTop = `<!doctype html>
       color: var(--mk-on-surface-variant);
     }
     .choice-name { flex: 1; text-align: start; }
+    /* What a choice is, or why it is closed: words to read, at body size. */
     .choice-type {
-      font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .14em;
-      color: var(--mk-on-surface-variant);
+      font-size: .78rem; color: var(--mk-on-surface-variant);
     }
     /* public routes reachable without signing in, offered under the form */
     .public { margin-top: 20px; animation: rise .7s .36s both; }
@@ -726,7 +777,18 @@ const flowTop = `<!doctype html>
     .public-links .group:empty { margin-top: 0; }
     /* button.pk-btn: must out-rank button.choice, whose margin: 0 wins over
        a bare class selector */
-    button.pk-btn { margin-top: 22px; width: 100%; justify-content: center; }
+    button.pk-btn { margin-top: 0; width: 100%; justify-content: center; }
+    /* The other ways in: one column of alike buttons under the form. */
+    .alts { display: grid; gap: 8px; width: 100%; margin-top: 18px; }
+    .alts .sep { margin: 0 0 2px; }
+    .alts > a.choice + a.choice { margin-top: 0; }
+    /* A field label with a link at its end ("Forgot your password?"). */
+    .field > .label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .field > .label-row > a.label-link {
+      font-family: var(--mk-font); font-size: .78rem; letter-spacing: normal; text-transform: none;
+      color: var(--mk-primary); text-decoration: none;
+    }
+    .field > .label-row > a.label-link:hover { text-decoration: underline; }
     /* language / color-scheme switchers - persisted in cookies, applied
        server-side on the next render (no flash) */
     /* Centred like everything else in the card. It is the one thing here that
@@ -1066,32 +1128,37 @@ const flowBottom = `    {{if and .Brand.Meerkat (not .App)}}<p class="foot">on w
 // making somebody type it again under an image they were told to copy is how
 // they end up submitting a different one. The focus then goes where the work
 // is left - the password.
-var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+var loginBody = `    {{if .Shut}}<h2 class="lead">{{.T.noWayIn}}</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
     {{end}}
     {{if .Credentials}}<form method="post" action="login">
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.username}}</span>
-        <input name="username" autocomplete="username" value="{{.Username}}"{{if not .Username}} autofocus{{end}} required>
+        <input name="username" autocomplete="username{{if .Passkeys}} webauthn{{end}}" value="{{.Username}}"{{if not .Username}} autofocus{{end}} required>
       </label>
+      {{/* "Forgot" where the password is, the one moment it is wanted. */}}
       <label class="field">
-        <span>{{.T.password}}</span>
+        <span class="label-row"><span>{{.T.password}}</span>{{if .Forgot}}<a class="label-link" href="/forgot-password">{{.T.forgotLink}}</a>{{end}}</span>
         <input name="password" type="password" autocomplete="current-password"{{if .Username}} autofocus{{end}} required>
       </label>
 ` + captchaField("/login/captcha") + `      <input type="hidden" name="next" value="{{.Next}}">
       <button type="submit">{{.T.signIn}}</button>
     </form>
-    {{else if and .Error (not .Shut)}}<p class="error">{{.Error}}</p>{{end}}
-    {{if .Providers}}
-    <p class="sep">{{.T.orSignInWith}}</p>
-    {{range .Providers}}<a class="choice" href="/login/{{.ID}}?next={{$.Next}}">{{.Name}}</a>{{end}}
-    {{end}}
-    {{if .SigninCode}}<p class="back"><a href="/login/code?next={{.Next}}">{{.T.signinCodeLink}}</a></p>{{end}}
-    {{if .Forgot}}<p class="back"><a href="/forgot-password">{{.T.forgotLink}}</a></p>{{end}}
-    {{if .Register}}<p class="back"><a href="/register">{{.T.createAccount}}</a></p>{{end}}
+    {{else if and .Error (not .Shut)}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+    {{/* Every other way in, together and alike: the passkey first, the
+         quickest for whoever comes back, then the authorities, then a code by
+         e-mail. They were scattered - buttons, three small links, and the
+         passkey alone at the bottom, under the fold on a phone. */}}
+    {{if or .Passkeys .Providers .SigninCode}}<div class="alts">
+      {{if .Credentials}}<p class="sep">{{.T.orSignInWith}}</p>{{end}}
+      {{if .Passkeys}}<button type="button" class="choice pk-btn" id="pk-login" data-next="{{.Next}}" hidden>{{.T.signInPasskey}}</button>{{end}}
+      {{range .Providers}}<a class="choice" href="/login/{{.ID}}?next={{$.Next}}">{{.Name}}</a>{{end}}
+      {{if .SigninCode}}<a class="choice" href="/login/code?next={{.Next}}">{{.T.signinCodeLink}}</a>{{end}}
+    </div>{{end}}
+    {{if and .Forgot (not .Credentials)}}<p class="back"><a href="/forgot-password">{{.T.forgotLink}}</a></p>{{end}}
+    {{if .Register}}<p class="back">{{.T.newHere}} <a href="/register">{{.T.createAccount}}</a></p>{{end}}
     {{if .Passkeys}}
-    <button type="button" class="choice pk-btn" id="pk-login" data-next="{{.Next}}" hidden>{{.T.signInPasskey}}</button>
     <p class="error" id="pk-error" hidden></p>
     <script>
     (() => {
@@ -1101,14 +1168,25 @@ var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
       const err = document.getElementById('pk-error');
       if (!window.PublicKeyCredential) return;
       btn.hidden = false;
-      btn.addEventListener('click', async () => {
-        err.hidden = true;
+      // The passkey offered in the username field's autofill as well
+      // (conditional mediation), where the browser can: the button opens the
+      // same ceremony in a dialog, and aborts the quiet one first - a browser
+      // runs one at a time.
+      let quiet = null;
+      const run = async (conditional) => {
+        if (!conditional) {
+          if (quiet) quiet.abort();
+          err.hidden = true;
+        }
+        const ctl = conditional ? (quiet = new AbortController()) : null;
         try {
           const start = await fetch('/login/passkey/start', { method: 'POST' }).then((r) => r.json());
           const pk = start.options.publicKey;
           pk.challenge = b64d(pk.challenge);
           (pk.allowCredentials || []).forEach((c) => { c.id = b64d(c.id); });
-          const cred = await navigator.credentials.get({ publicKey: pk });
+          const cred = await navigator.credentials.get(conditional
+            ? { publicKey: pk, mediation: 'conditional', signal: ctl.signal }
+            : { publicKey: pk });
           const body = {
             id: cred.id, rawId: b64e(cred.rawId), type: cred.type,
             response: {
@@ -1133,15 +1211,22 @@ var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
           }
           throw new Error(await fin.text());
         } catch (e) {
+          // The quiet offer says nothing when it is set aside or refused:
+          // nobody asked for it.
+          if (conditional) return;
           err.textContent = {{.T.errPasskey}};
           err.hidden = false;
         }
-      });
+      };
+      btn.addEventListener('click', () => run(false));
+      if (PublicKeyCredential.isConditionalMediationAvailable) {
+        PublicKeyCredential.isConditionalMediationAvailable().then((ok) => { if (ok) run(true); }).catch(() => {});
+      }
     })();
     </script>
     {{end}}
     {{if .Public}}<div class="public">
-      <p class="lead">{{.T.continueWithout}}</p>
+      <p class="eyebrow">{{.T.continueWithout}}</p>
       <nav class="public-links">
         {{range .Public}}{{if .Head}}<span class="group">{{.Group}}</span>{{end}}<a href="{{.Href}}">{{.Name}}</a>{{end}}
       </nav>
@@ -1149,8 +1234,8 @@ var loginBody = `    {{if .Shut}}<p class="lead">{{.T.noWayIn}}</p>
 `
 
 const updatePasswordBody = `    <form method="post" action="update-password">
-      <p class="lead">{{.T.mustChangeLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.mustChangeLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.newPassword}}</span>
         <input name="password" type="password" autocomplete="new-password" autofocus required>
@@ -1194,7 +1279,8 @@ const pluggedBody = `    <style>
       .pg-names > span { white-space: nowrap; }
     </style>
     <form method="post" action="/plugged">
-      <p class="lead">Served from a developer's machine</p>
+      <h2 class="lead">{{.T.pluggedLead}}</h2>
+      <p class="hint">{{.T.pluggedHint}}</p>
       {{range .Served}}
       <div class="pg-row">
         {{if .Who}}<span class="pg-who">{{.Who}}</span>{{end}}
@@ -1202,14 +1288,14 @@ const pluggedBody = `    <style>
       </div>
       {{end}}
       <input type="hidden" name="next" value="{{.Next}}">
-      <button type="submit">Continue</button>
+      <button type="submit">{{.T.continue}}</button>
     </form>
 `
 
 const selectTenantBody = `    <form method="post" action="select-tenant">
-      <p class="lead">{{.T.chooseTenantLead}}</p>
+      <h2 class="lead">{{.T.chooseTenantLead}}</h2>
       {{if .Why}}<p class="why">{{.Why}}</p>{{end}}
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       {{/* The membership type stays out on purpose: this is the APP side -
            administration lives on the admin port, which shows what you
            administer. */}}
@@ -1336,7 +1422,9 @@ const profileBody = `    <style>
          "this is the way out", not the absence of a background. */
       /* Leaving the organisation: a quiet link beside its name, in the colour
          of what cannot be undone from here. */
-      .org-leave { margin-left: 8px; font-size: .74rem; color: var(--mk-error); text-decoration: none; }
+      .org-leave { font-size: .8rem; color: var(--mk-error); text-decoration: none; }
+      .leave-tenant { margin-top: 18px; }
+      .back a.org-leave { color: var(--mk-error); }
       .org-leave:hover { text-decoration: underline; }
       .leave {
         margin: 0; width: 100%; box-shadow: none;
@@ -1400,7 +1488,7 @@ const profileBody = `    <style>
       .em-cancel:hover { filter: none; box-shadow: none; border-color: var(--mk-secondary); }
       .em-save { margin: 0; font-size: .82rem; padding: 8px 16px; }
     </style>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
     {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
     <div class="panel identity">
     <form method="post" action="/profile/avatar" enctype="multipart/form-data" class="avatar-form">
@@ -1429,7 +1517,7 @@ const profileBody = `    <style>
         {{if .Email}}<span class="em-value">{{.Email}}</span>{{else}}<span class="em-none">{{.T.emailNone}}</span>{{end}}
         <button type="button" class="em-edit" id="em-open" aria-label="{{.T.emailEdit}}" title="{{.T.emailEdit}}">&#9998;</button>
       </dd></div>
-      {{if .TenantName}}<div><dt>{{.T.factOrganisation}}</dt><dd>{{.TenantName}} <a class="org-leave" href="/profile/leave">{{.T.leaveOrganisation}}</a></dd></div>{{end}}
+      {{if .TenantName}}<div><dt>{{.T.factOrganisation}}</dt><dd>{{.TenantName}}</dd></div>{{end}}
     </dl>
     <form method="post" action="/profile/timezone" class="tz-form" id="tz-form">
       <label class="tz-title" for="tz">{{.T.timezone}}</label>
@@ -1556,7 +1644,7 @@ const profileBody = `    <style>
     </a>
     {{if .IsDev}}
     <a class="mfa-link" href="/profile/dev">
-      <span class="mfa-label">Developer</span>
+      <span class="mfa-label">{{.T.developer}}</span>
       <span class="mfa-state">&rsaquo;</span>
     </a>
     {{end}}
@@ -1599,6 +1687,9 @@ const profileBody = `    <style>
     })();
     </script>
     {{end}}{{end}}
+    {{/* Leaving is irreversible: at the foot, away from the identity it sat
+         in line with, where a stray click on a fact will not find it. */}}
+    {{if .TenantName}}<p class="back leave-tenant"><a class="org-leave" href="/profile/leave">{{.T.leaveOrganisation}}</a></p>{{end}}
     {{if .Console}}<p class="back"><a href="/">{{.T.backToConsole}}</a></p>{{end}}
     <form method="post" action="logout" class="signout">
       <button class="leave" type="submit">{{.T.signOut}}</button>
@@ -1623,24 +1714,26 @@ const profileSecurityBody = `    <style>
       }
       .mfa-link .mfa-state.on { color: var(--mk-tertiary); }
     </style>
-    <p class="lead">{{.T.security}}</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <h2 class="lead">{{.T.security}}</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+    {{/* Two groups a person can tell apart: how they get in, and where they
+         are in. Seven alike rows in one list hid "where am I signed in"
+         under a word nobody reads that way. */}}
+    <p class="eyebrow sec-group">{{.T.secSignIn}}</p>
+    {{if .HasPassword}}<a class="mfa-link" href="/profile/password">
+      <span class="mfa-label">{{.T.changePasswordLead}}</span>
+      <span class="mfa-state">&rsaquo;</span>
+    </a>{{end}}
     <a class="mfa-link" href="/profile/mfa">
       <span class="mfa-label">{{.T.twoFactor}}</span>
       <span class="mfa-state{{if .MFAEnrolled}} on{{end}}">{{if .MFAEnrolled}}{{.T.mfaOn}}{{else if .MFARequired}}{{.T.mfaRequired}}{{else}}{{.T.mfaOff}}{{end}}</span>
     </a>
-    <a class="mfa-link" href="/profile/password">
-      <span class="mfa-label">{{.T.changePasswordLead}}</span>
-      <span class="mfa-state">&rsaquo;</span>
+    {{if .PasskeysAllowed}}
+    <a class="mfa-link" href="/profile/passkeys">
+      <span class="mfa-label">{{.T.passkeys}}</span>
+      <span class="mfa-state">{{if .Passkeys}}{{len .Passkeys}}{{end}} &rsaquo;</span>
     </a>
-    <a class="mfa-link" href="/profile/history">
-      <span class="mfa-label">{{.T.signinHistory}}</span>
-      <span class="mfa-state">&rsaquo;</span>
-    </a>
-    <a class="mfa-link" href="/profile/sessions">
-      <span class="mfa-label">{{.T.sessionsActive}}</span>
-      <span class="mfa-state">&rsaquo;</span>
-    </a>
+    {{end}}
     {{if .Authorities}}
     <a class="mfa-link" href="/profile/authorities">
       <span class="mfa-label">{{.T.authorities}}</span>
@@ -1653,12 +1746,16 @@ const profileSecurityBody = `    <style>
       <span class="mfa-state">&rsaquo;</span>
     </a>
     {{end}}
-    {{if .PasskeysAllowed}}
-    <a class="mfa-link" href="/profile/passkeys">
-      <span class="mfa-label">{{.T.passkeys}}</span>
-      <span class="mfa-state">{{if .Passkeys}}{{len .Passkeys}}{{end}} &rsaquo;</span>
+    <p class="eyebrow sec-group">{{.T.secActivity}}</p>
+    <a class="mfa-link" href="/profile/sessions">
+      <span class="mfa-label">{{.T.sessionsActive}}</span>
+      <span class="mfa-state">&rsaquo;</span>
     </a>
-    {{end}}
+    <a class="mfa-link" href="/profile/history">
+      <span class="mfa-label">{{.T.signinHistory}}</span>
+      <span class="mfa-state">&rsaquo;</span>
+    </a>
+    <style>.sec-group { margin-top: 10px; }</style>
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
 `
 
@@ -1683,23 +1780,23 @@ const profileDevBody = `    <style>
       .dev-link .dl-state.on { color: var(--mk-tertiary); }
       .dev-link .dl-desc { margin: 0; font-size: .76rem; color: var(--mk-on-surface-variant); }
     </style>
-    <p class="lead">Developer</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <h2 class="lead">{{.T.developer}}</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
     {{if .PlugOpen}}
     <a class="dev-link" href="/profile/dev/key">
       <span class="dl-row">
-        <span class="dl-label">plug key</span>
-        <span class="dl-state{{if .Keys}} on{{end}}">{{if .Keys}}{{len .Keys}} {{if eq (len .Keys) 1}}key{{else}}keys{{end}}{{else}}&rsaquo;{{end}}</span>
+        <span class="dl-label">{{.T.devKey}}</span>
+        <span class="dl-state{{if .Keys}} on{{end}}">{{if .Keys}}{{if eq (len .Keys) 1}}{{.T.devKeyOne}}{{else}}{{printf .T.devKeyMany (len .Keys)}}{{end}}{{else}}&rsaquo;{{end}}</span>
       </span>
-      <p class="dl-desc">Register your public SSH key so your plugged services authenticate as you.</p>
+      <p class="dl-desc">{{.T.devPlugKeyDesc}}</p>
     </a>
     {{end}}
     <a class="dev-link" href="/meerkat/apidocs/">
       <span class="dl-row">
-        <span class="dl-label">OpenAPI documentation</span>
+        <span class="dl-label">{{.T.devApiDocs}}</span>
         <span class="dl-state">&rsaquo;</span>
       </span>
-      <p class="dl-desc">Explore and try the APIs of the routes that declare a spec, as any profile you choose.</p>
+      <p class="dl-desc">{{.T.devApiDocsDesc}}</p>
     </a>
     <p class="back"><a href="/profile">{{.T.backToProfile}}</a></p>
 `
@@ -1751,26 +1848,26 @@ const profileDevKeyBody = `    <style>
         border: 1px solid var(--mk-outline); border-radius: var(--mk-radius-small);
       }
     </style>
-    <p class="lead">plug keys</p>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <h2 class="lead">{{.T.devKeysLead}}</h2>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
     {{/* One key per workstation: plug keeps a pair per profile, so a second
          machine is a second key, and removing one closes that machine alone. */}}
     {{range .Keys}}
     <form method="post" action="/profile/dev-key" class="dk-form dk-key">
       <div class="dk-fact">
         <span class="dk-value">{{.Fingerprint}}</span>
-        <span class="dk-comment">{{if .Comment}}{{.Comment}} - {{end}}added {{.Added.HTML}}</span>
+        <span class="dk-comment">{{if .Comment}}{{.Comment}} - {{end}}{{$.T.devKeyAdded}} {{.Added.HTML}}</span>
       </div>
       <input type="hidden" name="action" value="remove">
       <input type="hidden" name="id" value="{{.ID}}">
-      <button class="dk-clear" type="submit">Remove</button>
+      <button class="dk-clear" type="submit">{{$.T.passkeyRemove}}</button>
     </form>
     {{end}}
     <form method="post" action="/profile/dev-key" class="dk-form">
-      {{if .Keys}}<span class="dk-label">Another workstation</span>{{end}}
+      {{if .Keys}}<span class="dk-label">{{.T.devKeyAnother}}</span>{{end}}
       <textarea name="key" rows="4" placeholder="ssh-ed25519 AAAA... you@laptop" required></textarea>
-      <button type="submit">Add key</button>
-      <p class="dk-hint">The key plug offers when it opens a tunnel to this gateway, one per workstation. Run plug keygen on the machine, then plug pubkey, and paste what it prints. Removing a key closes the door to that machine at its next connection.</p>
+      <button type="submit">{{.T.devKeyAdd}}</button>
+      <p class="dk-hint">{{.T.devKeyHint}}</p>
     </form>
     {{/* The commands, in the order somebody runs them the first time, with
          THIS gateway's published address in them - the one Infra, Plug
@@ -1780,11 +1877,11 @@ const profileDevKeyBody = `    <style>
          command names the profile after the application (plug 2.22 and
          later), and keygen and pubkey pass that same name. */}}
     <div class="dk-steps">
-      <p class="dk-hint">No plug yet? It installs from this gateway, not from a package manager. macOS and Linux:</p>
+      <p class="dk-hint">{{.T.devKeyNoPlug}}</p>
       <pre data-copy>ssh -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install {{.PlugProfile}} | sh</pre>
-      <p class="dk-hint">Windows, from Git Bash:</p>
+      <p class="dk-hint">{{.T.devKeyWindows}}</p>
       <pre data-copy>ssh -n -p {{.PlugPort}} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null get@{{.PlugHost}} install-windows | bash -s -- {{.PlugHost}} {{.PlugPort}} {{.PlugProfile}}</pre>
-      <p class="dk-hint">Then the key pair, once per machine - and paste what the second line prints above:</p>
+      <p class="dk-hint">{{.T.devKeyPair}}</p>
       <pre data-copy>plug keygen -p {{.PlugProfile}}
 plug pubkey -p {{.PlugProfile}}</pre>
     </div>
@@ -1909,8 +2006,8 @@ func decodeImageDataURI(uri string) (mediaType string, raw []byte, ok bool) {
 // by a link from the profile (mirrors /profile/mfa). It needs the CURRENT
 // password; on success the handler redirects back to /profile.
 const profilePasswordBody = `    <form method="post" action="/profile/password">
-      <p class="lead">{{.T.changePasswordLead}}</p>
-      {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+      <h2 class="lead">{{.T.changePasswordLead}}</h2>
+      {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
       <label class="field">
         <span>{{.T.currentPassword}}</span>
         <input name="current" type="password" autocomplete="current-password" autofocus required>
@@ -1925,7 +2022,7 @@ const profilePasswordBody = `    <form method="post" action="/profile/password">
       </label>
       <button type="submit">{{.T.changePassword}}</button>
     </form>
-    <p class="back"><a href="/profile">{{.T.cancel}}</a></p>
+    <p class="back"><a href="/profile/security">{{.T.cancel}}</a></p>
 `
 
 // Handler serves the user-flow pages (login, select-tenant, logout). The two
@@ -2046,6 +2143,9 @@ type brandView struct {
 	// square telling a visitor the page is unfinished, and the picture already
 	// says whose application this is.
 	HasBackground bool
+	// Contact is the administrators' address (mailto: or http(s)), checked by
+	// the store; "" offers nothing.
+	Contact string
 	// icon is the raw tab-icon data URI. It stays unexported and never reaches
 	// a template: the pages link to /meerkat/favicon instead, so a 64 KiB
 	// image is fetched once and cached rather than inlined in every page.
@@ -2074,6 +2174,7 @@ func toBrandView(b store.Branding) brandView {
 		LogoSize:      b.LogoSize,
 		BackgroundCSS: template.CSS(b.Background.CSS(backgroundPath, backgroundDarkPath)), //nolint:gosec // store-sanitized enum + fixed URLs
 		HasBackground: b.Background.Image != "" || b.Background.ImageDark != "",
+		Contact:       b.Contact,
 		icon:          b.TabIcon(),
 	}
 }
@@ -3050,6 +3151,9 @@ type profileSecurityData struct {
 	Error       string
 	MFAEnrolled bool
 	MFARequired bool
+	// HasPassword offers the password change: an account that only ever
+	// signs in through an authority has no current password to give.
+	HasPassword bool
 	// PasskeysAllowed mirrors the gateway-wide policy: when off the whole
 	// passkey section disappears (the ceremonies refuse server-side too).
 	PasskeysAllowed bool
@@ -3411,8 +3515,7 @@ func (h *Handler) doProfileDevKey(w http.ResponseWriter, r *http.Request) {
 	}
 	k, err := h.st.AddDevKey(r.Context(), sess.UserID, r.PostFormValue("key"))
 	if errors.Is(err, store.ErrDevKeyTaken) {
-		// English, like the page: a developer's tools are not translated.
-		h.renderProfileDevKey(w, r, sess, "This key is already deposited on this gateway.", http.StatusConflict)
+		h.renderProfileDevKey(w, r, sess, h.tr(r, "errDevKeyTaken"), http.StatusConflict)
 		return
 	}
 	if err != nil {
@@ -3528,6 +3631,9 @@ func (h *Handler) showProfileSecurity(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) renderProfileSecurity(w http.ResponseWriter, r *http.Request, sess store.Session, errMsg string, status int) {
 	data := profileSecurityData{flowChrome: h.flowData(r, "titleSecurity"), Error: errMsg}
+	if u, err := h.st.GetUserByID(r.Context(), sess.UserID); err == nil {
+		data.HasPassword = u.PasswordHash != ""
+	}
 	if totp, err := h.st.GetUserTOTP(r.Context(), sess.UserID); err == nil {
 		data.MFAEnrolled = totp.Enrolled
 	}
@@ -3577,11 +3683,8 @@ func (h *Handler) showProfileDev(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "developer capability required", http.StatusForbidden)
 		return
 	}
-	// English, like the page it titles: a developer's tools are not translated
-	// (see userButtonMenuLabels), and a French tab over an English page is the
-	// worst of the two.
 	data := profileDevData{flowChrome: h.flowData(r, ""), PlugOpen: h.st.Plug(r.Context()).Enabled}
-	data.Title = "Developer - Meerkat"
+	data.Title = data.T["developer"] + " - Meerkat"
 	data.Keys = h.devKeyRows(r, sess.UserID)
 	writeFlow(w, profileDevPage, data, http.StatusOK)
 }
@@ -3617,7 +3720,7 @@ func (h *Handler) renderProfileDevKey(w http.ResponseWriter, r *http.Request, se
 	data := profileDevData{flowChrome: h.flowData(r, ""), Error: errMsg, PlugOpen: true}
 	data.PlugHost, data.PlugPort, _ = devtunnel.Address(r.Context(), h.st.Plug(r.Context()))
 	data.PlugProfile = h.st.PlugProfile(r.Context())
-	data.Title = "plug keys - Meerkat"
+	data.Title = data.T["devKeysLead"] + " - Meerkat"
 	data.Keys = h.devKeyRows(r, sess.UserID)
 	writeFlow(w, profileDevKeyPage, data, status)
 }

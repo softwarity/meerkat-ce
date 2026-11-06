@@ -41,7 +41,7 @@ const LANDING: Record<string, RegExp> = {
   'infra-admin': /\/routes$/,
   'app-admin': /\/general$/,
   'tenant-admin': ENTERPRISE ? /\/tenants\/[^/]+/ : /\/license$/,
-  user: ENTERPRISE ? /\/tenants(\/[^/]+)?/ : /\/license$/,
+  user: /\/license$/,
 };
 
 test.describe('ui-landing', () => {

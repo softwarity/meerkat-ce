@@ -84,6 +84,14 @@ Under the hood, CSS cannot switch a `url()` through `light-dark()`, so the image
 two ways: the system preference, and a class the server stamps when a scheme is imposed - which
 outranks the preference, so the visitor's own choice holds even against their system's.
 
+## The administrator contact
+
+**Administrator contact** takes an e-mail address or a web address. The pages that tell somebody
+to ask an administrator - a page refused to them, the waiting room of an account not yet let in, an
+application's refused sign-in - then offer **Contact your administrator**, linking to it. An e-mail
+address is stored as a `mailto:` link, an address without a scheme as `https://`; any other scheme
+is refused, since the link is drawn on pages served to anyone. Empty, the pages offer nothing.
+
 ## The "powered by" mark
 
 The served pages carry a discreet `powered by softwarity/meerkat` line. Removing it is a switch on
