@@ -3063,7 +3063,7 @@ func pageAgentFragment(r store.Route, localeCodes []string) string {
 	// The application owns its colour scheme, and the way to work WITH it is to
 	// speak its own storage, not to fight it on the document.
 	//
-	// ng-m3-theme (understory) is the case that taught this: its service keeps
+	// A Material 3 theme library is the case that taught this: its service keeps
 	// "system | light | dark" under a key, and in system mode it CLEARS
 	// document.documentElement.style.colorScheme on every run. Anything the
 	// gateway set was wiped a tick later - and with nothing stored, its default

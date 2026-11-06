@@ -65,7 +65,7 @@ func TestAuditViewerScope(t *testing.T) {
 		t.Fatalf("add member: %d", code)
 	}
 
-	// root flips the group mode - exactly the François example.
+	// root flips the group mode - exactly the example the trail is for.
 	code, body = f.call(t, "PUT", "/api/tenants/"+acme.ID,
 		`{"name":"acme","enabled":true,"businessAccess":{"inherited":true},"sessionTTL":"","groupMode":"SINGLE"}`, f.rootC)
 	if code != http.StatusOK {

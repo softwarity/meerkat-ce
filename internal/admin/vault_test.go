@@ -100,7 +100,7 @@ func TestVaultReferenceReachesTheDataPlane(t *testing.T) {
 	}
 }
 
-// TestVaultScopesShadowByName proves the model François asked for: a name is
+// TestVaultScopesShadowByName proves the model that was asked for: a name is
 // unique PER SCOPE, so the same "db-password" means a different thing for two
 // organisations, and a tenant entry SHADOWS the application one it inherits.
 func TestVaultScopesShadowByName(t *testing.T) {

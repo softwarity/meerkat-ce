@@ -40,8 +40,8 @@ type PortalConfig struct {
 	Mode string `json:"mode"`
 	// Layout says which surface carries the PARENTS: "header" puts them in a
 	// top strip of tabs and their children in a rail; "rail" puts the parents
-	// in a rail and their children in a top strip. The one axis portal-nav
-	// (understory) could not swap.
+	// in a rail and their children in a top strip. The one axis an
+	// application's own navigation bar could not swap.
 	Layout string `json:"layout"`
 	// Side is which edge the rail takes. It always means something - one of
 	// the two surfaces is always a rail - so, unlike the page layout's side,

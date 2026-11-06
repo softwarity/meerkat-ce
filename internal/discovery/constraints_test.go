@@ -76,7 +76,7 @@ func (ca *testCA) leaf(t *testing.T, names ...string) (*x509.Certificate, []byte
 	return c, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
 
-var appsPermitted = []string{"apps", "cluster.local", "localhost", "meerkat-meerkat-internal", "rabbitmq", "svc", "understory.com"}
+var appsPermitted = []string{"apps", "cluster.local", "localhost", "meerkat-meerkat-internal", "rabbitmq", "svc", "example.com"}
 
 // TestTheMatcherIsCryptoX509s: for each constraint set and name, the matcher
 // says what crypto/x509 decides when it verifies a leaf carrying that one

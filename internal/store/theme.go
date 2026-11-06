@@ -114,7 +114,7 @@ func (t Theme) Generated() bool { return t.Colors.Primary != "" }
 // the closest generated one: its dark primary as the source, its dark surface
 // as the neutral, its light error, its dark muted text as the neutral variant
 // - with Color match, which keeps the source's own chroma instead of the
-// spec's. Measured against Understory and the old built-in palettes, that rule
+// spec's. Measured against a real application's theme and the old built-in palettes, that rule
 // came closest of the ones tried. ok is false when no primary can be read.
 func ColorsFromTokens(dark, light map[string]string) (c m3color.Core, ok bool) {
 	pick := func(vs ...string) string {

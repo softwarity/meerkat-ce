@@ -9,7 +9,7 @@ import (
 	"github.com/softwarity/meerkat/internal/store"
 )
 
-// The case these rules exist for, in François's own words: an application
+// The case these rules exist for, as it was put: an application
 // managing stations across French coastal ports. One directory for the whole
 // organisation, one tenant per port, and someone who works for two ports has
 // to end up a member of both - then pick which one they are working in.
@@ -144,7 +144,7 @@ func TestHandPlacedMembershipSurvivesTheRules(t *testing.T) {
 	}
 }
 
-// TestOneDirectoryPerPort covers the other shape François described: rather
+// TestOneDirectoryPerPort covers the other shape that was described: rather
 // than per-port groups in one directory, each port brings its own authority.
 // Same mechanism - a rule with no group name means "anyone from here".
 func TestOneDirectoryPerPort(t *testing.T) {
