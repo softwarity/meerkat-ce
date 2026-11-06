@@ -41,7 +41,7 @@ func (k SecretKey) Ref() string { return k.Namespace + "/" + k.Name + "/" + k.Ke
 func ParseSecretRef(ref string) (SecretKey, error) {
 	parts := strings.Split(strings.TrimSpace(ref), "/")
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return SecretKey{}, fmt.Errorf("%q is not a Secret key: write namespace/name/key, as canopy/my-app-oidc/client-secret", ref)
+		return SecretKey{}, fmt.Errorf("%q is not a Secret key: write namespace/name/key, as apps/my-app-oidc/client-secret", ref)
 	}
 	return SecretKey{Namespace: parts[0], Name: parts[1], Key: parts[2]}, nil
 }

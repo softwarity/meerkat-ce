@@ -167,7 +167,7 @@ var oidcSecretRefOK = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?/[a
 func CheckOIDCSecretRef(ref string) error {
 	if !oidcSecretRefOK.MatchString(ref) {
 		return invalidf(fmt.Errorf("%q is not a key of a Kubernetes Secret: write namespace/name/key, "+
-			"as canopy/my-app-oidc/client-secret", ref))
+			"as apps/my-app-oidc/client-secret", ref))
 	}
 	return nil
 }

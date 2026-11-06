@@ -54,7 +54,7 @@ func TestARouteIssuerIsCheckedWhereItMeansSomething(t *testing.T) {
 			t.Fatalf("%+v: %v", c.id, err)
 		}
 	}
-	if err := Validate(route(store.IdentityForward{Mechanism: "signed-jwt", Issuer: "https://canopy.example.com"})); err != nil {
+	if err := Validate(route(store.IdentityForward{Mechanism: "signed-jwt", Issuer: "https://gw.example.com"})); err != nil {
 		t.Fatalf("a valid issuer: %v", err)
 	}
 }
