@@ -2,6 +2,14 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.24.0
+
+<!-- release: built=2026-11-06T17:36:10Z migrates=true -->
+- **This version migrates the database** (schema 103 to 104). An older version no longer opens it
+  afterwards: take a backup before you update.
+
 - **Inside the cluster, Meerkat has an issuer of its own: its internal plane's full name.** The
   internal discovery document names it, and so do the tokens of an OIDC sign-in asked on the
   internal plane and **every route's JWT**; the public discovery and the tokens asked on the
