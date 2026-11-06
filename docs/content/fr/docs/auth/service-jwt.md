@@ -22,7 +22,7 @@ porte :
 
 | Claim | Ce qu'il contient |
 |---|---|
-| `iss` | l'émetteur : l'adresse publique du plan Application (`https://<nom public>`), `meerkat` tant qu'aucun n'est déclaré |
+| `iss` | l'émetteur : l'**émetteur interne** de la gateway, le nom complet du plan interne (voir [L'émetteur](#lmetteur)), ou l'**Issuer** propre à la route quand elle en écrit un |
 | `sub` | l'identifiant du compte de l'appelant |
 | `aud` | l'**Audience** de la route, ou son nom quand le champ est vide : en poser une quand le service attend une valeur à lui, ou pour qu'un renommage de la route ne change pas ses jetons. La même règle que l'audience d'un client OIDC : un texte de 255 caractères au plus, espaces à l'intérieur compris, sans caractère de contrôle |
 | `iat`, `exp` | quand il a été signé, et quand il cesse d'être valide : deux minutes plus tard par défaut, réglable par route |
@@ -93,7 +93,7 @@ http://meerkat:7070/.well-known/openid-configuration
 
 ```json
 {
-  "issuer": "meerkat",
+  "issuer": "http://meerkat:7070",
   "jwks_uri": "http://meerkat:7070/.well-known/jwks.json",
   "id_token_signing_alg_values_supported": ["ES256", "EdDSA", "RS256"],
   "subject_types_supported": ["public"]
@@ -114,12 +114,10 @@ Les bibliothèques le prennent de l'une de deux façons :
   prendre un service dans le cluster. En HTTP simple, dites-le là où la
   bibliothèque le demande (`RequireHttpsMetadata = false` en .NET).
 - **L'émetteur seul** - `issuer-uri` chez Spring, le provider de go-oidc.
-  Elles lisent `{issuer}/.well-known/openid-configuration` sur l'adresse
-  publique de la gateway, qui ne répond que tant que le
-  [fournisseur OpenID](/docs/auth/oidc-provider) (édition Enterprise) a un
-  client déclaré. Sinon, donnez à une telle bibliothèque le JWKS ci-dessous et
-  l'émetteur à vérifier (Spring : `jwk-set-uri` à côté de l'émetteur attendu)
-  plutôt que l'émetteur seul.
+  Elles lisent `{issuer}/.well-known/openid-configuration` et vérifient que le
+  document nomme ce même émetteur. L'émetteur interne est l'adresse même du plan
+  interne : cela marche donc dans le cluster. Donnez à la bibliothèque l'émetteur
+  que montre le tiroir sous **Issuer (internal)**, tel quel.
 
 ### Le JWKS, pour une bibliothèque qui ne prend que des clés
 
@@ -131,7 +129,8 @@ La partie publique des clés, sous forme de JWKS standard - pour une
 bibliothèque qui ne connaît pas la découverte, comme le jeu de clés distant de
 `jose`. Le `kid` du jeton désigne la clé, et la clé porte son algorithme : le
 service prend donc l'algorithme dans la clé, jamais dans l'en-tête du jeton. Il
-vérifie alors lui-même l'émetteur, celui que montre le tiroir.
+vérifie alors lui-même l'émetteur, celui que montre le tiroir sous **Issuer
+(internal)**.
 
 ### Un PEM, pour un service qui ne peut rien lire
 
@@ -142,17 +141,26 @@ seules.
 
 ## L'émetteur
 
-Chaque jeton dit qui l'a émis dans `iss`, et un service le vérifie. Il ne se
-tape pas : c'est le **nom public** du plan Application, déclaré dans **Domains &
-TLS**, onglet **Application**, écrit `https://<nom>` (un nom de cette machine,
-`localhost`, donne `http://localhost:<port du plan de données>`). Avec plusieurs
-noms, le tiroir **OIDC / JWT** en choisit un dans **Public address**, le premier
-jusque-là ; sans aucun, les jetons disent `meerkat` et le tiroir mène à cet
-onglet. Le même émetteur est celui du [fournisseur OpenID](/docs/auth/oidc-provider).
+Chaque jeton dit qui l'a émis dans `iss`, et un service le vérifie. Le JWT d'une
+route part vers un service du cluster, qui lit les clés sur le plan interne : il
+porte l'**émetteur interne** de la gateway, le nom complet du plan interne tel que
+le runtime le nomme - en Kubernetes, le Service placé devant lui,
+`https://<release>-internal.<namespace>.svc.cluster.local:7443` dès qu'un certificat
+y est placé, `http://...:7070` avant. Il ne se tape pas : le tiroir **OIDC / JWT**
+le montre sous **Issuer (internal)**, et le document de découverte interne le
+nomme, **le même quel que soit le nom par lequel un service l'a lu** - un JWT que
+personne ne demande doit porter le seul nom que tous les services ont appris. Une
+gateway qui ne peut pas interroger son runtime (un binaire nu) prend son émetteur
+public à la place.
 
-Déclarez, retirez ou choisissez un nom public, et le jeton suivant porte le
-nouvel émetteur, sur chaque nœud - changez donc en même temps ce qu'attendent
-les services.
+Un service qui lit l'émetteur dans la découverte interne suit tout seul. Un service
+qui écrit l'émetteur attendu dans sa propre configuration doit y écrire ce nom - ou
+bien la route écrit la valeur qu'attend le service : **Issuer**, sous l'audience
+dans **Auth forward**, remplace le `iss` des jetons de cette route.
+
+Le nom public, choisi dans **Public address**, est l'émetteur de la porte publique :
+celui des jetons du [fournisseur OpenID](/docs/auth/oidc-provider) demandés depuis
+l'extérieur du cluster.
 
 > [!NOTE]
 > Le document de découverte décrit comment vérifier un jeton, pas comment en

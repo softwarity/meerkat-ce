@@ -545,6 +545,14 @@ Lire les pods, c'est lire les variables d'environnement que déclarent leurs man
 où un manifeste porte un secret en clair, mettez `rbac.watch: false`, ou mieux, rangez ce
 secret dans un Secret.
 
+**Les Secrets.** Le secret d'un client OIDC peut être lu là où le chart de l'application
+l'écrit, une clé d'un Secret Kubernetes ([Meerkat fournisseur OpenID](/docs/auth/oidc-provider#un-secret-lu-dans-un-secret-kubernetes)).
+Le chart l'accorde avec `rbac.readSecrets`, actif par défaut : un ClusterRole avec `get` sur
+les secrets, et rien d'autre - jamais `list`. La console propose les clés que lisent les pods
+derrière les routes, trouvées dans les manifestes mêmes de ces pods : aucun Secret n'est
+jamais listé. C'est tout de même une lecture de tout Secret dont la gateway connaît le nom :
+mettez `rbac.readSecrets: false` là où elle ne doit pas, et collez alors le secret du client.
+
 Le tunnel développeur en demande davantage, et les droits qu'il reçoit sont détaillés sur
 la page [Une gateway](/docs/deploy/one-gateway).
 

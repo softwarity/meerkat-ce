@@ -777,9 +777,15 @@
                the public one). Written, it is for an application that expects
                a value of its own configuration. -->
           <h3 class="sub" i18n="@@Token_issuer">Issuer</h3>
-          <p class="section-hint id-hint" i18n="@@Token_issuer_hint">
-            The token's <code>iss</code>. Empty, the gateway's internal issuer, the one the internal discovery names; set it if the application expects another value.
-          </p>
+          @if (draft().identityMechanism === 'oidc') {
+            <p class="section-hint id-hint" i18n="@@Token_issuer_hint_oidc">
+              The tokens' <code>iss</code>. Empty, the issuer of the door they are asked at: the internal one for a server in the cluster, the public one otherwise. Set it if the application expects another value.
+            </p>
+          } @else {
+            <p class="section-hint id-hint" i18n="@@Token_issuer_hint">
+              The token's <code>iss</code>. Empty, the gateway's internal issuer, the one the internal discovery names; set it if the application expects another value.
+            </p>
+          }
           <div class="ttl-row">
             <mat-form-field class="position-field" subscriptSizing="dynamic">
               <mat-label i18n="@@Issuer">Issuer</mat-label>

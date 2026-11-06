@@ -381,3 +381,38 @@ func TestAClientReadingItsSecretFromASecretTravelsAsTheReference(t *testing.T) {
 		}
 	}
 }
+
+// TestARoutesOwnIssuerTravels: a route writing its own token issuer keeps it
+// through an export and an import on another gateway, and a comparison of two
+// documents names the field when it differs.
+func TestARoutesOwnIssuerTravels(t *testing.T) {
+	ctx := context.Background()
+	from := openTemp(t)
+	r := oidcRoute("ledger", "")
+	r.Identity = &store.IdentityForward{Mechanism: "signed-jwt", Issuer: "https://legacy.example.com"}
+	if err := from.SaveRoute(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	doc := travel(t, from)
+	to := openTemp(t)
+	if _, err := Apply(ctx, to, doc, false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := to.GetRoute(ctx, "ledger")
+	if err != nil || got.Identity == nil || got.Identity.Issuer != "https://legacy.example.com" {
+		t.Fatalf("imported: %+v %v", got.Identity, err)
+	}
+	other := travel(t, from)
+	for i := range other.Routes {
+		other.Routes[i].Identity.Issuer = ""
+	}
+	var moved []Change
+	for _, c := range Compare(doc, other) {
+		if c.Action != ActionSame && c.Kind == "route" {
+			moved = append(moved, c)
+		}
+	}
+	if len(moved) != 1 || moved[0].Kind != "route" || !slices.Contains(moved[0].Fields, "identity") {
+		t.Fatalf("compare: %+v", moved)
+	}
+}

@@ -21,7 +21,7 @@ client sent is removed first, so a caller cannot forge one. It carries:
 
 | Claim | What it holds |
 |---|---|
-| `iss` | the issuer: the application plane's public address (`https://<public name>`), `meerkat` while none is declared |
+| `iss` | the issuer: the gateway's **internal issuer**, the internal plane's full name (see [The issuer](#the-issuer)), or the route's own **Issuer** when it writes one |
 | `sub` | the caller's account id |
 | `aud` | the route's **Audience**, or its name when the field is empty: set one when the service checks for a value of its own, or so that renaming the route does not change its tokens. The same rule as an OIDC client's audience: any text up to 255 characters, spaces inside included, no control character |
 | `iat`, `exp` | when it was signed, and when it stops being valid: two minutes later by default, set per route |
@@ -90,7 +90,7 @@ http://meerkat:7070/.well-known/openid-configuration
 
 ```json
 {
-  "issuer": "meerkat",
+  "issuer": "http://meerkat:7070",
   "jwks_uri": "http://meerkat:7070/.well-known/jwks.json",
   "id_token_signing_alg_values_supported": ["ES256", "EdDSA", "RS256"],
   "subject_types_supported": ["public"]
@@ -110,11 +110,10 @@ Libraries take it in one of two ways:
   cluster should take. Over plain HTTP, say so where the library asks
   (`RequireHttpsMetadata = false` in .NET).
 - **The issuer alone** - Spring's `issuer-uri`, go-oidc's provider. They read
-  `{issuer}/.well-known/openid-configuration` on the gateway's public address,
-  which answers only while the [OpenID provider](/docs/auth/oidc-provider)
-  (Enterprise edition) has a client declared. Otherwise, give such a library the
-  JWKS below and the issuer to check (Spring: `jwk-set-uri` beside the expected
-  issuer) rather than the issuer alone.
+  `{issuer}/.well-known/openid-configuration` and check that the document names
+  that same issuer. The internal issuer is the internal plane's own address, so
+  this works inside the cluster: give the library the issuer the drawer shows
+  under **Issuer (internal)**, as it is.
 
 ### The JWKS, for a library that only takes keys
 
@@ -126,7 +125,7 @@ The public half of the keys, as a standard JWKS - for a library that knows no
 discovery, such as `jose`'s remote key set. The token's `kid` names the key,
 and the key carries its algorithm, so the service takes the algorithm from the
 key, never from the token's header. It then checks the issuer itself, against
-the one the drawer shows.
+the one the drawer shows under **Issuer (internal)**.
 
 ### A PEM, for a service that cannot fetch anything
 
@@ -136,16 +135,25 @@ rotation, where the two addresses above follow it on their own.
 
 ## The issuer
 
-Every token says who issued it in `iss`, and a service checks it. It is not
-typed: it is the application plane's **public name**, declared in **Domains &
-TLS**, **Application** tab, as `https://<name>` (a name on this machine,
-`localhost`, gives `http://localhost:<data-plane port>`). With several names,
-the **OIDC / JWT** drawer chooses one in **Public address**, the first until
-then; with none, the tokens say `meerkat` and the drawer links to that tab. The
-same issuer is the [OpenID provider](/docs/auth/oidc-provider)'s.
+Every token says who issued it in `iss`, and a service checks it. A route's JWT
+goes to a service inside the cluster, which reads the keys on the internal plane:
+it carries the gateway's **internal issuer**, the internal plane's full name as the
+runtime names it - in Kubernetes the Service in front of it,
+`https://<release>-internal.<namespace>.svc.cluster.local:7443` once a certificate
+is placed on it, `http://...:7070` before. It is not typed: the **OIDC / JWT**
+drawer shows it under **Issuer (internal)**, and the internal discovery document
+names it, **the same whatever name a service used to read it** - a JWT nobody
+asks for has to carry the one name every service learnt. A gateway that cannot
+ask its runtime (a bare binary) uses its public issuer instead.
 
-Declare, remove or choose a public name and the next token carries the new
-issuer, on every node - so change what the services expect at the same time.
+A service that reads the issuer in the internal discovery follows by itself. A
+service that writes the issuer it expects in its own configuration must write that
+name - or the route writes the value the service expects: **Issuer**, under the
+audience in **Auth forward**, replaces the `iss` of that route's tokens.
+
+The public name, chosen in **Public address**, is the issuer of the public door:
+the [OpenID provider](/docs/auth/oidc-provider)'s tokens asked from outside the
+cluster.
 
 > [!NOTE]
 > The discovery document describes how to verify a token, not how to obtain

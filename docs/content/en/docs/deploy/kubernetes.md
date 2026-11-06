@@ -377,6 +377,8 @@ The replicas and image of a service in another namespace are read once that name
 
 Reading the pods reads the environment variables their manifests declare. Where a manifest carries a secret in clear, set `rbac.watch: false`, or better, move the secret into a Secret.
 
+**The Secrets.** An OIDC client's secret may be read where the application's own chart writes it, a key of a Kubernetes Secret ([Meerkat as an OpenID provider](/docs/auth/oidc-provider#a-secret-read-from-a-kubernetes-secret)). The chart grants that with `rbac.readSecrets`, on by default: a ClusterRole with `get` on secrets, and nothing else - never `list`. The console offers the keys the pods behind the routes read, found in the pods' own manifests, so no Secret is ever listed. It is still a read of any Secret whose name the gateway knows: set `rbac.readSecrets: false` where it must not, and paste a client's secret instead.
+
 The developer tunnel asks for more than this, and what it grants is set out on [One gateway](/docs/deploy/one-gateway).
 
 ::: details The Role, the ClusterRole and their bindings
