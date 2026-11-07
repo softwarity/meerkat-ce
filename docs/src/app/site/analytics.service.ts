@@ -52,6 +52,10 @@ export class AnalyticsService {
       this.load();
       this.tagCounts = true;
     }
+    // One listener each for the whole site, the Markdown pages included: their
+    // links and code blocks are not components that could report themselves.
+    document.addEventListener('click', (e) => this.clicked(e), { capture: true });
+    document.addEventListener('copy', () => this.copiedSelection());
   }
 
   decide(consent: Consent): void {
@@ -66,6 +70,7 @@ export class AnalyticsService {
       window.gtag?.('consent', 'update', { analytics_storage: 'granted' });
       // The tag, loading now, counts the page being read.
       this.load();
+      this.interest(location.pathname);
       return;
     }
     // A withdrawn consent: Google stops writing, and its cookies go.
@@ -82,12 +87,61 @@ export class AnalyticsService {
   // based on browser history events" stays off: it fires before the new title
   // is set, and would count each page a second time.
   pageView(title: string): void {
+    this.interest(location.pathname);
     if (this.tagCounts) {
       this.tagCounts = false;
       return;
     }
+    this.event('page_view', { page_title: title, page_location: location.href });
+  }
+
+  // The gestures that say a reader is going further than reading - copying a
+  // command, fetching a deployment file, going to the code or the image,
+  // writing to sales, looking at the prices. Each has its own name, so that
+  // the property can mark it as a key event; the names are snake_case, as GA4
+  // wants them, and stable: a report is built on them.
+  event(name: string, params: Record<string, string> = {}): void {
     if (!this.loaded || this.consent() !== 'granted') return;
-    window.gtag?.('event', 'page_view', { page_title: title, page_location: location.href });
+    window.gtag?.('event', name, params);
+  }
+
+  private interest(path: string): void {
+    if (/^\/pricing(\/|$)/.test(path)) this.event('view_pricing');
+  }
+
+  private clicked(e: MouseEvent): void {
+    const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!a) return;
+    let url: URL;
+    try {
+      url = new URL(a.href);
+    } catch {
+      return;
+    }
+    const placement = a.closest('.topbar') ? 'topbar' : a.closest('.site-footer') ? 'footer' : 'page';
+    if (url.protocol === 'mailto:') {
+      if (!url.pathname.startsWith('sales@')) return;
+      const plan = (url.searchParams.get('subject') ?? '').replace(/^Meerkat\s*/, '') || 'general';
+      this.event('contact_sales', { plan, placement });
+    } else if (a.hasAttribute('download') && url.pathname.includes('/deploy/')) {
+      this.event('download_deploy_file', { file_name: url.pathname.split('/').pop() ?? '' });
+    } else if (url.hostname === 'github.com' && /^\/softwarity\/meerkat-ce(\/|$)/.test(url.pathname)) {
+      this.event('github_click', { link_url: url.href, placement });
+    } else if (url.hostname === 'hub.docker.com' || url.hostname === 'ghcr.io') {
+      this.event('image_click', { link_url: url.href, placement });
+    }
+  }
+
+  // A command selected by hand in a code block and copied. The install
+  // widget's Copy button writes to the clipboard without this event, and
+  // reports itself.
+  private copiedSelection(): void {
+    const sel = document.getSelection();
+    const node = sel?.anchorNode;
+    const el = node instanceof Element ? node : node?.parentElement;
+    if (!sel || !el?.closest('pre')) return;
+    const command = sel.toString().trim().split(/\s+/)[0];
+    if (command) this.event('copy_command', { command, source: 'selection' });
   }
 
   private load(): void {

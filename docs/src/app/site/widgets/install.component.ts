@@ -1,4 +1,5 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { AnalyticsService } from '../analytics.service';
 
 // "Start the gateway", for the edition and the platform the reader actually
 // has. One page used to give one command - the community image under plain
@@ -289,6 +290,7 @@ export class InstallComponent {
 
   protected readonly editions: Edition[] = ['ce', 'eval', 'licensed'];
   protected readonly platforms: Platform[] = ['docker', 'swarm', 'k8s'];
+  private readonly analytics = inject(AnalyticsService);
   protected readonly edition = signal<Edition>('ce');
   protected readonly platform = signal<Platform>('docker');
   protected readonly copied = signal(-1);
@@ -317,6 +319,12 @@ export class InstallComponent {
   }
 
   protected copy(text: string, index: number): void {
+    this.analytics.event('copy_command', {
+      command: text.split(/\s+/)[0],
+      edition: this.edition(),
+      platform: this.platform(),
+      source: 'install',
+    });
     void navigator.clipboard?.writeText(text).then(() => {
       this.copied.set(index);
       setTimeout(() => this.copied.set(-1), 1500);
