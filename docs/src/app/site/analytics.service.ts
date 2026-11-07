@@ -13,7 +13,7 @@ import { Injectable, signal } from '@angular/core';
 // MEASUREMENT_ID is the GA4 property's "G-..." id. Empty, there is no banner
 // and nothing is measured. It is public by nature (every page that measures
 // shows it), so it lives here rather than in a secret.
-const MEASUREMENT_ID = '';
+const MEASUREMENT_ID = 'G-D11Q13E556';
 
 // Measured only where the site is published: a local `ng serve`, or the site
 // served behind a gateway for a test, is not an audience.
