@@ -21,6 +21,7 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { Lang, WORDS } from './i18n';
 import { Nav, NavArea, NavSection, Page, Shot, SiteService } from './site.service';
+import { AnalyticsService } from './analytics.service';
 import { BenchmarkComponent } from './widgets/benchmark.component';
 import { InstallComponent } from './widgets/install.component';
 
@@ -46,6 +47,7 @@ export class PageComponent {
   private readonly site = inject(SiteService);
   private readonly router = inject(Router);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly analytics = inject(AnalyticsService);
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
   private readonly app = inject(ApplicationRef);
   private readonly injector = inject(EnvironmentInjector);
@@ -147,6 +149,7 @@ export class PageComponent {
           const house = p.area === 'softwarity' || p.area === 'project' ? 'Softwarity' : 'Meerkat';
           // The home page names the product first, as the file the build wrote does.
           document.title = slug === 'index' ? `Meerkat: ${p.title}` : `${p.title} | ${house}`;
+          this.analytics.pageView(document.title);
           const meta = document.querySelector('meta[name="description"]');
           if (meta && p.summary) meta.setAttribute('content', p.summary);
           // The anchors the build wrote point at pages, not at addresses -

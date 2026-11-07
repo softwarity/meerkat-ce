@@ -40,6 +40,10 @@ interface Words {
   previousImage: string;
   nextImage: string;
   imageOf: string;
+  cookies: string;
+  consentText: string;
+  accept: string;
+  refuse: string;
 }
 
 export const WORDS: Record<Lang, Words> = {
@@ -68,6 +72,11 @@ export const WORDS: Record<Lang, Words> = {
     previousImage: 'Previous image',
     nextImage: 'Next image',
     imageOf: 'of',
+    cookies: 'Cookies',
+    consentText:
+      'May we measure the audience of this site with Google Analytics? It sets cookies, and only if you accept. Nothing personal is shared for advertising, and you can change your mind at any time from the Cookies link at the bottom of the page.',
+    accept: 'Accept',
+    refuse: 'Refuse',
   },
   fr: {
     search: 'Rechercher',
@@ -94,5 +103,10 @@ export const WORDS: Record<Lang, Words> = {
     previousImage: 'Image précédente',
     nextImage: 'Image suivante',
     imageOf: 'sur',
+    cookies: 'Cookies',
+    consentText:
+      "Pouvons-nous mesurer l'audience de ce site avec Google Analytics ? Il dépose des cookies, et seulement si vous acceptez. Rien de personnel n'est partagé pour la publicité, et vous pouvez changer d'avis à tout moment depuis le lien Cookies en bas de page.",
+    accept: 'Accepter',
+    refuse: 'Refuser',
   },
 };

@@ -213,6 +213,45 @@ rail-nav-content {
   gap: 18px;
 }
 
+.foot-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.consent {
+  position: fixed;
+  // Above the rail (its drawer sits at 100 inside the page), below the
+  // picture viewer, which the reader opened on purpose.
+  z-index: 110;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-width: 560px;
+  margin-left: auto;
+  padding: 16px 18px;
+  background: var(--surface);
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+  line-height: 1.45;
+
+  p {
+    margin: 0 0 12px;
+  }
+}
+
+.consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .foot-made {
   display: flex;
   align-items: center;

@@ -104,3 +104,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # Cloudflare Pages, the host the site moves to: it runs
+      # docs/functions/_middleware.js, which answers ?lg=fr with the French
+      # file - GitHub Pages ignores the query and answers English, so the
+      # French pages were never indexed. Both hosts are fed until the domain's
+      # CNAME points at Cloudflare; GitHub Pages goes after that. No token on
+      # the repository, no Cloudflare: the site still ships, on GitHub Pages.
+      - name: Deploy to Cloudflare Pages
+        working-directory: docs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::no Cloudflare credentials on this repository: published on GitHub Pages only"
+            exit 0
+          fi
+          # Created once; every later run finds it.
+          npx -y wrangler@4.158.0 pages project list | grep -qw meerkat-site \
+            || npx -y wrangler@4.158.0 pages project create meerkat-site --production-branch main
+          npx -y wrangler@4.158.0 pages deploy dist/doc-site/browser \
+            --project-name meerkat-site --branch main --commit-dirty=true

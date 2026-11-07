@@ -13,8 +13,15 @@
 // the file itself; the application replaces it when it starts, as Angular
 // empties the host element of the root component it boots.
 //
+// Each head also says, in structured data (JSON-LD), what the page is: the
+// home page describes the product and its publisher, every other page where it
+// sits in the site (a breadcrumb a search result can show), and a
+// documentation page is a technical article with the date it last changed.
+//
 // Last, the two files a crawler asks for first: sitemap.xml, one address per
-// page, and robots.txt, which names it.
+// page with the date it last changed, and robots.txt, which names it.
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = join(here, '..', 'dist', 'doc-site', 'browser');
 const SITE = join(OUT, 'assets', 'site');
+const CONTENT = join(here, '..', 'content');
 const LANGS = ['en', 'fr'];
 const ORIGIN = 'https://meerkat.softwarity.dev';
 // The card a link preview shows: 1200 x 630, the size summary_large_image asks.
@@ -34,9 +42,34 @@ await writeFile(join(OUT, '404.html'), index);
 // hashes change on every build, so they are read rather than written down.
 const base = index.match(/<base href="([^"]*)"/)?.[1] ?? '/';
 const head = [
-  ...(index.match(/<link[^>]*>/g) ?? []),
+  // Not a page's own links: run twice over one build, the index read here is
+  // the one this script wrote, and they would be copied into every page.
+  ...(index.match(/<link[^>]*>/g) ?? []).filter((l) => !/rel="(canonical|alternate)"/.test(l)),
   ...(index.match(/<script[^>]*><\/script>/g) ?? []),
 ];
+
+const AREAS = JSON.parse(await readFile(join(CONTENT, 'areas.json'), 'utf8'));
+const VERSION = JSON.parse(await readFile(join(OUT, 'assets', 'version.json'), 'utf8')).version;
+
+// When a page last changed: the last commit that touched its Markdown, in any
+// language. The deploy checks out the whole history, so this is the page's own
+// date; a page generated from data (no Markdown of its own) has none, and a
+// sitemap says nothing rather than something false.
+function changed(slug) {
+  const files = [];
+  for (const lang of LANGS) {
+    for (const f of [`${slug}.md`, `${slug}/index.md`]) {
+      const path = join(CONTENT, lang, f);
+      if (existsSync(path)) files.push(path);
+    }
+  }
+  if (files.length === 0) return '';
+  try {
+    return execFileSync('git', ['log', '-1', '--format=%cI', '--', ...files], { cwd: CONTENT, encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
 
 const escape = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -46,7 +79,7 @@ const escape = (s) =>
 //   canonical  the address search engines keep for this file
 //   alternates the same page in each language, for a crawler: an address names
 //              a page and ?lg= names the language it is read in
-function document(lang, page, canonical, alternates) {
+function document(lang, page, canonical, alternates, modified) {
   // Same rule as the runtime: the company is the brand, Meerkat is the
   // product, and the tab says which of the two the page is about.
   const house = page.area === 'softwarity' || page.area === 'project' ? 'Softwarity' : 'Meerkat';
@@ -77,12 +110,70 @@ ${alternates.join('\n')}
 <meta name="twitter:title" content="${escape(title)}">
 <meta name="twitter:description" content="${escape(page.summary)}">
 <meta name="twitter:image" content="${card}">
+<script type="application/ld+json">${ld(lang, page, canonical, title, modified)}</script>
 <style>.prerender{max-width:860px;margin:32px auto;padding:0 16px;font-family:Roboto,Helvetica,Arial,sans-serif;line-height:1.5}.prerender img,.prerender svg{max-width:100%;height:auto}</style>
 ${head.join('\n')}
 </head>
 <body><app-root><main class="prerender">${page.html ?? ''}</main></app-root></body>
 </html>
 `;
+}
+
+// What the page is, for a search engine. The publisher and the product are
+// named once, on the home page, and the other pages point at them by @id.
+function ld(lang, page, canonical, title, modified) {
+  const home = `${ORIGIN}${base}`;
+  const org = { '@type': 'Organization', '@id': `${home}#softwarity`, name: 'Softwarity', url: `${home}softwarity/`, logo: `${home}img/softwarity.svg` };
+  const graph = [];
+  if (page.slug === 'index') {
+    graph.push(
+      org,
+      { '@type': 'WebSite', '@id': `${home}#site`, url: home, name: 'Meerkat', inLanguage: ['en', 'fr'], publisher: { '@id': org['@id'] } },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${home}#meerkat`,
+        name: 'Meerkat',
+        description: page.summary,
+        url: home,
+        image: `${home}${CARD}`,
+        applicationCategory: 'SecurityApplication',
+        operatingSystem: 'Linux, Docker, Kubernetes',
+        ...(VERSION && VERSION !== '0.0.0' ? { softwareVersion: VERSION } : {}),
+        downloadUrl: 'https://hub.docker.com/r/softwarity/meerkat',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR', description: 'Community edition' },
+        publisher: { '@id': org['@id'] },
+      },
+    );
+  } else {
+    // Home, the part of the site, the page: the part only when it is not the
+    // page itself.
+    // A page read in a named language (?lg=fr) keeps it along the trail.
+    const area = AREAS.find((a) => a.id === page.area);
+    const q = canonical.includes('?lg=') ? `?lg=${lang}` : '';
+    const crumbs = [{ name: lang === 'fr' ? 'Accueil' : 'Home', item: `${home}${q}` }];
+    if (area && !area.hidden && area.home !== page.slug) {
+      crumbs.push({ name: area.label?.[lang] ?? area.label?.en, item: `${home}${area.home}/${q}` });
+    }
+    crumbs.push({ name: page.title, item: canonical });
+    graph.push({
+      '@type': 'BreadcrumbList',
+      itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, ...c })),
+    });
+    if (page.slug.startsWith('docs/')) {
+      graph.push({
+        '@type': 'TechArticle',
+        headline: page.title,
+        description: page.summary,
+        url: canonical,
+        inLanguage: lang,
+        ...(modified ? { dateModified: modified } : {}),
+        about: { '@id': `${home}#meerkat` },
+        publisher: { '@id': org['@id'] },
+      });
+    }
+  }
+  // A closing tag inside a string would end the script element early.
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c');
 }
 
 // Two pages of one language with the same title ("Routes", the console's
@@ -126,8 +217,12 @@ for (const [slug, langs] of langsOf) {
   // nobody should have written.
   const path = slug === 'index' ? '' : `${slug}/`;
   const bare = `${ORIGIN}${base}${path}`;
+  // Each language's address: the first one is the address that names none,
+  // the others name theirs (?lg=fr), which the host answers with that
+  // language's file (functions/_middleware.js).
+  const at = (l) => (l === langs[0] ? bare : `${bare}?lg=${l}`);
   const alternates = [
-    ...langs.map((l) => `<link rel="alternate" hreflang="${l}" href="${bare}?lg=${l}">`),
+    ...langs.map((l) => `<link rel="alternate" hreflang="${l}" href="${at(l)}">`),
     `<link rel="alternate" hreflang="x-default" href="${bare}">`,
   ];
   // The page itself, at the address that names no language. Its head is in
@@ -135,29 +230,72 @@ for (const [slug, langs] of langsOf) {
   // own is chosen when the application starts.
   // The home page too: index.html is rewritten with its own head and text,
   // after 404.html took the shell as the builder wrote it.
-  await write(path, document(langs[0], pages.get(`${langs[0]}/${slug}`), bare, alternates));
-  sitemap.push(bare);
+  const modified = changed(slug);
+  await write(path, document(langs[0], pages.get(`${langs[0]}/${slug}`), bare, alternates, modified));
+  for (const l of langs) sitemap.push({ loc: at(l), modified, langs: langs.map((o) => [o, at(o)]), bare });
   written++;
-  // And the addresses of before, /en/... and /fr/..., which were sent and
-  // indexed: they answer 200 with their own head, name the new address as the
-  // canonical one, and the application takes the reader there.
+  // One file per language under /en/ and /fr/: what ?lg= is answered with,
+  // and the addresses of before, which were sent and indexed - the host
+  // redirects those to the address that replaced them, and a host that cannot
+  // (a plain file server) answers the file, whose canonical names it.
   for (const lang of langs) {
     const old = slug === 'index' ? lang : `${lang}/${slug}`;
-    await write(old, document(lang, pages.get(`${lang}/${slug}`), `${bare}?lg=${lang}`, alternates));
+    await write(old, document(lang, pages.get(`${lang}/${slug}`), at(lang), alternates, modified));
     written++;
   }
 }
 
-// One address per page, the canonical one: the /en/ and /fr/ addresses of
-// before name it themselves and are left out.
+// One address per page and language, each naming its versions in the other
+// languages - the sitemap form of hreflang. The /en/ and /fr/ files are left
+// out: they are what an address is answered with, not addresses.
+const xhtml = (u) =>
+  [...u.langs.map(([l, href]) => [l, href]), ['x-default', u.bare]]
+    .map(([l, href]) => `<xhtml:link rel="alternate" hreflang="${l}" href="${escape(href)}"/>`)
+    .join('');
 await writeFile(
   join(OUT, 'sitemap.xml'),
   `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${sitemap.map((u) => `  <url><loc>${escape(u)}</loc></url>`).join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${sitemap
+  .map(
+    (u) =>
+      `  <url><loc>${escape(u.loc)}</loc>${u.modified ? `<lastmod>${u.modified}</lastmod>` : ''}${u.langs.length > 1 ? xhtml(u) : ''}</url>`,
+  )
+  .join('\n')}
 </urlset>
 `,
 );
+
+// For Cloudflare Pages, which reads both files and which GitHub Pages serves
+// as two more files nobody asks for.
+//
+// _headers: the bundle's files carry a hash in their name, so they never
+// change - a year in the browser's cache, where a file host gives everything
+// ten minutes. Everything else keeps the host's default, which revalidates.
+// And the headers a product about security should send on its own site.
+//
+// _routes.json: only pages run the function that serves ?lg=; the bundle, the
+// content and the pictures are files, served for nothing.
+const hashed = (await readdir(OUT)).filter((f) => /-[A-Za-z0-9_-]{8}\.(js|css)$/.test(f));
+await writeFile(
+  join(OUT, '_headers'),
+  `/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Strict-Transport-Security: max-age=31536000
+${hashed.map((f) => `\n/${f}\n  Cache-Control: public, max-age=31536000, immutable`).join('\n')}
+`,
+);
+// The directories that hold no page: assets, pictures, downloads.
+const pageDirs = new Set([...langsOf.keys()].map((slug) => slug.split('/')[0]));
+const dirs = (await readdir(OUT, { withFileTypes: true }))
+  .filter((d) => d.isDirectory() && !pageDirs.has(d.name) && !LANGS.includes(d.name))
+  .map((d) => `/${d.name}/*`);
+await writeFile(
+  join(OUT, '_routes.json'),
+  JSON.stringify({ version: 1, include: ['/*'], exclude: [...dirs, ...hashed.map((f) => `/${f}`), '/*.json', '/*.xml', '/*.txt', '/*.svg', '/*.png'] }, null, 2),
+);
 await writeFile(join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}${base}sitemap.xml\n`);
 
-console.log(`[static-pages] ${written} pages + 404.html, sitemap.xml (${sitemap.length} addresses), robots.txt`);
+console.log(`[static-pages] ${written} pages + 404.html, sitemap.xml (${sitemap.length} addresses), robots.txt, _headers, _routes.json`);

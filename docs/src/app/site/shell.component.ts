@@ -15,6 +15,7 @@ import { filter, map, startWith } from 'rxjs';
 import { Lang, LANG_NAMES, LANGS, WORDS } from './i18n';
 import { Hit, LANG_PARAM, Nav, NavArea, Scheme, Shot, SiteService } from './site.service';
 import { VersionService } from '../version.service';
+import { AnalyticsService } from './analytics.service';
 
 const MEERKAT_MARK = `
 <svg viewBox="0 0 44 64" xmlns="http://www.w3.org/2000/svg">
@@ -122,6 +123,9 @@ export class ShellComponent {
   protected readonly shots = this.site.shots;
   protected readonly at = this.site.at;
   protected readonly shot = computed<Shot | null>(() => this.shots()[this.at()] ?? null);
+
+  // Audience measurement, and the question it asks first.
+  protected readonly analytics = inject(AnalyticsService);
 
   protected readonly searchOpen = signal(false);
   protected readonly query = signal('');

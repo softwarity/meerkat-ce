@@ -108,6 +108,9 @@
             <a href="https://github.com/softwarity/meerkat-ce/releases" target="_blank" rel="noopener">Releases</a>
             <a [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">Softwarity</a>
             <a [routerLink]="path('project/roadmap')" [queryParams]="langQuery()">{{ areaLabel('project') }}</a>
+            @if (analytics.enabled) {
+              <button type="button" class="foot-link" (click)="analytics.ask()">{{ words().cookies }}</button>
+            }
           </div>
           <div class="foot-made">
             <img src="img/softwarity.svg" alt="Softwarity" />
@@ -163,6 +166,18 @@
         }
       </figcaption>
     </figure>
+  </div>
+}
+
+<!-- The question audience measurement asks before anything of Google is
+     loaded. Refusing is one click, as accepting is, and the footer asks again. -->
+@if (analytics.asking()) {
+  <div class="consent" role="dialog" aria-live="polite" [attr.aria-label]="words().cookies">
+    <p>{{ words().consentText }}</p>
+    <div class="consent-actions">
+      <button type="button" class="pill" (click)="analytics.decide('denied')">{{ words().refuse }}</button>
+      <button type="button" class="pill" (click)="analytics.decide('granted')">{{ words().accept }}</button>
+    </div>
   </div>
 }
 
