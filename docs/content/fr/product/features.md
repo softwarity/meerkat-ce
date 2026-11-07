@@ -21,6 +21,8 @@ capacité sans Meerkat, ligne par ligne, dans [Ce que fait Meerkat](/docs/capabi
 Les pages que voient vos utilisateurs, servies par la gateway, à vos
 couleurs.
 
+**Pourquoi la gateway ?** Chaque requête traverse la gateway avant d'atteindre une application : c'est le seul endroit où l'on peut arrêter une personne, lui demander qui elle est, et la laisser passer une fois pour toutes. Connecté à la porte, un utilisateur l'est partout derrière, et aucun service ne garde de mot de passe, de second facteur ni de session à lui sur lesquels se tromper.
+
 Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 
 - **Pages de connexion servies par la gateway** : connexion, mot de passe oublié, vérification de l'adresse e-mail, inscription en option, en 21 langues, avec votre thème, votre logo et votre image de fond. Chaque traduction peut être corrigée, ou une langue ajoutée, depuis la console.
@@ -42,6 +44,8 @@ Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 
 Qui accède à quoi se décide à la porte, jamais dans chaque application.
 
+**Pourquoi la gateway ?** C'est le seul composant qui voit chaque requête et sait déjà qui l'envoie. En décidant là, une règle écrite une fois vaut pour tous les services, y compris celui écrit l'an dernier dans un autre langage ; et une requête refusée à la porte n'atteint jamais le code qui aurait pu oublier de vérifier.
+
 Pour en savoir plus : [Authentifier et autoriser](/docs/access/overview).
 
 - **Rôles hiérarchiques** et groupes de rôles par tenant, cumulés ou choisis à la connexion.
@@ -58,6 +62,8 @@ Pour en savoir plus : [Authentifier et autoriser](/docs/access/overview).
 La gateway appelle vos services à l'heure que vous indiquez, sans serveur de
 messages à installer.
 
+**Pourquoi la gateway ?** Un appel planifié est une requête comme une autre : il lui faut une adresse, une identité et les règles placées devant le service. La gateway a déjà les trois et tourne sur chaque nœud : elle passe l'appel sans conteneur cron, sans compte de service ni serveur de messages à côté, et garde l'historique là où se trouve le reste du trafic.
+
 Pour en savoir plus : [Appels planifiés](/docs/operations/scheduler).
 
 - **Une planification, c'est une route, un chemin et une cadence** : un intervalle, un calendrier cron dans un fuseau horaire, ou une date unique pour une action différée. L'appel passe par la porte d'entrée : toutes les règles placées devant le service s'y appliquent.
@@ -71,6 +77,8 @@ Pour en savoir plus : [Appels planifiés](/docs/operations/scheduler).
 
 Un service prévient ses utilisateurs, qui l'apprennent dans l'application qu'ils ont ouverte. **Enterprise** *en partie*
 
+**Pourquoi la gateway ?** Un service sait ce qui s'est passé, mais pas qui regarde ni où. La gateway sait les deux : qui est connecté, dans quel tenant, avec quels rôles, et quelle page est ouverte devant lui, puisque c'est elle qui l'a servie. Le service dit quoi, la gateway trouve qui et où.
+
 En savoir plus : [Notifier vos utilisateurs](/docs/operations/notifications).
 
 - **Une requête du service** : un titre, un texte, un lien vers le détail et jusqu'à cinq actions, désignés par le service et le chemin qu'il connaît déjà ; la gateway trouve l'adresse publique.
@@ -83,6 +91,8 @@ En savoir plus : [Notifier vos utilisateurs](/docs/operations/notifications).
 ## Routage et protection du trafic
 
 Une API gateway complète, pilotée depuis la console.
+
+**Pourquoi la gateway ?** Router est son premier métier, et le faire là où l'identité est connue rend les règles précises : une limite par utilisateur ou par tenant, un canari pour un rôle, une page de maintenance avec une porte pour les administrateurs, tout cela demande de savoir qui demande, ce qu'un simple proxy ignore.
 
 Pour en savoir plus : [Les routes](/docs/concepts/routes), et ce que coûte une
 requête dans [Performance](/product/performance).
@@ -102,6 +112,8 @@ requête dans [Performance](/product/performance).
 
 Ce que la gateway ajoute aux pages qu'elle sert.
 
+**Pourquoi la gateway ?** Elle sert chaque page, elle peut donc ajouter la même chose à toutes au passage : un bouton utilisateur, un menu, une même idée de qui est connecté, sur des applications écrites par des équipes différentes dans des frameworks différents. Fait dans chaque application, c'est à refaire dans chacune, et à garder en phase pour toujours.
+
 Pour en savoir plus : [Ce que la gateway injecte](/docs/concepts/data-plane-chrome).
 
 - **Bouton utilisateur injecté** : profil, déconnexion, changement de tenant, langue, mode clair ou sombre.
@@ -117,6 +129,8 @@ Pour en savoir plus : [Ce que la gateway injecte](/docs/concepts/data-plane-chro
 
 Les briques que l'on installe d'habitude à côté.
 
+**Pourquoi la gateway ?** Elle tient la bordure : la connexion TLS s'y termine, les secrets dont les routes ont besoin y sont lus, les en-têtes qui protègent le navigateur y sont écrits. Intégrées, ces briques partagent une clé, une console et un journal d'audit, au lieu de trois produits à installer, mettre à jour et raccorder.
+
 Pour en savoir plus : [Le coffre](/docs/operations/vault).
 
 - **Certificats TLS** plan par plan - générés, importés ou signés sur demande, chacun avec ses noms, un joker ou une IP - ajoutés sur la console, les applications ou le plan interne, avec des ports HTTPS ouverts à chaud.
@@ -129,6 +143,8 @@ Pour en savoir plus : [Le coffre](/docs/operations/vault).
 ## Exploitation
 
 Une console qui remplace les fichiers YAML et les pipelines de configuration.
+
+**Pourquoi la gateway ?** Chaque requête, chaque refus et chaque modification passe par elle : elle peut les compter, les journaliser et les tracer sans que chaque service le fasse de son côté. Et une moitié de l'audit ne peut s'écrire que là : les appels refusés avant d'atteindre le moindre service.
 
 Pour en savoir plus : [Exploitation](/docs/operations/overview).
 
@@ -154,6 +170,8 @@ Pour en savoir plus : [Exploitation](/docs/operations/overview).
 
 Tester sur le vrai cluster sans rien déployer.
 
+**Pourquoi la gateway ?** Elle décide déjà quel service répond à chaque requête : pour un développeur, elle peut donc envoyer cette requête vers sa machine, avec la même identité et les mêmes règles, puis la rendre au cluster quand il a fini. Le cluster ne change pas, seul le choix de la gateway change.
+
 Pour en savoir plus : [Mode développement](/product/dev-mode).
 
 - **Du poste de travail au cluster** avec **softwarity/plug** : le service qui tourne sur la machine d'un développeur prend la place du service déployé le temps de la session, puis le cluster retrouve exactement son état d'origine. Dans n'importe quel langage, sans modifier le code, depuis Linux, macOS ou Windows. `plug`
@@ -165,6 +183,8 @@ Pour en savoir plus : [Mode développement](/product/dev-mode).
 ## Pilotée par un agent IA
 
 L'exploitant demande avec des mots, la gateway exécute et enregistre.
+
+**Pourquoi la gateway ?** Un agent a besoin d'un seul endroit pour lire toute la plateforme et y agir, avec des droits que l'on peut restreindre et des actions qui sont enregistrées. La gateway est cet endroit : elle connaît chaque route, chaque rôle et chaque API, vérifie chaque appel de l'agent, et son journal d'audit garde ce qu'il a fait, sous son nom.
 
 Pour en savoir plus : [Le point d'entrée des agents](/docs/agent/overview).
 

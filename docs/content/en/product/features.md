@@ -20,6 +20,8 @@ without Meerkat, line by line, in [What Meerkat does](/docs/capabilities).
 
 The pages your users see, served by the gateway, in your colours.
 
+**Why the gateway?** Every request crosses the gateway before it reaches an application, so it is the one place where a person can be stopped, asked who they are, and let through once for all of them. Signed in at the door, a user is signed in everywhere behind it, and no service holds a password, a second factor or a session of its own to get wrong.
+
 Read more: [How someone signs in](/docs/auth/overview).
 
 - **Served sign-in pages**: sign-in, forgotten password, email verification, optional sign-up, in 21 languages, with your theme, logo and background. Any translation can be corrected, or a language added, from the console.
@@ -41,6 +43,8 @@ Read more: [How someone signs in](/docs/auth/overview).
 
 Who reaches what, decided at the door, never inside each application.
 
+**Why the gateway?** It is the only component that sees every request and already knows who sent it. Deciding there, a rule written once holds for every service, the one written last year in another language included; and a request refused at the door never reaches the code that might have forgotten to check.
+
 Read more: [Authenticating and authorising](/docs/access/overview).
 
 - **Hierarchical roles** and per-tenant role groups, cumulative or picked at sign-in.
@@ -56,6 +60,8 @@ Read more: [Authenticating and authorising](/docs/access/overview).
 
 The gateway calls your services at the hour you name, with no broker to install.
 
+**Why the gateway?** A scheduled call is a request like any other: it needs an address, an identity and the rules in front of the service. The gateway has all three already and runs on every node, so it makes the call with no cron container, no service account and no broker beside it, and keeps the history where the rest of the traffic is.
+
 Read more: [Scheduled calls](/docs/operations/scheduler).
 
 - **A schedule is a route, a path and a cadence**: an interval, a cron calendar in a time zone, or a single date for a delayed action. The call goes through the front door, so every rule in front of the service applies to it.
@@ -69,6 +75,8 @@ Read more: [Scheduled calls](/docs/operations/scheduler).
 
 A service tells its users something, and they see it in whichever application they have open. **Enterprise** *partly*
 
+**Why the gateway?** A service knows what happened, but not who is looking nor where. The gateway knows both: who is signed in, in which tenant, with which roles, and which page is open in front of them, since it served that page. The service says what, the gateway finds who and where.
+
 Read more: [Notifying your users](/docs/operations/notifications).
 
 - **One request from the service**: a title, a text, a link to the detail and up to five actions, named by the service and the path it already knows; the gateway finds the public address.
@@ -81,6 +89,8 @@ Read more: [Notifying your users](/docs/operations/notifications).
 ## Routing and traffic protection
 
 A complete API gateway, run from the console.
+
+**Why the gateway?** Routing is its first job, and doing it where identity is known is what makes the rules sharp: a limit per user or per tenant, a canary for one role, a maintenance page with a door for administrators all need to know who is asking, which a plain proxy does not.
 
 Read more: [Routes](/docs/concepts/routes), and what a request costs in
 [performance](/product/performance).
@@ -100,6 +110,8 @@ Read more: [Routes](/docs/concepts/routes), and what a request costs in
 
 What the gateway adds to the pages it serves.
 
+**Why the gateway?** It serves every page, so it can add the same thing to all of them on the way out: one user button, one menu, one idea of who is signed in, across applications written by different teams in different frameworks. Done inside each application, it is done in each, and kept in step forever.
+
 Read more: [What the gateway injects](/docs/concepts/data-plane-chrome).
 
 - **Injected user button**: profile, sign-out, tenant switch, language, light or dark.
@@ -115,6 +127,8 @@ Read more: [What the gateway injects](/docs/concepts/data-plane-chrome).
 
 The building blocks usually installed alongside.
 
+**Why the gateway?** It holds the edge: the TLS connection ends there, the secrets the routes need are read there, the headers that protect a browser are written there. Built in, these pieces share one key, one console and one audit trail, instead of three products to install, patch and wire together.
+
 Read more: [The vault](/docs/operations/vault).
 
 - **TLS certificates** plane by plane - generated, imported or signed on request, each with its names, a wildcard or an IP - added on the console, the applications or the internal plane, HTTPS ports opened live.
@@ -127,6 +141,8 @@ Read more: [The vault](/docs/operations/vault).
 ## Operations
 
 A console that replaces YAML files and configuration pipelines.
+
+**Why the gateway?** Every request, every refusal and every change passes through it, so it can count, log and trace them without each service doing it on its own. And one half of the audit can only be written there: the calls refused before they reached any service.
 
 Read more: [Operations](/docs/operations/overview).
 
@@ -152,6 +168,8 @@ Read more: [Operations](/docs/operations/overview).
 
 Test against the real cluster without deploying anything.
 
+**Why the gateway?** It already decides which service answers each request, so for one developer it can send that request to their machine instead, with the same identity and the same rules, and send it back when they are done. The cluster does not change; only the gateway's choice does.
+
 Read more: [Dev mode](/product/dev-mode).
 
 - **Workstation to cluster** with **softwarity/plug**: the service running on a developer's machine takes the place of the deployed one for the session, then the cluster goes back exactly as it was. Any language, no code change, from Linux, macOS or Windows. `plug`
@@ -163,6 +181,8 @@ Read more: [Dev mode](/product/dev-mode).
 ## Driven by an AI agent
 
 The operator asks in words, the gateway executes and records.
+
+**Why the gateway?** An agent needs one place to read the whole platform and act on it, with permissions that can be narrowed and actions that are recorded. The gateway is that place: it knows every route, role and API, checks every call the agent makes, and its audit trail keeps what the agent did under the agent's name.
 
 Read more: [The agent endpoint](/docs/agent/overview).
 
