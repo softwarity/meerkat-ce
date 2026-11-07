@@ -31,3 +31,4 @@
 # copied from deploy/ at build by scripts/gen-deploy.mjs - the repository's
 # files are the source, these are the download
 /public/deploy/
+/.wrangler

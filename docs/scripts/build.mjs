@@ -33,5 +33,8 @@ run('node', ['scripts/gen-test-plan.mjs']);
 // content build refuses a download with nothing behind it.
 run('node', ['scripts/gen-deploy.mjs']);
 run('node', ['scripts/build-site.mjs', '--strict']);
+// Before the bundle: the icon font is cut to a list, and a missing icon
+// would show as its name.
+run('node', ['scripts/check-icons.mjs']);
 run('npx', ['ng', 'build', ...passthrough]);
 run('node', ['scripts/static-pages.mjs']);

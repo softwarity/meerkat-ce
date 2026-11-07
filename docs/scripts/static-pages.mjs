@@ -36,17 +36,36 @@ const ORIGIN = 'https://meerkat.softwarity.dev';
 const CARD = 'img/og/meerkat.png';
 
 const index = await readFile(join(OUT, 'index.html'), 'utf8');
-await writeFile(join(OUT, '404.html'), index);
+// The shell as the builder wrote it - not when this script runs a second time
+// over the same build and finds its own home page there.
+if (!index.includes('rel="canonical"')) await writeFile(join(OUT, '404.html'), index);
 
 // What the bundle needs, taken from the index the builder just wrote: the
 // hashes change on every build, so they are read rather than written down.
 const base = index.match(/<base href="([^"]*)"/)?.[1] ?? '/';
-const head = [
-  // Not a page's own links: run twice over one build, the index read here is
-  // the one this script wrote, and they would be copied into every page.
-  ...(index.match(/<link[^>]*>/g) ?? []).filter((l) => !/rel="(canonical|alternate)"/.test(l)),
-  ...(index.match(/<script[^>]*><\/script>/g) ?? []),
-];
+//
+// ALL of it, as the builder wrote it: the head's links, its <style> blocks and
+// its <noscript>, and the body's scripts. Links and script files alone were
+// copied once, and that dropped the <style> blocks - where the builder inlines
+// the Google Fonts stylesheets and the critical CSS. Every page but 404.html
+// was then drawn without Roboto, and its icons showed only because the
+// projects menu happened to load an icon font of its own.
+//
+// What each page writes itself is left out: its title, metas, base, canonical
+// and alternates, its structured data and the prerender's style. Run twice
+// over one build, the index read here is the one this script wrote.
+const headOf = index.slice(index.indexOf('<head>') + 6, index.indexOf('</head>'));
+const head = headOf
+  .replace(/<title>[\s\S]*?<\/title>/g, '')
+  .replace(/<(meta|base)\b[^>]*>/g, '')
+  .replace(/<link[^>]*rel="(canonical|alternate)"[^>]*>/g, '')
+  .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
+  .replace(/<style>\.prerender[\s\S]*?<\/style>/g, '')
+  .split('\n')
+  .map((l) => l.trim())
+  .filter(Boolean);
+const bodyOf = index.slice(index.indexOf('<body'), index.indexOf('</body>'));
+const scripts = bodyOf.match(/<script\b[^>]*>[\s\S]*?<\/script>/g) ?? [];
 
 const AREAS = JSON.parse(await readFile(join(CONTENT, 'areas.json'), 'utf8'));
 const VERSION = JSON.parse(await readFile(join(OUT, 'assets', 'version.json'), 'utf8')).version;
@@ -111,12 +130,63 @@ ${alternates.join('\n')}
 <meta name="twitter:description" content="${escape(page.summary)}">
 <meta name="twitter:image" content="${card}">
 <script type="application/ld+json">${ld(lang, page, canonical, title, modified)}</script>
-<style>.prerender{max-width:860px;margin:32px auto;padding:0 16px;font-family:Roboto,Helvetica,Arial,sans-serif;line-height:1.5}.prerender img,.prerender svg{max-width:100%;height:auto}</style>
+<style>.prerender{max-width:860px;margin:32px auto;padding:0 16px;font-family:Roboto,Helvetica,Arial,sans-serif;line-height:1.5}.prerender img,.prerender svg{max-width:100%;height:auto}.prerender-nav{max-width:860px;margin:16px auto 0;padding:0 16px;font-family:Roboto,Helvetica,Arial,sans-serif;font-size:14px}.prerender-nav:first-child>ul{display:flex;flex-wrap:wrap;gap:4px 16px;list-style:none;padding:0}</style>
 ${head.join('\n')}
 </head>
-<body><app-root><main class="prerender">${page.html ?? ''}</main></app-root></body>
+<body><app-root>${menu(lang, page, canonical.includes('?lg=') ? lang : '', 'top')}<main class="prerender">${linked(page.html ?? '', canonical.includes('?lg=') ? lang : '')}</main>${menu(lang, page, canonical.includes('?lg=') ? lang : '', 'pages')}</app-root>
+${scripts.join('\n')}
+</body>
 </html>
 `;
+}
+
+// The menu, as the application draws it: the parts of the site, and the pages
+// of the part this page is in, section by section. Without it a page linked
+// only to what its own text names, and a crawler reading files saw a site of
+// islands. The application replaces it when it starts, with the page.
+const NAVS = Object.fromEntries(
+  await Promise.all(LANGS.map(async (l) => [l, JSON.parse(await readFile(join(SITE, l, 'nav.json'), 'utf8'))])),
+);
+// Two parts: the site's parts above the page, the pages of this part below it
+// - what a reader without scripts sees first is the page, not a list of 130
+// links.
+function menu(lang, page, lg, part) {
+  const nav = NAVS[lang];
+  if (!nav) return '';
+  const link = (slug, text) => linked(`<a data-page="${escape(slug)}">${escape(text)}</a>`, lg);
+  const areas = nav.areas.filter((a) => !a.hidden);
+  const here = nav.areas.find((a) => a.id === page.area);
+  const sections = (here?.sections ?? [])
+    .filter((sec) => sec.pages.length > 1 || here.sections.length > 1)
+    .map(
+      (sec) =>
+        `<li>${escape(sec.name)}<ul>${sec.pages.map((p) => `<li>${link(p.slug, p.title)}</li>`).join('')}</ul></li>`,
+    )
+    .join('');
+  if (part === 'top') {
+    return `<nav class="prerender-nav"><ul><li>${link('index', 'Meerkat')}</li>${areas.map((a) => `<li>${link(a.home, a.label)}</li>`).join('')}</ul></nav>`;
+  }
+  return sections ? `<nav class="prerender-nav"><ul>${sections}</ul></nav>` : '';
+}
+
+// The links between pages, given their address. The content names a page
+// (data-page) and lets the application write the address, which only it knows
+// at run time - the language, the version. A crawler reading the file did not
+// run it, and found anchors with nowhere to go: the pages were reachable from
+// the sitemap alone, and no page passed any weight to another. Here, each
+// link points at the canonical address of the page it names, in the language
+// of the file (?lg=), with the heading it aims at (?at=). The application
+// rewrites them when it starts, as before.
+function linked(html, lg) {
+  return html.replace(/<a data-page="([^"]*)"((?: data-at="[^"]*")?)/g, (_, slug, rest) => {
+    const at = rest.match(/data-at="([^"]*)"/)?.[1] ?? '';
+    const query = new URLSearchParams();
+    if (lg) query.set('lg', lg);
+    if (at) query.set('at', at);
+    const q = query.toString();
+    const href = `${base}${slug === 'index' ? '' : `${slug}/`}${q ? `?${q}` : ''}`;
+    return `<a href="${escape(href)}" data-page="${slug}"${rest}`;
+  });
 }
 
 // What the page is, for a search engine. The publisher and the product are
