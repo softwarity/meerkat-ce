@@ -36,11 +36,16 @@
 //   colorScheme  "dark" or "light" (default: dark on the console, light on
 //                the applications)
 //   signedIn     data plane only: sign in before (default true)
+//   as           the account to sign in with instead of the instance's own
+//                (signIn): a seeded one, with the seed's password
+//                (instance.usersPassword) - what one administrator sees
 //   steps        what to do once the page is up, in order - each one of
 //                {"click": selector}, {"hover": selector}, {"scrollTo": selector},
 //                {"waitFor": selector}, {"wait": ms}; selectors are Playwright's
 //   clip         [x, y, width, height] of the viewport to keep
 //   settle       ms to wait before the picture (default 1500)
+//   blur         selectors blurred in the picture: what a screen prints that
+//                is nobody's business (a license's id and licensee)
 //   status       the HTTP status the page answers when it is not a 2xx - a
 //                route under maintenance answers 503, and that IS the picture
 //   traffic      true: the screen shows live traffic. A traffic run is
@@ -116,7 +121,7 @@ async function pageFor(shot) {
   const inst = instanceOf(shot);
   const scheme = shot.colorScheme || (shot.plane === 'admin' ? 'dark' : 'light');
   const signedIn = shot.plane === 'admin' || shot.signedIn !== false;
-  const key = [shot.instance || '', shot.plane, scheme, signedIn].join('|');
+  const key = [shot.instance || '', shot.plane, scheme, signedIn, shot.as || ''].join('|');
   if (contexts.has(key)) return contexts.get(key);
   const ctx = await browser.newContext({
     viewport: { width: 1600, height: 1000 },
@@ -131,7 +136,7 @@ async function pageFor(shot) {
     const base = inst[shot.plane];
     await page.goto(base + '/login', { waitUntil: 'networkidle' }).catch(() => {});
     if (await page.locator('input[name=username]').count()) {
-      const [user, password] = inst.signIn.split(' / ');
+      const [user, password] = shot.as ? [shot.as, manifest.instance.usersPassword] : inst.signIn.split(' / ');
       await page.fill('input[name=username]', user);
       await page.fill('input[name=password]', password);
       await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type=submit]')]);
@@ -173,6 +178,10 @@ for (const shot of shots) {
     stepError = e.message.split('\n')[0];
   }
   await sleep(shot.settle ?? 1500);
+  if (shot.blur) {
+    await page.addStyleTag({ content: `${shot.blur.join(', ')} { filter: blur(6px); }` });
+    await sleep(150);
+  }
   const text = (await page.locator('body').innerText().catch(() => '')).trim();
   const status = res ? res.status() : 0;
   const ok = (shot.status ? status === shot.status : status > 0 && status < 400) && text.length > 120 && !stepError;

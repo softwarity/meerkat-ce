@@ -1,6 +1,6 @@
 ---
 title: Capacités d'administration
-section: Contrôle d'accès
+section: Administration
 order: 140
 summary: Les cinq indicateurs d'un compte qui ouvrent la console et l'API d'administration, et ce que chacun débloque exactement.
 ---

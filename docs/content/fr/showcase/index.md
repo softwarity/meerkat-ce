@@ -57,6 +57,22 @@ logo et la navigation viennent de la console.
 ![Les jetons d'API](img/showcase/access-tokens.webp) Des jetons dotés d'un plan et d'un périmètre, et un secret affiché une fois, pas deux.
 :::
 
+## Chaque administrateur, sa console
+
+La même console, réduite à ce que chacun administre : le plan de routage pour
+l'administrateur infra, les personnes et leurs rôles pour l'administrateur
+applicatif, un tenant pour son administrateur, et rien pour les autres. Ce que
+chacun peut faire est décrit dans [Administrateur infra](/docs/access/infra-admin),
+[Administrateur applicatif](/docs/access/app-admin) et
+[Administrateur de tenant](/docs/access/tenant-admin).
+
+::: gallery
+![La console de l'administrateur infra](img/showcase/admin-infra.webp) L'administrateur infra : les routes, les certificats, les autorités et le relais mail. Aucun compte, aucun rôle, aucun tenant.
+![La console de l'administratrice applicative](img/showcase/admin-app.webp) L'administratrice applicative : les comptes, les rôles, les réglages et les pages que sert la gateway. Pas une route.
+![La console d'une administratrice de tenant](img/showcase/admin-tenant.webp) L'administratrice d'un tenant : ses membres, ses groupes et ses réglages, et aucun autre tenant.
+![La console d'un compte qui n'administre rien](img/showcase/admin-none.webp) Tous les autres : l'écran de licence et leur propre compte, rien à administrer.
+:::
+
 ## L'exploiter
 
 ::: gallery

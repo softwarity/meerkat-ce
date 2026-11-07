@@ -20,7 +20,9 @@
       "data": "http://127.0.0.1:8086",
       "why": "what the seed and the traffic use: Node resolves no made-up name"
     },
-    "version": "MEERKAT_VERSION=1.0.1: the binary is built as dev, and the account menu and the release notes then read as a release, not as a development build"
+    "version": "MEERKAT_VERSION=1.0.1: the binary is built as dev, and the account menu and the release notes then read as a release, not as a development build",
+    "usersPassword": "test1234",
+    "usersPasswordWhy": "what every seeded account signs in with (USER_PASSWORD in screenshots-seed.mjs): a shot with `as` signs in as that account"
   },
   "convert": "cwebp -quiet -q 82 -resize 1600 0 <shot>.png -o public/<file>  (done by screenshots.mjs --shoot)",
   "shots": [
@@ -394,6 +396,62 @@
       "file": "img/showcase/vault.webp",
       "plane": "admin",
       "path": "/vault",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/showcase/admin-infra.webp",
+      "plane": "admin",
+      "path": "/infra/routes",
+      "as": "t.nakamura",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/showcase/admin-app.webp",
+      "plane": "admin",
+      "path": "/application/users",
+      "as": "l.moreau",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/showcase/admin-tenant.webp",
+      "plane": "admin",
+      "path": "/tenants/default/members",
+      "as": "s.oliveira",
+      "viewport": [
+        1600,
+        1000
+      ],
+      "usedBy": [
+        "showcase/index"
+      ]
+    },
+    {
+      "file": "img/showcase/admin-none.webp",
+      "plane": "admin",
+      "path": "/",
+      "as": "d.okonkwo",
+      "blur": [
+        "dl.license dd:nth-of-type(1)",
+        "dl.license dd:nth-of-type(2)"
+      ],
       "viewport": [
         1600,
         1000

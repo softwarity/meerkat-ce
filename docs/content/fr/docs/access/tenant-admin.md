@@ -1,6 +1,6 @@
 ---
 title: Administrateur de tenant
-section: Contrôle d'accès
+section: Administration
 order: 143
 summary: Ce qu'administrer un tenant ouvre dans la console - ses groupes, ses membres et ses règles, son audit et ses sessions - et rien des autres.
 ---

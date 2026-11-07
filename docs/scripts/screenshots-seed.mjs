@@ -104,9 +104,11 @@ const ROLES = [
 
 const USERS = [
   { username: 'd.okonkwo', fullname: 'Daniel Okonkwo', email: 'daniel.okonkwo@acme.example', groups: ['Order desk'] },
-  { username: 'l.moreau', fullname: 'Lucie Moreau', email: 'lucie.moreau@acme.example', appAdmin: true, type: 'ADMIN', groups: ['Finance'] },
+  // One account per administrator, each holding ONE of the three: the gallery
+  // shows what each one's console is, limited to it.
+  { username: 'l.moreau', fullname: 'Lucie Moreau', email: 'lucie.moreau@acme.example', appAdmin: true, groups: ['Finance'] },
   { username: 'm.haddad', fullname: 'Mariam Haddad', email: 'mariam.haddad@acme.example', groups: ['Warehouse'] },
-  { username: 's.oliveira', fullname: 'Sofia Oliveira', email: 'sofia.oliveira@acme.example', groups: ['Order desk', 'Finance'] },
+  { username: 's.oliveira', fullname: 'Sofia Oliveira', email: 'sofia.oliveira@acme.example', type: 'ADMIN', groups: ['Order desk', 'Finance'] },
   { username: 't.nakamura', fullname: 'Takeshi Nakamura', email: 'takeshi.nakamura@acme.example', infraAdmin: true, groups: ['Warehouse'] },
 ];
 

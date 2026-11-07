@@ -1,6 +1,6 @@
 ---
 title: Tenant administrator
-section: Access control
+section: Administration
 order: 143
 summary: What administering a tenant opens in the console - that tenant's groups, members and rules, its audit and sessions - and nothing of the others.
 ---

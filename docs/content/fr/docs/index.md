@@ -18,6 +18,17 @@ et de l'observation, pour que vos services n'aient plus à s'en occuper.
 - **[Démarrage rapide](/docs/start/quick-start)** - une gateway en marche et une première application derrière elle.
 - **[Concepts](/docs/concepts/architecture)** - les trois plans, les routes, l'identité, les accès.
 
+## Qui administre quoi
+
+Trois administrateurs se partagent la console, chacun sur une partie, et chacun ne voit que la sienne :
+
+- **[Administrateur infra](/docs/access/infra-admin)** - le plan de routage : routes, certificats, autorités, relais mail.
+- **[Administrateur applicatif](/docs/access/app-admin)** - les personnes : comptes, rôles, réglages, pages que sert la gateway.
+- **[Administrateur de tenant](/docs/access/tenant-admin)** - un tenant : ses membres, ses groupes, ses réglages.
+
+[Capacités d'administration](/docs/access/capabilities) dit comment on les donne, et la
+[galerie](/showcase/index) montre la console de chacun.
+
 ## Référence
 
 - **[Prédicats](/docs/predicates/overview)** - les onze façons dont une route décide qu'une requête lui est destinée.

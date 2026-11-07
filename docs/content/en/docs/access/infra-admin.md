@@ -1,6 +1,6 @@
 ---
 title: Infrastructure administrator
-section: Access control
+section: Administration
 order: 141
 summary: What the infra admin capability opens in the console - the routing plane, its certificates and authorities - and what stays out of reach.
 ---

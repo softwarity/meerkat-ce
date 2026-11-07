@@ -1,6 +1,6 @@
 ---
 title: Application administrator
-section: Access control
+section: Administration
 order: 142
 summary: What the app admin capability opens in the console - the people, their roles, the served pages - and what stays out of reach.
 ---

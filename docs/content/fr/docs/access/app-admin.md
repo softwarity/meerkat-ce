@@ -1,6 +1,6 @@
 ---
 title: Administrateur applicatif
-section: Contrôle d'accès
+section: Administration
 order: 142
 summary: Ce que la capacité app admin ouvre dans la console - les gens, leurs rôles, les pages servies - et ce qui reste hors de portée.
 ---

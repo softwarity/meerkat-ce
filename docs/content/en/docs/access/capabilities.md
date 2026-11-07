@@ -1,6 +1,6 @@
 ---
 title: Administration capabilities
-section: Access control
+section: Administration
 order: 140
 summary: The five flags on an account that open the console and the admin API, and exactly what each one unlocks.
 ---

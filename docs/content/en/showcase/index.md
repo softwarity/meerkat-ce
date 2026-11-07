@@ -56,6 +56,22 @@ navigation come from the console.
 ![API tokens](img/showcase/access-tokens.webp) Tokens with a plane and a perimeter, and a secret shown exactly once.
 :::
 
+## Each administrator, their own console
+
+The same console, cut to what each one administers: the routing plane for the
+infrastructure administrator, the people and their roles for the application
+administrator, one tenant for its administrator, and nothing for everyone else.
+What each one may do is on [Infrastructure administrator](/docs/access/infra-admin),
+[Application administrator](/docs/access/app-admin) and
+[Tenant administrator](/docs/access/tenant-admin).
+
+::: gallery
+![The infrastructure administrator's console](img/showcase/admin-infra.webp) The infrastructure administrator: routes, certificates, authorities and the mail relay. No account, no role, no tenant.
+![The application administrator's console](img/showcase/admin-app.webp) The application administrator: the accounts, the roles, the settings and the pages the gateway serves. Not one route.
+![A tenant administrator's console](img/showcase/admin-tenant.webp) A tenant's administrator: its members, its groups and its settings, and no other tenant.
+![The console of an account that administers nothing](img/showcase/admin-none.webp) Everyone else: the license screen and their own account, nothing to administer.
+:::
+
 ## Looking after it
 
 ::: gallery

@@ -18,6 +18,17 @@ routing and observation, so your services do not have to.
 - **[Quick start](/docs/start/quick-start)** - a gateway running and a first application behind it.
 - **[Concepts](/docs/concepts/architecture)** - the three planes, routes, identity, access.
 
+## Who administers what
+
+Three administrators share the console, each on a part of it, and each sees only that part:
+
+- **[Infrastructure administrator](/docs/access/infra-admin)** - the routing plane: routes, certificates, authorities, the mail relay.
+- **[Application administrator](/docs/access/app-admin)** - the people: accounts, roles, settings, the pages the gateway serves.
+- **[Tenant administrator](/docs/access/tenant-admin)** - one tenant: its members, its groups, its settings.
+
+[Administration capabilities](/docs/access/capabilities) says how they are given, and the
+[gallery](/showcase/index) shows each one's console.
+
 ## Reference
 
 - **[Predicates](/docs/predicates/overview)** - the eleven ways a route decides a request is for it.

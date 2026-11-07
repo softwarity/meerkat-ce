@@ -1,6 +1,6 @@
 ---
 title: Administrateur infra
-section: Contrôle d'accès
+section: Administration
 order: 141
 summary: Ce que la capacité infra admin ouvre dans la console - le plan de routage, ses certificats et ses autorités - et ce qui reste hors de portée.
 ---
