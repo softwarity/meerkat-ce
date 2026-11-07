@@ -11,7 +11,7 @@
 // to the browser: the conversion happens once, at build, and a reader
 // downloads the page they asked for rather than the book.
 //
-// GitHub Pages serves files and nothing else - no server, no index endpoint -
+// The host serves files and nothing else - no server, no index endpoint -
 // which is why the search index is a file too.
 //
 // THREE AXES, and only one of them is a build:

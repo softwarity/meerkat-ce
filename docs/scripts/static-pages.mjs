@@ -1,4 +1,4 @@
-// GitHub Pages serves files, not routes - so every page of the site is written
+// The host serves files, not routes - so every page of the site is written
 // as a file. Two things follow, and both matter for a site that is a product's
 // front door:
 //
@@ -266,8 +266,7 @@ ${sitemap
 `,
 );
 
-// For Cloudflare Pages, which reads both files and which GitHub Pages serves
-// as two more files nobody asks for.
+// For Cloudflare Pages, the host, which reads both files.
 //
 // _headers: the bundle's files carry a hash in their name, so they never
 // change - a year in the browser's cache, where a file host gives everything

@@ -9,7 +9,7 @@
 // and every asset would be served from the wrong root.
 //
 // Steps: the release tag, the generated pages, the deployment files, the
-// content, the bundle, and one HTML file per page so GitHub Pages answers real
+// content, the bundle, and one HTML file per page so the host answers real
 // paths with real titles.
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';

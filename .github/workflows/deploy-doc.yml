@@ -1,4 +1,4 @@
-name: Deploy Doc to GitHub Pages
+name: Deploy Doc
 run-name: ${{ github.actor }} deploy doc on ${{ github.repository }}
 
 on:
@@ -12,11 +12,8 @@ on:
       - '.github/workflows/deploy-doc.yml'
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
-  pages: write
-  id-token: write
   # The latest benchmark, an artifact of ci.yml (see the step that takes it).
   actions: read
 
@@ -28,6 +25,12 @@ concurrency:
 # The site is published from the PUBLIC mirror, softwarity/meerkat-ce, at its
 # custom domain (meerkat.softwarity.dev) - the address says what it is whichever
 # repository serves it.
+#
+# The host is Cloudflare Pages (project meerkat-site) since 2026-11-07, not
+# GitHub Pages: it runs docs/functions/_middleware.js, which answers ?lg=fr
+# with the French file. GitHub Pages ignored the query and answered English,
+# so the French pages were seen as duplicates and never indexed. The domain's
+# DNS stays where it was: a CNAME meerkat -> meerkat-site.pages.dev.
 #
 # It was published from the private tree for a while, so the front door would
 # not be a by-product of the source dump. What moved it back is the bill: the
@@ -44,8 +47,8 @@ jobs:
   deploy:
     if: github.repository == 'softwarity/meerkat-ce'
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: cloudflare-pages
+      url: https://meerkat.softwarity.dev
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -83,34 +86,17 @@ jobs:
           mkdir -p docs/public/bench
           unzip -o -q "$RUNNER_TEMP/bench.zip" -d docs/public/bench
 
-      - name: Build doc-site for GitHub Pages
+      - name: Build doc-site
         working-directory: docs
         # The ROOT, because the site answers on meerkat.softwarity.dev rather than
-        # under a repository path. This is not cosmetic: with /meerkat/ baked
-        # in, every asset lands one directory beside itself and the page
-        # renders black. The CNAME that names the domain rides in the artifact
-        # (docs/public/CNAME) - an Actions deployment that does not carry it
-        # clears the custom domain it was just given.
+        # under a repository path. This is not cosmetic: with another base
+        # baked in, every asset lands one directory beside itself and the page
+        # renders black.
         run: npm run build -- --base-href "/"
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: './docs/dist/doc-site/browser'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-
-      # Cloudflare Pages, the host the site moves to: it runs
-      # docs/functions/_middleware.js, which answers ?lg=fr with the French
-      # file - GitHub Pages ignores the query and answers English, so the
-      # French pages were never indexed. Both hosts are fed until the domain's
-      # CNAME points at Cloudflare; GitHub Pages goes after that. No token on
-      # the repository, no Cloudflare: the site still ships, on GitHub Pages.
+      # The pages, the function that serves ?lg= (docs/functions), and the
+      # host's own files the build writes (_headers, _routes.json). The project
+      # is created on the first run; every later run finds it.
       - name: Deploy to Cloudflare Pages
         working-directory: docs
         env:
@@ -119,10 +105,9 @@ jobs:
         run: |
           set -e
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::warning::no Cloudflare credentials on this repository: published on GitHub Pages only"
-            exit 0
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set on this repository (an Account API Token with Cloudflare Pages: Edit)"
+            exit 1
           fi
-          # Created once; every later run finds it.
           npx -y wrangler@4.158.0 pages project list | grep -qw meerkat-site \
             || npx -y wrangler@4.158.0 pages project create meerkat-site --production-branch main
           npx -y wrangler@4.158.0 pages deploy dist/doc-site/browser \

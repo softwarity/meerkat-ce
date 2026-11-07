@@ -1,5 +1,5 @@
 // Resolve the latest release tag at BUILD time and write it as a static resource
-// served by GitHub Pages (src/assets/version.json → /meerkat/assets/version.json).
+// served by the site's host (src/assets/version.json → /meerkat/assets/version.json).
 // The doc-site reads THAT file at runtime instead of the GitHub API, so there is
 // no API rate limit. Runs on every build (local and CI). CI must check out with
 // fetch-depth: 0 so the tags are present.
