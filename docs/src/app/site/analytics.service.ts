@@ -41,11 +41,17 @@ export class AnalyticsService {
   readonly asking = signal(this.enabled && this.consent() === null);
 
   private loaded = false;
-  // The page being read, kept for the page view sent at the moment of consent.
-  private last: { title: string; location: string } | null = null;
+  // Google's tag counts the page it loads on by itself: it ignores
+  // send_page_view:false (measured 2026-11-07, two page views per first page).
+  // Loaded at start, for a reader who accepted on an earlier visit, it counts
+  // the page the application is about to report: that report is skipped.
+  private tagCounts = false;
 
   constructor() {
-    if (this.consent() === 'granted') this.load();
+    if (this.consent() === 'granted') {
+      this.load();
+      this.tagCounts = true;
+    }
   }
 
   decide(consent: Consent): void {
@@ -58,8 +64,8 @@ export class AnalyticsService {
     }
     if (consent === 'granted') {
       window.gtag?.('consent', 'update', { analytics_storage: 'granted' });
+      // The tag, loading now, counts the page being read.
       this.load();
-      if (this.last) this.send(this.last);
       return;
     }
     // A withdrawn consent: Google stops writing, and its cookies go.
@@ -72,14 +78,16 @@ export class AnalyticsService {
   }
 
   // One page read: sent by the page once its title is set, since the
-  // application changes pages without reloading.
+  // application changes pages without reloading. The property's "page changes
+  // based on browser history events" stays off: it fires before the new title
+  // is set, and would count each page a second time.
   pageView(title: string): void {
-    this.last = { title, location: location.href };
-    if (this.loaded && this.consent() === 'granted') this.send(this.last);
-  }
-
-  private send(view: { title: string; location: string }): void {
-    window.gtag?.('event', 'page_view', { page_title: view.title, page_location: view.location });
+    if (this.tagCounts) {
+      this.tagCounts = false;
+      return;
+    }
+    if (!this.loaded || this.consent() !== 'granted') return;
+    window.gtag?.('event', 'page_view', { page_title: title, page_location: location.href });
   }
 
   private load(): void {
@@ -99,8 +107,8 @@ export class AnalyticsService {
       ad_personalization: 'denied',
     });
     window.gtag('js', new Date());
-    // Page views are sent by the application, one per page read (above).
-    window.gtag('config', MEASUREMENT_ID, { send_page_view: false });
+    // The tag counts this page; the next ones are sent by pageView (above).
+    window.gtag('config', MEASUREMENT_ID);
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
