@@ -1,6 +1,11 @@
 :host {
   display: block;
   padding-bottom: 40px;
+  /* A screen's height below the bar, from the first paint: the footer starts
+     under the fold and stays there while the page's text arrives. Without it
+     the footer was drawn at the bottom of the screen, then pushed down by the
+     text - a layout shift on every page. */
+  min-height: calc(100vh - 56px);
 }
 
 .layout {

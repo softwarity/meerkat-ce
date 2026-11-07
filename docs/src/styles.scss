@@ -78,6 +78,7 @@ rail-nav-item .rail-item:not(.expanded) {
   // a crop takes the logo off the left of a wide screenshot, which is the part
   // the caption is about.
   aspect-ratio: 16 / 10;
+  height: auto;
   object-fit: contain;
   background: var(--surface-2);
 }
@@ -184,6 +185,9 @@ a {
 
   img {
     max-width: 100%;
+    /* The tag carries the file's width and height (build-site.mjs, sizeOf):
+       the ratio they give keeps the place, the CSS sets the size. */
+    height: auto;
     border: 1px solid var(--line);
     border-radius: 10px;
     display: block;
@@ -415,6 +419,8 @@ a {
   background: var(--surface);
   padding: 18px 20px;
 
+  /* h2 or h3, by where the cards sit (build-site.mjs, cardLevels): one look. */
+  h2,
   h3 {
     margin: 0 0 8px;
     font-size: 1rem;

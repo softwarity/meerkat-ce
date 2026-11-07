@@ -1,13 +1,13 @@
 <div class="frame" (document:keydown)="onKey($event)">
   <header class="topbar">
     <a class="brand" [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">
-      <img src="img/softwarity.svg" alt="Softwarity" />
+      <img src="img/softwarity.svg" alt="" width="28" height="28" />
       <span class="word">Softwarity</span>
     </a>
     <!-- The company and the product are two names and two destinations: one
          goes to who we are, the other to the site's front page. The rail has
          no entry for it - this button IS the home. -->
-    <a class="product" [class.on]="atHome()" [routerLink]="path('index')" [queryParams]="langQuery()">
+    <a class="product" [class.on]="atHome()" [routerLink]="path('index')" [queryParams]="langQuery()" aria-label="Meerkat">
       <mat-icon svgIcon="meerkat" />
       <span class="hide-narrow">Meerkat</span>
     </a>
@@ -23,7 +23,7 @@
 
     <span class="grow"></span>
 
-    <button class="pill search-open" type="button" (click)="openSearch()">
+    <button class="pill search-open" type="button" (click)="openSearch()" [attr.aria-label]="words().search">
       <mat-icon>search</mat-icon>
       <span class="hide-narrow">{{ words().search }}</span>
       <kbd class="hide-narrow">/</kbd>
@@ -113,7 +113,7 @@
             }
           </div>
           <div class="foot-made">
-            <img src="img/softwarity.svg" alt="Softwarity" />
+            <img src="img/softwarity.svg" alt="" width="18" height="18" />
             <span>{{ words().madeBy }}</span>
             <a [routerLink]="path('softwarity/index')" [queryParams]="langQuery()">Softwarity</a>
           </div>

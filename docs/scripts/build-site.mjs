@@ -24,6 +24,7 @@
 //   - area: the rail entries, declared once in content/areas.json.
 
 import { mkdir, readFile, readdir, rm, writeFile, stat } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { loadFacts } from './facts.mjs';
 import { createHighlighter } from 'shiki';
 
@@ -53,6 +54,47 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT = join(here, '..', 'content');
 const OUT = join(here, '..', 'src', 'assets', 'site');
 const PUBLIC = join(here, '..', 'public');
+
+// An image's width and height, written on its tag. Without them the browser
+// knows an image's place only once the file has arrived: until then it is 0
+// pixels tall, and when it lands everything below it moves - the layout shift
+// that cost the pages their Core Web Vitals score. With them, the place is
+// kept from the first paint (the CSS scales it, height: auto). Read from the
+// file's own header: WebP, PNG, SVG; anything else is left as it was.
+const sizes = new Map();
+function sizeOf(src) {
+  if (/^https?:/.test(src)) return '';
+  if (!sizes.has(src)) {
+    let size = null;
+    try {
+      size = dimensions(readFileSync(join(PUBLIC, src)));
+    } catch {
+      /* not a file of the site: no size */
+    }
+    sizes.set(src, size);
+  }
+  const s = sizes.get(src);
+  return s ? ` width="${s[0]}" height="${s[1]}"` : '';
+}
+
+function dimensions(b) {
+  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') {
+    const chunk = b.toString('ascii', 12, 16);
+    if (chunk === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return [1 + (bits & 0x3fff), 1 + ((bits >> 14) & 0x3fff)];
+    }
+    if (chunk === 'VP8 ') return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+  }
+  if (b.readUInt32BE(0) === 0x89504e47) return [b.readUInt32BE(16), b.readUInt32BE(20)];
+  const svg = b.toString('utf8', 0, 2000);
+  if (svg.includes('<svg')) {
+    const box = svg.match(/viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/);
+    if (box) return [Math.round(Number(box[1])), Math.round(Number(box[2]))];
+  }
+  return null;
+}
 const LANGS = ['en', 'fr'];
 const STRICT = process.argv.includes('--strict');
 
@@ -83,7 +125,7 @@ function inline(text) {
   // on. Nothing to rewrite at runtime.
   out = out.replace(
     /!\[([^\]]*)\]\(([^)\s]+)\)/g,
-    (_, alt, src) => `<img src="${src}" alt="${alt}" loading="lazy" />`,
+    (_, alt, src) => `<img src="${src}" alt="${alt}"${sizeOf(src)} loading="lazy" />`,
   );
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => {
     if (/^https?:/.test(href)) return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
@@ -197,7 +239,7 @@ function renderBlock(name, body, file, lang, arg) {
       if (!m) continue;
       const [, alt, src, caption] = m;
       figures.push(
-        `<figure class="mk-shot"><img src="${src}" alt="${alt}" loading="lazy" />` +
+        `<figure class="mk-shot"><img src="${src}" alt="${alt}"${sizeOf(src)} loading="lazy" />` +
           `<figcaption>${inline((caption || alt).trim())}</figcaption></figure>`,
       );
     }
@@ -367,7 +409,23 @@ function render(md, file, lang) {
     html.push(`<p>${inline(para.join(' '))}</p>`);
   }
   closeList(listStack);
-  return { html: html.join('\n'), headings };
+  return { html: cardLevels(html.join('\n')), headings };
+}
+
+// A card's title is one level below the heading it sits under: an h2 when the
+// cards follow the page's h1 (the home page), an h3 under an h2. Always h3,
+// the home page went from h1 to h3 - a level skipped, which a screen reader's
+// outline shows as a hole and an accessibility audit reports.
+function cardLevels(html) {
+  let last = 1;
+  return html.replace(/<article class="mk-card"><h3>([\s\S]*?)<\/h3>|<h([1-6])\b/g, (m, title, level) => {
+    if (level) {
+      last = Number(level);
+      return m;
+    }
+    const n = Math.min(last + 1, 3);
+    return `<article class="mk-card"><h${n}>${title}</h${n}>`;
+  });
 }
 
 // ---- front matter ----------------------------------------------------------

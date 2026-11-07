@@ -13,6 +13,15 @@
 // the file itself; the application replaces it when it starts, as Angular
 // empties the host element of the root component it boots.
 //
+// It stays VISIBLE until the application takes over. Hidden, the swap moved
+// nothing a reader could see, but the first paint then waited for the
+// application: two seconds later on a slow phone, and a worse score overall
+// (measured both ways, 2026-11-07).
+//
+// Nothing is preloaded for the application either (its lazy code, the menu,
+// the page's JSON): measured, the preloads took the bandwidth the visible text
+// and its font needed, and the page painted later (LCP 2.8 s -> 4.6 s).
+//
 // Each head also says, in structured data (JSON-LD), what the page is: the
 // home page describes the product and its publisher, every other page where it
 // sits in the site (a breadcrumb a search result can show), and a
@@ -58,7 +67,7 @@ const headOf = index.slice(index.indexOf('<head>') + 6, index.indexOf('</head>')
 const head = headOf
   .replace(/<title>[\s\S]*?<\/title>/g, '')
   .replace(/<(meta|base)\b[^>]*>/g, '')
-  .replace(/<link[^>]*rel="(canonical|alternate)"[^>]*>/g, '')
+  .replace(/<link[^>]*rel="(canonical|alternate|modulepreload|preload)"[^>]*>/g, '')
   .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
   .replace(/<style>\.prerender[\s\S]*?<\/style>/g, '')
   .split('\n')
