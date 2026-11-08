@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.25.0
+
+<!-- release: built=2026-11-08T13:00:44Z migrates=false -->
+
 - **The portal's bar now moves the whole application clear of it, fixed elements included.** It
   used to pad the page, which moved what flows but not what an application places itself against
   the window - its own top bar, side menu, dialogs - and an off-the-shelf application came apart
