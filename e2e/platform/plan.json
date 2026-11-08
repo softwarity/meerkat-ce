@@ -1316,8 +1316,8 @@
     "CE",
     "EE"
    ],
-   "en": "Portal bar lists the routes the user may reach.",
-   "fr": "La barre du portail liste les routes auxquelles l'utilisateur a accès."
+   "en": "Portal bar lists the routes the user may reach, and the application's page, its fixed elements included, sits beside the bar rather than under it when its portal entry asks for it; a route outside the portal is not moved.",
+   "fr": "La barre du portail liste les routes auxquelles l'utilisateur a accès, et la page de l'application, éléments fixes compris, se place à côté de la barre et non dessous quand son entrée du portail le demande ; une route hors du portail n'est pas décalée."
   },
   {
    "id": "PORTAL-03",

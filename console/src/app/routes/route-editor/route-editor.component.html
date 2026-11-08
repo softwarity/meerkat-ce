@@ -194,17 +194,23 @@
           <div class="pair upstream-pick">
             <mat-form-field class="service">
               <mat-label i18n="@@Upstream">Upstream</mat-label>
-              <mat-select required [value]="pickedService()" (selectionChange)="pickService($event.value)"
-                panelClass="mk-url-suggestions">
-                <mat-select-trigger>{{ pickedLabel() }}</mat-select-trigger>
-                @for (c of upstreamChoices(); track c.value) {
+              <!-- Searched, not scrolled: a namespace can hold a hundred
+                   services. Typing filters the list; the pick still comes from
+                   it - a list closed on a typed name that is none puts the
+                   picked service back, since a typed host could only be a typo. -->
+              <input matInput required [matAutocomplete]="services" [value]="serviceQuery() ?? pickedLabel()"
+                (input)="serviceQuery.set($any($event.target).value)"
+                (focus)="$any($event.target).select()" />
+              <mat-autocomplete #services class="mk-url-suggestions" [displayWith]="serviceLabel"
+                (optionSelected)="pickService($event.option.value)" (closed)="serviceQuery.set(null)">
+                @for (c of serviceOffered(); track c.value) {
                   <mat-option [value]="c.value" [class.muted]="c.muted">
                     {{ c.label ?? c.value }}
                     @if (c.hint) {<span class="hint">{{ c.hint }}</span>}
                     @if (c.detail) {<span class="detail">{{ c.detail }}</span>}
                   </mat-option>
                 }
-              </mat-select>
+              </mat-autocomplete>
               <mat-select matPrefix class="proto" [value]="upstreamScheme()"
                 (selectionChange)="setUpstreamScheme($event.value)" i18n-aria-label="@@Protocol" aria-label="Protocol">
                 @for (p of ['http', 'https', 'h2c']; track p) {

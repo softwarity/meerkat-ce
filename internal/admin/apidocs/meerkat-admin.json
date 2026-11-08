@@ -3900,6 +3900,10 @@
             "type": "boolean",
             "description": "Kept but hidden"
           },
+          "overlay": {
+            "type": "boolean",
+            "description": "True lets the bar draw over this module's pages, the application making the room itself from the --meerkat-top, --meerkat-left and --meerkat-right properties. False (default): the bar moves the whole page clear of it, fixed elements included. A route in no entry is never moved."
+          },
           "special": {
             "type": "string",
             "enum": [
@@ -3932,6 +3936,10 @@
           "disabled": {
             "type": "boolean",
             "description": "Kept but hidden"
+          },
+          "overlay": {
+            "type": "boolean",
+            "description": "True lets the bar draw over this module's pages, the application making the room itself from the --meerkat-top, --meerkat-left and --meerkat-right properties. False (default): the bar moves the whole page clear of it, fixed elements included. A route in no entry is never moved."
           },
           "children": {
             "type": "array",

@@ -1,15 +1,34 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PortalPreviewComponent } from './portal-preview.component';
-import { Element, Entity, Field, Recipe, elementKey, elementsOf, fieldsOf, listOrigin, same, short } from './compose.model';
+import {
+  Element,
+  Entity,
+  Field,
+  FileLine,
+  MediaInfo,
+  Recipe,
+  codePairs,
+  elementKey,
+  elementsOf,
+  fieldsOf,
+  fileLines,
+  listOrigin,
+  same,
+  short,
+} from './compose.model';
 
 // What a click on the loom says: the object whole from a side or out, a field
 // from a side or cleared, an element in or out, a list in order, a pairing.
 // What rides beside a route: its deposited spec, its files.
-export type Media = { left?: { spec?: boolean; files?: number }; right?: { spec?: boolean; files?: number }; result?: { spec?: boolean; files?: number } };
+// The name the deposited spec goes by on the files line.
+const SPEC = 'OpenAPI spec';
+
+export type Media = { left?: MediaInfo; right?: MediaInfo; result?: MediaInfo };
 
 export type PickEvent =
   | { type: 'whole'; path: string; from: 'left' | 'right' | 'none' }
@@ -440,6 +459,26 @@ export type PickEvent =
       .el.ro {
         cursor: default;
       }
+      /* A file rewritten, or on one side only. */
+      .el.moved {
+        border-color: var(--mat-sys-error);
+        border-width: 1.5px;
+      }
+      button.codebtn {
+        flex-shrink: 0;
+        height: 18px;
+        padding: 0 7px;
+        border-radius: 9px;
+        border: 1px solid var(--mat-sys-outline);
+        background: var(--mat-sys-surface-container-lowest);
+        color: var(--mat-sys-on-surface);
+        font: 500 10.5px var(--mk-mono, monospace);
+        cursor: pointer;
+        margin-top: 1px;
+      }
+      button.codebtn:hover {
+        border-color: var(--mk-center);
+      }
       .el[draggable='true'] {
         cursor: grab;
       }
@@ -694,6 +733,7 @@ export type PickEvent =
                 @for (el of sideElements(f, 'left'); track el.key) {
                   <span
                     [class]="chipClass(el, f)"
+                    [matTooltip]="chipTip(el)"
                     [attr.tabindex]="f.same ? null : 0"
                     [attr.role]="f.same ? null : 'button'"
                     (click)="!f.same && toggle($event, f, el)"
@@ -725,6 +765,16 @@ export type PickEvent =
             </div>
           }
         }
+        @if (files().length) {
+          <div class="fcell val side-left same">
+            <span class="k">files</span>
+            <span class="chips">
+              @for (l of filesOn('left'); track l.name) {
+                <span class="el ro" [class.moved]="l.state !== 'same'" [matTooltip]="fileTip(l)">{{ l.name }}</span>
+              }
+            </span>
+          </div>
+        }
       </div>
       <div class="fpanel res">
         @for (f of shownFields(); track f.path) {
@@ -735,6 +785,7 @@ export type PickEvent =
                 @for (el of elements(f); track el.key) {
                   <span
                     [class]="chipClass(el, f)"
+                    [matTooltip]="chipTip(el)"
                     [attr.tabindex]="f.same ? null : 0"
                     [attr.role]="f.same ? null : 'button'"
                     [attr.draggable]="f.same ? null : 'true'"
@@ -748,6 +799,9 @@ export type PickEvent =
                   >
                 }
               </span>
+              @if (codeOf(f).length) {
+                <button class="codebtn" matTooltip="See the code of both sides, line by line" (click)="$event.stopPropagation(); openCode(f)">code</button>
+              }
               @if (!f.same && hasElements(f)) {
                 <button class="unset" matTooltip="Not set in the result" (click)="pick.emit({ type: 'field', path: fieldPath(f), from: 'unset' })">x</button>
               }
@@ -756,11 +810,24 @@ export type PickEvent =
             <div class="fcell res" [class]="'fcell res ' + (f.same ? 'same from-both' : 'from-' + scalarSide(f))" [attr.data-fcard]="fieldPath(f) + ':res'">
               <span class="k">{{ f.path }}</span>
               <span class="v" [class.unset]="f.result === undefined">{{ f.result === undefined || f.result === '' ? 'not set' : short(f.result) }}</span>
+              @if (codeOf(f).length) {
+                <button class="codebtn" matTooltip="See the code of both sides, line by line" (click)="$event.stopPropagation(); openCode(f)">code</button>
+              }
               @if (!f.same && f.result !== undefined) {
                 <button class="unset" matTooltip="Not set in the result" (click)="pick.emit({ type: 'field', path: fieldPath(f), from: 'unset' })">x</button>
               }
             </div>
           }
+        }
+        @if (files().length) {
+          <div class="fcell res same">
+            <span class="k">files</span>
+            <span class="chips">
+              @for (l of filesOn('result'); track l.name) {
+                <span class="el ro" [class.moved]="l.state !== 'same'" [matTooltip]="fileTip(l)">{{ l.name }}</span>
+              }
+            </span>
+          </div>
         }
       </div>
       <div class="fpanel side-right">
@@ -782,6 +849,7 @@ export type PickEvent =
                 @for (el of sideElements(f, 'right'); track el.key) {
                   <span
                     [class]="chipClass(el, f)"
+                    [matTooltip]="chipTip(el)"
                     [attr.tabindex]="f.same ? null : 0"
                     [attr.role]="f.same ? null : 'button'"
                     (click)="!f.same && toggle($event, f, el)"
@@ -813,6 +881,16 @@ export type PickEvent =
             </div>
           }
         }
+        @if (files().length) {
+          <div class="fcell val side-right same">
+            <span class="k">files</span>
+            <span class="chips">
+              @for (l of filesOn('right'); track l.name) {
+                <span class="el ro" [class.moved]="l.state !== 'same'" [matTooltip]="fileTip(l)">{{ l.name }}</span>
+              }
+            </span>
+          </div>
+        }
       </div>
     </ng-template>
   `,
@@ -839,6 +917,62 @@ export class ComposeBlockComponent {
   // no label of its own.
   readonly routeNames = input<ReadonlyMap<string, string>>(new Map());
   readonly pick = output<PickEvent>();
+
+  private readonly dialog = inject(MatDialog);
+
+  // The code blocks a field holds that differ, by field path.
+  private readonly code = computed(() => new Map(this.fields().map((f) => [f.path, codePairs(f)])));
+  protected codeOf(f: Field) {
+    return this.code().get(f.path) ?? [];
+  }
+
+  protected async openCode(f: Field): Promise<void> {
+    const { CodeDiffDialogComponent } = await import('./code-diff-dialog.component');
+    this.dialog.open(CodeDiffDialogComponent, {
+      width: '92vw',
+      maxWidth: '1400px',
+      data: { title: `${this.entity().label}: ${f.path}`, leftName: this.leftName(), rightName: this.rightName(), pairs: this.codeOf(f) },
+    });
+  }
+
+  // A block of a route's own code says its first lines on hover: two chips
+  // of the same place read the same otherwise.
+  protected chipTip(el: Element): string {
+    const v = el.val as Record<string, unknown> | null;
+    if (!v || typeof v !== 'object' || typeof v['code'] !== 'string') return '';
+    const code = (v['code'] as string).trim();
+    return code.length > 400 ? code.slice(0, 400) + '...' : code;
+  }
+
+  // The files a route carries, when they differ between the sides: each
+  // side lists its own, the result those of the side its route comes from.
+  protected readonly files = computed<FileLine[]>(() => {
+    const m = this.media();
+    if (!m) return [];
+    const lines = fileLines(m.left, m.right);
+    // The deposited spec rides the same way, and is one more such line.
+    const ls = m.left?.specSum ?? '';
+    const rs = m.right?.specSum ?? '';
+    if (ls || rs) lines.push({ name: SPEC, state: !rs ? 'left' : !ls ? 'right' : ls === rs ? 'same' : 'changed' });
+    return lines.some((l) => l.state !== 'same') ? lines : [];
+  });
+  protected filesOn(side: 'left' | 'right' | 'result'): FileLine[] {
+    const m = this.media()?.[side];
+    const sums = m?.fileSums ?? {};
+    return this.files().filter((l) => (l.name === SPEC ? !!m?.spec : l.name in sums));
+  }
+  protected fileTip(l: FileLine): string {
+    switch (l.state) {
+      case 'changed':
+        return 'Its content differs between the two sides';
+      case 'left':
+        return `Only in ${this.leftName()}`;
+      case 'right':
+        return `Only in ${this.rightName()}`;
+      default:
+        return 'The same on both sides';
+    }
+  }
 
   protected mediaLabel(side: 'left' | 'right' | 'result'): string {
     const m = this.media()?.[side];

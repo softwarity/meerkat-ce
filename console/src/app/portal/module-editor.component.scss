@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: min(480px, 92vw);
+  width: 100%; // the drawer that holds it sets the width (portal page)
 }
 
 .head {
@@ -41,6 +41,8 @@
 // The form fields and the icon head/search keep their height; the palette
 // grows to fill what is left, so the actions sit at the very bottom.
 .body > mat-form-field,
+.row,
+.room,
 .icon-head,
 .icon-search,
 .hint {
@@ -48,6 +50,15 @@
 }
 mat-form-field {
   width: 100%;
+}
+// The route and the label side by side, each half of the line.
+.row {
+  display: flex;
+  gap: 12px;
+}
+.row > mat-form-field {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .icon-head {
@@ -179,4 +190,33 @@ mat-form-field {
   gap: 8px;
   padding: 12px 20px;
   border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+// The make-room toggle and its info marker, on one line.
+.room {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.field-info {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+}
+.field-info:hover,
+.field-info:focus-visible {
+  opacity: 1;
+}
+.field-info:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: -4px;
 }

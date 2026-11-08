@@ -52,24 +52,51 @@
     <p class="hint text-muted" i18n="@@Portal_notifications_entry_hint">
       Opens the notifications page and shows the unread count.
     </p>
-  } @else if (data().kind !== 'container') {
-    <mat-form-field>
-      <mat-label i18n="@@Portal_module_route">Application (route)</mat-label>
-      <mat-select [value]="routeId()" (selectionChange)="routeId.set($event.value)">
-        @for (r of data().routes; track r.id) {
-          <mat-option [value]="r.id">{{ r.name }}@if (!r.enabled) { <span class="text-muted" i18n="@@Portal_route_off_option">(turned off)</span> }</mat-option>
-        }
-      </mat-select>
-      <mat-hint>{{ !data().routes.length ? noRoutes : routeOff() ? offHint : '' }}</mat-hint>
-    </mat-form-field>
   }
 
-  <mat-form-field>
-    <mat-label i18n="@@Portal_module_label">Label</mat-label>
-    <input matInput [value]="label()" (input)="label.set($any($event.target).value)"
-      [placeholder]="data().special ? notificationsName : routeName()" />
-    <mat-hint>{{ data().special ? notificationsLabelHint : data().kind === 'container' ? containerLabelHint : labelHint }}</mat-hint>
-  </mat-form-field>
+  <!-- A module's route and its label on one line: the label falls back to
+       the route's name, so the two are read together. -->
+  <div class="row">
+    @if (!data().special && data().kind !== 'container') {
+      <mat-form-field>
+        <mat-label i18n="@@Portal_module_route">Application (route)</mat-label>
+        <mat-select [value]="routeId()" (selectionChange)="routeId.set($event.value)">
+          @for (r of data().routes; track r.id) {
+            <mat-option [value]="r.id">{{ r.name }}@if (!r.enabled) { <span class="text-muted" i18n="@@Portal_route_off_option">(turned off)</span> }</mat-option>
+          }
+        </mat-select>
+        <mat-hint>{{ !data().routes.length ? noRoutes : routeOff() ? offHint : '' }}</mat-hint>
+      </mat-form-field>
+    }
+    <mat-form-field>
+      <mat-label i18n="@@Portal_module_label">Label</mat-label>
+      <input matInput [value]="label()" (input)="label.set($any($event.target).value)"
+        [placeholder]="data().special ? notificationsName : routeName()" />
+      <mat-hint>{{ data().special ? notificationsLabelHint : data().kind === 'container' ? containerLabelHint : labelHint }}</mat-hint>
+    </mat-form-field>
+  </div>
+
+  <!-- Whether the bar moves this application's pages clear of it. Only a
+       module has pages, and only a bar takes room. -->
+  @if (data().bar && !data().special && data().kind !== 'container') {
+    <div class="room">
+      <mat-slide-toggle [checked]="room()" (change)="room.set($event.checked)">
+        <span i18n="@@Portal_make_room">Make room for the bar</span>
+      </mat-slide-toggle>
+      <!-- The explanation is the tooltip's, as on the fields: the name says
+           what it does, the detail is there for whoever asks. -->
+      <button
+        type="button"
+        class="field-info"
+        i18n-matTooltip="@@Portal_make_room_info"
+        matTooltip="Moves the application's page below and beside the bar, fixed elements included. Off: the bar draws over the page, and the application makes the room itself from --meerkat-top, --meerkat-left and --meerkat-right."
+        matTooltipPositionAtOrigin
+        i18n-aria-label="@@More_information"
+        aria-label="More information"
+        (click)="$event.preventDefault()"
+      ><mat-icon>info</mat-icon></button>
+    </div>
+  }
 
   <mat-form-field>
     <mat-label i18n="@@Portal_module_description">Description (tooltip)</mat-label>

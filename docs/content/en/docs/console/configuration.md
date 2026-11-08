@@ -60,6 +60,15 @@ A ribbon joins what feeds the result to its place in the middle. To decide:
   one is out. Click to bring one in or take it out, drag to reorder.
 - **An object the two sides share** has *in the result* ticked: untick it to leave it
   out anyway.
+- **Code** - a custom code block, an `onChange` hook - shows a **code** button
+  beside the value: it opens the two sides line by line. A block that only moved
+  (from the end of the body to the head, say) is not code that changed: it says
+  where it went, and offers no comparison when the code is the same.
+- **The files beside a route** - those it serves, its OpenAPI spec - are compared
+  by content: a **files** line names those that differ, are added or removed, and
+  a spec that differs is said too.
+
+![The code button of a rewritten CSS block: the two sides line by line, the changes marked](img/console/configuration-code.webp)
 
 The double tick in a column's header takes that side for everything still
 undecided, and **Reset** beside the result forgets every choice. **Only differences**

@@ -2,6 +2,30 @@
 
 ## NEXT RELEASE
 
+- **The portal's bar now moves the whole application clear of it, fixed elements included.** It
+  used to pad the page, which moved what flows but not what an application places itself against
+  the window - its own top bar, side menu, dialogs - and an off-the-shelf application came apart
+  under the bar. The page is now set below and beside the bar as a whole, so those land in the room
+  left to it, with no rule to write. The bar itself sits in the browser's top layer. What still
+  counts from the window is what no stylesheet can change: an element sized `100vh` runs past the
+  bottom by the bar's height, and a menu placed from the mouse's coordinates opens offset by it;
+  such an element takes a rule in the route's custom code. It is set on each module of the portal
+  (**Make room for the bar**, on by default; `overlay` on the entry in the API), and a route outside
+  the portal is not moved. Turned off, the bar draws over the page and publishes the room it takes as
+  `--meerkat-top`, `--meerkat-left` and `--meerkat-right`, for the application's own rule, for
+  example `header { top: var(--meerkat-top, 0px); }`.
+- **Comparing configurations now shows a route's own code.** A block of CSS or JavaScript rewritten
+  between the two sides reads as that block changed, and its **code** button shows both versions side
+  by side, line by line; so does any text over several lines, such as a language hook. The files
+  uploaded on a route and its OpenAPI spec are compared by their content: a route that differs only
+  by a rewritten file is no longer shown as the same, and the file is named.
+- **Saving a route no longer sends the routes list back to the top.** The saved route's row is
+  replaced in place instead of the whole list being read again behind a spinner; enabling,
+  disabling and deleting a route do the same. Other consoles showing the screen follow the change
+  live, as before.
+- **The upstream of a route can be searched.** With a namespace chosen, the service field filters as
+  you type, on the service's names and on what is said beside them, instead of a list to scroll.
+
 ---
 
 ## 1.24.0

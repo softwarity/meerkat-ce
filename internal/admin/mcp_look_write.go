@@ -62,6 +62,9 @@ func (a *API) lookWriteTools() []mcp.Tool {
 }
 
 func portalSchema() map[string]any {
+	overlay := map[string]any{"type": "boolean", "description": "A module's: true lets the bar draw over its pages, " +
+		"the application making room itself from the --meerkat-top/left/right CSS properties. Left out, the bar moves " +
+		"the whole page clear of it, fixed elements included."}
 	special := str("\"notifications\" makes this the notifications entry (Enterprise edition): no route, no children, " +
 		"it opens the notifications page and wears the unread badge. Once in the whole catalogue.")
 	sub := map[string]any{
@@ -72,6 +75,7 @@ func portalSchema() map[string]any {
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
+			"overlay":     overlay,
 			"special":     special,
 		},
 	}
@@ -86,6 +90,7 @@ func portalSchema() map[string]any {
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
+			"overlay":     overlay,
 			"children":    map[string]any{"type": "array", "description": "A container's modules, in order. Never on a module.", "items": sub},
 			"special":     special,
 		},

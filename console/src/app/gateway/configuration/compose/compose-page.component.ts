@@ -658,7 +658,7 @@ export class ComposePageComponent {
     const a = this.answer();
     this.version();
     if (!a) return [];
-    return entities(a.left, a.right, a.result, this.recipe.pairs);
+    return entities(a.left, a.right, a.result, this.recipe.pairs, a.media);
   });
 
   protected readonly kindCounts = computed(() =>

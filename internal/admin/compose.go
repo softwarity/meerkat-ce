@@ -523,6 +523,11 @@ func (a *API) saveOrRefreshComposed(w http.ResponseWriter, r *http.Request, acto
 type mediaInfo struct {
 	Spec  bool `json:"spec,omitempty"`
 	Files int  `json:"files,omitempty"`
+	// The content's hashes - the spec's, and each file's by name - so the
+	// screen can tell a route whose code changed in a file from one that
+	// did not, and name the file.
+	SpecSum  string            `json:"specSum,omitempty"`
+	FileSums map[string]string `json:"fileSums,omitempty"`
 }
 
 // mediaOf lists the routes of doc that carry a spec or files.
@@ -531,9 +536,10 @@ func mediaOf(doc *config.Document) map[string]mediaInfo {
 	if doc == nil {
 		return out
 	}
-	for id := range doc.Specs {
+	for id, spec := range doc.Specs {
 		m := out[id]
 		m.Spec = true
+		m.SpecSum = config.SpecSum(spec)
 		out[id] = m
 	}
 	for id, files := range doc.Files {
@@ -542,6 +548,7 @@ func mediaOf(doc *config.Document) map[string]mediaInfo {
 		}
 		m := out[id]
 		m.Files = len(files)
+		m.FileSums = config.FileSums(files)
 		out[id] = m
 	}
 	return out

@@ -63,6 +63,8 @@ Once root has turned [notifications](/docs/console/notifications) on
 
 ## An entry
 
+![A module's drawer: its route and label on one line, and under them whether the bar makes room for the page](img/console/portal-module.webp)
+
 **Add a module** for an application, **Add a container** to group modules.
 
 - **Application (route)** - a module's UI route. Only **UI routes** are
@@ -73,6 +75,11 @@ Once root has turned [notifications](/docs/console/notifications) on
   name.
 - **Description** - the tooltip.
 - **Icon** (*Portal* mode) - search the embedded icon set, or give an SVG: paste it, drop its file, or choose the file.
+- **Make room for the bar** (*Portal* mode, a module) - on by default: the
+  application's page is moved below and beside the bar. Off, the bar draws over
+  the page and the application makes the room itself; the info icon beside it
+  names the CSS variables it reads. See
+  [the page under the bar](/docs/customise/portal#the-page-under-the-bar).
 
 A container opens its first sub-module the visitor may open, and is not shown to
 a visitor who may open none of them.

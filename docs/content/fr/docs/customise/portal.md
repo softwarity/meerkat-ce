@@ -58,6 +58,7 @@ En mode **Portal**, une entrée porte en plus une icône :
 | Champ | Ce qu'il fait |
 |---|---|
 | Icon | un pictogramme choisi dans la bibliothèque de la console, stocké en SVG et dessiné comme un masque CSS - aucune police d'icônes n'est jamais chargée. Laissé vide, c'est l'initiale du libellé qui sert |
+| Make room for the bar | activé par défaut, sur un module : la page de l'application est décalée sous la barre et à côté du rail. Désactivé, la barre se dessine par-dessus la page (voir plus bas) |
 
 En mode **Links**, un conteneur est un intertitre au-dessus de ses modules, dans
 le menu du bouton de compte comme sur les pages intégrées ; un module qui revient
@@ -129,6 +130,32 @@ occupent une seule surface, et non deux coins de l'écran.
 
 La barre n'est jamais affichée dans une iframe : une page incorporée ailleurs
 n'est pas un endroit où naviguer.
+
+## La page sous la barre
+
+Une application derrière le portail n'a pas été écrite avec une barre au-dessus
+d'elle. Par défaut, la barre lui **fait donc de la place** : la page est décalée
+sous le bandeau et à côté du rail, éléments fixes compris - une barre d'outils
+collée en haut de la fenêtre, un menu latéral, une boîte de dialogue restent dans
+l'espace laissé à la page. L'application n'est pas modifiée et n'en sait rien.
+
+Ce qui lit encore la fenêtre entière peut passer sous la barre : une hauteur de
+`100vh`, une position calculée depuis la souris ou `getBoundingClientRect()`, la
+largeur de la fenêtre. La plupart des applications n'en montrent rien ; celle qui
+en montre quelque chose s'ajuste de son côté.
+
+**Make room for the bar** se règle par module, dans le portail. Désactivé, la
+barre se dessine par-dessus la page, et l'application fait la place elle-même à
+partir de trois variables CSS que la barre pose sur la racine de la page :
+
+| Variable | Ce qu'elle contient |
+|---|---|
+| `--meerkat-top` | la hauteur du bandeau |
+| `--meerkat-left` | la largeur du rail, quand il est à gauche |
+| `--meerkat-right` | la largeur du rail, quand il est à droite |
+
+Une route absente du portail n'est jamais décalée : la barre s'y dessine
+par-dessus la page, puisqu'aucune entrée ne dit où elle va.
 
 Techniquement, c'est un simple élément personnalisé doté d'un shadow DOM, servi
 comme le bouton utilisateur, qui prend le thème du plan de données et le mode

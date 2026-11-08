@@ -93,6 +93,7 @@ export function entities(
   right: ComposeDocument,
   result: ComposeDocument,
   pairs: { left: string; right: string; kind: string }[],
+  media?: { left: Record<string, MediaInfo>; right: Record<string, MediaInfo> },
 ): Entity[] {
   const out: Entity[] = [];
   for (const K of KINDS) {
@@ -114,10 +115,13 @@ export function entities(
       const r = R.get(id);
       const res = Res.get(id);
       const path = K.key === 'single' ? K.kind : `${K.kind}:${id}`;
-      const status = l && r ? (same(l, r) ? 'same' : 'update') : l ? 'left-only' : 'right-only';
+      const pair = pairs.find((p) => p.kind === K.kind && p.left === id);
+      // A route's files and spec ride beside it: one rewritten makes the
+      // route differ though its JSON does not.
+      const moved = K.kind === 'route' && !!media && mediaMoved(media.left[id], media.right[pair?.right ?? id]).length > 0;
+      const status = l && r ? (same(l, r) && !moved ? 'same' : 'update') : l ? 'left-only' : 'right-only';
       const e: Entity = { kind: K.kind, id, path, label: labelOf(l ?? r ?? {}, id), left: l, right: r, result: res, status };
       if (res) e.origin = l && same(res, l) ? 'left' : r && same(res, r) ? 'right' : l ? 'left' : 'right';
-      const pair = pairs.find((p) => p.kind === K.kind && p.left === id);
       if (pair) e.pairedWith = pair.right;
       out.push(e);
     }
@@ -325,4 +329,115 @@ export class Recipe {
     this.picks.clear();
     this.pairs.length = 0;
   }
+}
+
+// What rides beside a route, per side: its deposited spec and its uploaded
+// files, with their content's hashes.
+export interface MediaInfo {
+  spec?: boolean;
+  files?: number;
+  specSum?: string;
+  fileSums?: Record<string, string>;
+}
+
+// What moved beside a route between two sides: 'files', 'spec'.
+export function mediaMoved(l?: MediaInfo, r?: MediaInfo): string[] {
+  const out: string[] = [];
+  if (canonical(l?.fileSums ?? {}) !== canonical(r?.fileSums ?? {})) out.push('files');
+  if ((l?.specSum ?? '') !== (r?.specSum ?? '')) out.push('spec');
+  return out;
+}
+
+// One file of a route seen on both sides: the same, rewritten, or on one
+// side only.
+export interface FileLine {
+  name: string;
+  state: 'same' | 'changed' | 'left' | 'right';
+}
+
+export function fileLines(l?: MediaInfo, r?: MediaInfo): FileLine[] {
+  const lf = l?.fileSums ?? {};
+  const rf = r?.fileSums ?? {};
+  const names = [...new Set([...Object.keys(lf), ...Object.keys(rf)])].sort();
+  return names.map((name) => ({
+    name,
+    state: !(name in rf) ? 'left' : !(name in lf) ? 'right' : lf[name] === rf[name] ? 'same' : 'changed',
+  }));
+}
+
+// One block of code as the two sides have it, for the side-by-side view: a
+// side that lacks it is null.
+export interface CodePair {
+  label: string;
+  lang: 'css' | 'js' | 'text';
+  left: string | null;
+  right: string | null;
+}
+
+// The code a field holds that differs between the sides. A route's own
+// blocks (ui.injections) are matched in three passes, so that only a change
+// of code is shown as one: first the blocks whose code is the same on both
+// sides - moved to another place, switched off or on, but not rewritten, and
+// so no code to compare (the chips say where each one is); then the blocks
+// of the same kind, place and file, in order, rewritten in place; then those
+// of the same kind and file, rewritten AND moved. What is left is on one side
+// only. A file's content is compared in the files line. Any other text over
+// several lines - a locale hook, a template - is one block.
+export function codePairs(f: Field): CodePair[] {
+  if (f.same) return [];
+  if (f.set) {
+    if (!/(^|\.)injections$/.test(f.path)) return [];
+    const blocks = (list: unknown) => (Array.isArray(list) ? list : []).filter(isObj) as Obj[];
+    const L = blocks(f.left);
+    const R = blocks(f.right);
+    const usedL = new Set<number>();
+    const usedR = new Set<number>();
+    const code = (o: Obj) => (typeof o['code'] === 'string' ? (o['code'] as string) : '');
+    // What the code says, blanks at the ends of lines and of the block left
+    // out: a block moved in the editor often gains or loses a last empty line,
+    // and that is not a change of code.
+    const said = (t: string | null) => (t ?? '').split('\n').map((l) => l.trimEnd()).join('\n').trim();
+    const file = (o: Obj) => (typeof o['file'] === 'string' ? (o['file'] as string) : '');
+    const what = (o: Obj) => `${String(o['kind']).toUpperCase()} ${file(o) || 'code'}`;
+    const lang = (o: Obj): 'css' | 'js' => (o['kind'] === 'js' ? 'js' : 'css');
+    // Pairs every unused left block with the first unused right one the
+    // test accepts, in order.
+    const match = (accept: (l: Obj, r: Obj) => boolean, found: (l: Obj, r: Obj) => void) => {
+      L.forEach((l, i) => {
+        if (usedL.has(i)) return;
+        const j = R.findIndex((r, k) => !usedR.has(k) && accept(l, r));
+        if (j < 0) return;
+        usedL.add(i);
+        usedR.add(j);
+        found(l, R[j]);
+      });
+    };
+    const out: CodePair[] = [];
+    // 1. The same code: nothing to compare.
+    match(
+      (l, r) => l['kind'] === r['kind'] && file(l) === file(r) && said(code(l)) === said(code(r)),
+      () => undefined,
+    );
+    // 2. Rewritten where it stands.
+    match(
+      (l, r) => l['kind'] === r['kind'] && file(l) === file(r) && l['position'] === r['position'],
+      (l, r) => out.push({ label: `${what(l)}, ${l['position']}`, lang: lang(l), left: code(l), right: code(r) }),
+    );
+    // 3. Rewritten and moved.
+    match(
+      (l, r) => l['kind'] === r['kind'] && file(l) === file(r),
+      (l, r) =>
+        out.push({ label: `${what(l)}, moved from ${l['position']} to ${r['position']}`, lang: lang(l), left: code(l), right: code(r) }),
+    );
+    // 4. On one side only.
+    L.forEach((l, i) => !usedL.has(i) && out.push({ label: `${what(l)}, ${l['position']}`, lang: lang(l), left: code(l), right: null }));
+    R.forEach((r, j) => !usedR.has(j) && out.push({ label: `${what(r)}, ${r['position']}`, lang: lang(r), left: null, right: code(r) }));
+    // A block of a file has no code of its own here: one on a side only says
+    // nothing the chips do not.
+    return out.filter((p) => (p.left === null || p.right === null ? said(p.left ?? p.right) !== '' : said(p.left) !== said(p.right)));
+  }
+  const multi = (v: unknown) => typeof v === 'string' && v.includes('\n');
+  if (!multi(f.left) && !multi(f.right)) return [];
+  const text = (v: unknown) => (typeof v === 'string' ? v : v === undefined ? null : String(v));
+  return [{ label: f.path, lang: /onChange$/.test(f.path) ? 'js' : 'text', left: text(f.left), right: text(f.right) }];
 }

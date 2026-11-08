@@ -868,7 +868,9 @@ export interface ComposeAnswer {
   report: ComposeReport;
   // Which routes carry a deposited spec and files, per side and in the
   // result: they ride beside the document, never in it.
-  media: Record<'left' | 'right' | 'result', Record<string, { spec?: boolean; files?: number }>>;
+  // What rides beside each route, per side: its spec and files, with their
+  // content's hashes so a rewritten file shows.
+  media: Record<'left' | 'right' | 'result', Record<string, { spec?: boolean; files?: number; specSum?: string; fileSums?: Record<string, string> }>>;
   // What the result does not carry once on a filesystem.
   leaves: ComposeLeaves;
   // The revision the right side was read at, when it is a git location.
@@ -2667,6 +2669,9 @@ export interface PortalEntry {
   description?: string;
   // Turned off for everyone but kept in the config (not served).
   disabled?: boolean;
+  // A module's: the bar draws over its pages instead of moving them clear,
+  // the application making the room itself.
+  overlay?: boolean;
   children?: PortalSubEntry[];
   // The notifications entry: no route, no children.
   special?: PortalSpecial;
@@ -2679,6 +2684,7 @@ export interface PortalSubEntry {
   label?: string;
   description?: string;
   disabled?: boolean;
+  overlay?: boolean;
   special?: PortalSpecial;
 }
 

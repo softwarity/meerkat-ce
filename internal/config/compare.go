@@ -30,7 +30,7 @@ func Compare(from, to *Document) []Change {
 		}
 		out = append(out, compareSection(kind, a[key], b[key])...)
 	}
-	return out
+	return withMedia(out, from, to)
 }
 
 // sectionKind names each section's objects the way a plan does.

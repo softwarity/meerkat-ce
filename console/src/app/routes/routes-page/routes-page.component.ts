@@ -171,7 +171,10 @@ export class RoutesPageComponent {
         // because "I saved a second ago" is a race and a revision is a fact.
         this.api.getRoute(open.id).subscribe({
           next: (fresh) => {
-            if (fresh.rev === open.rev) return; // ours: nothing to say
+            // Compared with what the editor holds NOW, not when the news came:
+            // the echo of this tab's own save can arrive before the answer to
+            // it, and by the time this read lands the save has been adopted.
+            if (fresh.rev === (this.editingRoute()?.rev ?? open.rev)) return; // ours: nothing to say
             this.changedUnderEdit.set(change);
           },
           error: () => this.changedUnderEdit.set(change),
@@ -204,21 +207,33 @@ export class RoutesPageComponent {
       // gateway about a row nobody is showing.
       return;
     }
+    this.reread(id);
+  }
+
+  // One route read again and put back where it was.
+  private reread(id: string): void {
     this.api.getRoute(id).subscribe({
-      next: (fresh) => {
-        // A NEW array holding a NEW object. The table takes its rows through an
-        // input signal, and this application is zoneless: mutating the route in
-        // place, or writing back the array this signal already holds, changes
-        // what is on screen for nobody - the reference is what is compared, and
-        // there is no zone to notice the rest.
-        this.routes.update((list) => list.map((r) => (r.id === fresh.id ? fresh : r)));
-        // The badge follows the same write: a route that stopped compiling is
-        // exactly the news this screen is for.
-        this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
-      },
+      next: (fresh) => this.replace(fresh),
       // Gone between the write and this read - or refused. The list settles it.
       error: () => this.refresh(),
     });
+  }
+
+  // One row swapped for its new state, the rest of the list untouched: the
+  // table keeps its rows and the reader keeps their place in a long list,
+  // which a reload (a spinner, then the list again from the top) took away
+  // on every save.
+  //
+  // A NEW array holding a NEW object. The table takes its rows through an
+  // input signal, and this application is zoneless: mutating the route in
+  // place, or writing back the array this signal already holds, changes what
+  // is on screen for nobody - the reference is what is compared, and there is
+  // no zone to notice the rest.
+  private replace(fresh: Route): void {
+    this.routes.update((list) => list.map((r) => (r.id === fresh.id ? fresh : r)));
+    // The badge follows the same write: a route that stopped compiling is
+    // exactly the news this screen is for.
+    this.api.routeHealth().subscribe({ next: (h) => this.health.set(h), error: () => {} });
   }
 
   // The list and the health badge, as the gateway has them now.
@@ -399,7 +414,18 @@ export class RoutesPageComponent {
     // reseeded, dirty stayed true for ever, and every write from then on raised
     // the banner. Two saves in a row and the editor was unusable.
     this.changedUnderEdit.set(null);
-    this.load(false, true);
+    // A creation goes through the list, quietly: where a new route lands is
+    // decided by its order, and the gateway is what knows it.
+    if (!this.routes().some((r) => r.id === saved.id)) {
+      this.load(true, true);
+      return;
+    }
+    // An edit replaces its own row - shown at once from the answer, then read
+    // again, because what the editor hands back after a spec was deposited or
+    // removed is pieced together and its revision may be behind. The other
+    // consoles follow through the live channel, the same way.
+    this.replace(saved);
+    this.reread(saved.id);
   }
 
   // Persist a drag-reorder: apply optimistically, then save (order is
@@ -410,7 +436,7 @@ export class RoutesPageComponent {
     this.api.reorderRoutes(ids).subscribe({
       error: () => {
         this.snack.open($localize`:@@Request_failed:Request failed`, undefined, { duration: 3000 });
-        this.load();
+        this.load(true);
       },
     });
   }
@@ -425,7 +451,7 @@ export class RoutesPageComponent {
           undefined,
           { duration: 2500 },
         );
-        this.load();
+        this.replace(saved);
       },
       error: () => this.snack.open($localize`:@@Request_failed:Request failed`, undefined, { duration: 3000 }),
     });
@@ -454,7 +480,7 @@ export class RoutesPageComponent {
             undefined,
             { duration: 3000 },
           );
-          this.load();
+          this.load(true);
           void this.router.navigate(['/infra/routes', saved.id, 'target']);
         },
         error: (e) => {
@@ -476,7 +502,10 @@ export class RoutesPageComponent {
     this.api.deleteRoute(route.id).subscribe({
       next: () => {
         this.snack.open($localize`:@@Route_NAME_deleted:Route "${route.name}:NAME:" deleted`, undefined, { duration: 2500 });
-        this.load();
+        // The drawer goes with the route it was showing: there is nothing left
+        // in it to edit.
+        if (this.editingRoute()?.id === route.id) void this.router.navigate(['/infra/routes']);
+        this.routes.update((list) => list.filter((r) => r.id !== route.id));
       },
       error: () => this.snack.open($localize`:@@Delete_failed:Delete failed`, undefined, { duration: 3000 }),
     });

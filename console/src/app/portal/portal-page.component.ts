@@ -667,6 +667,7 @@ export class PortalPageComponent {
         label: m?.label ?? '',
         description: m?.description ?? '',
         disabled: !!m?.disabled,
+        room: !m?.overlay,
       } satisfies ModuleDraft,
     });
   }
@@ -708,6 +709,8 @@ function entryFromDraft(m: ModuleDraft): PortalEntry {
     label: m.label,
     description: m.description,
     disabled: m.disabled,
+    // Only a module has pages to move: a container says nothing.
+    overlay: m.routeId && !m.room ? true : undefined,
   };
 }
 
@@ -743,6 +746,8 @@ function childFromDraft(m: ModuleDraft): PortalSubEntry {
     label: m.label,
     description: m.description,
     disabled: m.disabled,
+    // Only a module has pages to move: a container says nothing.
+    overlay: m.routeId && !m.room ? true : undefined,
   };
 }
 

@@ -1943,6 +1943,24 @@ export class RouteEditorComponent {
     const s = this.pickedEntry();
     return s ? s.names?.[0] || s.name : this.missingUpstream();
   });
+  // What is typed in the service field, null while nothing is: the field then
+  // reads the pick. Cleared when the list closes, picked or not.
+  protected readonly serviceQuery = signal<string | null>(null);
+  // The list, narrowed by what is typed - on every name it shows: the short
+  // one, the stored one, and the hint (the stack, the network).
+  protected readonly serviceOffered = computed(() => {
+    const typed = (this.serviceQuery() ?? "").trim().toLowerCase();
+    const all = this.upstreamChoices();
+    return typed
+      ? all.filter((c) =>
+          [c.value, c.label ?? "", c.detail ?? "", c.hint ?? ""].some((v) => v.toLowerCase().includes(typed)),
+        )
+      : all;
+  });
+  // What the field shows once a service is picked: its short name, as the
+  // list reads it, not the stored one.
+  protected readonly serviceLabel = (stored: string): string =>
+    this.upstreamChoices().find((c) => c.value === stored)?.label ?? stored;
   // The picked service's ports, with the route's own when the list does not
   // carry it: a port nobody listed is shown, not lost. The field is always
   // there and filled; it only opens when this leaves a choice.

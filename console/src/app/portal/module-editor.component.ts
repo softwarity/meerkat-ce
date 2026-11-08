@@ -23,6 +23,9 @@ export interface ModuleDraft {
   label: string;
   description: string;
   disabled: boolean;
+  // Whether the bar moves this module's pages clear of it (stored the other
+  // way round, overlay, so that an entry saying nothing has the room made).
+  room: boolean;
 }
 
 // What is edited: a top-level module, a container, or a module inside one.
@@ -98,6 +101,7 @@ export class ModuleEditorComponent implements OnInit {
   protected readonly label = signal('');
   protected readonly description = signal('');
   protected readonly disabled = signal(false);
+  protected readonly room = signal(true);
 
   protected readonly iconMode = signal<'search' | 'svg'>('search');
   protected readonly query = signal('');
@@ -116,6 +120,7 @@ export class ModuleEditorComponent implements OnInit {
     this.label.set(m.label);
     this.description.set(m.description);
     this.disabled.set(m.disabled);
+    this.room.set(m.room);
 
     this.q$
       .pipe(
@@ -177,6 +182,7 @@ export class ModuleEditorComponent implements OnInit {
       label: this.label().trim(),
       description: this.description().trim(),
       disabled: this.disabled(),
+      room: this.room(),
     });
   }
 

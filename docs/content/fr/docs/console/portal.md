@@ -66,6 +66,8 @@ Une fois les [notifications](/docs/console/notifications) activées par root
 
 ## Une entrée
 
+![Le tiroir d'un module : sa route et son libellé sur une ligne, et dessous, si la barre fait de la place à la page](img/console/portal-module.webp)
+
 **Add a module** ajoute une application, **Add a container** un groupe de modules.
 
 - **Application (route)** - la route UI d'un module. Seules les **routes UI**
@@ -77,6 +79,11 @@ Une fois les [notifications](/docs/console/notifications) activées par root
   reprend le nom de la route.
 - **Description** - le texte de l'infobulle.
 - **Icon** (mode *Portal*) - cherchez dans le jeu d'icônes embarqué, ou fournissez un SVG : collez-le, déposez son fichier ou choisissez-le.
+- **Make room for the bar** (mode *Portal*, un module) - activé par défaut : la
+  page de l'application est décalée sous la barre et à côté. Désactivé, la barre
+  se dessine par-dessus la page et l'application fait la place elle-même ;
+  l'icône d'information à côté nomme les variables CSS qu'elle lit. Voir
+  [la page sous la barre](/docs/customise/portal#la-page-sous-la-barre).
 
 Un conteneur ouvre son premier sous-module que le visiteur a le droit d'ouvrir,
 et il n'est pas affiché pour un visiteur qui ne peut en ouvrir aucun.

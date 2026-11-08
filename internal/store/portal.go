@@ -146,6 +146,12 @@ type PortalEntry struct {
 	// Disabled turns the module off for everyone without removing it: kept in
 	// the config but never served. Zero value (false) means enabled.
 	Disabled bool `json:"disabled,omitempty"`
+	// Overlay lets the bar draw over this application's pages instead of
+	// moving them clear of it. By default (false) the bar makes room: the
+	// whole page is set below and beside it, its fixed elements included.
+	// Set for an application that makes the room itself, from
+	// --meerkat-top/left/right. A route in no entry is never moved.
+	Overlay bool `json:"overlay,omitempty"`
 	// Children are a container's modules, its sub-modules. Empty on a module.
 	Children []PortalSubEntry `json:"children,omitempty"`
 	// Special makes the entry one the gateway provides rather than a route:
@@ -167,6 +173,8 @@ type PortalSubEntry struct {
 	Description string `json:"description,omitempty"`
 	// Disabled turns the sub-module off for everyone (see PortalEntry.Disabled).
 	Disabled bool `json:"disabled,omitempty"`
+	// Overlay: see PortalEntry.Overlay.
+	Overlay bool `json:"overlay,omitempty"`
 	// Special: see PortalEntry.Special. The notifications entry may sit in a
 	// container too.
 	Special string `json:"special,omitempty"`

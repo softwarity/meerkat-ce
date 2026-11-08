@@ -211,7 +211,11 @@ async function seedCompose(page) {
   orders.timeouts.response = 'PT45S';
   orders.predicates[1].args.methods = ['GET', 'POST', 'PATCH'];
   orders.limits[0].requests = 1200;
-  route('billing').upstream = 'http://billing.staging.acme.internal:8080';
+  const billing = route('billing');
+  billing.upstream = 'http://billing.staging.acme.internal:8080';
+  // Its CSS block rewritten, for the code button and the side-by-side it opens.
+  billing.ui.injections[0].code =
+    ':root { --acme-brand: #7a3db8; }\n.app-header { background: var(--acme-brand); }\n.app-header a { color: white; }';
   doc.routes.push({
     id: 'reports', name: 'Reports', order: 6, enabled: true,
     upstream: 'http://reports.staging.acme.internal:8080',
@@ -1074,6 +1078,20 @@ const SHOTS = [
       await page.waitForTimeout(2500);
     },
   },
+  // A module's drawer: the route and its label on one line, and under them
+  // whether the bar makes room for the page.
+  {
+    file: 'portal-module', path: '/application/portal', settle: 3500,
+    act: async (page) => {
+      await page.getByRole('button', { name: 'Add a module' }).first().click();
+      const drawer = page.locator('app-module-editor');
+      // The floating label lies over an empty select: the click goes through it.
+      await drawer.locator('mat-select').first().click({ force: true });
+      await page.getByRole('option', { name: /Docs portal/ }).first().click();
+      await drawer.getByLabel('Label', { exact: true }).fill('Documentation');
+      await page.waitForTimeout(800);
+    },
+  },
   { file: 'security', path: '/application/security' },
   // ── Tenants ──
   { file: 'tenants', path: '/tenants' },
@@ -1136,6 +1154,16 @@ const SHOTS = [
       const block = page.locator('fieldset.block', { has: page.locator('legend', { hasText: /^portal$/ }) });
       await block.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(1200);
+    },
+  },
+  // A code block rewritten on the other side: its code, line by line.
+  {
+    file: 'configuration-code', path: () => composePath, prepare: seedCompose, settle: 1800,
+    act: async (page) => {
+      await onlyDifferences(page);
+      await page.locator('button.codebtn').first().click();
+      await page.locator('app-code-diff-dialog .cm-mergeView').first().waitFor();
+      await page.waitForTimeout(800);
     },
   },
   {

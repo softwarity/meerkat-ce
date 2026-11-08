@@ -71,6 +71,11 @@ export class RoutesTableComponent {
   // caller has to LAND on the gateway's own answer - the sign-in page, or the
   // page saying which organisation or role was wanted - and a fetch would turn
   // all of that into a status code nobody reads.
+  // Rows kept by route, not by object: a list read again hands back new
+  // objects for the same routes, and the table would otherwise rebuild every
+  // row of a long list for the one that changed.
+  protected readonly byId = (_: number, r: Route): string => r.id;
+
   protected openUrl(r: Route): string {
     const origin = this.dataOrigin();
     if (!origin) return '';

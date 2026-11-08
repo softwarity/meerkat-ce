@@ -1,5 +1,5 @@
 <div class="table-wrap">
-  <mat-table [dataSource]="routes()" cdkDropList (cdkDropListDropped)="drop($event)">
+  <mat-table [dataSource]="routes()" [trackBy]="byId" cdkDropList (cdkDropListDropped)="drop($event)">
     <ng-container matColumnDef="name">
       <mat-header-cell *matHeaderCellDef i18n="@@Name">Name</mat-header-cell>
       <mat-cell *matCellDef="let r">

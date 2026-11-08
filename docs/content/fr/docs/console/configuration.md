@@ -60,6 +60,16 @@ ruban relie ce qui nourrit le résultat à sa place au milieu. Pour décider :
   pâle en pointillés n'y est pas. Un clic l'ajoute ou la retire, un glisser la réordonne.
 - **Un objet commun aux deux côtés** a *in the result* coché : décochez pour le laisser
   dehors malgré tout.
+- **Du code** - un bloc de code personnalisé, un hook `onChange` - affiche un bouton
+  **code** à côté de la valeur : il ouvre les deux côtés ligne à ligne. Un bloc qui a
+  seulement changé de place (de la fin du body vers le head, par exemple) n'est pas du
+  code modifié : il dit où il est passé, et aucune comparaison n'est proposée quand le
+  code est le même.
+- **Les fichiers d'une route** - ceux qu'elle sert, sa spec OpenAPI - sont comparés par
+  leur contenu : une ligne **files** nomme ceux qui diffèrent, sont ajoutés ou retirés,
+  et une spec qui diffère est signalée aussi.
+
+![Le bouton code d'un bloc CSS réécrit : les deux côtés ligne à ligne, les changements marqués](img/console/configuration-code.webp)
 
 La double coche dans l'en-tête d'une colonne prend ce côté pour tout ce qui reste à
 décider, et **Reset** à côté du résultat oublie tous les choix. **Only differences**

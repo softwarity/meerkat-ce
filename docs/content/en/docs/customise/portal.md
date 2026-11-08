@@ -57,6 +57,7 @@ In **Portal** mode an entry also carries an icon:
 | Field | What it does |
 |---|---|
 | Icon | a glyph picked from the console's bank, stored as SVG and drawn as a CSS mask - no icon font is ever loaded. Empty falls back to the label's initial |
+| Make room for the bar | on by default, on a module: the application's page is moved below and beside the bar. Off, the bar draws over the page (see below) |
 
 In **Links** mode, a container is a heading over its modules, in the account
 button's menu as on the built-in pages; a module back at the top level after it
@@ -122,6 +123,32 @@ the account menu are one surface, not two corners.
 
 The bar is never drawn in an iframe: a page embedded elsewhere is not the place
 for navigation.
+
+## The page under the bar
+
+An application behind the portal was not written with a bar above it. So, by
+default, the bar **makes room** for it: the page is moved below the strip and
+beside the rail, its fixed elements included - a toolbar pinned to the top of
+the window, a side menu, a dialog stay inside the space left to the page. The
+application is not changed and knows nothing of it.
+
+What still reads the whole window can land under the bar: a height of `100vh`,
+a position computed from the mouse or from `getBoundingClientRect()`, the width
+of the window. Most applications show nothing of it; one that does is fitted from
+its own side.
+
+**Make room for the bar** is set per module, in the portal. Turned off, the bar
+draws over the page, and the application makes the room itself from three CSS
+variables the bar sets on the page's root:
+
+| Variable | What it holds |
+|---|---|
+| `--meerkat-top` | the height of the strip |
+| `--meerkat-left` | the width of the rail, when it is on the left |
+| `--meerkat-right` | the width of the rail, when it is on the right |
+
+A route that is not in the portal is never moved: the bar is drawn on it, over
+the page, since no entry says where it belongs.
 
 Technically it is a plain custom element with a shadow DOM, served like the user
 button, wearing the data plane's theme and the visitor's light or dark.

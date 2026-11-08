@@ -289,6 +289,17 @@ func AppPage(c FlowChrome) FlowChrome {
 	return c
 }
 
+// PortalRoomCSS makes room for the bar on a flow page of the GATEWAY's own,
+// whose layout is known. On an application's page the bar moves the whole
+// document clear of it, a transform on <html> that carries its fixed
+// elements too, when the portal entry of its route says so; a flow page
+// belongs to no route, and keeps the room it has always made: it flows,
+// so padding <html> is enough; border-box and the viewport's height keep
+// height:100% meaning "what is left", or a full-height page ran past the
+// bottom by the bar's height and raised a scroll bar over nothing.
+const PortalRoomCSS = `<style>html { padding: var(--meerkat-top, 0px) var(--meerkat-right, 0px) 0 var(--meerkat-left, 0px);` +
+	` box-sizing: border-box; height: 100dvh; }</style>`
+
 // BehindPortal puts a flow page behind the portal the way a route page stands
 // there: in portal mode, on an image that carries the bar, the page agent and
 // the bar ride at the top of its body - the same fragment, so the same bar, in
@@ -312,7 +323,8 @@ func (h *Handler) BehindPortal(r *http.Request, c FlowChrome) FlowChrome {
 	agent := `<script defer src="/meerkat/page.js?v=` + ChromeVersion + `" data-scheme="select"` +
 		` data-scheme-mechanism="class" data-scheme-tag="body" data-scheme-light="mk-scheme-light" data-scheme-dark="mk-scheme-dark"` +
 		` data-languages="` + template.HTMLEscapeString(strings.Join(langs, ",")) + `"></script>` +
-		`<style>:root:has(> body.mk-scheme-light) { color-scheme: light; } :root:has(> body.mk-scheme-dark) { color-scheme: dark; }</style>`
+		`<style>:root:has(> body.mk-scheme-light) { color-scheme: light; } :root:has(> body.mk-scheme-dark) { color-scheme: dark; }</style>` +
+		PortalRoomCSS
 	c.BodyStart = template.HTML(agent + portalBar.Fragment(store.Route{IsUI: true}, langs)) //nolint:gosec // constants, and language codes validated and escaped
 	c.SchemeSwitch = false
 	c.Langs = nil
