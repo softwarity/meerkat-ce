@@ -131,6 +131,13 @@ occupent une seule surface, et non deux coins de l'écran.
 La barre n'est jamais affichée dans une iframe : une page incorporée ailleurs
 n'est pas un endroit où naviguer.
 
+L'entrée marquée comme courante est celle sur laquelle vous avez cliqué, tant que
+les pages viennent de l'application qu'elle a ouverte : deux entrées peuvent
+ouvrir la même application à deux endroits (son accueil, un de ses tableaux de
+bord), et celle que vous avez choisie reste sélectionnée pendant que vous y
+naviguez, rechargement compris. Une autre entrée cliquée, ou une autre
+application atteinte, et c'est de nouveau l'adresse de la page qui décide.
+
 ## La page sous la barre
 
 Une application derrière le portail n'a pas été écrite avec une barre au-dessus

@@ -124,6 +124,12 @@ the account menu are one surface, not two corners.
 The bar is never drawn in an iframe: a page embedded elsewhere is not the place
 for navigation.
 
+The entry shown as current is the one you clicked, for as long as the pages come
+from the application it opened: two entries can open the same application at two
+places (its home, one of its dashboards), and the one you chose stays selected
+as you move on inside it, a reload included. Another entry clicked, or another
+application reached, and the page's address decides again.
+
 ## The page under the bar
 
 An application behind the portal was not written with a bar above it. So, by

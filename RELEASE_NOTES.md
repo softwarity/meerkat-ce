@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+- **The portal's bar keeps the entry you clicked.** Two entries may open the same application at
+  two places - its home, and one of its dashboards - and once inside, the application moves on to
+  addresses neither entry names. The bar matched the address and selected the other entry, or none.
+  It now holds the entry clicked, for the tab, as long as the pages come from the application it
+  opened, a reload included; another entry clicked or another application reached, and the address
+  decides again.
 - **An agent saving the portal no longer wipes its icons.** The settings an agent reads describe
   each entry's icon in a line rather than carry the drawing, and the portal tool takes the
   catalogue back whole: sending it back as read, to add or move one entry, erased the icon of every
