@@ -291,8 +291,8 @@ func AppPage(c FlowChrome) FlowChrome {
 
 // PortalRoomCSS makes room for the bar on a flow page of the GATEWAY's own,
 // whose layout is known. On an application's page the bar moves the whole
-// document clear of it, a transform on <html> that carries its fixed
-// elements too, when the portal entry of its route says so; a flow page
+// document clear of it, layout containment on <html> that carries its
+// fixed elements too, when the portal entry of its route says so; a flow page
 // belongs to no route, and keeps the room it has always made: it flows,
 // so padding <html> is enough; border-box and the viewport's height keep
 // height:100% meaning "what is left", or a full-height page ran past the
