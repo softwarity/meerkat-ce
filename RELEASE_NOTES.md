@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.25.1
+
+<!-- release: built=2026-11-09T14:34:11Z migrates=false -->
+
 - **The portal's bar keeps the entry you clicked.** Two entries may open the same application at
   two places - its home, and one of its dashboards - and once inside, the application moves on to
   addresses neither entry names. The bar matched the address and selected the other entry, or none.
