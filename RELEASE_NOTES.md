@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.25.2
+
+<!-- release: built=2026-11-09T15:35:40Z migrates=false -->
+
 - **The portal's bar makes room for a page with layout containment instead of a transform.** The
   page still moves below and beside the bar with its fixed elements - an application's own top bar,
   side menu and dialogs land in the room left to it - but the browser no longer composites the
