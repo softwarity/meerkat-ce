@@ -152,6 +152,7 @@ func (a *API) toolSavePortal(ctx context.Context, args json.RawMessage) (any, er
 		return nil, err
 	}
 	before := a.st.Portal(ctx)
+	keepDescribedIcons(&portal, before)
 	routes, err := a.st.ListRoutes(ctx)
 	if err != nil {
 		return nil, err

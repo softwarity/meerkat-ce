@@ -156,6 +156,57 @@ func TestThePortalIsWrittenAgainstTheRoutesThatExist(t *testing.T) {
 	}
 }
 
+// An agent adds a module the way the tool says: read the portal, change it,
+// send it back whole. What it read carries each icon as a line ("<svg, 643
+// bytes>"), and sending that back must keep the drawings, not wipe them.
+func TestAPortalSentBackAsReadKeepsItsIcons(t *testing.T) {
+	f := setupBare(t)
+	ctx := mcpCtx(rootUser(t, f))
+	for _, id := range []string{"sales", "stock"} {
+		if err := f.api.st.SaveRoute(ctx, store.Route{
+			ID: id, Name: id, Enabled: true, IsUI: true,
+			Upstream: "http://" + id + ".test", Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/" + id + "/**"}}}},
+		}); err != nil {
+			t.Fatalf("seeding a route: %v", err)
+		}
+	}
+	if _, err := f.api.toolSavePortal(ctx, json.RawMessage(
+		`{"mode":"links","layout":"header","entries":[{"label":"Shop","icon":"storefront","children":[{"routeId":"sales","icon":"receipt_long"}]}]}`)); err != nil {
+		t.Fatalf("save_portal: %v", err)
+	}
+	first := f.api.st.Portal(ctx)
+
+	read, err := f.api.toolGetSettings(ctx, nil)
+	if err != nil {
+		t.Fatalf("get_settings: %v", err)
+	}
+	raw, _ := json.Marshal(read)
+	var view struct {
+		Portal store.PortalConfig `json:"portal"`
+	}
+	if err := json.Unmarshal(raw, &view); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(view.Portal.Entries[0].Icon, "<svg, ") {
+		t.Fatalf("get_settings should describe the icon, got %.40q", view.Portal.Entries[0].Icon)
+	}
+	view.Portal.Entries[0].Children = append(view.Portal.Entries[0].Children, store.PortalSubEntry{RouteID: "stock"})
+	back, _ := json.Marshal(view.Portal)
+	if _, err := f.api.toolSavePortal(ctx, back); err != nil {
+		t.Fatalf("save_portal: %v", err)
+	}
+	saved := f.api.st.Portal(ctx)
+	if saved.Entries[0].Icon != first.Entries[0].Icon {
+		t.Errorf("the container lost its icon: %.40q", saved.Entries[0].Icon)
+	}
+	if saved.Entries[0].Children[0].Icon != first.Entries[0].Children[0].Icon {
+		t.Errorf("the module lost its icon: %.40q", saved.Entries[0].Children[0].Icon)
+	}
+	if len(saved.Entries[0].Children) != 2 || saved.Entries[0].Children[1].Icon != "" {
+		t.Errorf("the module added should be there, without an icon: %+v", saved.Entries[0].Children)
+	}
+}
+
 // resolveImage is the whole decision in one place, so it is worth pinning:
 // what is kept, what is changed, what is removed, what is refused.
 func TestWhatAnImageFieldMeans(t *testing.T) {

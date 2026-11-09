@@ -2,6 +2,11 @@
 
 ## NEXT RELEASE
 
+- **An agent saving the portal no longer wipes its icons.** The settings an agent reads describe
+  each entry's icon in a line rather than carry the drawing, and the portal tool takes the
+  catalogue back whole: sending it back as read, to add or move one entry, erased the icon of every
+  other entry. An icon that comes back described now keeps the drawing already stored.
+
 ---
 
 ## 1.25.0

@@ -107,6 +107,57 @@ func describeSVG(svg string) string {
 	return fmt.Sprintf("<svg, %s>", byteSize(len(svg)))
 }
 
+// keepDescribedIcons gives an entry back its stored drawing when it comes back
+// carrying the line describeSVG put in its place. get_settings says "<svg, 643
+// bytes>" rather than the drawing, and save_portal is a read-modify-write: an
+// agent that adds one module sends every other entry back as it read it. That
+// line is neither an icon name nor an SVG, so it resolved to nothing, and one
+// added module wiped the icon of every entry of the bar.
+//
+// The entry is found again by what it is - its route, the special entry it is,
+// or a container's label - not by its place, since an agent may have moved it.
+// A summary no stored entry answers to is dropped: there is no drawing to keep.
+func keepDescribedIcons(in *store.PortalConfig, before store.PortalConfig) {
+	described := func(icon string) bool {
+		return strings.HasPrefix(icon, "<svg, ") && strings.HasSuffix(icon, ">")
+	}
+	key := func(route, special, label string) string {
+		switch {
+		case route != "":
+			return "route:" + route
+		case special != "":
+			return "special:" + special
+		default:
+			return "container:" + label
+		}
+	}
+	stored := map[string]string{}
+	keep := func(k, icon string) {
+		if _, seen := stored[k]; !seen {
+			stored[k] = icon
+		}
+	}
+	for _, e := range before.Entries {
+		keep(key(e.RouteID, e.Special, e.Label), e.Icon)
+		for _, c := range e.Children {
+			keep(key(c.RouteID, c.Special, c.Label), c.Icon)
+		}
+	}
+	restore := func(icon *string, k string) {
+		if described(*icon) {
+			*icon = stored[k]
+		}
+	}
+	for i := range in.Entries {
+		e := &in.Entries[i]
+		restore(&e.Icon, key(e.RouteID, e.Special, e.Label))
+		for j := range e.Children {
+			c := &e.Children[j]
+			restore(&c.Icon, key(c.RouteID, c.Special, c.Label))
+		}
+	}
+}
+
 // brandingView is the branding with its pictures named instead of carried.
 type brandingView struct {
 	AppName    string `json:"appName"`
