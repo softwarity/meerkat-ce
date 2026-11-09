@@ -1,0 +1,60 @@
+name: Docker Hub pages
+
+# The page each image has on Docker Hub: a short description and the text in
+# docker/hub/, which says what Meerkat is, how to try it, and links to the site.
+# Written when that text changes, or by hand. Not tied to a release: the text
+# says nothing a release moves.
+#
+# Its own token, DOCKERHUB_DESCRIPTION (a repository secret here): Docker Hub
+# writes a description only with a token scoped read, write AND delete, which
+# the push token (DOCKERHUB_RW, read and write) is not. Not set, the run says
+# so and stops there.
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/hub/**
+      - .github/workflows/dockerhub-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pages:
+    name: Write the Docker Hub pages
+    # The public mirror runs the CI; the private repository only mirrors.
+    if: github.repository == 'softwarity/meerkat-ce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Is there a token for the pages?
+        id: token
+        env:
+          TOKEN: ${{ secrets.DOCKERHUB_DESCRIPTION }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::DOCKERHUB_DESCRIPTION is not set on this repository: the Docker Hub pages were not written"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.token.outputs.set == 'true'
+      - name: softwarity/meerkat
+        if: steps.token.outputs.set == 'true'
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_DESCRIPTION }}
+          repository: softwarity/meerkat
+          short-description: Authentication proxy and API gateway for internal applications. Evaluation without a license.
+          readme-filepath: docker/hub/meerkat.md
+      - name: softwarity/meerkat-ce
+        if: steps.token.outputs.set == 'true'
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_DESCRIPTION }}
+          repository: softwarity/meerkat-ce
+          short-description: Authentication proxy and API gateway for internal applications. Community edition, free.
+          readme-filepath: docker/hub/meerkat-ce.md
