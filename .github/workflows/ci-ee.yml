@@ -873,7 +873,7 @@ jobs:
             GO_TAGS=ee
             EDITION=ee
       - run: echo "published docker.io/softwarity/meerkat:latest @ ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: sigstore/cosign-installer@v4.1.2
+      - uses: sigstore/cosign-installer@v4.1.3
       # Signed BY DIGEST: a signature attached to a tag would drift the day
       # somebody moved the tag. This signs `latest`, and what a release stamps
       # it into is a NEW manifest, which the release job signs in turn. The
@@ -1126,7 +1126,7 @@ jobs:
       # VERIFIED, index and platform images, against the identity the install
       # page tells a client to check. A release that ships an unsigned tag
       # fails here, before release-flow cuts the version.
-      - uses: sigstore/cosign-installer@v4.1.2
+      - uses: sigstore/cosign-installer@v4.1.3
       - name: Sign what was pushed
         env:
           MEERKAT: ${{ steps.meerkat.outputs.digest }}
