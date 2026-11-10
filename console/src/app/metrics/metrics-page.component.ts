@@ -8,6 +8,13 @@ import { MatRippleModule } from '@angular/material/core';
 import { LiveWindowDataSource } from '@softwarity/livewire';
 import { throttleTime } from 'rxjs';
 import type { EChartsCoreOption } from 'echarts/core';
+
+// A colour the console's theme holds, for a chart that paints from code: read
+// off the document, the literal when the page has none (a test, a server).
+function houseColour(token: string, fallback: string): string {
+  const v = typeof document === 'undefined' ? '' : getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  return v || fallback;
+}
 import { ChartComponent } from './chart.component';
 import {
   EndpointsAnswer,
@@ -167,7 +174,7 @@ export class MetricsPageComponent {
       },
       {
         name: $localize`:@@Metrics_refused:Refused`,
-        colour: '#ffa726',
+        colour: houseColour('--mk-warning', '#ffa726'),
         data: samples.map((s) => classAt(s, 4)),
       },
       {

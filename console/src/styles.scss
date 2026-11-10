@@ -69,6 +69,9 @@ html {
   // House tokens layered on top of M3.
   --mk-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
   --mk-signal: var(--mat-sys-secondary); // mint - used sparingly, as an accent
+  // "Some, not all": a service partly up, a request refused. M3 has no warning
+  // token and the theme's tertiary is a lilac, so the orange is the house's.
+  --mk-warning: #ffa726;
   --mk-radius: 12px;
 }
 

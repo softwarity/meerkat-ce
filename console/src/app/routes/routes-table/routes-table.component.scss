@@ -45,8 +45,8 @@ mat-row.clickable {
   color: #4caf50;
 }
 .heart.degraded {
-  /* The orange the traffic chart draws "Refused" with: answering, not fully. */
-  color: #ffa726;
+  /* The house orange, the traffic chart's "Refused": answering, not fully. */
+  color: var(--mk-warning);
 }
 .heart.down {
   color: var(--mat-sys-error);

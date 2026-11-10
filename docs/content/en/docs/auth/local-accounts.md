@@ -233,6 +233,8 @@ browser.
 
 `/forgot-password` exists as soon as a mail relay is configured and local
 passwords are accepted; it does not wait for self-registration to be open. The
+sign-in page offers it under the sign-in button, out of the way of Tab between
+the username and the password. The
 outcome page is the same whether the address is known or not. An account born at
 an authority (OIDC, LDAP, GitHub) has no local password and is sent no link: one
 would open a second door the authority knows nothing about.

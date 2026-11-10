@@ -1,10 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { LoadingIndicatorComponent } from '@softwarity/loading-indicator';
-import { InfraService } from '../api.service';
+import { InfraInstance, InfraService } from '../api.service';
 import { InfrastructureService } from '../shared/infrastructure.service';
 import { ZonedDatePipe, zoned } from '../shared/zoned-date.pipe';
 import { MeService } from '../me.service';
@@ -19,18 +22,22 @@ import { MeService } from '../me.service';
 
 // The drawing's grid, in pixels: a card's height and the gap that holds the
 // sync link, the fieldset's head and foot, where the cards sit across.
-const CARD = 112;
+const CARD = 84;
 const GAP = 30;
 const HEAD = 40;
-const FOOT_SYNCED = 56;
+const FOOT_SYNCED = 24;
 const FOOT_ALONE = 24;
-const CARD_X = 70;
+const CARD_X = 24;
 const CARD_W = 280;
-const LEFT_W = 380;
+const LEFT_W = 328;
 const DB_GAP = 30;
 const DB_H = 96;
-const BAR_X = 396;
-const PANEL_X = 420;
+const BAR_X = 344;
+const PANEL_X = 368;
+// A link to the database leaves its card from below, a little in from the
+// left, and stops short of every card it passes behind by this much.
+const LANE_IN = 28;
+const LANE_CLEAR = 6;
 
 @Component({
   selector: 'app-topology-page',
@@ -38,7 +45,9 @@ const PANEL_X = 420;
     ZonedDatePipe,
     NgTemplateOutlet,
     MatCardModule,
+    MatButtonModule,
     MatIconModule,
+    MatTooltipModule,
     RouterLink,
     LoadingIndicatorComponent,
   ],
@@ -108,7 +117,6 @@ const PANEL_X = 420;
           <div class="topo" [style.min-height.px]="g().height">
             @for (l of g().lanes; track $index) {
               <div class="line db-line" [style.left.px]="l.x" [style.top.px]="l.y" [style.width.px]="2" [style.height.px]="l.h"></div>
-              <div class="line db-line" [style.left.px]="l.x" [style.top.px]="l.y - 1" [style.width.px]="cardX - l.x" [style.height.px]="2"></div>
             }
 
             <fieldset class="meerkat" [style.width.px]="leftW" [style.height.px]="g().fieldset">
@@ -116,28 +124,31 @@ const PANEL_X = 420;
             </fieldset>
 
             @for (n of s.instances; track n.id; let i = $index) {
+              <!-- The node this console talks to wears its own colour; one not
+                   ready, or past the license, says so in its corner. -->
               <div class="card node" [class.self]="n.self" [class.extra]="extra(n.id)" [class.down]="!n.ready"
                 [style.left.px]="cardX" [style.top.px]="g().tops[i]" [style.width.px]="cardW" [style.height.px]="card">
-                <div class="row">
-                  <mat-icon svgIcon="meerkat" class="kind" aria-hidden="true" />
-                  <span class="mono host" [title]="n.host">{{ n.host }}</span>
+                <div class="row between">
+                  <span class="row">
+                    <mat-icon svgIcon="meerkat" class="kind" aria-hidden="true" />
+                    <span class="name" i18n="@@Meerkat">Meerkat</span>
+                  </span>
+                  <span class="row">
+                    @if (!n.ready) {
+                      <span class="chip bad" [matTooltip]="n.reason ?? ''" i18n="@@Not_ready">Not ready</span>
+                    }
+                    @if (extra(n.id)) {
+                      <span class="chip warn" i18n="@@Past_the_license">Past the license</span>
+                    }
+                    <span class="mono version" [matTooltip]="startedTip(n)">{{ n.version }}</span>
+                  </span>
                 </div>
-                <div class="chips">
-                  @if (n.ready) {
-                    <span class="chip ok" i18n="@@Ready">Ready</span>
-                  } @else {
-                    <span class="chip bad" i18n="@@Not_ready">Not ready</span>
-                  }
-                  @if (n.self) {
-                    <span class="chip self" i18n="@@This_node">This node</span>
-                  }
-                  @if (extra(n.id)) {
-                    <span class="chip warn" i18n="@@Past_the_license">Past the license</span>
-                  }
-                </div>
-                <div class="facts label">
-                  <span i18n="@@Version">Version</span><span class="mono">{{ n.version }}</span>
-                  <span i18n="@@Started">Started</span><span>{{ sec(n.started) | zoned: zone() : 'long' }}</span>
+                <div class="row addr">
+                  <span class="mono label line2" [title]="n.host">{{ n.host }}</span>
+                  <button matIconButton class="copy" (click)="$event.stopPropagation(); copy(n.host)"
+                    i18n-aria-label="@@Copy" aria-label="Copy">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
                 </div>
               </div>
             }
@@ -150,9 +161,6 @@ const PANEL_X = 420;
                 </div>
                 <div class="sync-label label" [style.left.px]="cardX + cardW / 2 + 20" [style.top.px]="y + 7" i18n="@@in_sync">in sync</div>
               }
-              <div class="foot label" [style.left.px]="cardX" [style.top.px]="g().foot" [style.width.px]="cardW" i18n="@@Infra_sync_what">
-                Routes, certificates, sessions and the license reach every instance within a second.
-              </div>
             }
 
             <div class="card db" [style.top.px]="g().db" [style.width.px]="leftW" [style.min-height.px]="dbH">
@@ -181,12 +189,10 @@ const PANEL_X = 420;
               <div class="line svc-line" [style.left.px]="barX" [style.top.px]="g().middle - 1" [style.width.px]="panelX - barX" [style.height.px]="2"></div>
             }
 
-            <section class="services" [style.left.px]="panelX"
-              aria-label="Services" i18n-aria-label="@@Services">
-              <div class="services-head">
-                <span class="title" i18n="@@Services">Services</span>
-                <span class="label" i18n="@@Infra_n_services">{{ s.services.length }} services</span>
-              </div>
+            <!-- A frame like Meerkat's, its name on the border. How many there
+                 are is the tile's, above. -->
+            <fieldset class="services" [style.left.px]="panelX">
+              <legend i18n="@@Services">Services</legend>
               <div class="services-list">
                 @for (v of s.services; track v.address) {
                   <div [class]="'card svc ' + v.state">
@@ -196,7 +202,7 @@ const PANEL_X = 420;
                   <p class="label" i18n="@@Infra_no_services">No route points at a service yet.</p>
                 }
               </div>
-            </section>
+            </fieldset>
           </div>
         </mat-card>
 
@@ -205,18 +211,23 @@ const PANEL_X = 420;
       <loading-indicator withContainer />
     }
 
+    <!-- One mark for the state, in the corner: how many of the service's
+         replicas answer, out of how many - the words are in its tooltip. -->
     <ng-template #svcBody let-v>
       <span class="row between">
         <span class="row">
           <mat-icon [class]="'kind ' + v.state" aria-hidden="true">{{ v.ui ? 'web' : 'api' }}</mat-icon>
           <span class="name" [title]="routeNames(v)">{{ routeNames(v) }}</span>
         </span>
-        <span [class]="'chip ' + v.state">{{ stateLabel(v) }}</span>
+        <span [class]="'ratio ' + v.state" [matTooltip]="stateTip(v)">{{ ratio(v) }}</span>
       </span>
-      <span class="mono label line2" [title]="v.address">{{ v.address }}</span>
-      @if (v.state === 'down') {
-        <span class="label line2 bad-text">{{ detail(v) }}</span>
-      }
+      <span class="row addr">
+        <span class="mono label line2" [title]="v.address">{{ v.address }}</span>
+        <button matIconButton class="copy" (click)="copy(v.address)"
+          i18n-aria-label="@@Copy" aria-label="Copy">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </span>
     </ng-template>
 
   `,
@@ -309,7 +320,9 @@ const PANEL_X = 420;
       .line {
         background: var(--mat-sys-outline);
       }
-      .line.db-line {
+      /* Every link in the colour that frames the active instance. */
+      .line.db-line,
+      .line.svc-line {
         background: var(--mat-sys-primary);
       }
       fieldset.meerkat {
@@ -321,7 +334,7 @@ const PANEL_X = 420;
         border-radius: 14px;
       }
       fieldset.meerkat legend {
-        margin-left: 72px;
+        margin-left: 20px;
         padding: 0 8px;
         font: var(--mat-sys-title-small);
       }
@@ -338,6 +351,58 @@ const PANEL_X = 420;
       }
       .node.self {
         border: 2px solid var(--mat-sys-primary);
+        background: var(--mat-sys-primary-container);
+        color: var(--mat-sys-on-primary-container);
+      }
+      .node.self .label {
+        color: inherit;
+      }
+      .version {
+        font: var(--mat-sys-label-medium);
+        cursor: default;
+      }
+      .addr {
+        gap: 2px;
+      }
+      .addr .line2 {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      /* Sized through the button's own tokens: Material centres the icon from
+         the two (padding = (layer - icon) / 2), which a fixed padding broke. */
+      .copy {
+        flex: none;
+        --mat-icon-button-state-layer-size: 22px;
+        --mat-icon-button-icon-size: 14px;
+      }
+      /* The token sizes the button's room, not mat-icon's own 24px box. */
+      .copy mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+      /* "3/3" in a badge: the replicas that answer, out of those wanted - the
+         accent when all do, the house orange for some, error for none - over
+         a tint of the same. */
+      .ratio {
+        --c: var(--mat-sys-on-surface-variant);
+        flex: none;
+        font: var(--mat-sys-label-small);
+        line-height: 16px;
+        padding: 0 6px;
+        border-radius: 8px;
+        color: var(--c);
+        background: color-mix(in srgb, var(--c) 16%, transparent);
+        cursor: default;
+      }
+      .ratio.up {
+        --c: var(--mk-signal);
+      }
+      .ratio.degraded {
+        --c: var(--mk-warning);
+      }
+      .ratio.down {
+        --c: var(--mat-sys-error);
       }
       .node.extra {
         border: 2px dashed var(--mat-sys-tertiary);
@@ -374,22 +439,6 @@ const PANEL_X = 420;
       .kind.unknown {
         color: var(--mat-sys-on-surface-variant);
       }
-      .host {
-        font-size: 13px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .facts {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        column-gap: 8px;
-      }
-      .facts .mono {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       .chips {
         display: flex;
         flex-wrap: wrap;
@@ -401,10 +450,6 @@ const PANEL_X = 420;
         padding: 2px 8px;
         border-radius: 10px;
         background: var(--mat-sys-surface-container-highest);
-      }
-      .chip.self {
-        background: var(--mat-sys-primary-container);
-        color: var(--mat-sys-on-primary-container);
       }
       .chip.warn,
       .chip.degraded {
@@ -449,29 +494,28 @@ const PANEL_X = 420;
       .sync-label {
         color: var(--mat-sys-tertiary);
       }
-      .foot {
-        text-align: center;
-      }
-      .services {
+      fieldset.services {
         top: 10px;
         bottom: 10px;
         right: 0;
+        margin: 0;
+        padding: 0;
+        min-width: 0;
         border: 1px solid var(--mat-sys-outline);
         border-radius: 14px;
         display: flex;
         flex-direction: column;
       }
-      .services-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        padding: 10px 16px 8px;
+      fieldset.services legend {
+        margin-left: 20px;
+        padding: 0 8px;
+        font: var(--mat-sys-title-small);
       }
       .services-list {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
-        padding: 0 16px 14px;
+        padding: 8px 16px 14px;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
         gap: 10px;
@@ -530,10 +574,20 @@ export class TopologyPageComponent {
     const centers = tops.map((t) => t + CARD / 2);
     const fieldset = HEAD + n * CARD + (n - 1) * GAP + (synced ? FOOT_SYNCED : FOOT_ALONE);
     const db = top + fieldset + DB_GAP;
-    const step = n > 1 ? Math.min(14, 42 / (n - 1)) : 0;
-    const lanes = centers.map((c, i) => {
-      const x = 18 + i * step;
-      return { x, y: c, h: db - c };
+    // Each instance straight down to the database from the bottom of its
+    // card, each on its own x so no two lines run together; a line passing
+    // behind a card lower down is cut short of it on both sides, so it never
+    // reads as touching a card it does not belong to.
+    const step = n > 1 ? Math.min(16, 64 / (n - 1)) : 0;
+    const lanes: { x: number; y: number; h: number }[] = [];
+    tops.forEach((t, i) => {
+      const x = CARD_X + LANE_IN + i * step;
+      let y = t + CARD;
+      for (const below of tops.slice(i + 1)) {
+        lanes.push({ x, y, h: below - LANE_CLEAR - y });
+        y = below + CARD + LANE_CLEAR;
+      }
+      lanes.push({ x, y, h: db - y });
     });
     return {
       tops,
@@ -541,7 +595,6 @@ export class TopologyPageComponent {
       middle: (centers[0] + centers[n - 1]) / 2,
       syncs: tops.slice(0, -1).map((t) => t + CARD),
       fieldset,
-      foot: tops[n - 1] + CARD + 12,
       db,
       lanes,
       height: Math.max(db + DB_H + 10, 420),
@@ -568,6 +621,36 @@ export class TopologyPageComponent {
     if (!s.covers) return $localize`:@@Infra_no_ceiling:${this.planName()}:plan: license, no instance ceiling`;
     return $localize`:@@Infra_covered:${this.planName()}:plan: license, ${s.covers}:covers: covered`;
   });
+
+  private readonly snack = inject(MatSnackBar);
+
+  // How many of the service's replicas answer, out of how many. A service the
+  // runtime does not count (an external host, found out by connecting) is one
+  // address: 1/1 answering, 0/1 not.
+  protected ratio(v: InfraService): string {
+    if (v.state === 'unknown') return '?';
+    if (v.wanted) return `${v.ready ?? 0}/${v.wanted}`;
+    if (v.state === 'up') return '1/1';
+    if (v.state === 'down') return '0/1';
+    return '?';
+  }
+
+  // The words behind the mark: the state, and for one that does not answer,
+  // why and since when.
+  protected stateTip(v: InfraService): string {
+    const label = this.stateLabel(v);
+    return v.state === 'down' ? `${label}: ${this.detail(v)}` : label;
+  }
+
+  protected startedTip(n: InfraInstance): string {
+    const at = zoned(this.sec(n.started), this.zone(), 'long');
+    return $localize`:@@Infra_started_at:Started ${at}:at:`;
+  }
+
+  protected copy(text: string): void {
+    void navigator.clipboard?.writeText(text);
+    this.snack.open($localize`:@@Copied:Copied`, undefined, { duration: 1500 });
+  }
 
   protected stateLabel(v: InfraService): string {
     switch (v.state) {

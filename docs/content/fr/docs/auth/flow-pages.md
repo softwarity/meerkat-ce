@@ -70,7 +70,8 @@ heure : les pages de la gateway, la console pour un administrateur, et les
 applications qui le demandent.
 
 - Sans choix, la première option, **Fuseau du navigateur**, chaque écran suit le
-  navigateur. **UTC** est proposé comme n'importe quel fuseau.
+  navigateur. **UTC** est dans la liste comme n'importe quel fuseau, et à un clic
+  avec le bouton à côté du champ.
 - Toute date et toute heure s'écrivent d'une seule façon, en ISO sur une ligne :
   `2026-10-25T17:41`, suivi de `Z` en UTC, et `2026-10-25` pour un jour seul.
 - Une application reçoit le fuseau que la personne a choisi. Sans choix, elle ne

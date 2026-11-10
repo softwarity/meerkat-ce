@@ -21,15 +21,20 @@ L'écran est à `/infra/topology`. Réservé à root et aux administrateurs infr
 À gauche, dans le cadre **Meerkat**, chaque instance qui tourne, de la plus
 ancienne à la plus récente :
 
-- son **nom d'hôte** - le pod ou le conteneur, ce par quoi on la retrouve ;
-- **Ready**, ou pourquoi elle ne l'est pas : ce que répond son `/readyz` ;
-- **This node** : l'instance qui a répondu à l'écran ;
-- sa **version** et l'heure de son **démarrage**, dans le fuseau de votre profil.
+- son **nom d'hôte** - le pod ou le conteneur, ce par quoi on la retrouve - avec
+  un bouton qui le copie ;
+- sa **version** dans le coin, et l'heure de son **démarrage** dans son infobulle,
+  dans le fuseau de votre profil ;
+- **Not ready**, avec la raison dans son infobulle (ce que répond son `/readyz`),
+  seulement quand elle ne l'est pas ; **Past the license** pour une instance au-delà
+  de ce que couvre la licence.
+
+L'instance qui a répondu à l'écran prend la couleur du cadre.
 
 Entre deux instances, **in sync** dit que le bus de changement les tient
 synchronisées : une route, un certificat, une session ou la licence enregistrés
-sur l'une atteignent les autres en moins d'une seconde. Chaque instance est reliée
-à la **base** dessous, celle qu'elles partagent. Sur la base embarquée, il n'y a
+sur l'une atteignent les autres en moins d'une seconde. Chaque instance descend tout
+droit vers la **base** dessous, celle qu'elles partagent. Sur la base embarquée, il n'y a
 qu'une instance et rien à synchroniser.
 
 Chaque instance dit qui elle est toutes les cinq secondes, qu'elle porte du trafic
@@ -38,18 +43,22 @@ le quitte au bout de vingt secondes.
 
 ## Les services
 
-À droite, **Services** : une carte par adresse vers laquelle pointent les routes
-actives, nommée par les routes qui y mènent, l'adresse dessous. L'icône est `web`
+À droite, dans le cadre **Services** : une carte par adresse vers laquelle pointent
+les routes actives, nommée par les routes qui y mènent, l'adresse dessous avec un
+bouton qui la copie. L'icône est `web`
 quand l'une de ces routes sert des pages à des personnes, `api` sinon. Seul ce
 qu'une route déclare est montré : rien n'est découvert ici.
 
-Chacune dit ce que la gateway en voit :
+Un badge dans son coin dit ce que la gateway en voit - combien de ses répliques
+répondent, sur combien - et son infobulle le dit en mots :
 
-- **Answering** : il répond ;
-- **Not answering** : il ne répond pas, avec la raison et depuis quand ;
-- **1 of 2 ready** quand le runtime compte ses répliques et qu'il en manque ;
-- **Not checked yet** pour un service qu'aucun trafic ni aucune vérification n'a
-  encore atteint.
+- **3/3**, dans la couleur d'accent : il répond ;
+- **1/2**, en orange : il manque des répliques ;
+- **0/2**, en rouge : il ne répond pas, avec la raison et depuis quand ;
+- **?** pour un service qu'aucun trafic ni aucune vérification n'a encore atteint.
+
+Un service dont le runtime ne compte pas les répliques - un hôte externe, vérifié
+par une connexion - est une seule adresse : **1/1** ou **0/1**.
 
 Ceux qui demandent un regard passent en tête, et la liste défile seule quand il y
 en a beaucoup. C'est une vue : un service se modifie par ses routes, sur l'écran

@@ -782,13 +782,6 @@ const flowTop = `<!doctype html>
     .alts { display: grid; gap: 8px; width: 100%; margin-top: 18px; }
     .alts .sep { margin: 0 0 2px; }
     .alts > a.choice + a.choice { margin-top: 0; }
-    /* A field label with a link at its end ("Forgot your password?"). */
-    .field > .label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-    .field > .label-row > a.label-link {
-      font-family: var(--mk-font); font-size: .78rem; letter-spacing: normal; text-transform: none;
-      color: var(--mk-primary); text-decoration: none;
-    }
-    .field > .label-row > a.label-link:hover { text-decoration: underline; }
     /* language / color-scheme switchers - persisted in cookies, applied
        server-side on the next render (no flash) */
     /* Centred like everything else in the card. It is the one thing here that
@@ -1137,14 +1130,19 @@ var loginBody = `    {{if .Shut}}<h2 class="lead">{{.T.noWayIn}}</h2>
         <span>{{.T.username}}</span>
         <input name="username" autocomplete="username{{if .Passkeys}} webauthn{{end}}" value="{{.Username}}"{{if not .Username}} autofocus{{end}} required>
       </label>
-      {{/* "Forgot" where the password is, the one moment it is wanted. */}}
       <label class="field">
-        <span class="label-row"><span>{{.T.password}}</span>{{if .Forgot}}<a class="label-link" href="/forgot-password">{{.T.forgotLink}}</a>{{end}}</span>
+        <span>{{.T.password}}</span>
         <input name="password" type="password" autocomplete="current-password"{{if .Username}} autofocus{{end}} required>
       </label>
 ` + captchaField("/login/captcha") + `      <input type="hidden" name="next" value="{{.Next}}">
       <button type="submit">{{.T.signIn}}</button>
     </form>
+    {{/* "Forgot" right under the button, not in the password's label: placed
+         before the field it took a Tab of its own between the username and the
+         password, and a keyboard went to the wrong page. Under the button the
+         order is the one the eye follows - username, password, sign in - and
+         it is where the page already put it when there is no password form. */}}
+    {{if .Forgot}}<p class="back"><a href="/forgot-password">{{.T.forgotLink}}</a></p>{{end}}
     {{else if and .Error (not .Shut)}}<p class="error" role="alert">{{.Error}}</p>{{end}}
     {{/* Every other way in, together and alike: the passkey first, the
          quickest for whoever comes back, then the authorities, then a code by
@@ -1445,10 +1443,23 @@ const profileBody = `    <style>
         font-family: var(--mk-mono); font-size: .62rem; letter-spacing: .16em;
         text-transform: uppercase; color: var(--mk-on-surface-variant);
       }
+      /* The field, and UTC beside it: the one zone people pick on purpose,
+         one click away instead of a scroll through the world. */
+      .tz-row { display: flex; gap: 8px; align-items: stretch; }
+      .tz-row > .tz-btn { margin: 0; align-self: stretch; }
+      /* Our own chevron, the browser's sat on the field's edge: drawn in the
+         text's colour, centred, clear of the border. */
+      .tz-field { position: relative; flex: 1; min-width: 0; display: flex; }
+      .tz-field::after {
+        content: ''; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px;
+        border-right: 1.5px solid var(--mk-on-surface-variant); border-bottom: 1.5px solid var(--mk-on-surface-variant);
+        transform: translateY(-70%) rotate(45deg); pointer-events: none;
+      }
       .tz-select {
-        width: 100%; padding: 9px 10px; border-radius: var(--mk-radius-small);
+        width: 100%; padding: 9px 36px 9px 10px; border-radius: var(--mk-radius-small);
         font: inherit; font-size: .85rem; border: 1px solid var(--mk-outline);
         background: var(--mk-surface-container-high); color: var(--mk-on-surface);
+        appearance: none; -webkit-appearance: none;
       }
       .tz-select:focus { outline: none; border-color: var(--mk-primary); }
       .tz-actions { display: flex; align-items: center; gap: 8px; }
@@ -1521,7 +1532,10 @@ const profileBody = `    <style>
     </dl>
     <form method="post" action="/profile/timezone" class="tz-form" id="tz-form">
       <label class="tz-title" for="tz">{{.T.timezone}}</label>
-      <select name="timezone" id="tz" class="tz-select"><option value="{{.Timezone}}">{{.Timezone}}</option></select>
+      <div class="tz-row">
+        <span class="tz-field"><select name="timezone" id="tz" class="tz-select"><option value="{{.Timezone}}">{{.Timezone}}</option></select></span>
+        <button type="button" class="tz-btn" id="tz-utc">UTC</button>
+      </div>
       <div class="tz-actions">
         <span class="tz-now" id="tz-now"></span>
         <button type="button" class="tz-btn" id="tz-detect">{{.T.tzDetect}}</button>
@@ -1633,6 +1647,7 @@ const profileBody = `    <style>
       const refresh = () => { tick(); save.disabled = sel.value === saved; };
       sel.onchange = refresh;
       detect.onclick = () => { if (byZone.has(mine)) { sel.value = mine; refresh(); } };
+      document.getElementById('tz-utc').onclick = () => { sel.value = 'UTC'; refresh(); };
       detect.disabled = !byZone.has(mine);
       refresh();
       setInterval(tick, 30000);

@@ -69,7 +69,8 @@ the gateway's pages, the console for an administrator, and the applications
 that ask for it.
 
 - With no choice, the first option, **My browser's zone**, every screen follows
-  the browser. **UTC** is offered like any other zone.
+  the browser. **UTC** is in the list like any other zone, and one click away on
+  the button beside the field.
 - Every date and time is written one way, ISO on one line: `2026-10-25T17:41`,
   followed by `Z` in UTC, and `2026-10-25` for a day alone.
 - An application is given the zone the person chose. With no choice, it is

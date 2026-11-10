@@ -241,7 +241,9 @@ autre navigateur.
 ## Un mot de passe oublié
 
 `/forgot-password` existe dès qu'un relais de messagerie est configuré et que les mots de
-passe locaux sont acceptés, sans attendre que l'auto-inscription soit ouverte. La page
+passe locaux sont acceptés, sans attendre que l'auto-inscription soit ouverte. La page de
+connexion le propose sous le bouton de connexion, hors du chemin de la touche Tab entre
+l'identifiant et le mot de passe. La page
 affichée ensuite est la même, que l'adresse soit connue ou non. Un compte créé par une
 autorité (OIDC, LDAP, GitHub) n'a pas de mot de passe local et ne reçoit aucun lien : cela
 ouvrirait une seconde porte dont l'autorité ne saurait rien.

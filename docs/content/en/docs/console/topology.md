@@ -19,15 +19,19 @@ It is at `/infra/topology`. Root and infra admins only.
 
 On the left, in the **Meerkat** frame, every instance running, oldest first:
 
-- its **host name** - the pod or the container, what you find it by;
-- **Ready**, or why not: what its `/readyz` answers;
-- **This node**: the instance that answered the screen;
-- its **version** and when it **started**, in the zone of your profile.
+- its **host name** - the pod or the container, what you find it by - with a
+  button that copies it;
+- its **version** in the corner, and when it **started** in its tooltip, in the
+  zone of your profile;
+- **Not ready**, and why in its tooltip (what its `/readyz` answers), only when
+  it is not; **Past the license** for an instance beyond what the license covers.
+
+The instance that answered the screen wears the frame's colour.
 
 Between two instances, **in sync** says the change bus keeps them in step: a
 route, a certificate, a session or the license saved on one reaches the others
-within a second. Each instance is wired to the **database** below, the one they
-share. On the embedded database there is one instance and nothing to keep in sync.
+within a second. Each instance is wired straight down to the **database** below,
+the one they share. On the embedded database there is one instance and nothing to keep in sync.
 
 Every instance says who it is every five seconds, whether or not it carries
 traffic. One that stops says so and leaves the drawing at once; one that goes
@@ -35,17 +39,22 @@ silent leaves it after twenty seconds.
 
 ## The services
 
-On the right, **Services**: one card per address the enabled routes point at,
-named by the routes that lead there, the address beneath. The icon is `web`
+On the right, in the **Services** frame: one card per address the enabled routes
+point at, named by the routes that lead there, the address beneath with a button
+that copies it. The icon is `web`
 when one of those routes serves pages to people, `api` otherwise. Only what a
 route declares is shown: nothing here is discovered.
 
-Each says what the gateway sees of it:
+A badge in its corner says what the gateway sees of it - how many of its
+replicas answer, out of how many - and its tooltip says it in words:
 
-- **Answering**;
-- **Not answering**, with the reason and since when;
-- **1 of 2 ready** when the runtime counts its replicas and some are missing;
-- **Not checked yet** for a service no traffic and no check has reached.
+- **3/3**, in the accent: answering;
+- **1/2**, in orange: some replicas are missing;
+- **0/2**, in red: not answering, with the reason and since when;
+- **?** for a service no traffic and no check has reached.
+
+A service the runtime does not count - an external host, checked by connecting -
+is one address: **1/1** or **0/1**.
 
 The ones that want a look come first, and the list scrolls on its own when there
 are many. This is a view: a service is changed through its routes, on the

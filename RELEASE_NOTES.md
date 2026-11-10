@@ -2,6 +2,23 @@
 
 ## NEXT RELEASE
 
+- **Tab goes from the username straight to the password on the sign-in page.** "Forgot your
+  password?" sat in the password's label, before the field, so the keyboard stopped on it between
+  the two and a Tab too many opened the recovery page. It is now under the sign-in button, where
+  the page already put it when there is no password form.
+- **The Topology screen says each service's state in a badge.** In its corner, how many of its
+  replicas answer out of how many - 3/3 in the accent, 1/2 in orange, 0/2 in red, ? before any
+  check - with the words, and for one that does not answer the reason and since when, in its
+  tooltip. An instance card shows its version in the corner, its start in that tooltip, and wears
+  the frame's colour when it is the one answering the screen; Ready and This node are gone, Not
+  ready and Past the license stay for when they are true. Every address and host name has a button
+  that copies it, the database links run straight down from each instance, and Services is a frame
+  like Meerkat.
+- **The profile's time zone has a UTC button** beside the field, and the field draws its own
+  chevron, clear of its edge.
+- **One orange for "partly"** across the console: a service partly up on the
+  routes list and the Topology screen, and the refused requests of the traffic chart.
+
 ---
 
 ## 1.25.2
