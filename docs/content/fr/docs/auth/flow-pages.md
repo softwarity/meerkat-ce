@@ -10,7 +10,7 @@ summary: Connexion, second facteur, changement de mot de passe, choix du tenant 
 Tout ce qu'une personne doit voir avant d'atteindre votre application est servi par la
 gateway elle-même : aucune bibliothèque dans votre application, aucune page à écrire,
 aucun gabarit à déployer. Ces pages sont compilées dans le binaire, elles portent vos
-couleurs et votre logo, et elles parlent vingt et une langues.
+couleurs et votre logo, et elles parlent vingt-deux langues.
 
 Elles sont toutes servies avec `Cache-Control: no-store` : une page qui nomme une personne
 ne doit jamais séjourner dans un cache partagé.
@@ -136,9 +136,9 @@ monde.
 
 ## Les langues
 
-Vingt et un catalogues sont intégrés : arabe, allemand, anglais, espagnol, français, hébreu,
+Vingt-deux catalogues sont intégrés : arabe, allemand, anglais, espagnol, français, hébreu,
 hindi, indonésien, italien, japonais, coréen, néerlandais, polonais, portugais, roumain,
-russe, thaï, turc, ukrainien, vietnamien et chinois simplifié. L'anglais sert de référence : une
+russe, suédois, thaï, turc, ukrainien, vietnamien et chinois simplifié. L'anglais sert de référence : une
 clé absente d'un autre catalogue est remplacée par la phrase anglaise au lieu de laisser un
 vide.
 

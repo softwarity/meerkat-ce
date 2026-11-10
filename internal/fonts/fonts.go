@@ -5,7 +5,7 @@
 //
 // The files are written once by tools/fonts/fetch.mjs and committed. Each
 // family is the variable version on its weight axis, cut into the Unicode
-// ranges Google cuts it into and kept only for the scripts Meerkat's twenty-one
+// ranges Google cuts it into and kept only for the scripts Meerkat's twenty-two
 // languages need. A family the integrator CHOOSES draws Latin (with Polish,
 // Romanian, Turkish and Vietnamese) and Cyrillic; four Noto COMPANIONS draw Arabic,
 // Hebrew, Devanagari and Thai behind any choice; Chinese, Japanese and

@@ -27,7 +27,7 @@ alternatives assemblées est dans [le dossier Meerkat](/product/the-case).
 
 ## Connexion et identité
 
-Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 21 langues.
+Les façons d'entrer, toutes servies par la gateway à vos couleurs, en 22 langues.
 
 | Méthode | Édition |
 |---|---|

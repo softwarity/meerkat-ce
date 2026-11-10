@@ -44,7 +44,7 @@ func TestTheMomentItWentOnSurvivesAnEdit(t *testing.T) {
 	}
 }
 
-// The reason is a KEY, not a sentence: the page is read in twenty-one languages,
+// The reason is a KEY, not a sentence: the page is read in twenty-two languages,
 // and anything not in the catalogue would reach a visitor as debris. The
 // refusal names what is allowed, like every other error in this package.
 func TestOnlyAReasonThisProductCanSayIsAccepted(t *testing.T) {

@@ -37,7 +37,7 @@ var maintenancePage = flowPage("maintenance", maintenanceBody)
 type maintenanceData struct {
 	flowChrome
 	// Reason is the CHOSEN one, already translated. Free text used to sit here
-	// and it was the wrong shape: this page is read in twenty-one languages, and a
+	// and it was the wrong shape: this page is read in twenty-two languages, and a
 	// sentence typed in a console is a sentence in one of them. The operator
 	// picks from a closed list; the product says it in the visitor's language.
 	Reason string

@@ -4,7 +4,7 @@
 // admin port then answers with its JSON status page instead.
 //
 // The console is served in ENGLISH only, and that is a decision rather than a
-// gap: it is an operator's tool, and twenty-one copies of the same SPA weighed
+// gap: it is an operator's tool, and twenty-two copies of the same SPA weighed
 // 120 MB in the binary for an audience that reads the API's vocabulary anyway.
 // The DATA plane - the pages the application's own users see - stays
 // translated, and that is where the languages matter.

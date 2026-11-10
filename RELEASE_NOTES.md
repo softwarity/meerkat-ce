@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+- **Swedish is a shipped language.** The built-in pages (sign-in, two-factor, profile,
+  notifications, the not-found page, the user button) and the mails now speak Swedish too,
+  twenty-two languages in all. A route offers it by declaring `sv` among its locales.
+
 ---
 
 ## 1.25.4
