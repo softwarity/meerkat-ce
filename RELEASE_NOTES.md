@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.25.3
+
+<!-- release: built=2026-11-10T04:25:50Z migrates=false -->
+
 - **Tab goes from the username straight to the password on the sign-in page.** "Forgot your
   password?" sat in the password's label, before the field, so the keyboard stopped on it between
   the two and a Tab too many opened the recovery page. It is now under the sign-in button, where
