@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -28,12 +29,12 @@ const changesKept = 50
 // WHAT IT CARRIES, AND WHY THAT AND NOT THE ROWS. One line per WRITE - the kind
 // of object, which one, what was done to it and by whom - never the object
 // itself. That is a security decision rather than a frugal one: livewire shares
-// one read between every subscriber of the same key and calls Read with a
-// context of its own (Registry.Watch), so a source cannot know WHO is reading.
-// Publishing rows here would mean deciding who may see them somewhere other
-// than where that is already decided - the endpoints - and the second copy of a
-// rule is the one that drifts. So the socket says "route X was updated" and the
-// screen asks the API it already asks, with the caller's own session behind it.
+// one read between every subscriber of the same key, so what is read is what a
+// whole perimeter may see, never what one caller may. Publishing rows here
+// would mean deciding who may see them somewhere other than where that is
+// already decided - the endpoints - and the second copy of a rule is the one
+// that drifts. So the socket says "route X was updated" and the screen asks the
+// API it already asks, with the caller's own session behind it.
 //
 // ONE LINE PER WRITE AND NOT PER KIND, which is what makes a screen able to
 // reload ONE row instead of its whole list. A line per kind holding the last
@@ -104,6 +105,30 @@ func (c *Changes) waking() chan struct{} {
 	return c.wake
 }
 
+// ReadQuery is the trust boundary, and the client's query has no say in it:
+// what a reader may see is the perimeter the control plane put on the request
+// that opened the socket (ServeFor), never anything the client wrote - a filter
+// read from raw would be a filter a client could widen. The query IS that
+// reader's view, and its key is what readers of one perimeter share.
+func (c *Changes) ReadQuery(_ json.RawMessage, opening *http.Request) (any, error) {
+	p, err := perimeterOf(opening)
+	if err != nil {
+		return nil, err
+	}
+	return c.view(p.Named, p.Quiet), nil
+}
+
+// Key is the perimeter: one read per perimeter, however many screens watch.
+func (c *Changes) Key(query any) string { return query.(*changesView).Key(nil) }
+
+// Wake fires when anything was recorded, for every perimeter: see changesView.
+func (c *Changes) Wake() <-chan struct{} { return c.waking() }
+
+// Read is the journal as the query's perimeter sees it.
+func (c *Changes) Read(ctx context.Context, query any) (livewire.Window, error) {
+	return query.(*changesView).Read(ctx, nil)
+}
+
 // For is one reader's view of the journal, and the partition is the trail's own
 // (store.AuditTargets, admin.auditScope):
 //
@@ -113,7 +138,9 @@ func (c *Changes) waking() chan struct{} {
 //   - quiet: the kinds they administer but whose rows belong to an organisation,
 //     so all they are told is that something of that kind moved,
 //   - anything else: absent.
-func (c *Changes) For(named, quiet []string) livewire.Source {
+func (c *Changes) For(named, quiet []string) livewire.Source { return c.view(named, quiet) }
+
+func (c *Changes) view(named, quiet []string) *changesView {
 	v := &changesView{
 		changes: c,
 		named:   append([]string(nil), named...),
@@ -124,17 +151,15 @@ func (c *Changes) For(named, quiet []string) livewire.Source {
 	return v
 }
 
-// changesView is one perimeter's source. Several readers of the same perimeter
-// share one, which is what Key is for.
+// changesView is one perimeter's view, and the query of its readers: several
+// readers of the same perimeter share one read, which is what Key is for.
 type changesView struct {
 	changes *Changes
 	named   []string
 	quiet   []string
 }
 
-// ReadQuery is the trust boundary, and there is nothing to read: what a reader
-// may see is decided by which view it was handed, never by what it asks for.
-// A filter here would be a filter a client could widen.
+// ReadQuery: a view is already one perimeter's, nothing a client writes moves it.
 func (v *changesView) ReadQuery(_ json.RawMessage) (any, error) { return struct{}{}, nil }
 
 // Key: one read per perimeter, however many screens are watching.

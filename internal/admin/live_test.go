@@ -87,9 +87,9 @@ func TestLivePerimeterFollowsTheCapability(t *testing.T) {
 		t.Errorf("an app-admin administers the application's plane only: %+v", app)
 	}
 
-	// Two callers of the same perimeter share one read; two perimeters do not.
-	if infra.Key == app.Key || infra.Key == root.Key {
-		t.Errorf("two perimeters share one key: %q %q %q", root.Key, infra.Key, app.Key)
+	// Two perimeters are told different things.
+	if slices.Equal(infra.Named, app.Named) || slices.Equal(infra.Named, root.Named) {
+		t.Errorf("two perimeters are told the same kinds: %v %v %v", root.Named, infra.Named, app.Named)
 	}
 }
 

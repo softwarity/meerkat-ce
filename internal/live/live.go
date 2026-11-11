@@ -19,51 +19,38 @@
 // BEHIND the control plane's own funnel, so a subscription passes exactly the
 // checks an API call passes - session, pending login, token perimeter, narrowing
 // to the token's domain - and the funnel also says WHAT this caller may watch
-// (admin.livePerimeter, read from the audit trail's own partition). This package
-// turns that answer into a registry holding those sources and nothing else,
-// because a source cannot do it: the library shares one read between the
-// subscribers of a topic and hands it a context of its own, so by the time a
-// source runs there is no caller left to check. Deciding it twice - once in the
-// funnel, once in a predicate here - would be writing the boundary twice, and
-// the second copy is the one that drifts.
+// (admin.livePerimeter, read from the audit trail's own partition). ServeFor
+// puts that answer on the request that opens the socket, and the library hands
+// that request to every subscription of the socket (SPEC 5.5): a topic this
+// reader may not watch refuses the subscription, and the changes journal reads
+// which kinds it may describe. Deciding it a second time here - in a predicate
+// of our own over the caller - would be writing the boundary twice, and the
+// second copy is the one that drifts.
 package live
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"sort"
-	"sync"
 
 	livewire "github.com/softwarity/livewire/go"
 )
 
-// Server is the console's live channel.
-//
-// ONE REGISTRY PER PERIMETER, and the reason is in the library rather than in a
-// taste for indirection: a registry shares one read between every subscriber of
-// a topic and calls the source with a context of its own, so a source cannot
-// tell its readers apart. Authorising a subscription therefore has to happen
-// where the reader is still known - at the upgrade - and the way to say "this
-// reader may watch these sources" is to hand them a registry that holds those.
-//
-// Built on demand and kept, keyed by the perimeter: the console has a handful
-// of perimeters (root, one per capability, and the readers who administer an
-// organisation), not one per screen, so this is a map with four or five entries
-// in it and one read behind each.
+// Server is the console's live channel: one registry, one handler, for every
+// reader. What a reader may watch travels with the socket, not in a registry of
+// its own.
 type Server struct {
-	// What every perimeter is built FROM, set once at wiring time.
-	sources func(Perimeter) Sources
-
-	mu       sync.Mutex
-	handlers map[string]http.Handler
+	handler http.Handler
+	topics  map[string]Topic
 }
 
 // Perimeter is one reader's view of the channel. It mirrors admin.LivePerimeter,
 // which main translates: the control plane decides who sees what, this package
 // decides which source serves it.
 type Perimeter struct {
-	// Key is what two readers must share to share one read.
-	Key string
 	// Named are the kinds whose last write may be described, Quiet the kinds the
 	// reader is only told moved.
 	Named []string
@@ -74,46 +61,84 @@ type Perimeter struct {
 	Schedules bool
 }
 
-// Sources is what one perimeter may watch, by topic. An alias, so the wiring
-// names it without importing the library for one type.
-type Sources = map[string]livewire.Source
+// Topic is one source on the channel and who may watch it.
+type Topic struct {
+	Source livewire.Source
+	// May answers whether a reader of this perimeter may subscribe. Nil is
+	// everyone the funnel let in: a counter that names nothing, whose answer is
+	// read through an endpoint that scopes it.
+	May func(Perimeter) bool
+}
 
-// New returns a server whose perimeters are built by sources.
-func New(sources func(Perimeter) Sources) *Server {
-	return &Server{sources: sources, handlers: map[string]http.Handler{}}
+// New returns the channel: the changes journal, whose rows depend on who is
+// reading, and the other topics, each with who may watch it.
+func New(changes *Changes, topics map[string]Topic) *Server {
+	registry := livewire.NewRegistry(0)
+	registry.RegisterWithContext(ChangesTopic, changes)
+	for topic, t := range topics {
+		if t.May == nil {
+			registry.Register(topic, t.Source)
+			continue
+		}
+		registry.RegisterWithContext(topic, gated{Source: t.Source, topic: topic, may: t.May})
+	}
+	// Authorize is nil ON PURPOSE: the library takes that to mean the mount
+	// point has already authenticated, which is exactly the case - see the note
+	// on the package.
+	return &Server{
+		handler: livewire.NewServer(registry, livewire.Options{Logger: slog.Default()}),
+		topics:  topics,
+	}
 }
 
 // ServeFor upgrades a connection that may watch what the perimeter allows.
 func (s *Server) ServeFor(p Perimeter, w http.ResponseWriter, r *http.Request) {
-	s.handlerFor(p).ServeHTTP(w, r)
+	s.handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), perimeterKey{}, p)))
 }
 
-func (s *Server) handlerFor(p Perimeter) http.Handler {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if h, built := s.handlers[p.Key]; built {
-		return h
-	}
-	registry := livewire.NewRegistry(0)
-	for topic, source := range s.sources(p) {
-		registry.Register(topic, source)
-	}
-	// Authorize is nil ON PURPOSE: the library takes that to mean the mount
-	// point has already authenticated, which is exactly the case - and what it
-	// authenticated is now also WHICH registry this is - see the note on the
-	// package.
-	h := livewire.NewServer(registry, livewire.Options{Logger: slog.Default()})
-	s.handlers[p.Key] = h
-	return h
-}
-
-// Topics is what one perimeter serves, sorted - for a status page and for a test
-// that wants to know nothing was dropped.
+// Topics is what one perimeter may watch, sorted - for a status page and for a
+// test that wants to know nothing was dropped.
 func (s *Server) Topics(p Perimeter) []string {
-	topics := make([]string, 0, 3)
-	for topic := range s.sources(p) {
-		topics = append(topics, topic)
+	out := []string{ChangesTopic}
+	for topic, t := range s.topics {
+		if t.May == nil || t.May(p) {
+			out = append(out, topic)
+		}
 	}
-	sort.Strings(topics)
-	return topics
+	sort.Strings(out)
+	return out
+}
+
+type perimeterKey struct{}
+
+// perimeterOf is the perimeter ServeFor put on the request that opened the
+// socket. A socket opened any other way has none, and is refused everything
+// that depends on one: failing closed is the only answer for a boundary.
+func perimeterOf(opening *http.Request) (Perimeter, error) {
+	if opening != nil {
+		if p, ok := opening.Context().Value(perimeterKey{}).(Perimeter); ok {
+			return p, nil
+		}
+	}
+	return Perimeter{}, errors.New("this socket was opened without a perimeter")
+}
+
+// gated is a source only some readers may watch. Its rows are the same for all
+// of them, so they still share one read: nothing taken from the opening request
+// is in the query, and the key stays the source's own.
+type gated struct {
+	livewire.Source
+	topic string
+	may   func(Perimeter) bool
+}
+
+// ReadQuery refuses a reader outside the topic's perimeter, in the words the
+// library uses for a topic that does not exist: a reader learns nothing from a
+// refusal that it would not learn from an absence.
+func (g gated) ReadQuery(raw json.RawMessage, opening *http.Request) (any, error) {
+	p, err := perimeterOf(opening)
+	if err != nil || !g.may(p) {
+		return nil, errors.New("No topic '" + g.topic + "'")
+	}
+	return g.Source.ReadQuery(raw)
 }

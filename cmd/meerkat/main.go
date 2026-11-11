@@ -749,40 +749,36 @@ func run(o options) error {
 	runtime := discovery.NewWatcher()
 	go runtime.Run(ctx)
 	go router.WatchTargets(ctx, gateway.DefaultTargetCheck(runtime, routeHealth.Flipped))
-	liveServer := live.New(func(p live.Perimeter) live.Sources {
-		sources := live.Sources{
-			live.ChangesTopic: changes.For(p.Named, p.Quiet),
-			// A counter, no person: what it answers is read through
-			// GET /api/sessions, which scopes it.
-			live.PresenceTopic:     presence,
-			live.CertificatesTopic: issues,
-			live.DoorTrafficTopic:  doorMoved,
-			live.PauseTopic:        paused,
-			// Read through GET /api/infrastructure, which says who may.
-			live.InstancesTopic: nodesMoved,
-		}
-		if p.Traffic {
-			sources[live.TrafficTopic] = traffic
-			// The routing plane's readers are who GET /api/routes/health
-			// answers, so they are who hear that a target flipped.
-			sources[live.RouteHealthTopic] = routeHealth
-			// And that this node wrote a line, for the Logs screen (OBS-03),
-			// read through GET /api/logs, which answers the same readers.
-			sources[live.LogsTopic] = logs
-			// And that a newer release was found: GET /api/updates answers the
-			// same readers.
-			sources[live.UpdatesTopic] = updatesMoved
-		}
-		if p.Schedules {
-			// The scheduler screen watches a run start, advance and finish
-			// (SCHED-01).
-			sources[live.SchedulesTopic] = schedules
-		}
-		return sources
+	// The routing plane's readers and the application's: who the endpoints
+	// behind these topics answer.
+	routing := func(p live.Perimeter) bool { return p.Traffic }
+	application := func(p live.Perimeter) bool { return p.Schedules }
+	liveServer := live.New(changes, map[string]live.Topic{
+		// A counter, no person: what it answers is read through
+		// GET /api/sessions, which scopes it.
+		live.PresenceTopic:     {Source: presence},
+		live.CertificatesTopic: {Source: issues},
+		live.DoorTrafficTopic:  {Source: doorMoved},
+		live.PauseTopic:        {Source: paused},
+		// Read through GET /api/infrastructure, which says who may.
+		live.InstancesTopic: {Source: nodesMoved},
+		live.TrafficTopic:   {Source: traffic, May: routing},
+		// The routing plane's readers are who GET /api/routes/health answers,
+		// so they are who hear that a target flipped.
+		live.RouteHealthTopic: {Source: routeHealth, May: routing},
+		// And that this node wrote a line, for the Logs screen (OBS-03), read
+		// through GET /api/logs, which answers the same readers.
+		live.LogsTopic: {Source: logs, May: routing},
+		// And that a newer release was found: GET /api/updates answers the
+		// same readers.
+		live.UpdatesTopic: {Source: updatesMoved, May: routing},
+		// The scheduler screen watches a run start, advance and finish
+		// (SCHED-01).
+		live.SchedulesTopic: {Source: schedules, May: application},
 	})
 	adminAPI.Live = func(p admin.LivePerimeter, w http.ResponseWriter, r *http.Request) {
 		liveServer.ServeFor(live.Perimeter{
-			Key: p.Key, Named: p.Named, Quiet: p.Quiet,
+			Named: p.Named, Quiet: p.Quiet,
 			Traffic: p.RoutingPlane, Schedules: p.ApplicationPlane,
 		}, w, r)
 	}

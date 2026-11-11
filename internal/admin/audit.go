@@ -407,13 +407,12 @@ func atoi64(s string) int64 {
 // gives, and for the same reason: the console's live channel is an
 // administrative view, not an empty page.
 //
-// WHAT IS IN THE KEY, and what is deliberately not. The key is what makes two
-// callers share one read, so it holds exactly what the rows are built from: the
-// kinds, and whether they may be named. The ORGANISATIONS a tenant admin
-// administers are not in it, because nothing published depends on them - a
-// tenant's kinds stay quiet precisely because a shared read cannot check them -
-// so every tenant admin on the installation shares one read instead of opening
-// one apiece.
+// WHAT IS IN IT, and what is deliberately not. Two callers with the same kinds
+// share one read (live.Changes keys it by them). The ORGANISATIONS a tenant
+// admin administers are not in it, because nothing published depends on them -
+// a tenant's kinds stay quiet precisely because a shared read cannot check
+// them - so every tenant admin on the installation shares one read instead of
+// opening one apiece.
 func (a *API) livePerimeter(ctx context.Context, actor store.User) (LivePerimeter, bool) {
 	if _, ok := a.auditScope(ctx, actor); !ok {
 		return LivePerimeter{}, false
@@ -421,7 +420,7 @@ func (a *API) livePerimeter(ctx context.Context, actor store.User) (LivePerimete
 	if actor.Root {
 		named := store.AuditTargetKinds()
 		return LivePerimeter{
-			Key: "root", Named: named,
+			Named:        named,
 			RoutingPlane: true, ApplicationPlane: true,
 		}, true
 	}
@@ -454,7 +453,6 @@ func (a *API) livePerimeter(ctx context.Context, actor store.User) (LivePerimete
 	}
 	sort.Strings(p.Named)
 	sort.Strings(p.Quiet)
-	p.Key = strings.Join(p.Named, ",") + "|" + strings.Join(p.Quiet, ",")
 	return p, true
 }
 

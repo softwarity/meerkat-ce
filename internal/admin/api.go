@@ -156,8 +156,7 @@ type API struct {
 	//
 	// It is asked to serve FOR a caller rather than handed the request, because
 	// what a subscriber may watch is decided here and not inside the socket:
-	// the library shares one read between the subscribers of a topic and cannot
-	// tell them apart, so the perimeter is chosen at the upgrade - see
+	// the perimeter travels with the socket, and the sources only apply it - see
 	// live.Server.ServeFor.
 	Live LiveChannel
 	// Changes is the journal the console's screens watch (CONSOLE-13): every
@@ -215,13 +214,9 @@ type CertManager interface {
 // is what main is for.
 type LiveChannel func(p LivePerimeter, w http.ResponseWriter, r *http.Request)
 
-// LivePerimeter is one caller's view of the channel: the key that makes two
-// callers the same reader, and the topics they may subscribe to.
+// LivePerimeter is one caller's view of the channel: what they may be told,
+// and the topics they may subscribe to.
 type LivePerimeter struct {
-	// Key is what two readers must share to share one read. It carries
-	// everything the sources below were built from, so two callers with the
-	// same key would receive byte for byte the same rows.
-	Key string
 	// Named are the kinds whose last write may be DESCRIBED to this reader -
 	// the action, the instance, who did it - and Quiet the kinds they are only
 	// told moved. The split is the trail's own partition (auditScope): a kind

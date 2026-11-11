@@ -8,6 +8,8 @@
 - **Dependencies brought up to date.** Angular 22.2.5 and Angular Material 22.2.6 in the console,
   the live channel library 0.6.0 on both sides, Playwright 1.65.0 for the tests, and fast-uri 3.1.9
   in the build tools (four URI parsing advisories; it is not part of what ships).
+- **The console's live channel uses livewire 0.6.0's sources that know who is asking.** One
+  registry for every reader instead of one per perimeter; nothing changes on screen.
 
 ---
 
