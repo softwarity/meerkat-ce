@@ -195,6 +195,13 @@ a {
     box-shadow: var(--shadow);
   }
 
+  /* An animation is a square drawing, not a screenshot: at its own 900 px it
+     fills the screen. Smaller, and centred in the column. */
+  img[src$='.gif'] {
+    width: min(100%, 560px);
+    margin: 24px auto;
+  }
+
   :not(pre) > code {
     font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
     background: var(--surface-2);

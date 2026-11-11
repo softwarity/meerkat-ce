@@ -8,10 +8,14 @@
 in front of your internal applications.** It signs people in, decides who may
 reach which application and which endpoint, routes the request, and records
 what happened. Your services receive requests that are already authenticated,
-with a signed JWT carrying the identity, the roles and the organisation.
+with a signed JWT carrying the identity, the roles and the tenant.
 
 One binary, no external dependency: no database to install, no cache, no
 broker.
+
+<p align="center">
+  <img src="docs/public/img/readme/app-gateway.gif" width="520" alt="Users reach the services through Meerkat, which signs them in, routes their requests and records what happened">
+</p>
 
 ## What it replaces
 
@@ -22,18 +26,42 @@ The stack teams usually assemble in front of an internal application:
 | Protect an application that has no login | oauth2-proxy, Pomerium | Sign-in pages and session, per-route access rules |
 | Sign-in, two-factor, single sign-on | Keycloak, Authentik | Local accounts, TOTP, OpenID Connect, GitHub; LDAP and SAML in Enterprise |
 | Routing, rate limits, quotas | Kong, Traefik, APISIX | Hot-reloaded routes, predicates and filters, per-endpoint quotas |
-| Roles and organisations | admin screens to build | Hierarchical roles, groups, organisations |
+| Roles and tenants | admin screens to build | Hierarchical roles, groups, tenants |
 | Audit of every admin change | a log pipeline to connect | Built-in audit trail, before and after |
 | Calls on a timer | cron jobs in every service | Scheduled calls to your services |
 
 The [case for Meerkat](https://meerkat.softwarity.dev/product/the-case/) sets
 each line against its alternatives.
 
+## The pages your users see
+
+An API gateway routes requests; it serves no page. Put Kong, Traefik or APISIX in
+front of an application and every screen of the account journey is still yours
+to build, in every application, or to theme in an identity server beside the
+gateway. Meerkat serves some forty of them:
+
+- **Getting in**: sign-in by password, passkey, emailed code or your directory;
+  sign-up with address confirmation; forgotten password; an expired link that
+  says what to do next.
+- **Securing the account**: authenticator app enrolment and challenge, recovery
+  codes, passkeys, trusted browsers.
+- **Managing the account**: profile, password, address, active sessions, sign-in history,
+  API tokens.
+- **Being let in, or not, clearly**: the choice of a tenant and a group, a
+  waiting room for an account with no access yet, refusals that say why and whom
+  to contact, a maintenance page that comes back by itself.
+
+Every one of them in 22 languages, with translations editable from the console;
+in your colours, light and dark, with the contrast of every text measured by the
+test suite; with your logo, and previewed in the console before anyone sees it.
+The emails they send wear the same theme. An application behind Meerkat writes
+none of them.
+
 ## Try it
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
 ```
 
 - **http://localhost:9090** is the administration console. Sign in as `admin`
@@ -41,10 +69,10 @@ docker run -p 8080:8080 -p 9090:9090 \
 - **http://localhost:8080** is what your users reach. A fresh gateway has no
   route, so it answers 404 until you add one.
 
-`softwarity/meerkat` is everything Meerkat does: without a license it runs as an
-evaluation, with a notice on its pages, and a license makes it Team or
-Enterprise. The community edition, built from this repository, is
-`softwarity/meerkat-ce`.
+This is the community edition, built from this repository: free, production
+included. `softwarity/meerkat` is everything Meerkat does: without a license it
+runs as an evaluation, with a notice on its pages, and a license makes it Team
+or Enterprise.
 
 <!-- Screenshot of the administration console goes here:
      docs/public/img/readme/console.webp, referenced as
@@ -62,7 +90,7 @@ and Helm are on the
 | **Price** | Free, production included | Commercial license |
 | **Sign-in** | Local accounts, TOTP two-factor, OpenID Connect, GitHub, API tokens | Also LDAP, Active Directory and SAML 2.0 |
 | **Access** | Hierarchical roles, groups, per-route and per-endpoint rules | Also roles granted from directory groups at sign-in |
-| **Organisations** | One | Several, isolated, chosen at sign-in |
+| **Tenants** | One | Several, isolated, chosen at sign-in |
 | **Routing** | Hot-reloaded routes, predicates, filters, WebSocket, rate limits, per-endpoint quotas | Same |
 | **TLS** | Generated, imported or signed certificates | Also ACME issuance and renewal |
 | **Secrets** | Encrypted vault | Same |

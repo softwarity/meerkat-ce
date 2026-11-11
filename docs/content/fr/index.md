@@ -47,7 +47,17 @@ seul, trente-huit pods ou un seul, et ce que coûte le même socle en licences e
 en jours d'ingénierie.
 :::
 
+![Les utilisateurs atteignent les services à travers Meerkat, qui les connecte, route leurs requêtes et garde la trace de ce qui s'est passé](img/readme/app-gateway.gif)
+
 ::: cards
+### Tout le parcours du compte, déjà écrit
+
+La connexion, l'inscription, le mot de passe oublié, la double authentification,
+les passkeys, les pages du compte, le choix du tenant, des refus qui disent
+pourquoi : une quarantaine de pages qu'une gateway d'API ne sert pas, servies
+ici en 22 langues et à vos couleurs. Une application derrière Meerkat n'en écrit
+[aucune](/docs/customise/built-in-pages).
+
 ### Une porte, pas une stack
 
 Installer la gateway, puis Prometheus, puis Grafana, puis écrire du YAML

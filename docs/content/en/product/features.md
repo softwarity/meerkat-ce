@@ -18,13 +18,19 @@ without Meerkat, line by line, in [What Meerkat does](/docs/capabilities).
 
 ## Sign-in and identity
 
-The pages your users see, served by the gateway, in your colours.
+The pages your users see, served by the gateway, in your colours: some forty
+pages an API gateway leaves to each application, written once here. See
+[the built-in pages](/docs/customise/built-in-pages).
 
 **Why the gateway?** Every request crosses the gateway before it reaches an application, so it is the one place where a person can be stopped, asked who they are, and let through once for all of them. Signed in at the door, a user is signed in everywhere behind it, and no service holds a password, a second factor or a session of its own to get wrong.
 
 Read more: [How someone signs in](/docs/auth/overview).
 
-- **Served sign-in pages**: sign-in, forgotten password, email verification, optional sign-up, in 22 languages, with your theme, logo and background. Any translation can be corrected, or a language added, from the console.
+- **Getting in**: sign-in by password, passkey, emailed code or an external authority; sign-up with address confirmation; forgotten password; an expired link that says what to do next.
+- **Securing the account**: authenticator app enrolment and challenge, recovery codes, passkeys, trusted browsers.
+- **Managing the account**: profile, password, address, active sessions, sign-in history, API tokens.
+- **Being let in, or not, clearly**: the choice of a tenant and a group, a waiting room for an account with no access yet, refusals that say why and whom to contact, a maintenance page that reloads by itself when it ends.
+- **On every one of these pages**: 22 languages, any translation corrected or a language added from the console; your theme, light and dark, the contrast of every text measured by the test suite; your logo and background; a preview of each page in the console; emails in the same colours.
 - **More page arrangements** - split, drawer, banner, bare - and the Meerkat mark removed from the pages you serve. **Enterprise**
 - **Themes made the way Material Theme Builder makes them**: six source colours, three contrast levels, its JSON file in and out, and the fonts served by the gateway itself - nothing fetched from a CDN.
 - **Passwords** with a configurable policy and history, brute-force protection shared by every node, and messages that never reveal whether an account exists.

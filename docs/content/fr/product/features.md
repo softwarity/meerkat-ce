@@ -19,13 +19,18 @@ capacité sans Meerkat, ligne par ligne, dans [Ce que fait Meerkat](/docs/capabi
 ## Connexion et identité
 
 Les pages que voient vos utilisateurs, servies par la gateway, à vos
-couleurs.
+couleurs : une quarantaine de pages qu'une gateway d'API laisse à chaque
+application, écrites une fois ici. Voir [les pages intégrées](/docs/customise/built-in-pages).
 
 **Pourquoi la gateway ?** Chaque requête traverse la gateway avant d'atteindre une application : c'est le seul endroit où l'on peut arrêter une personne, lui demander qui elle est, et la laisser passer une fois pour toutes. Connecté à la porte, un utilisateur l'est partout derrière, et aucun service ne garde de mot de passe, de second facteur ni de session à lui sur lesquels se tromper.
 
 Pour en savoir plus : [Comment on se connecte](/docs/auth/overview).
 
-- **Pages de connexion servies par la gateway** : connexion, mot de passe oublié, vérification de l'adresse e-mail, inscription en option, en 22 langues, avec votre thème, votre logo et votre image de fond. Chaque traduction peut être corrigée, ou une langue ajoutée, depuis la console.
+- **Entrer** : connexion par mot de passe, passkey, code par e-mail ou autorité externe ; inscription avec confirmation de l'adresse ; mot de passe oublié ; un lien expiré qui dit quoi faire ensuite.
+- **Sécuriser le compte** : mise en place et vérification de l'application d'authentification, codes de secours, passkeys, navigateurs de confiance.
+- **Gérer son compte** : profil, mot de passe, adresse, sessions actives, historique des connexions, jetons d'API.
+- **Être admis, ou non, clairement** : le choix d'un tenant et d'un groupe, une salle d'attente pour un compte sans accès, des refus qui disent pourquoi et qui contacter, une page de maintenance qui se recharge d'elle-même quand elle prend fin.
+- **Sur chacune de ces pages** : 22 langues, chaque traduction corrigée ou une langue ajoutée depuis la console ; votre thème, en clair et en sombre, le contraste de chaque texte mesuré par la suite de tests ; votre logo et votre image de fond ; l'aperçu de chaque page dans la console ; des e-mails aux mêmes couleurs.
 - **D'autres dispositions de page** - split, drawer, banner, bare - et la marque Meerkat retirée des pages que vous servez. **Enterprise**
 - **Des thèmes faits comme dans Material Theme Builder** : six couleurs sources, trois niveaux de contraste, son fichier JSON en entrée comme en sortie, et des polices servies par la gateway elle-même, sans rien chercher sur un CDN.
 - **Mots de passe** avec une politique et un historique configurables, une protection contre la force brute commune à tous les nœuds, et des messages qui ne révèlent jamais si un compte existe.
