@@ -83,6 +83,8 @@ export class PageComponent {
   // through the sections after it. A scroll event, not a timer: it moves only
   // when the reader does.
   protected readonly reading = signal('');
+  // The page on screen, to tell a new page from the same one in another language.
+  private shownSlug = '';
   private spyFrame = 0;
   private readonly spy = (): void => {
     if (this.spyFrame) return;
@@ -166,6 +168,16 @@ export class PageComponent {
         .page(lang, slug)
         .then((p) => {
           this.page.set(p);
+          // Another page opens at its top. The router's own restoration
+          // scrolls the WINDOW, and here the window never scrolls: the shell's
+          // content area does, so without this the new page opened where the
+          // reader had left the previous one. The same page in another
+          // language keeps its place; a heading named in ?at= is jumped to
+          // below, once the HTML is in.
+          if (slug !== this.shownSlug) {
+            this.shownSlug = slug;
+            document.querySelector('rail-nav-content')?.scrollTo({ top: 0 });
+          }
           // The company is the brand, Meerkat is the product: a page about the
           // product says so in the tab, a page about the company says the company.
           const house = p.area === 'softwarity' || p.area === 'project' ? 'Softwarity' : 'Meerkat';
