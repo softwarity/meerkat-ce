@@ -92,3 +92,5 @@ chacun peut faire est décrit dans [Administrateur infra](/docs/access/infra-adm
 ![Les réglages généraux](img/showcase/general.webp) Ce qu'est cette installation, et les politiques auxquelles chaque compte est soumis.
 ![Le point d'entrée des agents](img/showcase/mcp.webp) MCP sur le plan de contrôle, pour qu'un assistant travaille en suivant les mêmes règles.
 :::
+
+Ce que produisent ces écrans : [six marques inventées](/docs/customise/overview), la même page de connexion habillée de six façons.

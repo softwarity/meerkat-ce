@@ -17,8 +17,11 @@ avant d'y arriver ?**
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
 ```
+
+C'est l'édition Community, gratuite ; `softwarity/meerkat` à sa place lance
+tout ce que fait Meerkat, en évaluation jusqu'à l'ajout d'une licence.
 
 Pas de base de données à créer, pas de serveur de messages, pas de fichier de
 configuration, pas de chart à générer. La gateway démarre avec son propre

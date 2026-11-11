@@ -123,15 +123,23 @@ rôle, pour faire le travail ou prouver une règle.
 
 ## L'essayer
 
+L'édition Community, gratuite et utilisable en production :
+
+```bash
+docker run -p 8080:8080 -p 9090:9090 \
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
+```
+
+Tout ce que fait Meerkat, en évaluation jusqu'à l'ajout d'une licence :
+
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
   -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
 Le port 8080 est celui qu'atteignent vos utilisateurs, le 9090 celui de la
-console d'administration. Sans licence, elle tourne en évaluation : tout, avec
-une mention sur ses pages. L'édition Community est `softwarity/meerkat-ce`. À
-partir de là, le
+console d'administration. L'évaluation porte une mention sur ses pages ; une
+licence Team ou Enterprise la retire, sans redémarrage. À partir de là, le
 [démarrage rapide](/docs/start/quick-start) place l'un de vos services derrière
 la gateway en cinq minutes environ.
 

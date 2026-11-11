@@ -16,8 +16,11 @@ did you have to read first?**
 
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
-  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
 ```
+
+That is the free community edition; `softwarity/meerkat` in its place runs
+everything Meerkat does, as an evaluation until a license is added.
 
 No database to create, no message broker, no configuration file, no chart to
 render. The gateway starts with its storage inside it, serves its own sign-in

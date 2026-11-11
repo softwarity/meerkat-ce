@@ -82,22 +82,19 @@ navigateur depuis que ce choix existe ; qui veut UTC le choisit de nouveau.
 
 ## Les couleurs
 
-**Application > Built-in pages > Theme.** Dix couleurs, saisies en hexadécimal : la couleur
-d'accent et celle de son texte, les surfaces (page, carte, champ), le texte et sa variante
-atténuée, le contour, et la couleur d'erreur. Elles sont émises sous forme de variables
-CSS - `--mk-primary`, `--mk-surface`, `--mk-on-surface`... - une seule fois par page, la
-valeur claire et la valeur sombre côte à côte. La palette suit ainsi le mode d'affichage du
-visiteur, sans clignotement et sans script.
+**Application > Built-in pages > Theme.** Un thème se construit comme dans Material
+Theme Builder : six couleurs sources (seule la primaire est obligatoire), un niveau de
+contraste et un « color match », d'où sont générés tous les rôles de Material 3, en
+clair et en sombre, plus trois polices que la gateway sert elle-même. Les rôles sont
+émis sous forme de variables CSS - `--mk-primary`, `--mk-surface`, `--mk-on-surface`... -
+une seule fois par page, la valeur claire et la valeur sombre côte à côte. La palette
+suit ainsi le mode d'affichage du visiteur, sans clignotement et sans script.
 
-Plusieurs thèmes peuvent coexister ; un seul est actif. Vous dupliquez un thème, le
-modifiez, le prévisualisez, l'activez, revenez en arrière. Huit thèmes prédéfinis sont
-fournis, tous construits sur la même base avec une couleur d'accent différente : Sentinel's
-Watch, le thème par défaut, puis Midnight, Lavender, Orchid, Rose, Crimson, Ember et
-Forest. Une case *Glow* désactive d'un seul geste les effets et le dégradé, pour un rendu
-plus sobre.
-
-Seules les couleurs hexadécimales sont acceptées. Rien d'autre n'atteint le bloc de style
-de la page.
+Plusieurs thèmes peuvent coexister ; un seul est actif. Huit thèmes intégrés sont
+fournis, en lecture seule, tous construits sur la même base avec une primaire
+différente ; dupliquez-en un pour partir de lui. Une case *Glow* désactive d'un seul
+geste les effets et le dégradé, pour un rendu plus sobre. Tout le reste est sur la
+page [le thème](/docs/customise/theme).
 
 ## Clair et sombre
 

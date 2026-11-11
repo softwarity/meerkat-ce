@@ -59,9 +59,18 @@ none of them.
 
 ## Try it
 
+The community edition, built from this repository, free and fit for production:
+
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
   -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
+```
+
+Everything Meerkat does, as an evaluation until a license is added:
+
+```bash
+docker run -p 8080:8080 -p 9090:9090 \
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
 - **http://localhost:9090** is the administration console. Sign in as `admin`
@@ -69,10 +78,8 @@ docker run -p 8080:8080 -p 9090:9090 \
 - **http://localhost:8080** is what your users reach. A fresh gateway has no
   route, so it answers 404 until you add one.
 
-This is the community edition, built from this repository: free, production
-included. `softwarity/meerkat` is everything Meerkat does: without a license it
-runs as an evaluation, with a notice on its pages, and a license makes it Team
-or Enterprise.
+The evaluation carries a notice on its pages; a Team or Enterprise license
+removes it, with no restart.
 
 <!-- Screenshot of the administration console goes here:
      docs/public/img/readme/console.webp, referenced as

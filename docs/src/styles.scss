@@ -542,6 +542,11 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 22px;
   margin: 18px 0 30px;
+
+  &.compact {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+  }
 }
 
 .mk-shot {

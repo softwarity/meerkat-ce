@@ -82,6 +82,8 @@ Un catalogue fermé de dispositions, chacune étant un bloc de CSS livré avec l
 | `banner` | la marque dans un bandeau en haut de l'écran, la carte en dessous |
 | `bare` | aucune carte : les champs reposent directement sur le fond |
 
+Chacune, portée par une marque inventée : [six marques, les mêmes pages](/docs/customise/overview).
+
 `split` et `drawer` sont faites de deux moitiés et demandent donc un **côté** : gauche ou
 droite. Les autres l'ignorent, et le champ est vidé plutôt que conservé sans servir à rien.
 

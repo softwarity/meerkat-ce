@@ -31,8 +31,9 @@ to look at it; click **the palette on the nav block** to make that theme **live*
 Selected and active are two different things, which is what lets you try a theme
 without serving it.
 
-The controls between the arrows add a theme (a duplicate of this one, or a start
-from a preset) and delete one. The active theme cannot be deleted.
+The eight built-in themes ride in the carousel, read-only: duplicate one to edit
+it. The **more** menu beside the theme's name duplicates or deletes it. The active
+theme cannot be deleted.
 
 ## Theme
 

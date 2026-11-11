@@ -32,8 +32,9 @@ pour l'examiner ; cliquez sur **la palette affichée sur le bloc de navigation**
 mettre ce thème **en service**. Sélectionné et actif sont deux états distincts : c'est
 ce qui permet d'essayer un thème sans le servir.
 
-Les commandes situées entre les flèches ajoutent un thème (en dupliquant celui-ci ou en
-partant d'un préréglage) et en suppriment un. Le thème actif ne peut pas être supprimé.
+Les huit thèmes intégrés figurent dans le carrousel, en lecture seule : dupliquez-en un
+pour le modifier. Le menu **more** à côté du nom du thème le duplique ou le supprime. Le
+thème actif ne peut pas être supprimé.
 
 ## Theme
 

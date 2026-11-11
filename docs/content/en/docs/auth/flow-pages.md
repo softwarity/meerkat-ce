@@ -81,20 +81,18 @@ since this choice exists; whoever wants UTC picks it again.
 
 ## Colours
 
-**Application > Built-in pages > Theme.** Ten colours, edited as hex values:
-accent and its text, the surfaces (page, card, field), the text and its muted
-variant, the outline, and the error colour. They are emitted as CSS variables -
-`--mk-primary`, `--mk-surface`, `--mk-on-surface`... - once per page, with the
-light and the dark value side by side, so the visitor's scheme picks the palette
-with no flash and no script.
+**Application > Built-in pages > Theme.** A theme is made the way Material Theme
+Builder makes one: six source colours (only the primary is required), a contrast
+level and a "color match", from which every Material 3 role is generated, in light
+and in dark, plus three typefaces the gateway serves itself. The roles are emitted
+as CSS variables - `--mk-primary`, `--mk-surface`, `--mk-on-surface`... - once per
+page, with the light and the dark value side by side, so the visitor's scheme picks
+the palette with no flash and no script.
 
-Several themes can coexist; exactly one is active. Duplicate one, edit it,
-preview it, activate it, roll back. Eight presets ship, all on the same base with
-a different accent: Sentinel's Watch, the default, then Midnight, Lavender,
-Orchid, Rose, Crimson, Ember and Forest. A *Glow* checkbox turns the effects and
-the gradient off in one gesture for a flatter look.
-
-Only hex colours are accepted. Nothing else reaches the page's style block.
+Several themes can coexist; exactly one is active. Eight built-in themes ship,
+read-only, all on the same base with a different primary; duplicate one to start
+from it. A *Glow* checkbox turns the effects and the gradient off in one gesture
+for a flatter look. Everything else is on [the theme](/docs/customise/theme) page.
 
 ## Light and dark
 

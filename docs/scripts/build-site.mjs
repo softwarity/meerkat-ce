@@ -244,7 +244,11 @@ function renderBlock(name, body, file, lang, arg) {
       );
     }
     if (!figures.length) throw new Error(`${file}: a gallery block holds no image`);
-    return `<div class="mk-gallery">${figures.join('')}</div>`;
+    // `::: gallery compact` packs smaller figures, two abreast in a doc
+    // column, for a series that is read as a set; a click still enlarges one.
+    const variant = (arg || '').trim();
+    if (variant && variant !== 'compact') throw new Error(`${file}: a gallery takes no argument, or "compact"`);
+    return `<div class="mk-gallery${variant ? ' ' + variant : ''}">${figures.join('')}</div>`;
   }
   return `<div class="mk-${name}">${render(body, file, lang).html}</div>`;
 }

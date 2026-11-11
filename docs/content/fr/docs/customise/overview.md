@@ -25,6 +25,32 @@ autres peuvent prendre l'apparence de votre produit plutôt que celle du nôtre.
 | [Du CSS et du JavaScript supplémentaires](/docs/customise/injections) | la route | par route |
 | Le bouton utilisateur, son coin et son menu | la route | par route |
 
+## Six marques, les mêmes pages
+
+La même page de connexion, habillée pour six marques inventées pour l'occasion. Chacune est
+un thème (couleurs et polices), une marque (nom, slogan, logo, fond) et une disposition, tous
+réglés depuis les écrans listés plus haut : rien ici n'est du HTML ou du CSS sur mesure.
+
+::: gallery compact
+![Glimmo, disposition centered, en clair](img/login-examples/glimmo-centered-light.webp) **Glimmo**, une application de partage de photos : la disposition centered, celle par défaut, en clair.
+![Glimmo, disposition centered, en sombre](img/login-examples/glimmo-centered-dark.webp) Le même Glimmo en sombre, avec son propre [fond sombre](/docs/customise/branding).
+![Halvern Bank, disposition split, en clair](img/login-examples/halvern-split-light.webp) **Halvern Bank**, une banque privée : la disposition split, un titre à empattements et un texte sans.
+![Halvern Bank, disposition split, en sombre](img/login-examples/halvern-split-dark.webp) La même banque en sombre : la [palette](/docs/customise/theme) a son côté sombre, le fond son image sombre.
+![Maison Velune, disposition split, en sombre](img/login-examples/velune-split-dark.webp) **Maison Velune**, une maison de couture : la disposition split, cette fois l'image à gauche, en sombre.
+![Maison Velune, disposition drawer, en clair](img/login-examples/velune-drawer-light.webp) La même maison en clair, en disposition drawer avec son panneau à gauche.
+![Nightreel, disposition drawer, en sombre](img/login-examples/nightreel-drawer-dark.webp) **Nightreel**, un service de streaming : la disposition [drawer](/docs/customise/built-in-pages), son panneau contre le bord droit, en sombre.
+![Monoforge, disposition bare, en sombre](img/login-examples/monoforge-bare-dark.webp) **Monoforge**, une plateforme pour développeurs : la disposition bare, sans carte, et la case [Glow](/docs/customise/theme) décochée, pour un rendu plat.
+![Basketa, disposition banner, en clair](img/login-examples/basketa-banner-light.webp) **Basketa**, la livraison de courses : la disposition banner, la marque dans un bandeau en haut.
+:::
+
+Un fond se lit avec la page qu'il porte : une image faite pour le mode sombre est souvent
+trop sombre derrière un texte clair, et inversement. Quand les pages proposent les deux
+modes, donnez au fond [une image par mode](/docs/customise/branding).
+
+Toutes les dispositions sauf `centered` relèvent d'Enterprise. Le script qui construit ces
+marques et prend les captures est `e2e/scripts/capture-themes.mjs` : il tourne contre
+n'importe quelle gateway, ce qui en fait un point de départ pour les vôtres.
+
 ## Une connexion, une identité
 
 Le thème et la marque se décident **une seule fois**, pour toute la gateway : un même

@@ -117,14 +117,23 @@ the service through the gateway, as any role, to do the job or prove a rule.
 
 ## Try it
 
+The community edition, free and fit for production:
+
+```bash
+docker run -p 8080:8080 -p 9090:9090 \
+  -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat-ce
+```
+
+Everything Meerkat does, as an evaluation until a license is added:
+
 ```bash
 docker run -p 8080:8080 -p 9090:9090 \
   -e MEERKAT_ADMIN_PASSWORD=choose-one softwarity/meerkat
 ```
 
-8080 is what your users reach, 9090 is the admin console. Without a license it
-runs as an evaluation: everything, with a notice on its pages. The community
-edition is `softwarity/meerkat-ce`. From there,
+8080 is what your users reach, 9090 is the admin console. The evaluation
+carries a notice on its pages; a Team or Enterprise license removes it, with no
+restart. From there,
 [Quick start](/docs/start/quick-start) puts one of your own services behind it
 in about five minutes.
 

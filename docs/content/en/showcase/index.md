@@ -91,3 +91,5 @@ What each one may do is on [Infrastructure administrator](/docs/access/infra-adm
 ![General settings](img/showcase/general.webp) What this installation is, and the policies every account lives under.
 ![The agent endpoint](img/showcase/mcp.webp) MCP on the control plane, so an assistant can work under the same rules.
 :::
+
+What these screens produce: [six invented brands](/docs/customise/overview), the same sign-in page dressed six ways.

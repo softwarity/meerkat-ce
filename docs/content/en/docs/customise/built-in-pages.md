@@ -77,6 +77,8 @@ A closed catalogue of layouts, each a block of CSS shipped with the product:
 | `banner` | the brand in a band across the top, the card under it |
 | `bare` | no card at all: the fields sit on the background |
 
+Each of them, worn by an invented brand: [six brands, the same pages](/docs/customise/overview).
+
 `split` and `drawer` are built of two halves, so they carry a **side**: left or right. The others
 ignore it, and the field is cleared rather than kept and silently unused.
 
