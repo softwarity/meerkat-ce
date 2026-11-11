@@ -186,11 +186,20 @@
     color: var(--muted);
     font: inherit;
     font-size: 0.86rem;
-    padding: 3px 0;
+    padding: 3px 0 3px 10px;
+    border-left: 2px solid var(--line-soft);
     cursor: pointer;
 
+    // The pointer only darkens the text: the accent belongs to the section
+    // being read, or an entry left under a still pointer reads as the place
+    // the reader is.
     &:hover {
+      color: var(--text);
+    }
+
+    &.reading {
       color: var(--accent);
+      border-left-color: var(--accent);
     }
   }
 }

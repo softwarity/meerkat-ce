@@ -75,7 +75,7 @@
       <nav class="onpage">
         <div class="onpage-head">{{ words().onThisPage }}</div>
         @for (h of p.headings; track h.id) {
-          <button type="button" (click)="jump(h.id)">{{ h.text }}</button>
+          <button type="button" [class.reading]="reading() === h.id" [attr.aria-current]="reading() === h.id ? 'location' : null" (click)="jump(h.id)">{{ h.text }}</button>
         }
       </nav>
     }

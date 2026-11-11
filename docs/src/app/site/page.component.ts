@@ -77,6 +77,21 @@ export class PageComponent {
 
   protected readonly wide = computed(() => this.page()?.layout === 'wide');
 
+  // The heading being read, lit in "On this page". Without it the outline
+  // said nothing about where the reader was, and the entry just clicked
+  // stayed coloured under a pointer that had not moved while the page went
+  // through the sections after it. A scroll event, not a timer: it moves only
+  // when the reader does.
+  protected readonly reading = signal('');
+  private spyFrame = 0;
+  private readonly spy = (): void => {
+    if (this.spyFrame) return;
+    this.spyFrame = requestAnimationFrame(() => {
+      this.spyFrame = 0;
+      this.reading.set(this.headingRead());
+    });
+  };
+
 
   // bypassSecurityTrustHtml is safe HERE and would not be anywhere else: this
   // HTML is not user input, it is the output of scripts/build-site.mjs over
@@ -116,7 +131,14 @@ export class PageComponent {
   });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.unmountWidgets());
+    // Captured, because the page scrolls inside the shell's content area, not
+    // the window, and a scroll event does not bubble.
+    document.addEventListener('scroll', this.spy, { capture: true, passive: true });
+    inject(DestroyRef).onDestroy(() => {
+      this.unmountWidgets();
+      document.removeEventListener('scroll', this.spy, { capture: true });
+      cancelAnimationFrame(this.spyFrame);
+    });
     effect(() => {
       // BOTH read here, synchronously, or the effect does not depend on them.
       // A signal read inside the `then` below runs after the effect has
@@ -159,6 +181,7 @@ export class PageComponent {
             this.wireLinks();
             this.wireShots();
             this.mountWidgets();
+            this.reading.set(this.headingRead());
             // A deep link may name a heading (?at=the-heading): the path is
             // the page, so the anchor could not ride in the fragment.
             const at = new URL(location.href).searchParams.get('at');
@@ -203,6 +226,24 @@ export class PageComponent {
 
   protected jump(id: string): void {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // The last heading that has reached the top band of the screen. At the very
+  // bottom of the page the last one, which may be too short to ever get there.
+  private headingRead(): string {
+    const ids = this.page()?.headings.map((h) => h.id) ?? [];
+    const els = ids.map((id) => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
+    if (!els.length) return '';
+    const scroller = els[0].closest('rail-nav-content') ?? document.scrollingElement;
+    if (scroller && scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) {
+      return els[els.length - 1].id;
+    }
+    let read = '';
+    for (const el of els) {
+      if (el.getBoundingClientRect().top > 140) break;
+      read = el.id;
+    }
+    return read;
   }
 
   // Which addresses an area owns is declared once, in content/areas.json, and
