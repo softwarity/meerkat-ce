@@ -14,7 +14,7 @@ require (
 	github.com/pb33f/libopenapi v0.38.7
 	github.com/russellhaering/gosaml2 v0.12.0
 	github.com/russellhaering/goxmldsig v1.6.1
-	github.com/softwarity/livewire/go v0.4.0
+	github.com/softwarity/livewire/go v0.6.0
 	github.com/softwarity/plug/agent v0.0.0-20261110091023-86edacb5c58c
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0

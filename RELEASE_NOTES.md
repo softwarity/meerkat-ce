@@ -5,6 +5,9 @@
 - **Swedish is a shipped language.** The built-in pages (sign-in, two-factor, profile,
   notifications, the not-found page, the user button) and the mails now speak Swedish too,
   twenty-two languages in all. A route offers it by declaring `sv` among its locales.
+- **Dependencies brought up to date.** Angular 22.2.5 and Angular Material 22.2.6 in the console,
+  the live channel library 0.6.0 on both sides, Playwright 1.65.0 for the tests, and fast-uri 3.1.9
+  in the build tools (four URI parsing advisories; it is not part of what ships).
 
 ---
 
