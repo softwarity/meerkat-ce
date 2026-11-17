@@ -2,6 +2,14 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.26.0
+
+<!-- release: built=2026-11-17T06:08:59Z migrates=true -->
+- **This version migrates the database** (schema 104 to 105). An older version no longer opens it
+  afterwards: take a backup before you update.
+
 - **The endpoint screens read like the application's own swagger.** Endpoint security, rate
   limits and audit group the operations under their tags, in the spec's order, each section
   with what its tag is for and a chevron that folds it; operations without a tag sit under
