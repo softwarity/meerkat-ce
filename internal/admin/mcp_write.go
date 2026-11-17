@@ -405,6 +405,8 @@ func routeSchema() map[string]any {
 			"description": "Whether the gateway reports on what this route answers. Absent follows the installation."},
 		"telemetryUi": map[string]any{"type": "boolean",
 			"description": "Whether the pages of this UI route report from the browser too."},
+		"auditStream": map[string]any{"type": "string",
+			"description": "The value of the audit attribute on this route's audited calls, when not the installation's template. {servicename} is the service behind the route, the first label of its upstream's host."},
 	}, "id", "name", "predicates")
 	// Anything this build does not name still travels: a route read from a
 	// newer gateway must not lose a field on its way back.

@@ -2,6 +2,16 @@
 
 ## NEXT RELEASE
 
+- **The endpoint screens read like the application's own swagger.** Endpoint security, rate
+  limits and audit group the operations under their tags, in the spec's order, each section
+  with what its tag is for and a chevron that folds it; operations without a tag sit under
+  "default". The column headers are gone: the API version stands beside the route selector, the
+  method and tag filters at the right of the bar. An operation's drawer leads with what it does,
+  its path below in smaller print.
+- **Only the roles an application declares are shown beside an operation.** The "Signed in" and
+  "Public" marks read from the spec are gone: a stock spec declares a credential on every
+  operation whatever the deployment does, and beside a route Meerkat leaves open it read as a
+  contradiction. The declared roles stay, since they are what a route maps.
 - **Swedish is a shipped language.** The built-in pages (sign-in, two-factor, profile,
   notifications, the not-found page, the user button) and the mails now speak Swedish too,
   twenty-two languages in all. A route offers it by declaring `sv` among its locales.
@@ -10,6 +20,20 @@
   in the build tools (four URI parsing advisories; it is not part of what ships).
 - **The console's live channel uses livewire 0.6.0's sources that know who is asking.** One
   registry for every reader instead of one per perimeter; nothing changes on screen.
+- **An audit event says which service it audits; `meerkat.stream` is gone.** Sent to a collector,
+  an audit event carries the resource attribute `audit` set to the service it is about, the first
+  label of the route's upstream host (`audit=orders-api`), or `audit=meerkat` for sign-ins and
+  console changes. A line without it is a log: the logs carry nothing any more. Attribute and
+  value are set under the switches of Infra, OpenTelemetry, Audit, and a route sets its own value
+  in its OpenTelemetry section. **A collector or a log backend that selected on `meerkat.stream`
+  must select on `audit` instead**: in Loki, index `audit` (`otlp_config`) and keep the audit
+  with `{audit=~".+"}`.
+- **A route's OpenTelemetry section reads Traces, Metrics, Audit.** Only the traces are set there;
+  the audit part counts the audited operations and opens Endpoint audit on that route, or says
+  an OpenAPI contract is needed. Where the OpenAPI contract is chosen, the route now says what
+  depends on it: endpoint security, endpoint rate limits, endpoint audit, the API reference.
+- **The audit configuration file is gone.** Endpoint audit no longer exports a route's rules
+  and the route editor no longer uploads them: the rules travel with the configuration export.
 
 ---
 

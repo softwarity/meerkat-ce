@@ -105,7 +105,7 @@ func logWorker() {
 			batch = batch[:0]
 			return
 		}
-		body, err := logsPayload(cfg, "logs", "meerkat.logs", batch)
+		body, err := logsPayload(cfg, "", "", "meerkat.logs", batch)
 		if err == nil {
 			pause := time.Second
 			for attempt := 1; ; attempt++ {

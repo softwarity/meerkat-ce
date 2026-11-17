@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 	"strings"
+
+	"github.com/softwarity/meerkat/internal/tracing"
 )
 
 // Where this gateway's traces go, and how much of them (OBS-04).
@@ -84,12 +86,61 @@ type TelemetryConfig struct {
 	// writes to the outputs and depends on no collector.
 	AccessLog bool `json:"accessLog,omitempty"`
 	// Audit sends the DATA PLANE's audit to the collector, as logs marked
-	// meerkat.stream=audit (AUD-03, AUD-04): the accounts' sign-ins and
-	// refusals, and the calls of the audited endpoints.
+	// with what they audit (AuditStreamKey, AuditStream; AUD-03, AUD-04): the
+	// accounts' sign-ins and refusals, and the calls of the audited endpoints.
 	Audit bool `json:"audit,omitempty"`
 	// AuditConsole sends the console's audit too: its changes and its
 	// sign-ins. A copy: that trail stays in the database.
 	AuditConsole bool `json:"auditConsole,omitempty"`
+	// AuditStreamKey and AuditStream are the attribute and the value template
+	// that say what an audit event audits: audit=orders-api. A log
+	// backend selects on it and keeps by it, and a line without it is a log.
+	// {servicename} is the service behind the route the event belongs to (the
+	// first label of its upstream's host), or "meerkat" when it belongs to
+	// none (a sign-in, a console change). A route may set its own value,
+	// never the attribute. Empty is the default: audit, and {servicename}.
+	AuditStreamKey string `json:"auditStreamKey,omitempty"`
+	AuditStream    string `json:"auditStream,omitempty"`
+}
+
+const maxStreamTemplate = 120
+
+// SanitizeStreamKey trims the attribute a stream is written under and refuses
+// what is not an attribute name: letters, digits, '.', '_', '-'.
+func SanitizeStreamKey(field string, v *string) error {
+	*v = strings.TrimSpace(*v)
+	if len(*v) > 60 {
+		return fmt.Errorf("%s is %d characters, 60 at most", field, len(*v))
+	}
+	for _, c := range *v {
+		if !streamChar(c) {
+			return fmt.Errorf("%s %q holds %q: an attribute name takes letters, digits, '.', '_' and '-', such as audit",
+				field, *v, c)
+		}
+	}
+	return nil
+}
+
+func streamChar(c rune) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '-'
+}
+
+// SanitizeStream trims a stream template and refuses what a log backend could
+// not take as a label value: letters, digits, '.', '_', '-' and the
+// {servicename} token.
+func SanitizeStream(field string, v *string) error {
+	*v = strings.TrimSpace(*v)
+	if len(*v) > maxStreamTemplate {
+		return fmt.Errorf("%s is %d characters, %d at most", field, len(*v), maxStreamTemplate)
+	}
+	rest := strings.ReplaceAll(*v, tracing.StreamServiceToken, "")
+	for _, c := range rest {
+		if !streamChar(c) {
+			return fmt.Errorf("%s %q holds %q: allowed are letters, digits, '.', '_', '-' and the token %s",
+				field, *v, c, tracing.StreamServiceToken)
+		}
+	}
+	return nil
 }
 
 // WHERE THE BROWSER HALF WENT. It used to be a switch here - "start traces in
@@ -123,6 +174,12 @@ func (c TelemetryConfig) ExportsMetrics() bool { return c.Enabled && c.Metrics }
 // SanitizeTelemetry refuses what cannot work, and names what is allowed.
 func SanitizeTelemetry(c *TelemetryConfig) error {
 	c.Endpoint = strings.TrimRight(strings.TrimSpace(c.Endpoint), "/")
+	if err := SanitizeStream("auditStream", &c.AuditStream); err != nil {
+		return err
+	}
+	if err := SanitizeStreamKey("auditStreamKey", &c.AuditStreamKey); err != nil {
+		return err
+	}
 	if c.Logs && c.LogsPush {
 		return fmt.Errorf("the logs are either written for an agent or pushed to the collector, not both: every line would arrive twice")
 	}

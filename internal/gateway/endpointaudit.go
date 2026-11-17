@@ -100,7 +100,9 @@ func (rt *Router) endpointAuditor(routeName string, audits []store.EndpointAudit
 		ev.ID, ev.At = store.NewEventID(), now.Unix()
 		rt.st.RecordEndpointCall(ev)
 		if tracing.ShippingData() {
-			tracing.ShipAudit(auditRecordOf(ev, now))
+			rec := auditRecordOf(ev, now)
+			rec.Stream = tracing.AuditStream(routeName)
+			tracing.ShipAudit(rec)
 		}
 	}), nil
 }

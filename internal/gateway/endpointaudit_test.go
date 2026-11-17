@@ -90,7 +90,7 @@ func TestAnAuditedCallBecomesAnEventAndTheBodyStillArrives(t *testing.T) {
 	select {
 	case ev := <-sent:
 		for _, want := range []string{
-			`"meerkat.stream"`, `"Order changed"`,
+			`"key":"audit"`, `"Order changed"`,
 			`"audit.field.order","value":{"stringValue":"77"}`,
 			`"audit.field.reason","value":{"stringValue":"refund"}`,
 			`"audit.field.client","value":{"stringValue":"kiosk-3"}`,

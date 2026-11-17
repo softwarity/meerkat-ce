@@ -10,7 +10,7 @@ import (
 )
 
 // What leaves is an OTLP/JSON logs request the Collector routes by its
-// resource: meerkat.stream=audit, with the action as the body and the trace id
+// resource: audit=meerkat, with the action as the body and the trace id
 // of the request that caused it (AUD-03).
 func TestAnAuditBatchIsAnOTLPLogsRequestMarkedAudit(t *testing.T) {
 	auditMu.Lock()
@@ -43,7 +43,7 @@ func TestAnAuditBatchIsAnOTLPLogsRequestMarkedAudit(t *testing.T) {
 	for _, a := range req.ResourceLogs[0].Resource.Attributes {
 		res[a.Key] = a.Value["stringValue"]
 	}
-	if res["meerkat.stream"] != "audit" || res["service.name"] != "meerkat" || res["service.version"] != "1.2.3" {
+	if res["audit"] != "meerkat" || res["service.name"] != "meerkat" || res["service.version"] != "1.2.3" {
 		t.Errorf("resource: %v", res)
 	}
 	rec := req.ResourceLogs[0].ScopeLogs[0].LogRecords[0]

@@ -39,12 +39,9 @@ import { firstValueFrom } from "rxjs";
 import { DialogsService } from "../../shared/dialogs.service";
 import { LOCALE_ID } from "@angular/core";
 import {
-  AUDIT_FILE_KIND,
   Access,
   ApiService,
-  AuditFile,
   CatalogEntry,
-  EndpointAudit,
   DiscoveredService,
   Spec,
   IDENTITY_FIELDS,
@@ -78,6 +75,7 @@ import { MeService } from "../../me.service";
 import { humanDuration } from "../../shared/duration";
 import { EeLockComponent } from "../../shared/ee-lock.component";
 import { FormFieldComponent } from "../../shared/form-field.component";
+import { serviceOf } from "../../shared/service-of";
 import { Lazy } from "../../shared/lazy";
 import {
   UrlInputComponent,
@@ -488,6 +486,9 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     // being traced is not a UI matter, only starting from the page is.
     telemetry: r?.telemetry ?? true,
     telemetryUi: r?.telemetryUi ?? false,
+    // This route's own value of the audit attribute; '' follows the
+    // installation's template.
+    auditStream: r?.auditStream ?? "",
     identityMechanism: (r?.identity?.mechanism ?? "") as IdentityMechanism,
     identityTtl: r?.identity?.ttl || "PT2M",
     identityAudience: r?.identity?.audience ?? "",
@@ -773,41 +774,13 @@ export class RouteEditorComponent {
   // the work away.
   readonly dirty = computed(
     () =>
-      this.auditUpload() !== null ||
       JSON.stringify(this.draft()) !==
         JSON.stringify(draftOf(this.route(), this.customFields())),
   );
 
-  // Audited operations read from a file (AUD-04), waiting for Save. Null when
-  // nothing was uploaded: the route keeps what it has, read live like the
-  // endpoint security, so the Endpoint audit screen's edits are never undone
-  // by a save here. Cleared when the drawer opens another route.
-  protected readonly auditUpload = linkedSignal<Route | null, EndpointAudit[] | null>({
-    source: this.route,
-    computation: () => null,
-  });
-  protected readonly auditUploadError = signal("");
-  protected readonly auditCount = computed(
-    () => (this.auditUpload() ?? this.route()?.api?.audit ?? []).length,
-  );
-
-  protected uploadAudit(file: File | undefined): void {
-    if (!file) return;
-    this.auditUploadError.set("");
-    file.text().then((text) => {
-      try {
-        const parsed = JSON.parse(text) as Partial<AuditFile>;
-        if (parsed.kind !== AUDIT_FILE_KIND || !Array.isArray(parsed.audit)) {
-          throw new Error("kind");
-        }
-        this.auditUpload.set(parsed.audit);
-      } catch {
-        this.auditUploadError.set(
-          $localize`:@@Audit_file_invalid:Not an audit file exported from Endpoint audit.`,
-        );
-      }
-    });
-  }
+  // Audited operations (AUD-04), read live like the endpoint security: the
+  // Endpoint audit screen edits them, this drawer only counts them.
+  protected readonly auditCount = computed(() => this.route()?.api?.audit?.length ?? 0);
 
   // The APPLICATION's locale offer, shown read-only (managed in Application
   // General). Display names come from Intl: the console's locale for the
@@ -958,7 +931,13 @@ export class RouteEditorComponent {
     // not grey out two switches somebody came to set, so the section draws as
     // it would with the export on.
     this.api.telemetrySetting().subscribe({
-      next: (s) => this.telemetryOn.set(s.enabled && s.traces),
+      next: (s) => {
+        this.telemetryOn.set(s.enabled && s.traces);
+        this.streamTemplates.set({
+          auditKey: s.auditStreamKey || "audit",
+          audit: s.auditStream || "{servicename}",
+        });
+      },
       error: () => {},
     });
     this.loadServices();
@@ -1486,6 +1465,29 @@ export class RouteEditorComponent {
   // so they are DISABLED rather than hidden or silently flipped: what the route
   // holds stays exactly as it is, and the section says where to turn it on.
   protected readonly telemetryOn = signal(true);
+  // The installation's audit stream attribute and template: the attribute is
+  // the field's fixed prefix (a route sets the value, never the attribute),
+  // the template resolved for this route is its placeholder - what it gets
+  // when it says nothing.
+  protected readonly streamTemplates = signal({
+    auditKey: "audit",
+    audit: "{servicename}",
+  });
+  protected readonly inheritedAudit = computed(() => this.resolveStream(this.streamTemplates().audit));
+  // What this route's audited calls will carry, as typed or inherited: the
+  // hint under the field, so the form of {servicename} is seen.
+  protected readonly auditSent = computed(() => {
+    const own = this.draft().auditStream.trim();
+    const value = own ? this.resolveStream(own) : this.inheritedAudit();
+    const key = this.streamTemplates().auditKey;
+    return $localize`:@@Route_stream_sent:Sent as ${key}:key:=${value}:value:`;
+  });
+  // {servicename} is the service behind the route (its upstream's host), not
+  // the route's display name: three routes onto one service share its stream.
+  private resolveStream(template: string): string {
+    const d = this.draft();
+    return template.replaceAll("{servicename}", serviceOf(d.upstream, d.name.trim() || "meerkat"));
+  }
 
   // Why the second switch is disabled, where the question is rather than in a
   // paragraph above it.
@@ -2212,7 +2214,8 @@ export class RouteEditorComponent {
       | "localesHeader"
       | "localesParam"
       | "breakerTrip"
-      | "breakerCool",
+      | "breakerCool"
+      | "auditStream",
     value: string,
   ): void {
     this.draft.update((d) => ({ ...d, [key]: value }));
@@ -2356,6 +2359,7 @@ export class RouteEditorComponent {
       // Starting from the page is a UI privilege: a route that stops being one
       // must not keep a switch the gateway would ignore.
       telemetryUi: d.telemetryUi && d.telemetry && d.isUi && this.uiPossible(),
+      auditStream: d.auditStream.trim() || undefined,
       upstream: d.upstream.trim(),
       // Two cleaners, because the two answer different questions: a predicate
       // with nothing in it is a row somebody started and left, a filter with
@@ -2394,9 +2398,9 @@ export class RouteEditorComponent {
     if (security) {
       route.api = { ...(route.api ?? {}), security };
     }
-    // Carried over like the security - its own screen edits it - unless a
-    // file was uploaded here. Dropping it was a save that erased the audit.
-    const audit = this.auditUpload() ?? this.route()?.api?.audit;
+    // Carried over like the security - its own screen edits it. Dropping it
+    // was a save that erased the audit.
+    const audit = this.route()?.api?.audit;
     if (audit?.length) {
       route.api = { ...(route.api ?? {}), audit };
     }
@@ -2665,12 +2669,12 @@ export class RouteEditorComponent {
     );
   }
 
-  // Save the route, then jump to its endpoint-security screen (which needs the
+  // Save the route, then jump to one of its endpoint screens (which need the
   // route persisted, with its spec, to fetch the operations).
-  protected goEndpointSecurity(): void {
+  protected goEndpoints(page: "endpoint-security" | "endpoint-audit"): void {
     this.save(
       (out) =>
-        void this.router.navigate(["/infra/endpoint-security"], {
+        void this.router.navigate(["/infra/" + page], {
           queryParams: { route: out.id },
         }),
     );

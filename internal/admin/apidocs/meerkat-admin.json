@@ -888,6 +888,10 @@
             "type": "boolean",
             "description": "Add the OpenTelemetry browser script to the pages. UI routes only."
           },
+          "auditStream": {
+            "type": "string",
+            "description": "Value of the audit attribute on this route's audited calls; empty follows auditStream of the telemetry setting. {servicename} is the service behind the route, the first label of its upstream's host."
+          },
           "upstream": {
             "type": "string",
             "description": "Target base URL; may hold `$name` vault references. Unused with a terminal filter."
@@ -4113,11 +4117,19 @@
           },
           "audit": {
             "type": "boolean",
-            "description": "Send the data plane's audit to the collector (meerkat.stream=audit)"
+            "description": "Send the data plane's audit to the collector, marked by what it audits (auditStreamKey, auditStream)"
           },
           "auditConsole": {
             "type": "boolean",
             "description": "Also send the console's audit"
+          },
+          "auditStreamKey": {
+            "type": "string",
+            "description": "Resource attribute saying what an audit event audits, default audit. A line without it is a log"
+          },
+          "auditStream": {
+            "type": "string",
+            "description": "Value template of that attribute, default {servicename}: the service behind the route an event belongs to (first label of its upstream's host), or meerkat"
           }
         }
       },

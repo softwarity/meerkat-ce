@@ -148,9 +148,12 @@ nobody's fault in particular.
 - *Send Meerkat's console audit too*: the changes made in the console and the
   sign-ins to it.
 
-Each event also leaves as an OpenTelemetry **log** whose resource says
-`meerkat.stream=audit`: the Collector and the backend keep it apart from
-ordinary logs, with its own query, retention and readers. The action is the
+Each event also leaves as an OpenTelemetry **log** whose resource says what it
+audits: `audit=orders-api` for a call of an audited operation of a route whose
+upstream is `orders-api`, `audit=meerkat` for the gateway's own events (sign-ins,
+console changes). A line without that attribute is a log, so the Collector and
+the backend keep the audit apart with one selector, `{audit=~".+"}` in Loki,
+with its own query, retention and readers. The action is the
 body; the actor (`user.id`, `user.name`), the target, the tenant, the
 client address and the field-level changes are attributes; the trace id is the
 request's, which joins the event to its trace and its access line.
@@ -208,13 +211,21 @@ security, sees the answer the caller got, and cannot open or close an
 operation. A route without an OpenAPI contract cannot be audited this way:
 deposit its contract, or let the service audit itself.
 
-### From one route to another
+### What an event says it audits
 
-**Export** on the Endpoint audit screen downloads the route's rules as a JSON
-file. In the route editor, the **OpenTelemetry** section has **Upload audit
-configuration**: it reads such a file, and the rules are saved with the route.
-The button is greyed on a redirect route: it has no operations to audit.
-The rules also travel with the [configuration](/docs/console/configuration)
+Under the switches of the **Audit** tab, **Selector in your log backend** sets the
+attribute (`audit` by default) and its value (`{servicename}` by default). The
+value is a template: `{servicename}` is the service behind the route, the first
+label of its upstream's host (`orders-api.shop.svc.cluster.local` gives
+`orders-api`), so several routes onto one service share it; the gateway's own
+events give `meerkat`. A line under the value shows it resolved on one of your
+services. For your log backend to select on it, index the attribute: in Loki,
+an `index_label` entry for `audit` in `otlp_config`.
+
+A route sets its own value in the **Audit** part of its **OpenTelemetry**
+section, `audit = [ ... ]`, the installation's value resolved for that route as
+the placeholder. The field is there only when the route has an OpenAPI
+contract. The rules travel with the [configuration](/docs/console/configuration)
 export.
 
 ## Filters, retention, and what is missing

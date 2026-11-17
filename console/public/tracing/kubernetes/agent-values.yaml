@@ -10,8 +10,9 @@
 #   traces   -> the gateway (gateway-values.yaml), routed by trace id: it sorts
 #               them once complete (tail sampling) and writes them into Tempo
 #   metrics  -> Prometheus (its OTLP receiver)
-#   logs     -> Loki, pushed ones and the containers' stdout alike, labelled
-#               meerkat.stream = "audit" or "logs"
+#   logs     -> Loki, pushed ones and the containers' stdout alike; Meerkat's
+#               audit events say what they audit (audit=<service>), a line
+#               without it is a log
 #
 # A line a container writes in OpenTelemetry's JSON log format is decoded
 # field by field:
@@ -26,8 +27,8 @@
 mode: daemonset
 fullnameOverride: opentelemetry
 image:
-  # contrib: the distribution with the load balancing exporter, the file
-  # reader and the transform processor.
+  # contrib: the distribution with the load balancing exporter and the file
+  # reader.
   repository: otel/opentelemetry-collector-contrib
 
 # A DaemonSet gets no Service unless asked; this one is the address.
@@ -103,14 +104,6 @@ config:
         - type: remove
           if: 'attributes["otel"] != nil'
           field: attributes["otel"]
-  processors:
-    # Meerkat marks its audit records meerkat.stream=audit; anything unmarked
-    # is an application log. Loki tells them apart by this resource attribute.
-    transform/stream:
-      log_statements:
-        - context: resource
-          statements:
-            - set(attributes["meerkat.stream"], "logs") where attributes["meerkat.stream"] == nil
   exporters:
     # Every span of one trace to the SAME gateway, whichever node made it: the
     # trace id picks the gateway among the addresses of its headless Service.
@@ -128,7 +121,18 @@ config:
       # Prometheus' native OTLP endpoint (--web.enable-otlp-receiver).
       endpoint: http://prometheus/api/v1/otlp
     otlphttp/loki:
-      # Loki's native OTLP endpoint.
+      # Loki's native OTLP endpoint. Meerkat's audit events carry what they
+      # audit as a resource attribute (audit=orders-api, audit=meerkat),
+      # and a line without it is a log. For Loki to INDEX it - a query and a
+      # retention rule select on it - declare it in its limits_config:
+      #   otlp_config:
+      #     resource_attributes:
+      #       attributes_config:
+      #         - action: index_label
+      #           attributes: [audit]
+      # and a rule such as
+      #   retention_stream: [{selector: '{audit=~".+"}', period: 8760h}]
+      # keeps the audit a year.
       endpoint: http://loki:3100/otlp
   service:
     pipelines:
@@ -142,7 +146,7 @@ config:
         exporters: [otlphttp/prometheus]
       logs:
         receivers: [otlp, filelog]
-        processors: [memory_limiter, transform/stream, batch]
+        processors: [memory_limiter, batch]
         exporters: [otlphttp/loki]
 
 resources:

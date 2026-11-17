@@ -15,9 +15,9 @@ import (
 // A copy: the trail stays in the database and on the console's screen. Every
 // event the gateway records - a change made in the console, a sign-in, a
 // refusal, a new factor - also leaves, as a log record whose resource says
-// meerkat.stream=audit, which is what lets the Collector and the backend keep
-// it apart from ordinary logs: its own query, its own retention, its own
-// readers. It carries the trace id of the request that caused it, the join
+// what it audits (audit=orders-api, audit=meerkat; see streams.go),
+// which is what lets the Collector and the backend keep it apart from
+// ordinary logs: its own query, its own retention, its own readers. It carries the trace id of the request that caused it, the join
 // with the trace and the access log.
 //
 // NEVER SAMPLED, and NOT QUIETLY LOST. Recording an event never waits on the
@@ -39,6 +39,9 @@ type AuditRecord struct {
 	// Console is an event of the console - a change made there, a sign-in to
 	// it - rather than of the data plane. The two are sent on two switches.
 	Console bool
+	// Stream is what it audits, the value of the audit attribute
+	// (streams.go). Empty is what belongs to no route.
+	Stream string
 	// Severity, for a log line (logship.go); an audit event is INFO.
 	SeverityText   string
 	SeverityNumber int
@@ -118,6 +121,9 @@ func ShipAudit(r AuditRecord) {
 	if (r.Console && !auditConsole.Load()) || (!r.Console && !auditData.Load()) || !Shipping() {
 		return
 	}
+	if r.Stream == "" {
+		r.Stream = AuditStream("")
+	}
 	select {
 	case auditQueue <- r:
 	default:
@@ -187,15 +193,21 @@ func auditPayload(batch []AuditRecord) ([]byte, error) {
 	auditMu.Lock()
 	cfg := auditConfig
 	auditMu.Unlock()
-	return logsPayload(cfg, "audit", "meerkat.audit", batch)
+	return logsPayload(cfg, AuditStreamKey(), AuditStream(""), "meerkat.audit", batch)
 }
 
 // logsPayload is an OTLP/JSON logs export request: the records of one batch,
-// under a resource that names the writer and the stream - "audit" or "logs" -
-// which is what the Collector and the backend keep apart.
-func logsPayload(cfg Config, stream, scope string, batch []AuditRecord) ([]byte, error) {
-	records := make([]map[string]any, len(batch))
-	for i, r := range batch {
+// under one resource per value of key (what an audit event audits), which is
+// what the Collector and the backend keep apart. A record with no value takes
+// def. An empty key writes none: a log line carries no such attribute.
+func logsPayload(cfg Config, key, def, scope string, batch []AuditRecord) ([]byte, error) {
+	service := cfg.Service
+	if service == "" {
+		service = "meerkat"
+	}
+	var order []string
+	byStream := map[string][]map[string]any{}
+	for _, r := range batch {
 		text, num := r.SeverityText, r.SeverityNumber
 		if text == "" {
 			text, num = "INFO", 9
@@ -213,25 +225,33 @@ func logsPayload(cfg Config, stream, scope string, batch []AuditRecord) ([]byte,
 		if r.SpanID != "" {
 			rec["spanId"] = r.SpanID
 		}
-		records[i] = rec
+		stream := r.Stream
+		if stream == "" {
+			stream = def
+		}
+		if _, seen := byStream[stream]; !seen {
+			order = append(order, stream)
+		}
+		byStream[stream] = append(byStream[stream], rec)
 	}
-	service := cfg.Service
-	if service == "" {
-		service = "meerkat"
-	}
-	resource := []Attr{String("service.name", service), String("meerkat.stream", stream)}
-	if cfg.Version != "" {
-		resource = append(resource, String("service.version", cfg.Version))
-	}
-	return json.Marshal(map[string]any{
-		"resourceLogs": []any{map[string]any{
+	resourceLogs := make([]any, 0, len(order))
+	for _, stream := range order {
+		resource := []Attr{String("service.name", service)}
+		if key != "" {
+			resource = append(resource, String(key, stream))
+		}
+		if cfg.Version != "" {
+			resource = append(resource, String("service.version", cfg.Version))
+		}
+		resourceLogs = append(resourceLogs, map[string]any{
 			"resource": map[string]any{"attributes": otlpAttrs(resource)},
 			"scopeLogs": []any{map[string]any{
 				"scope":      map[string]any{"name": scope},
-				"logRecords": records,
+				"logRecords": byStream[stream],
 			}},
-		}},
-	})
+		})
+	}
+	return json.Marshal(map[string]any{"resourceLogs": resourceLogs})
 }
 
 func otlpAttrs(attrs []Attr) []any {

@@ -185,12 +185,14 @@ test('declared roles: read from the spec, imported into the catalogue, forwarded
     expect(described('/anything')).toContain('**Required by the application:** a signed-in caller.');
     await dev.dispose();
 
-    // The console: the operation's chip in "Application requires", and the
-    // header button counting the mapped roles.
+    // The console: the role the application declares on the operation, and
+    // the header button counting the mapped roles. Only the roles: what a
+    // document says about a credential in general is no fact about the
+    // running application, and beside Meerkat's own rule it read as one.
     const context = await browser.newContext({ storageState: authFile('root') });
     const page = await context.newPage();
     await page.goto(`${ADMIN_URL}/infra/endpoint-security?route=${ROUTE}`);
-    await expect(page.getByRole('columnheader', { name: 'Application requires' })).toBeVisible();
+    await expect(page.locator('app-upstream-mark .up')).toHaveCount(1);
     const chip = page.locator('app-upstream-mark .up.role', { hasText: 'ROLE_ADMIN' });
     await expect(chip).toBeVisible();
     await expect(chip).not.toHaveClass(/\bunmapped\b/);

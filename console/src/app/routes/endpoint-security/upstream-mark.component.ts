@@ -2,8 +2,13 @@ import { Component, computed, input } from '@angular/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { UpstreamAccess } from '../../api.service';
 
-// What the APPLICATION requires for one operation, as its OpenAPI spec says
-// it: its roles, "Signed in" or "Public". Read-only, and drawn apart from
+// The roles the APPLICATION declares for one operation, as its OpenAPI spec
+// says them. Only the roles: they are what the route maps onto the catalogue,
+// so they are the one thing here somebody acts on. What a document says about
+// a credential in general ("signed in", "public") is no fact about the running
+// application - a stock spec declares basic auth on everything whatever the
+// deployment does - and beside Meerkat's own rule it read as a contradiction.
+// Read-only, and drawn apart from
 // Meerkat's own access badges on purpose - dashed, in the tertiary tone, never
 // the orange of a gateway rule - because the two answer different questions:
 // the badges are what Meerkat refuses at the door, this is what the
@@ -17,23 +22,13 @@ import { UpstreamAccess } from '../../api.service';
   selector: 'app-upstream-mark',
   imports: [MatTooltipModule],
   template: `
-    @switch (upstream()?.access) {
-      @case ('public') {
-        <span class="up" [matTooltip]="appChecks" i18n="@@Upstream_public">Public</span>
-      }
-      @case ('authenticated') {
-        <span class="up" [matTooltip]="appChecks" i18n="@@Upstream_signed_in">Signed in</span>
-      }
-      @case ('roles') {
-        @for (r of rows(); track r.declared) {
-          <span class="up role" [class.unmapped]="!r.target" [matTooltip]="r.tip">
-            {{ r.declared }}
-            @if (detailed() && r.target) {
-              <span class="to" i18n="@@Upstream_mapped_to">mapped to {{ r.target }}</span>
-            }
-          </span>
+    @for (r of rows(); track r.declared) {
+      <span class="up role" [class.unmapped]="!r.target" [matTooltip]="r.tip">
+        {{ r.declared }}
+        @if (detailed() && r.target) {
+          <span class="to" i18n="@@Upstream_mapped_to">mapped to {{ r.target }}</span>
         }
-      }
+      </span>
     }
   `,
   styles: [
@@ -75,7 +70,7 @@ export class UpstreamMarkComponent {
   // In the drawer the mapping is written out; in the table it is one hover away.
   readonly detailed = input(false);
 
-  protected readonly appChecks = $localize`:@@Upstream_checked_by_app:The application checks this itself, Meerkat does not.`;
+  protected readonly appChecks = $localize`:@@Upstream_declared_by_app:Declared in the application's OpenAPI spec. Meerkat does not check it.`;
 
   protected readonly rows = computed(() => {
     const map = this.roleMap() ?? {};

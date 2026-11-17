@@ -149,9 +149,12 @@ capacités, sans que ce soit la faute de qui que ce soit en particulier.
 - *Send Meerkat's console audit too* : les modifications faites dans la console et les
   connexions à celle-ci.
 
-Chaque événement part aussi sous la forme d'un **log** OpenTelemetry dont la ressource porte
-`meerkat.stream=audit` : le Collector et le backend le tiennent ainsi à l'écart des logs
-ordinaires, avec sa propre requête, sa propre durée de conservation et ses propres lecteurs.
+Chaque événement part aussi sous la forme d'un **log** OpenTelemetry dont la ressource dit ce
+qu'il audite : `audit=orders-api` pour l'appel d'une opération auditée d'une route dont
+l'upstream est `orders-api`, `audit=meerkat` pour les événements de la passerelle elle-même
+(connexions, changements dans la console). Une ligne sans cet attribut est un log : le
+Collector et le backend tiennent l'audit à l'écart avec un seul sélecteur, `{audit=~".+"}`
+dans Loki, avec sa propre requête, sa propre durée de conservation et ses propres lecteurs.
 L'action constitue le corps ; l'acteur (`user.id`, `user.name`), la cible, le tenant,
 l'adresse du client et les changements champ par champ sont des attributs ; l'identifiant de
 trace est celui de la requête, ce qui relie l'événement à sa trace et à sa ligne d'accès.
@@ -209,13 +212,21 @@ réponse reçue par l'appelant, et ne peut ni ouvrir ni fermer une opération. U
 contrat OpenAPI ne peut pas être auditée de cette façon : déposez son contrat, ou laissez le
 service s'auditer lui-même.
 
-### D'une route à l'autre
+### Ce que dit un événement de ce qu'il audite
 
-**Export**, sur l'écran Endpoint audit, télécharge les règles de la route dans un fichier
-JSON. Dans l'éditeur de route, la section **OpenTelemetry** propose **Upload audit
-configuration** : ce bouton lit un tel fichier, et les règles sont enregistrées avec la
-route. Il est grisé sur une route de redirection, qui n'a aucune opération à auditer. Les
-règles voyagent aussi avec l'export de la [configuration](/docs/console/configuration).
+Sous les interrupteurs de l'onglet **Audit**, **Selector in your log backend** règle
+l'attribut (`audit` par défaut) et sa valeur (`{servicename}` par défaut). La valeur est un
+gabarit : `{servicename}` est le service derrière la route, le premier segment du nom d'hôte
+de son upstream (`orders-api.shop.svc.cluster.local` donne `orders-api`), si bien que
+plusieurs routes vers un même service le partagent ; les événements de la passerelle donnent
+`meerkat`. Une ligne sous la valeur la montre résolue sur l'un de vos services. Pour que votre
+backend de logs sélectionne dessus, indexez l'attribut : dans Loki, une entrée `index_label`
+pour `audit` dans `otlp_config`.
+
+Une route règle sa propre valeur dans la partie **Audit** de sa section **OpenTelemetry**,
+`audit = [ ... ]`, avec en placeholder la valeur de l'installation résolue pour cette route.
+Le champ n'apparaît que si la route a un contrat OpenAPI. Les règles voyagent avec l'export de
+la [configuration](/docs/console/configuration).
 
 ## Filtres, rétention, et ce qui manque
 

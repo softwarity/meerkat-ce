@@ -342,9 +342,45 @@
       <p class="hint" i18n="@@Tracing_signal_audit_console_note">
         Changes and sign-ins in this console. They are also kept here.
       </p>
-      <p class="hint" i18n="@@Tracing_audit_stream_note">
-        Sent as logs marked <b>meerkat.stream=audit</b>.
-      </p>
+      <!-- What an audit event says it audits: the attribute and its value, a
+           log backend selects and keeps the audit by them, and a line without
+           the attribute is a log. A route may set its own value, in its
+           OpenTelemetry section. The hint resolves the template on a real
+           service, so the form of {servicename} is seen rather than explained. -->
+      <h3 class="stream-title" i18n="@@Tracing_stream_title">Selector in your log backend</h3>
+      <div class="pair">
+        <app-form-field
+          icon="label"
+          i18n-label="@@Tracing_stream_key"
+          label="Label"
+          floatLabel="always"
+          i18n-info="@@Tracing_stream_key_info"
+          info="The resource attribute on every audit event. Your log backend indexes it; a line without it is a log."
+        >
+          <input
+            matInput
+            [value]="auditStreamKey()"
+            (change)="setStream('auditKey', $any($event.target).value)"
+            placeholder="audit"
+          />
+        </app-form-field>
+        <app-form-field
+          i18n-label="@@Tracing_stream_value"
+          label="Value"
+          floatLabel="always"
+          i18n-info="@@Tracing_stream_value_info"
+          info="What is audited. {servicename} is the service behind the route (the host of its upstream), or meerkat for the gateway's own events (sign-ins, console). A route can set its own value."
+          [hint]="streamExample('audit')"
+          subscriptSizing="dynamic"
+        >
+          <input
+            matInput
+            [value]="auditStream()"
+            (change)="setStream('audit', $any($event.target).value)"
+            placeholder="{servicename}"
+          />
+        </app-form-field>
+      </div>
       @if (auditLost() > 0) {
         <p class="warn" i18n="@@Tracing_audit_lost">
           <mat-icon inline>warning</mat-icon>

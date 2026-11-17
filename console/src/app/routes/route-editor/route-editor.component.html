@@ -353,8 +353,18 @@
             <mat-option value="upstream" i18n="@@Spec_from_service">Published by the service</mat-option>
             <mat-option value="file" i18n="@@Spec_deposited">Uploaded here</mat-option>
           </mat-select>
-          <mat-hint align="end" i18n="@@Spec_hint">Used by endpoint security and the API reference</mat-hint>
         </mat-form-field>
+        <!-- Said before the choice is made, not discovered on four other
+             screens: every per-operation feature reads this spec, and without
+             it each of them has nothing to list for this route. -->
+        <p class="section-hint off-note">
+          <mat-icon inline>info</mat-icon>
+          <span i18n="@@Spec_impact"
+            >Endpoint security, endpoint rate limits, endpoint audit, the API reference and, soon,
+            quotas act on the operations of this spec. Without one, none of them applies to this
+            route.</span
+          >
+        </p>
 
         @if (draft().specSource === 'upstream') {
         <mat-form-field>
@@ -370,7 +380,7 @@
             matSuffix
             type="button"
             [disabled]="saving() || !draft().name.trim() || !draft().upstream.trim() || !draft().specPath.trim()"
-            (click)="goEndpointSecurity()"
+            (click)="goEndpoints('endpoint-security')"
             i18n-matTooltip="@@Edit_endpoint_security"
             matTooltip="Endpoints"
             i18n-aria-label="@@Edit_endpoint_security"
@@ -405,7 +415,7 @@
             matIconButton
             type="button"
             [disabled]="saving() || !draft().name.trim()"
-            (click)="goEndpointSecurity()"
+            (click)="goEndpoints('endpoint-security')"
             i18n-matTooltip="@@Edit_endpoint_security"
             matTooltip="Endpoints"
             i18n-aria-label="@@Edit_endpoint_security"
@@ -1439,6 +1449,10 @@
             </button>
           </p>
         }
+        <!-- Four signals, one place to read where each is decided. Only the
+             traces are chosen per route: the rest is said, briefly, with the
+             screen that does decide it. -->
+        <h3 class="sub" i18n="@@Section_traces">Traces</h3>
         <!-- Shown whatever the installation's tracing setting says: a field
              that vanishes teaches nothing about why it is not there. Offered on
              every route, not only the UI ones - a service route has the
@@ -1469,33 +1483,59 @@
           The trace starts at the <b>click</b>, in the page. Leave it off if the application already
           has its own OpenTelemetry agent.
         </p>
-        <!-- The operations whose calls are audited (AUD-04). Edited one by
-             one on the Endpoint audit screen; here, a file exported from it
-             replaces them at once, on this route or another one. -->
-        <div class="audit-block" [class.off]="mode() === 'redirect'" [matTooltip]="mode() === 'redirect' ? noAuditTip : ''">
-        <h3 class="sub" i18n="@@Section_audit">Audit</h3>
-        <p class="section-hint">
-          @if (auditUpload(); as up) {
-            <ng-container i18n="@@Audit_uploaded">{{ up.length }} audited operations from the file, saved with the route.</ng-container>
-          } @else {
-            <ng-container i18n="@@Audit_count">{{ auditCount() }} audited operations, set in
-              <a routerLink="/infra/endpoint-audit">Endpoint audit</a>.</ng-container>
-          }
+
+        <h3 class="sub" i18n="@@Section_metrics">Metrics</h3>
+        <p class="section-hint" i18n="@@Route_metrics_where">
+          This route's series follow the switch above. Turned on for the installation in
+          <b>Infra, OpenTelemetry, Metrics</b>.
         </p>
-        <div class="css-row" ee-feature="AUD-04">
-          <app-file-button accept="application/json,.json" [disabled]="!route() || mode() === 'redirect'" (picked)="uploadAudit($event[0])">
-            <ng-container i18n="@@Upload_audit">Upload audit configuration</ng-container>
-          </app-file-button>
+
+        <!-- The audited operations (AUD-04) are chosen on the Endpoint audit
+             screen, which lists the operations of the SAVED spec: no spec, no
+             link to a screen that would not offer this route. Kept in Meerkat's
+             own trail whatever the switch above says. -->
+        <h3 class="sub" i18n="@@Section_audit">Audit</h3>
+        <p class="section-hint off-note">
+          @if (mode() === 'redirect') {
+            <span>{{ noAuditTip }}</span>
+          } @else if (!route()?.api?.spec) {
+            <span i18n="@@Audit_needs_spec"
+              >Needs an OpenAPI spec, set in <b>Target, The API contract</b>.</span
+            >
+          } @else {
+            <span i18n="@@Audit_where"
+              >{{ auditCount() }} audited operations, chosen in
+              <a href="#" (click)="$event.preventDefault(); goEndpoints('endpoint-audit')">Endpoint audit</a>.
+              Kept in Meerkat's audit log, and sent to the collector from
+              <b>Infra, OpenTelemetry, Audit</b>.</span
+            >
+          }
           <app-ee-lock
             feature="AUD-04"
             i18n-why="@@Endpoint_audit_ee_why"
             why="Record chosen operations of a route in the audit trail, and send them to your collector."
           />
-        </div>
-        @if (auditUploadError(); as err) {
-          <p class="section-hint error">{{ err }}</p>
+        </p>
+        @if (mode() !== 'redirect' && route()?.api?.spec) {
+          <app-form-field
+            icon="label"
+            i18n-label="@@Route_audit_stream"
+            label="Audited as"
+            i18n-info="@@Route_stream_info"
+            info="What these calls audit, for a log backend to select and keep on. {servicename} is the service behind this route, from its upstream. The attribute itself is set in Infra, OpenTelemetry."
+            floatLabel="always"
+            [prefix]="streamTemplates().auditKey + '\u00a0=\u00a0'"
+            [hint]="auditSent()"
+            subscriptSizing="dynamic"
+          >
+            <input
+              matInput
+              [value]="draft().auditStream"
+              (input)="patch('auditStream', $any($event.target).value)"
+              [placeholder]="inheritedAudit()"
+            />
+          </app-form-field>
         }
-        </div>
       }
       @case ('custom') {
         <p class="section-hint" i18n="@@Custom_hint3">

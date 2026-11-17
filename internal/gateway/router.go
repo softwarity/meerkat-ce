@@ -271,6 +271,15 @@ func (rt *Router) Reload(ctx context.Context) error {
 		}
 	}
 	tracing.SetBrowserWanted(wantsBrowser)
+	// What each route's audit events say they audit: the installation's
+	// attribute and template, each route's own template and the service
+	// behind it, handed over whole so an event is resolved without asking
+	// the store.
+	streams := tracing.Streams{AuditKey: tel.AuditStreamKey, Audit: tel.AuditStream, Routes: map[string]tracing.RouteStreams{}}
+	for _, r := range stored {
+		streams.Routes[r.Name] = tracing.RouteStreams{Audit: r.AuditStream, Service: tracing.ServiceOf(r.Upstream, r.Name)}
+	}
+	tracing.SetStreams(streams)
 	// Vault values feed the $name expansion below. A vault that cannot be read
 	// is not a reason to stop serving: routes without references still work,
 	// and the ones with references will report their unresolved names.

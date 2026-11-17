@@ -1,5 +1,3 @@
-@use '@angular/material' as mat;
-
 :host {
   display: flex;
   flex-direction: column;
@@ -35,11 +33,17 @@
   .picker {
     min-width: 280px;
   }
-  // The pushing moves here, to the action: the selector says WHICH route is
-  // being read and belongs beside the title, the export is what one does with
-  // the screen and belongs against the right edge with the other actions.
-  .export {
+  // Against the right edge: the filters, then what one does with the screen.
+  // The selector says WHICH route is read and stays beside the title.
+  .tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
     margin-left: auto;
+  }
+  .filter {
+    width: 150px;
   }
   .intro {
     flex-basis: 100%;
@@ -74,29 +78,6 @@
     color: var(--mat-sys-on-surface-variant);
     font-size: 0.8rem;
   }
-}
-
-// Tags cell: chips wrap onto several lines within the column width.
-.c-tags {
-  max-width: 240px;
-  white-space: normal;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-.rowtag {
-  display: inline-block;
-  margin: 1px 4px 1px 0;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--mat-sys-surface-container-high);
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.7rem;
-}
-// A compact select in a column header filters the rows (by method or by tag).
-// The density mixin shrinks the Material field so it does not inflate the header.
-.colfilter {
-  width: 130px;
-  @include mat.form-field-density(-5);
 }
 
 // The drawer's override switch, and what follows it. A slide toggle carries no
@@ -143,12 +124,6 @@ table.ops {
   // keeps its own, because that one marks where the data starts.
   --mat-table-row-item-outline-width: 0;
 
-  th {
-    background: var(--mat-sys-surface-container);
-    color: var(--mat-sys-on-surface-variant);
-    font-weight: 600;
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
-  }
   .c-status {
     width: 116px;
   }
@@ -159,8 +134,64 @@ table.ops {
   }
 }
 
+// A tag's section head, as a swagger draws it: the tag large, what it is for
+// beside it, the chevron that folds it at the far end. It stays at the top
+// while its operations scroll under it, and the next head pushes it away.
+// Sticky on the CELL, as Material's own sticky rows do: a cell sticks
+// reliably, a row less so.
+.group-row {
+  cursor: pointer;
+}
+.group-cell {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0;
+  background: var(--mat-sys-surface);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.group-head {
+  padding: 14px 20px 8px 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+
+  .group-name {
+    flex: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .group-desc {
+    min-width: 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.82rem;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .group-count {
+    flex: none;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8rem;
+  }
+  .group-chev {
+    flex: none;
+    align-self: center;
+    color: var(--mat-sys-on-surface-variant);
+    transition: transform 0.15s ease;
+    transform: rotate(180deg);
+  }
+  &.collapsed .group-chev {
+    transform: none;
+  }
+}
+
 .op-row {
   cursor: pointer;
+  // A table row ignores overflow, so the ripple's wave spilled over the rows
+  // around it. clip-path clips where overflow cannot.
+  clip-path: inset(0);
 
   // Banded like every other table of the console (styles/_table.scss), which
   // these three screens never were - they are read by scanning a column of
@@ -172,7 +203,9 @@ table.ops {
   // variables (styles.scss), not from a mix repeated here: this screen is not
   // a mat-table, so it cannot take the shared mixin, but it must not be a
   // second opinion on what a banded row looks like.
-  &:nth-child(even) {
+  // Counted within its section (the .band class), so every section starts
+  // on the same tone whatever the one above ended on.
+  &.band {
     background: var(--mk-row-band);
   }
   // After the banding, which it ties on specificity and therefore wins by order.
@@ -416,13 +449,13 @@ mat-drawer {
   height: 100%;
 }
 .op-head,
-.op-summary {
+.op-path {
   flex: none;
 }
 .op-head {
   padding: 16px 24px 0;
 }
-.op-summary {
+.op-path {
   padding: 0 24px;
 }
 .op-panel {
@@ -443,14 +476,24 @@ mat-drawer {
 .op-head .spacer {
   flex: 1;
 }
-.op-head .path {
-  font-size: 0.95rem;
+.op-head .op-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
 }
-.op-summary {
-  margin: 0 0 20px;
-  font-size: 0.85rem;
+.op-head .op-title.path {
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+.op-path {
+  display: block;
+  margin: 0 0 16px;
+  font-family: var(--mk-mono);
+  font-size: 0.78rem;
   color: var(--mat-sys-on-surface-variant);
-  max-width: 72ch;
+  word-break: break-all;
 }
 .op-panel section {
   padding: 16px 0 20px;

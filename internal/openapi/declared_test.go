@@ -83,6 +83,23 @@ func TestDeclaredSecurityV2(t *testing.T) {
 	}
 }
 
+// The sections a reader groups by: the document's tags in its order, with what
+// each is for, then a tag an operation names that the list forgot.
+func TestDeclaredTags(t *testing.T) {
+	spec, err := Parse([]byte(`{"openapi":"3.0.0","info":{"title":"t","version":"1"},
+	  "tags":[{"name":"zeta","description":"Last letter, first listed."},{"name":"alpha"}],
+	  "paths":{
+	    "/a":{"get":{"tags":["alpha"],"responses":{"200":{"description":"ok"}}}},
+	    "/b":{"get":{"tags":["beta","zeta"],"responses":{"200":{"description":"ok"}}}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Tag{{Name: "zeta", Description: "Last letter, first listed."}, {Name: "alpha"}, {Name: "beta"}}
+	if !reflect.DeepEqual(spec.Tags, want) {
+		t.Errorf("tags %+v, want %+v", spec.Tags, want)
+	}
+}
+
 // The developer's swagger: the roles land in the description, with the
 // catalogue role that grants each one when the route maps it.
 func TestAnnotateDeclared(t *testing.T) {

@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 import { ApiService, TelemetryConfig, TelemetrySetting } from '../api.service';
 import { EeLockComponent } from '../shared/ee-lock.component';
 import { FormFieldComponent } from '../shared/form-field.component';
+import { serviceOf } from '../shared/service-of';
 import { SecretFieldComponent } from '../shared/secret-field.component';
 import { SnippetComponent } from '../shared/snippet.component';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -94,6 +95,13 @@ export class OtelPageComponent {
   protected readonly logs = signal(false);
   protected readonly logsPush = signal(false);
   protected readonly accessLog = signal(false);
+  // What an audit event says it audits: the attribute and the value
+  // template; '' is the default (audit, {servicename}).
+  protected readonly auditStreamKey = signal('');
+  protected readonly auditStream = signal('');
+  // A real service behind a route, to show a template resolved rather than
+  // explain it.
+  private readonly exampleService = signal('orders');
   protected readonly logsLost = signal(0);
   // The three positions of the logs, as the radio group reads them.
   protected readonly logsMode = computed(() => (this.logsPush() ? 'push' : this.logs() ? 'agent' : 'off'));
@@ -126,6 +134,26 @@ export class OtelPageComponent {
 
   constructor() {
     this.load();
+    this.api
+      .listRoutes()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (routes) => {
+          const r = routes.find((x) => serviceOf(x.upstream, '') !== '');
+          if (r) this.exampleService.set(serviceOf(r.upstream, r.name));
+        },
+        error: () => {},
+      });
+  }
+
+  // "e.g. audit=orders" - the template as one real service's events will
+  // carry it. One short line: a hint that wraps is cut by the field.
+  protected streamExample(_which: 'audit'): string {
+    const key = this.auditStreamKey() || 'audit';
+    const tmpl = this.auditStream() || '{servicename}';
+    const service = this.exampleService();
+    const value = tmpl.replaceAll('{servicename}', service);
+    return $localize`:@@Tracing_stream_example:e.g. ${key}:key:=${value}:value:`;
   }
 
   // After a server-side move into the vault: the setting was rewritten under
@@ -159,6 +187,8 @@ export class OtelPageComponent {
     this.logs.set(!!s.logs);
     this.logsPush.set(!!s.logsPush);
     this.accessLog.set(!!s.accessLog);
+    this.auditStreamKey.set(s.auditStreamKey ?? '');
+    this.auditStream.set(s.auditStream ?? '');
     this.logsLost.set(s.logsLost ?? 0);
     this.auditLost.set(s.auditLost ?? 0);
     this.enterprise.set(s.enterprise);
@@ -224,6 +254,13 @@ export class OtelPageComponent {
   protected setLogsMode(mode: 'off' | 'agent' | 'push') {
     this.logs.set(mode === 'agent');
     this.logsPush.set(mode === 'push');
+    this.commit();
+  }
+
+  // Applied when the field is left, like a switch: one value, no Save to
+  // forget.
+  protected setStream(which: 'audit' | 'auditKey', raw: string) {
+    (which === 'audit' ? this.auditStream : this.auditStreamKey).set(raw.trim());
     this.commit();
   }
 
@@ -330,6 +367,8 @@ export class OtelPageComponent {
       logs: this.logs(),
       logsPush: this.logsPush(),
       accessLog: this.accessLog(),
+      auditStreamKey: this.auditStreamKey(),
+      auditStream: this.auditStream(),
     };
     this.api
       .setTelemetrySetting(cfg)

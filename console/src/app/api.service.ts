@@ -113,6 +113,12 @@ export interface TelemetryConfig {
   // One line per request on standard output, typed "access": a switch of
   // its own, applied live on every node, needing no collector.
   accessLog?: boolean;
+  // What an audit event says it audits: the attribute and the value
+  // template; '' is audit and {servicename}, the service behind the route
+  // (first label of its upstream's host), or meerkat. A line without the
+  // attribute is a log.
+  auditStreamKey?: string;
+  auditStream?: string;
 }
 
 export interface TelemetrySetting extends TelemetryConfig {
@@ -276,15 +282,6 @@ export interface AuditField {
   from: 'path' | 'query' | 'header' | 'body';
   key: string;
 }
-// An exported set of audited operations: the Endpoint audit screen writes it,
-// the route editor reads it back onto a route.
-export const AUDIT_FILE_KIND = 'meerkat.endpoint-audit';
-export interface AuditFile {
-  kind: typeof AUDIT_FILE_KIND;
-  route: string;
-  audit: EndpointAudit[];
-}
-
 export interface EndpointAudit {
   method: string;
   path: string;
@@ -312,6 +309,14 @@ export interface RouteOperations {
   // each onto a catalogue role.
   declaredRoles?: string[];
   roleMap?: Record<string, string>;
+  // The spec's tag list, in its order, with what each tag is for: the
+  // sections the operations are grouped in, as a swagger does.
+  tags?: OpenAPITag[];
+}
+
+export interface OpenAPITag {
+  name: string;
+  description?: string;
 }
 
 // The injected <meerkat-user-button> web component. The two-word position's
@@ -1009,6 +1014,9 @@ export interface Route {
   // OpenTelemetry bundle is injected into this route's pages. UI routes only,
   // and off unless somebody asked - it injects code into an application.
   telemetryUi?: boolean;
+  // This route's own value of the audit attribute; absent follows the
+  // installation's template.
+  auditStream?: string;
   // Why the RUNNING gateway is not serving it, or absent. Read-only, filled by
   // the server: a route that does not compile is left out rather than taking
   // the whole table down, and this is where it says so.

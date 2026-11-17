@@ -193,6 +193,14 @@ mat-expansion-panel {
 .signals {
   margin-top: 0;
 }
+// The title over a stream's label and value: what a log backend selects
+// and keeps these lines by.
+.stream-title {
+  margin: 16px 0 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
 .tab {
   // Room on the right for the info buttons' touch target, which reaches a
   // few pixels past the field: without it every tab drew a scrollbar.

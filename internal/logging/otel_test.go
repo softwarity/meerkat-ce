@@ -92,7 +92,7 @@ func TestTheSwitchReturnsToTheStartupFormat(t *testing.T) {
 }
 
 // Pushed: the line leaves for the collector as an OTLP log marked
-// meerkat.stream=logs, with its severity and attributes - and the output keeps
+// nothing it audits, with its severity and attributes - and the output keeps
 // writing it too.
 func TestAPushedLineLeavesAndStillIsWritten(t *testing.T) {
 	sent := make(chan string, 4)
@@ -112,7 +112,7 @@ func TestAPushedLineLeavesAndStillIsWritten(t *testing.T) {
 	slog.Warn("the upstream is down", "route", "billing")
 	select {
 	case b := <-sent:
-		for _, want := range []string{`"meerkat.stream"`, `"logs"`, `"the upstream is down"`, `"WARN"`, `"route"`} {
+		for _, want := range []string{`"the upstream is down"`, `"WARN"`, `"route"`} {
 			if !strings.Contains(b, want) {
 				t.Errorf("missing %s in %s", want, b)
 			}

@@ -58,6 +58,13 @@ type Upstream struct {
 	Roles  []string `json:"roles,omitempty"`
 }
 
+// Tag is one of the document's declared tags: the name operations are filed
+// under, and the sentence that says what the group is for.
+type Tag struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
 // Spec is the parsed projection of an OpenAPI / Swagger document: API metadata
 // plus the flat, sorted list of operations.
 type Spec struct {
@@ -74,6 +81,10 @@ type Spec struct {
 	// Roles is every role the document declares, over all its operations,
 	// sorted: what an application asks of the people calling it, in its words.
 	Roles []string `json:"roles,omitempty"`
+	// Tags is the document's own tag list, in its order: what a reader groups
+	// the operations by, as every swagger does. A tag an operation names but
+	// the list forgets is added after, in the order it first appears.
+	Tags []Tag `json:"tags,omitempty"`
 }
 
 // cleanBase normalises what a document says about where it lives: "/api/v3",
@@ -148,6 +159,7 @@ func parseV2(doc libopenapi.Document, data []byte) (*Spec, error) {
 	}
 	sortOps(out.Operations)
 	out.Roles = declaredRoles(out.Operations)
+	out.Tags = declaredTags(sw.Tags, out.Operations)
 	return out, nil
 }
 
@@ -196,7 +208,31 @@ func parseV3(doc libopenapi.Document) (*Spec, error) {
 	}
 	sortOps(out.Operations)
 	out.Roles = declaredRoles(out.Operations)
+	out.Tags = declaredTags(d.Tags, out.Operations)
 	return out, nil
+}
+
+// declaredTags is the document's tag list, then the tags operations name that
+// the list forgot, in the order they first appear.
+func declaredTags(doc []*base.Tag, ops []Operation) []Tag {
+	seen := map[string]bool{}
+	var out []Tag
+	for _, t := range doc {
+		if t == nil || strings.TrimSpace(t.Name) == "" || seen[t.Name] {
+			continue
+		}
+		seen[t.Name] = true
+		out = append(out, Tag{Name: t.Name, Description: strings.TrimSpace(t.Description)})
+	}
+	for _, op := range ops {
+		for _, name := range op.Tags {
+			if !seen[name] {
+				seen[name] = true
+				out = append(out, Tag{Name: name})
+			}
+		}
+	}
+	return out
 }
 
 // Fetch retrieves a spec over HTTP server-side and parses it. The caller

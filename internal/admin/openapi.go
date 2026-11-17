@@ -83,6 +83,9 @@ type routeOperations struct {
 	// names; RoleMap what each one is tied to in the catalogue.
 	DeclaredRoles []string          `json:"declaredRoles,omitempty"`
 	RoleMap       map[string]string `json:"roleMap,omitempty"`
+	// Tags is the spec's tag list, in its order and with what each is for:
+	// the sections the operations are grouped in.
+	Tags []openapi.Tag `json:"tags,omitempty"`
 }
 
 // routeSecurityPayload is the endpoint-security screen's PUT body: the route's
@@ -123,7 +126,7 @@ func (a *API) getRouteOperations(w http.ResponseWriter, r *http.Request) {
 		Title: spec.Title, Version: spec.Version, Format: spec.Format,
 		Access: route.Access, Operations: ops, Security: securityOf(route),
 		Audit: auditOf(route), Prefix: kept,
-		DeclaredRoles: spec.Roles, RoleMap: route.RoleMap(),
+		DeclaredRoles: spec.Roles, RoleMap: route.RoleMap(), Tags: spec.Tags,
 	})
 }
 

@@ -254,6 +254,9 @@ CREATE TABLE IF NOT EXISTS routes (
   -- the subject look like one that answered no.
   telemetry     BOOLEAN,
   telemetry_ui  BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The stream value of this route's audited calls (v105), when it is not
+  -- the installation's template. '' is "the installation's".
+  audit_stream  TEXT NOT NULL DEFAULT '',
   upstream      TEXT NOT NULL,
   predicates    TEXT NOT NULL DEFAULT '[]',
   filters       TEXT NOT NULL DEFAULT '[]',
@@ -1517,7 +1520,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // becomes ref.
 // 104 carries no step: oidc_clients.secret_ref is filled in by the additive
 // pass, empty - every client declared before keeps its secret as a hash.
-const schemaVersion = 104
+// 105 carries no step: routes.audit_stream is filled in by the additive
+// pass, empty - every route follows the installation's stream.
+const schemaVersion = 105
 
 func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()
@@ -2327,7 +2332,14 @@ type Route struct {
 	// an application the gateway does not own, and an application that already
 	// carries its own agent would then produce two traces for one click, with
 	// neither the whole story.
-	TelemetryUI bool           `json:"telemetryUi,omitempty"`
+	TelemetryUI bool `json:"telemetryUi,omitempty"`
+	// AuditStream is the stream value of this route's audited calls, when it
+	// is not the installation's template (TelemetryConfig.AuditStream). Empty
+	// follows the installation. {servicename} in it is the service behind this route. It
+	// is what a log backend selects and keeps on: one route's audit can be
+	// kept a year and another's a month. A route has no logs of its own to
+	// label - the application's are collected where it runs.
+	AuditStream string         `json:"auditStream,omitempty"`
 	Upstream    string         `json:"upstream"`
 	Predicates  []routing.Spec `json:"predicates"`
 	Filters     []routing.Spec `json:"filters"`
@@ -2358,7 +2370,7 @@ type Route struct {
 // ListRoutes returns every route ordered by ascending Order.
 func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
+		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, audit_stream, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
 		 FROM routes ORDER BY ord ASC, name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list routes: %w", err)
@@ -2369,7 +2381,7 @@ func (s *Store) ListRoutes(ctx context.Context) ([]Route, error) {
 		var r Route
 		var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 		if err := rows.Scan(&r.ID, &r.Name, &r.Order, &r.Enabled,
-			&r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev); err != nil {
+			&r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.AuditStream, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev); err != nil {
 			return nil, fmt.Errorf("store: scan route: %w", err)
 		}
 		if err := json.Unmarshal([]byte(preds), &r.Predicates); err != nil {
@@ -2446,6 +2458,9 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		}
 		api = string(b)
 	}
+	if err := SanitizeStream("auditStream", &r.AuditStream); err != nil {
+		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
+	}
 	if r.UI != nil {
 		b, err := json.Marshal(r.UI)
 		if err != nil {
@@ -2500,17 +2515,18 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO routes (id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+		`INSERT INTO routes (id, name, ord, enabled, is_ui, telemetry, telemetry_ui, audit_stream, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name = excluded.name, ord = excluded.ord, enabled = excluded.enabled,
 		   is_ui = excluded.is_ui, telemetry = excluded.telemetry,
-		   telemetry_ui = excluded.telemetry_ui, upstream = excluded.upstream,
+		   telemetry_ui = excluded.telemetry_ui, audit_stream = excluded.audit_stream,
+		   upstream = excluded.upstream,
 		   predicates = excluded.predicates, filters = excluded.filters,
 		   api = excluded.api, ui = excluded.ui, identity = excluded.identity, locales = excluded.locales,
 		   access = excluded.access, timeouts = excluded.timeouts, breaker = excluded.breaker,
 		   rate_limits = excluded.rate_limits, rev = routes.rev + 1`,
-		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Telemetry, r.TelemetryUI, r.Upstream,
+		r.ID, r.Name, r.Order, r.Enabled, r.IsUI, r.Telemetry, r.TelemetryUI, r.AuditStream, r.Upstream,
 		string(preds), string(filts), api, ui, identity, locales, string(access), timeouts, breaker, rateLimits)
 	if err != nil {
 		return fmt.Errorf("store: save route %q: %w", r.Name, err)
@@ -2543,9 +2559,9 @@ func (s *Store) GetRoute(ctx context.Context, id string) (Route, error) {
 	var r Route
 	var preds, filts, api, ui, identity, locales, access, timeouts, breaker, rateLimits string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
+		`SELECT id, name, ord, enabled, is_ui, telemetry, telemetry_ui, audit_stream, upstream, predicates, filters, api, ui, identity, locales, access, timeouts, breaker, rate_limits, rev
 		 FROM routes WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev)
+		Scan(&r.ID, &r.Name, &r.Order, &r.Enabled, &r.IsUI, &r.Telemetry, &r.TelemetryUI, &r.AuditStream, &r.Upstream, &preds, &filts, &api, &ui, &identity, &locales, &access, &timeouts, &breaker, &rateLimits, &r.Rev)
 	if err != nil {
 		return Route{}, fmt.Errorf("store: get route %q: %w", id, err)
 	}

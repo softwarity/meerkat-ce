@@ -111,13 +111,24 @@ app-form-field {
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.85rem;
 }
+/* Shaped like the group headers of the section list on the left (Filters,
+   Modifiers), in the colour of its entries: one way of saying "a part starts
+   here" across the drawer. */
 .sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 18px 0 10px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--mat-sys-on-surface-variant);
+  letter-spacing: 0.08em;
+  color: var(--mat-sys-on-surface);
+}
+.sub::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--mat-sys-outline-variant);
 }
 .sub:first-child {
   margin-top: 0;
@@ -709,11 +720,6 @@ footer .gaps {
   margin-right: auto;
   --mat-button-text-label-text-color: var(--mat-sys-error);
   --mat-button-text-icon-color: var(--mat-sys-error);
-}
-
-// Audit on a redirect: kept in place, greyed - there are no operations.
-.audit-block.off {
-  opacity: 0.5;
 }
 
 /* The shaped roles, as they leave on this catalogue. */

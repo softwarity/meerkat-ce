@@ -31,23 +31,50 @@
     </mat-select>
   </mat-form-field>
 
-  @if (intent() === 'security' && declaredRoles().length) {
-    <!-- The roles the application's spec declares, and how many are mapped
-         onto the catalogue: unmapped, Auth forward sends none of them. -->
-    <button class="export" matButton="tonal" type="button" (click)="openMapping()">
-      <mat-icon>badge</mat-icon>
-      <ng-container i18n="@@Declared_roles_btn">Declared roles: {{ mappedCount() }} of {{ declaredRoles().length }} mapped</ng-container>
-    </button>
+  <!-- The version the API declares for ITSELF (info.version), beside the
+       selector that names the route: the two say together which API is read.
+       The FORMAT the document is written in (OpenAPI 3.0.0) is not shown: it
+       is a fact about the file, not about who may call these operations. -->
+  @if (data()?.version; as v) {
+    <span class="api-version" i18n="@@API_version_badge">API {{ v }}</span>
   }
 
-  @if (intent() === 'audit' && selectedId()) {
-    <!-- The rules as a file: what the route editor's OpenTelemetry section
-         uploads, onto this route or another one. -->
-    <button class="export" matButton="tonal" type="button" ee-feature="AUD-04" (click)="exportAudit()">
-      <mat-icon>download</mat-icon>
-      <ng-container i18n="@@Export">Export</ng-container>
-    </button>
-  }
+  <!-- Right of the bar: the filters, then what one does with the screen. The
+       table has no header row any more - the tags are its sections - so the
+       filters that lived in its header cells live here. -->
+  <div class="tools">
+    @if (allMethods().length > 1) {
+      <mat-form-field class="filter" subscriptSizing="dynamic">
+        <mat-label i18n="@@Method">Method</mat-label>
+        <mat-select multiple [value]="view.$methods()" (selectionChange)="setMethodFilter($event.value)">
+          <mat-select-trigger>{{ view.$methods().join(', ') }}</mat-select-trigger>
+          @for (m of allMethods(); track m) {
+            <mat-option [value]="m">{{ m }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+    @if (allTags().length > 1) {
+      <mat-form-field class="filter" subscriptSizing="dynamic">
+        <mat-label i18n="@@Tags">Tags</mat-label>
+        <mat-select multiple [value]="view.$tags()" (selectionChange)="setTagFilter($event.value)">
+          <mat-select-trigger>{{ view.$tags().join(', ') }}</mat-select-trigger>
+          @for (t of allTags(); track t.name) {
+            <mat-option [value]="t.name">{{ t.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (intent() === 'security' && declaredRoles().length) {
+      <!-- The roles the application's spec declares, and how many are mapped
+           onto the catalogue: unmapped, Auth forward sends none of them. -->
+      <button matButton="tonal" type="button" (click)="openMapping()">
+        <mat-icon>badge</mat-icon>
+        <ng-container i18n="@@Declared_roles_btn">Declared roles: {{ mappedCount() }} of {{ declaredRoles().length }} mapped</ng-container>
+      </button>
+    }
+  </div>
 
   @if (intent() === 'audit') {
     <p class="intro" i18n="@@Endpoint_audit_intro">
@@ -94,38 +121,38 @@
 } @else if (!loadingOps() && data()) {
 
   <div class="table-wrap" [attr.ee-feature]="intent() === 'audit' ? 'AUD-04' : null">
-    <table
-      mat-table
-      [dataSource]="sortedOps()"
-      matSort
-      [matSortActive]="view.$sortActive()"
-      [matSortDirection]="view.$sortDir()"
-      (matSortChange)="onSort($event)"
-      class="ops"
-    >
+    <!-- One table, the tags as its sections, as a swagger draws them: a head
+         per tag with what the tag is for, and its operations under it. One
+         table rather than one per section, so the columns line up from one
+         section to the next. No header row: what each column is reads from
+         the cells, and the filters that lived in the header are in the bar. -->
+    <table mat-table [dataSource]="rows()" class="ops">
+      <ng-container matColumnDef="group">
+        <td mat-cell *matCellDef="let r" [attr.colspan]="columns().length" class="group-cell">
+          @let g = asGroup(r);
+          <!-- The ripple on this block, not on the row: a table row is a poor
+               container for it (Chrome positions the wave against the table),
+               and a cell's own block is an ordinary one. -->
+          <div class="group-head" matRipple [class.collapsed]="g.collapsed">
+            <span class="group-name">{{ g.tag.name }}</span>
+            @if (g.tag.description) {
+              <span class="group-desc">{{ g.tag.description }}</span>
+            }
+            <span class="spacer"></span>
+            <span class="group-count">{{ g.count }}</span>
+            <mat-icon class="group-chev">expand_more</mat-icon>
+          </div>
+        </td>
+      </ng-container>
+
       <ng-container matColumnDef="status">
-        <!-- The version the API declares for ITSELF (info.version), in the one
-             header cell that had nothing to say. The FORMAT the document is
-             written in (OpenAPI 3.0.0) is gone: it is a fact about the file,
-             not about who may call these operations, and side by side the two
-             numbers read as one thing versioned twice. The route's name and
-             its prefix are gone too - the selector beside the title says
-             which route this is, and the prefix is on every line below. -->
-        <th mat-header-cell *matHeaderCellDef class="c-status">
-          @if (data()?.version; as v) {
-            <span class="api-version" i18n="@@API_version_badge">API {{ v }}</span>
-          }
-        </th>
-        <td mat-cell *matCellDef="let o" class="c-status">
-          <!-- The badges say what is posed AND are the way in: clicking the
-               access half or the bound half opens the same drawer with that
-               section under the eye. Two doors into one object rather than two
-               drawers - an operation split across two panels is one nobody can
-               check without recomposing it from memory. -->
-          <!-- The two pages do not show the same thing, and that is what makes
-               them two pages rather than one listed twice: an access rule has
-               no business on the page about bounds, and a bound none on the
-               page about who may call. -->
+        <td mat-cell *matCellDef="let r" class="c-status">
+          @let o = asOp(r).op;
+          <!-- The badges say what is posed AND are the way in: clicking them
+               opens the operation's drawer. The pages do not show the same
+               thing, and that is what makes them three pages rather than one
+               listed three times: an access rule has no business on the page
+               about bounds, and a bound none on the page about who may call. -->
           @if (intent() === 'audit') {
             @if (auditOf(o); as a) {
               <span class="bound" [matTooltip]="a.description || ''">
@@ -159,83 +186,49 @@
       </ng-container>
 
       <ng-container matColumnDef="method">
-        <th mat-header-cell *matHeaderCellDef class="c-method">
-          @if (allMethods().length) {
-            <mat-form-field class="colfilter" subscriptSizing="dynamic">
-              <mat-label i18n="@@Method">Method</mat-label>
-              <mat-select multiple [value]="view.$methods()" (selectionChange)="setMethodFilter($event.value)">
-                <mat-select-trigger>{{ view.$methods().length }}</mat-select-trigger>
-                @for (m of allMethods(); track m) {
-                  <mat-option [value]="m">{{ m }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          } @else {
-            <span i18n="@@Method">Method</span>
-          }
-        </th>
-        <td mat-cell *matCellDef="let o" class="c-method">
-          <span class="method m-{{ o.method.toLowerCase() }}">{{ o.method }}</span>
+        <td mat-cell *matCellDef="let r" class="c-method">
+          <span class="method m-{{ asOp(r).op.method.toLowerCase() }}">{{ asOp(r).op.method }}</span>
         </td>
       </ng-container>
 
       <ng-container matColumnDef="path">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header i18n="@@Path">Path</th>
-        <td mat-cell *matCellDef="let o">
-          <span class="path">{{ shortPath(o.path) }}</span>
+        <td mat-cell *matCellDef="let r">
+          <span class="path">{{ shortPath(asOp(r).op.path) }}</span>
         </td>
       </ng-container>
 
       <ng-container matColumnDef="upstream">
-        <th mat-header-cell *matHeaderCellDef class="c-upstream" i18n="@@Application_requires">Application requires</th>
-        <td mat-cell *matCellDef="let o" class="c-upstream">
-          <app-upstream-mark [upstream]="o.upstream" [roleMap]="roleMap()" />
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="tags">
-        <th mat-header-cell *matHeaderCellDef class="c-tags">
-          @if (allTags().length) {
-            <mat-form-field class="colfilter" subscriptSizing="dynamic">
-              <mat-label i18n="@@Tags">Tags</mat-label>
-              <mat-select multiple [value]="view.$tags()" (selectionChange)="setTagFilter($event.value)">
-                <mat-select-trigger>{{ view.$tags().length }}</mat-select-trigger>
-                @for (t of allTags(); track t) {
-                  <mat-option [value]="t">{{ t }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          } @else {
-            <span i18n="@@Tags">Tags</span>
-          }
-        </th>
-        <td mat-cell *matCellDef="let o" class="c-tags">
-          @for (t of o.tags ?? []; track t) {
-            <span class="rowtag">{{ t }}</span>
-          }
+        <td mat-cell *matCellDef="let r" class="c-upstream">
+          <app-upstream-mark [upstream]="asOp(r).op.upstream" [roleMap]="roleMap()" />
         </td>
       </ng-container>
 
       <ng-container matColumnDef="summary">
-        <th mat-header-cell *matHeaderCellDef i18n="@@Description">Description</th>
-        <td mat-cell *matCellDef="let o"><span class="summary">{{ o.summary }}</span></td>
+        <td mat-cell *matCellDef="let r"><span class="summary">{{ asOp(r).op.summary }}</span></td>
       </ng-container>
 
       <ng-container matColumnDef="expand">
-        <th mat-header-cell *matHeaderCellDef class="c-expand"></th>
-        <td mat-cell *matCellDef="let o" class="c-expand">
+        <td mat-cell *matCellDef="let r" class="c-expand">
           <mat-icon class="chev">chevron_right</mat-icon>
         </td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="columns(); sticky: true"></tr>
       <tr
         mat-row
-        *matRowDef="let o; columns: columns()"
+        *matRowDef="let r; columns: ['group']; when: isGroup"
+        class="group-row"
+        [attr.aria-expanded]="!asGroup(r).collapsed"
+        (click)="toggleGroup(asGroup(r).tag.name)"
+      ></tr>
+      <tr
+        mat-row
+        *matRowDef="let r; columns: columns()"
+        matRipple
         class="op-row"
-        [class.secured]="stateOf(o).override"
-        [class.open]="isOpen(o)"
-        (click)="open(o)"
+        [class.band]="asOp(r).band"
+        [class.secured]="stateOf(asOp(r).op).override"
+        [class.open]="isOpen(asOp(r).op)"
+        (click)="open(asOp(r).op)"
       ></tr>
     </table>
   </div>
@@ -333,16 +326,24 @@
     </div>
     } @else if (openOp(); as o) {
     <div class="op-drawer">
+      <!-- What the operation DOES leads, the method beside it; the path is
+           the address under it, smaller and lighter. A long path wrapped over
+           two lines as the title, and the sentence a person reads first came
+           after it in small print. Without a summary the path is the title. -->
       <div class="op-head">
         <span class="method m-{{ o.method.toLowerCase() }}">{{ o.method }}</span>
-        <code class="path">{{ o.path }}</code>
+        @if (o.summary) {
+          <h3 class="op-title">{{ o.summary }}</h3>
+        } @else {
+          <code class="op-title path">{{ o.path }}</code>
+        }
         <span class="spacer"></span>
         <button matIconButton type="button" (click)="close()" i18n-aria-label="@@Close" aria-label="Close">
           <mat-icon>close</mat-icon>
         </button>
       </div>
       @if (o.summary) {
-        <p class="op-summary">{{ o.summary }}</p>
+        <code class="op-path">{{ o.path }}</code>
       }
       <div class="op-panel">
         @if (o.operationId) {
@@ -468,21 +469,19 @@
                i18n="@@Inherits_route_default">Follows the route's rule</a>
           }
         </section>
-        @if (o.upstream) {
-          <!-- What the application checks once the call is through, apart
-               from what Meerkat refuses at the door above. -->
+        @if (o.upstream?.roles?.length) {
+          <!-- The roles the application declares, apart from what Meerkat
+               refuses at the door above. -->
           <section>
-            <h3 i18n="@@Required_by_the_application">Required by the application</h3>
+            <h3 i18n="@@Declared_by_the_application">Roles the application declares</h3>
             <p class="sub" i18n="@@Required_by_the_application_sub">
-              From its OpenAPI spec. The application checks it itself, Meerkat does not.
+              From its OpenAPI spec. Meerkat does not check them: it sends the mapped ones to the application.
             </p>
             <app-upstream-mark [upstream]="o.upstream" [roleMap]="roleMap()" [detailed]="true" />
-            @if (o.upstream.access === 'roles') {
-              <button class="map-link" matButton type="button" (click)="openMapping()">
-                <mat-icon>badge</mat-icon>
-                <ng-container i18n="@@Map_the_declared_roles">Map the declared roles</ng-container>
-              </button>
-            }
+            <button class="map-link" matButton type="button" (click)="openMapping()">
+              <mat-icon>badge</mat-icon>
+              <ng-container i18n="@@Map_the_declared_roles">Map the declared roles</ng-container>
+            </button>
           </section>
         }
         }

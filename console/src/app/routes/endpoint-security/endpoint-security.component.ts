@@ -4,14 +4,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import { MatRippleModule } from '@angular/material/core';
 import { MatTable, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -19,14 +18,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { sessionStored } from '@softwarity/store';
 import { Subject, catchError, debounceTime, firstValueFrom, map, of } from 'rxjs';
 import {
-  AUDIT_FILE_KIND,
   Access,
   ApiService,
   AuditField,
-  AuditFile,
   EndpointAudit,
   EndpointPolicy,
   OpenAPIOperation,
+  OpenAPITag,
   RateLimit,
   Role,
   Route,
@@ -57,6 +55,26 @@ interface OpState {
   // together would make somebody pose a security rule to write a bound.
   limits: RateLimit[];
 }
+
+// The table's lines: a tag's section head, or an operation inside it. An
+// operation filed under two tags is in both sections, as a swagger shows it.
+interface GroupRow {
+  kind: 'group';
+  tag: OpenAPITag;
+  count: number;
+  collapsed: boolean;
+}
+interface OpRow {
+  kind: 'op';
+  op: OpenAPIOperation;
+  // Banded within its section, so every section starts on the same tone.
+  band: boolean;
+}
+type Row = GroupRow | OpRow;
+
+// Swagger's name for the operations that carry no tag: the same word the
+// application's own documentation shows them under.
+const UNTAGGED = 'default';
 
 function opKey(method: string, path: string): string {
   return `${method.toUpperCase()} ${path}`;
@@ -113,7 +131,6 @@ function fromWire(a: Access | undefined): AccessState {
   imports: [
     RouterLink,
     MatButtonModule,
-    MatExpansionModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -121,7 +138,7 @@ function fromWire(a: Access | undefined): AccessState {
     MatSelectModule,
     MatSidenavModule,
     MatSlideToggleModule,
-    MatSortModule,
+    MatRippleModule,
     MatTableModule,
     MatTooltipModule,
     AccessEditorComponent,
@@ -258,11 +275,12 @@ export class EndpointSecurityComponent {
   // What the application itself requires, as its spec says it: a column of
   // its own on the security page, and only when the spec says something about
   // at least one operation - an empty column is a question nobody asked.
-  protected readonly hasUpstream = computed(() => this.operations().some((o) => !!o.upstream));
+  protected readonly hasUpstream = computed(() => this.operations().some((o) => !!o.upstream?.roles?.length));
+  // No tags column: the tags are the sections now, as in a swagger.
   protected readonly columns = computed(() =>
     this.intent() === 'security' && this.hasUpstream()
-      ? ['status', 'method', 'path', 'upstream', 'tags', 'summary', 'expand']
-      : ['status', 'method', 'path', 'tags', 'summary', 'expand'],
+      ? ['status', 'method', 'path', 'upstream', 'summary', 'expand']
+      : ['status', 'method', 'path', 'summary', 'expand'],
   );
 
   // The roles the spec declares, and the saved mapping of each onto the
@@ -282,23 +300,34 @@ export class EndpointSecurityComponent {
     this.operations().find((o) => opKey(o.method, o.path) === this.openKey()) ?? null,
   );
 
-  // Distinct tags across the spec, for the column-header filter.
-  protected readonly allTags = computed(() => {
-    const set = new Set<string>();
-    for (const o of this.operations()) for (const t of o.tags ?? []) set.add(t);
-    return [...set].sort((a, b) => a.localeCompare(b));
+  // The sections, in the spec's own order (its tag list, then the tags it
+  // forgot), and the untagged operations last, under swagger's "default".
+  protected readonly allTags = computed<OpenAPITag[]>(() => {
+    const out = [...(this.data()?.tags ?? [])];
+    const known = new Set(out.map((t) => t.name));
+    let untagged = false;
+    for (const o of this.operations()) {
+      if (!o.tags?.length) untagged = true;
+      for (const t of o.tags ?? []) {
+        if (!known.has(t)) {
+          known.add(t);
+          out.push({ name: t });
+        }
+      }
+    }
+    if (untagged && out.length) out.push({ name: UNTAGGED });
+    return out;
   });
-  // Sort + method/tag filters persisted in sessionStorage: they survive a page
-  // refresh (not the session). $prop() signals drive the template and computeds.
+  // Method/tag filters and the folded sections, persisted in sessionStorage:
+  // they survive a page refresh (not the session). $prop() signals drive the
+  // template and computeds.
   protected readonly view = sessionStored(
     {
-      sortActive: '',
-      sortDir: '' as '' | 'asc' | 'desc',
       methods: [] as string[],
       tags: [] as string[],
-      routeOpen: true, // the "whole route" panel is expanded by default
+      collapsed: [] as string[],
     },
-    { storageKey: 'endpoint-security-view.v3' },
+    { storageKey: 'endpoint-security-view.v4' },
   );
 
   // Distinct methods present, in conventional verb order, for the header filter.
@@ -316,30 +345,38 @@ export class EndpointSecurityComponent {
     this.view.methods = methods;
     this.table()?.renderRows();
   }
-  protected onSort(s: Sort): void {
-    this.view.sortActive = s.active;
-    this.view.sortDir = s.direction;
-    this.table()?.renderRows();
+  protected toggleGroup(name: string): void {
+    const c = this.view.collapsed;
+    this.view.collapsed = c.includes(name) ? c.filter((n) => n !== name) : [...c, name];
   }
-  // The rows the table shows: filtered by method and tags, then sorted (path only).
-  protected readonly sortedOps = computed(() => {
+
+  // The lines the table shows: one section per tag in the spec's order, each
+  // with the operations the method filter keeps, in the spec's path order. A
+  // section the filters empty is not drawn; a folded one keeps its head. A
+  // spec with no tags at all has no sections - one head over everything says
+  // nothing.
+  protected readonly rows = computed<Row[]>(() => {
     const methods = this.view.$methods();
     const tags = this.view.$tags();
+    const collapsed = this.view.$collapsed();
     let ops = this.operations();
     if (methods.length) ops = ops.filter((o) => methods.includes(o.method.toUpperCase()));
-    if (tags.length) ops = ops.filter((o) => (o.tags ?? []).some((t) => tags.includes(t)));
-    ops = [...ops];
-    const active = this.view.$sortActive();
-    const dir = this.view.$sortDir();
-    if (!dir) return ops;
-    const mul = dir === 'asc' ? 1 : -1;
-    ops.sort((a, b) => {
-      const byMethod = methodRank(a.method) - methodRank(b.method) || a.path.localeCompare(b.path);
-      const byPath = a.path.localeCompare(b.path) || methodRank(a.method) - methodRank(b.method);
-      return (active === 'method' ? byMethod : byPath) * mul;
-    });
-    return ops;
+    const groups = this.allTags();
+    if (!groups.length) return ops.map((op, i) => ({ kind: 'op', op, band: i % 2 === 1 }));
+    const out: Row[] = [];
+    for (const tag of groups) {
+      if (tags.length && !tags.includes(tag.name)) continue;
+      const mine = ops.filter((o) => (o.tags?.length ? o.tags.includes(tag.name) : tag.name === UNTAGGED));
+      if (!mine.length) continue;
+      const folded = collapsed.includes(tag.name);
+      out.push({ kind: 'group', tag, count: mine.length, collapsed: folded });
+      if (!folded) mine.forEach((op, i) => out.push({ kind: 'op', op, band: i % 2 === 1 }));
+    }
+    return out;
   });
+  protected readonly isGroup = (_: number, r: Row) => r.kind === 'group';
+  protected readonly asGroup = (r: Row) => r as GroupRow;
+  protected readonly asOp = (r: Row) => r as OpRow;
 
   // Operations whose EFFECTIVE access gates something. The preserved extras -
   // saved rules matching no operation of the spec - used to be ADDED to this,
@@ -450,7 +487,9 @@ export class EndpointSecurityComponent {
         knownMethods.add(o.method.toUpperCase());
         for (const t of o.tags ?? []) knownTags.add(t);
       }
+      if (ops.operations.some((o) => !o.tags?.length)) knownTags.add(UNTAGGED);
       this.view.tags = this.view.tags.filter((t) => knownTags.has(t));
+      this.view.collapsed = this.view.collapsed.filter((t) => knownTags.has(t));
       this.view.methods = this.view.methods.filter((m) => knownMethods.has(m));
     } catch (e) {
       if (mine === this.selection) this.error.set(this.message(e));
@@ -616,23 +655,6 @@ export class EndpointSecurityComponent {
       return { ...s, [k]: { ...cur, override: true, access: seed } };
     });
     this.scheduleSave();
-  }
-
-  // The audited operations as a file: the route editor uploads it back, onto
-  // this route or another (AUD-04).
-  protected exportAudit(): void {
-    const route = this.apiRoutes().find((r) => r.id === this.selectedId());
-    const file: AuditFile = {
-      kind: AUDIT_FILE_KIND,
-      route: route?.name ?? this.selectedId(),
-      audit: this.auditEndpoints(),
-    };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2) + '\n'], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(route?.name ?? 'route').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-audit.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   // Only what can be valid leaves: a field being typed is kept on screen until
