@@ -10,15 +10,15 @@
     "icons:build": "node scripts/build-icon-bank.mjs"
   },
   "dependencies": {
-    "@angular/cdk": "^22.2.6",
-    "@angular/common": "^22.2.5",
-    "@angular/compiler": "^22.2.5",
-    "@angular/core": "^22.2.5",
-    "@angular/forms": "^22.2.5",
-    "@angular/localize": "^22.2.5",
-    "@angular/material": "^22.2.6",
-    "@angular/platform-browser": "^22.2.5",
-    "@angular/router": "^22.2.5",
+    "@angular/cdk": "^22.2.7",
+    "@angular/common": "^22.2.6",
+    "@angular/compiler": "^22.2.6",
+    "@angular/core": "^22.2.6",
+    "@angular/forms": "^22.2.6",
+    "@angular/localize": "^22.2.6",
+    "@angular/material": "^22.2.7",
+    "@angular/platform-browser": "^22.2.6",
+    "@angular/router": "^22.2.6",
     "@catppuccin/codemirror": "^1.0.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-javascript": "^6.2.5",
@@ -41,10 +41,10 @@
     "tslib": "^2.9.1"
   },
   "devDependencies": {
-    "@angular/build": "^22.2.6",
-    "@angular/cli": "^22.2.6",
+    "@angular/build": "^22.2.7",
+    "@angular/cli": "^22.2.7",
     "@angular/compiler-cli": "^22.2.3",
-    "@material-symbols/svg-400": "^0.48.3",
+    "@material-symbols/svg-400": "^0.49.0",
     "@types/luxon": "^3.7.6",
     "typescript": "~6.0.0"
   },
