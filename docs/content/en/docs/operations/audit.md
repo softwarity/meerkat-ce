@@ -192,8 +192,9 @@ route and not applied, and can still be removed.
 
 | Always carried | |
 |---|---|
-| the caller | `user.id`, `user.name`, `meerkat.tenant.id`, `meerkat.tenant.name`, `meerkat.group`, `meerkat.roles` |
-| the operation | `meerkat.route`, `http.request.method`, `http.route` (the template), `url.path` (as asked) |
+| the caller | `user.id`, `user.name`, `user.roles` (a list), `tenant.id`, `tenant.name` |
+| their own fields | each custom field of the account as `user.<name>`, of its tenant as `tenant.<name>`, a list for a multiple choice |
+| the operation | `gateway.route` (the route it came through), `http.request.method`, `http.route` (the template), `url.path` (as asked) |
 | the answer | `http.response.status_code` - a refusal is an event too |
 | the rest | `client.address`, the trace id, and the description as the body (pre-filled from the OpenAPI summary) |
 

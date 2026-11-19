@@ -7,7 +7,7 @@ import (
 
 func TestTheCallerIsOnTheSpansOnlyWhenSwitchedOn(t *testing.T) {
 	defer SetCaller(false)
-	who := Who{UserID: "u1", Username: "alice", TenantID: "t1", Tenant: "Acme", Group: "ops", Roles: []string{"admin", "viewer"}}
+	who := Who{UserID: "u1", Username: "alice", TenantID: "t1", Tenant: "Acme", Roles: []string{"admin", "viewer"}}
 	if a := PersonAttrs(who); a != nil {
 		t.Errorf("off by default, yet the person left: %v", a)
 	}
@@ -17,7 +17,7 @@ func TestTheCallerIsOnTheSpansOnlyWhenSwitchedOn(t *testing.T) {
 		k = append(k, a.Key+"="+a.Str+strings.Join(a.Strs, "+"))
 	}
 	if got, want := strings.Join(k, ","),
-		"user.id=u1,user.name=alice,meerkat.tenant.id=t1,meerkat.tenant.name=Acme,meerkat.group=ops,meerkat.roles=admin+viewer"; got != want {
+		"user.id=u1,user.name=alice,tenant.id=t1,tenant.name=Acme,user.roles=admin+viewer"; got != want {
 		t.Errorf("on: %q, want %q", got, want)
 	}
 	if a := PersonAttrs(Who{}); a != nil {
@@ -32,8 +32,8 @@ func TestARelayedBatchCarriesThePersonAndNothingElseChanges(t *testing.T) {
 		`"spans":[{"name":"GET /x","startTimeUnixNano":1727771234567891234,"unknownField":true,` +
 		`"attributes":[{"key":"http.method","value":{"stringValue":"GET"}},` +
 		`{"key":"user.id","value":{"stringValue":"somebody-else"}}]}]}]}]}`
-	out, err := StampSpans([]byte(in), []Attr{String("user.id", "u1"), String("meerkat.tenant.id", "t1"),
-		Strings("meerkat.roles", []string{"admin", "viewer"})})
+	out, err := StampSpans([]byte(in), []Attr{String("user.id", "u1"), String("tenant.id", "t1"),
+		Strings("user.roles", []string{"admin", "viewer"})})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,8 +43,8 @@ func TestARelayedBatchCarriesThePersonAndNothingElseChanges(t *testing.T) {
 		`"unknownField":true`,
 		`{"key":"http.method","value":{"stringValue":"GET"}}`,
 		`{"key":"user.id","value":{"stringValue":"u1"}}`,
-		`{"key":"meerkat.tenant.id","value":{"stringValue":"t1"}}`,
-		`{"key":"meerkat.roles","value":{"arrayValue":{"values":[{"stringValue":"admin"},{"stringValue":"viewer"}]}}}`,
+		`{"key":"tenant.id","value":{"stringValue":"t1"}}`,
+		`{"key":"user.roles","value":{"arrayValue":{"values":[{"stringValue":"admin"},{"stringValue":"viewer"}]}}}`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %s in %s", want, got)

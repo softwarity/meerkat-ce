@@ -134,9 +134,13 @@ type EndpointCall struct {
 	Path      string            `json:"path"`      // as requested
 	Status    int               `json:"status"`
 	TraceID   string            `json:"traceId,omitempty"`
-	Group     string            `json:"group,omitempty"`
 	Roles     []string          `json:"roles,omitempty"`
 	Fields    map[string]string `json:"fields,omitempty"`
+	// User and Tenant are the installation's own facts about the caller and
+	// their tenant (the custom fields), each value a string or, for a
+	// multiple choice or a list, an array of them - as a JWT carries them.
+	User   map[string]any `json:"user,omitempty"`
+	Tenant map[string]any `json:"tenant,omitempty"`
 	// Body is the request body with its masked fields replaced, as JSON text.
 	Body string `json:"body,omitempty"`
 	// BodyOmitted says why a body that was asked for is not there.
@@ -411,8 +415,8 @@ func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string, 
 		tracing.String("audit.target.name", ev.TargetName),
 		tracing.String("audit.detail", ev.Detail),
 		tracing.String("user.id", ev.ActorID),
-		tracing.String("meerkat.token", ev.ActorToken),
-		tracing.String("meerkat.tenant.id", ev.TenantID),
+		tracing.String("user.token", ev.ActorToken),
+		tracing.String("tenant.id", ev.TenantID),
 		tracing.String("client.address", ev.IP),
 	}
 	if ev.Peer != "" {
@@ -429,7 +433,7 @@ func (s *Store) auditRecord(ctx context.Context, ev AuditEvent, changes string, 
 	}
 	if ev.TenantID != "" {
 		if t, err := s.GetTenant(ctx, ev.TenantID); err == nil {
-			attrs = append(attrs, tracing.String("meerkat.tenant.name", t.Name))
+			attrs = append(attrs, tracing.String("tenant.name", t.Name))
 		}
 	}
 	return tracing.AuditRecord{

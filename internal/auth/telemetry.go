@@ -127,11 +127,6 @@ func (h *Handler) relayPerson(r *http.Request) tracing.Who {
 			who.Tenant = t.Name
 		}
 	}
-	if sess.GroupID != "" {
-		if g, err := h.st.GetGroup(r.Context(), sess.GroupID); err == nil {
-			who.Group = g.Name
-		}
-	}
 	// The roles the access rules are judged on, as the user button reads them.
 	if names, err := h.st.SessionRoleNames(r.Context(), sess.UserID, sess.TenantID, sess.GroupID); err == nil {
 		who.Roles = names

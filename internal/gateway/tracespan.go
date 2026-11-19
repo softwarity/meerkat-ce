@@ -105,7 +105,7 @@ func dropTracing(next http.Handler) http.Handler {
 func spanPerson(ctx context.Context, d identityData) {
 	if n := spanOf(ctx); n != nil && !n.fromPage && n.who.UserID == "" {
 		n.who = tracing.Who{UserID: d.UserID, Username: d.Username, TenantID: d.TenantID, Tenant: d.Tenant,
-			Group: d.Group, Roles: slices.Clone(d.Roles)}
+			Roles: slices.Clone(d.Roles)}
 	}
 }
 
@@ -140,7 +140,7 @@ func finishSpan(req *http.Request, routeName, endpoint string, status int) {
 		tracing.String("url.path", endpoint),
 	}
 	if routeName != "" {
-		attrs = append(attrs, tracing.String("meerkat.route", routeName))
+		attrs = append(attrs, tracing.String("gateway.route", routeName))
 	}
 	attrs = append(attrs, tracing.PersonAttrs(n.who)...)
 	tracing.Emit(tracing.Span{

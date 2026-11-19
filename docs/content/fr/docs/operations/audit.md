@@ -193,8 +193,9 @@ avec la route sans être appliquées, et vous pouvez toujours les supprimer.
 
 | Toujours transmis | |
 |---|---|
-| l'appelant | `user.id`, `user.name`, `meerkat.tenant.id`, `meerkat.tenant.name`, `meerkat.group`, `meerkat.roles` |
-| l'opération | `meerkat.route`, `http.request.method`, `http.route` (le gabarit), `url.path` (le chemin demandé) |
+| l'appelant | `user.id`, `user.name`, `user.roles` (une liste), `tenant.id`, `tenant.name` |
+| ses propres champs | chaque champ personnalisé du compte sous `user.<nom>`, de son tenant sous `tenant.<nom>`, une liste pour un choix multiple |
+| l'opération | `gateway.route` (la route par laquelle il est passé), `http.request.method`, `http.route` (le gabarit), `url.path` (le chemin demandé) |
 | la réponse | `http.response.status_code` - un refus est aussi un événement |
 | le reste | `client.address`, l'identifiant de trace, et la description en guise de corps (préremplie à partir du résumé OpenAPI) |
 

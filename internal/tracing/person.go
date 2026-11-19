@@ -54,10 +54,10 @@ type Who struct {
 	Username string
 	TenantID string
 	Tenant   string
-	// Group is the session's active group, when the organisation works in
-	// exclusive mode and one is chosen; Roles are the roles the access rules
-	// were judged on - what a refusal is explained by.
-	Group string
+	// Roles are the roles the access rules were judged on - what a refusal is
+	// explained by. The session's chosen group is not said: no route can
+	// forward it, so no layer behind the gateway could ever read it back, and
+	// the roles already are what it produced.
 	Roles []string
 }
 
@@ -72,16 +72,13 @@ func PersonAttrs(w Who) []Attr {
 		attrs = append(attrs, String("user.name", w.Username))
 	}
 	if w.TenantID != "" {
-		attrs = append(attrs, String("meerkat.tenant.id", w.TenantID))
+		attrs = append(attrs, String("tenant.id", w.TenantID))
 	}
 	if w.Tenant != "" {
-		attrs = append(attrs, String("meerkat.tenant.name", w.Tenant))
-	}
-	if w.Group != "" {
-		attrs = append(attrs, String("meerkat.group", w.Group))
+		attrs = append(attrs, String("tenant.name", w.Tenant))
 	}
 	if len(w.Roles) > 0 {
-		attrs = append(attrs, Strings("meerkat.roles", w.Roles))
+		attrs = append(attrs, Strings("user.roles", w.Roles))
 	}
 	return attrs
 }

@@ -18,7 +18,7 @@ func TestAnAuditBatchIsAnOTLPLogsRequestMarkedAudit(t *testing.T) {
 	auditMu.Unlock()
 	body, err := auditPayload([]AuditRecord{{
 		Time: time.Unix(1700000000, 0), TraceID: "4bf92f3577b34da6a3ce929d0e0e4736", Body: "route.update",
-		Attrs: []Attr{String("user.id", "u1"), String("audit.detail", ""), Strings("meerkat.roles", []string{"admin"})},
+		Attrs: []Attr{String("user.id", "u1"), String("audit.detail", ""), Strings("user.roles", []string{"admin"})},
 	}})
 	if err != nil {
 		t.Fatal(err)

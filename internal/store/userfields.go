@@ -95,6 +95,11 @@ type UserField struct {
 // fieldNameOK bounds a name the way a header name is bounded: it becomes one.
 var fieldNameOK = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
+// auditOwnedNames are taken under user. and tenant. on an audit event
+// (gateway's endpointaudit.go, store's audit.go): a custom field may not be
+// one of them. roles is a built-in field already.
+var auditOwnedNames = []string{"id", "name", "token"}
+
 // SanitizeUserFields checks a whole definition list and normalises what it
 // can. Refusals name what is allowed, because this is read by someone typing
 // into a form and the error is the only teacher they get.
@@ -114,6 +119,13 @@ func SanitizeUserFields(fields []UserField) ([]UserField, error) {
 		if slices.Contains(PageUserFields, f.Name) || slices.Contains(IdentityFields, f.Name) {
 			return nil, fmt.Errorf("field name %q is already one this gateway carries: %s",
 				f.Name, strings.Join(builtInFieldNames(), ", "))
+		}
+		// A custom field leaves on an audit event as user.<name> or
+		// tenant.<name>, beside user.id, user.name, user.roles, user.token,
+		// tenant.id and tenant.name: these would be overwritten in silence.
+		if slices.Contains(auditOwnedNames, strings.ToLower(f.Name)) {
+			return nil, fmt.Errorf("field name %q is not allowed: an audit event carries it as user.%s or tenant.%s, which already exist; not %s",
+				f.Name, f.Name, f.Name, strings.Join(auditOwnedNames, ", "))
 		}
 		if seen[strings.ToLower(f.Name)] {
 			// Lower-cased: these become header names, and a header name is

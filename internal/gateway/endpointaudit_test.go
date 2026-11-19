@@ -96,12 +96,17 @@ func TestAnAuditedCallBecomesAnEventAndTheBodyStillArrives(t *testing.T) {
 			`"audit.field.client","value":{"stringValue":"kiosk-3"}`,
 			`"audit.field.amount","value":{"stringValue":"42"}`,
 			`"user.name","value":{"stringValue":"alice"}`,
+			`"gateway.route","value"`,
 			`"http.response.status_code","value":{"intValue":"201"}`,
 			`\"password\":\"***\"`,
 		} {
 			if !strings.Contains(ev, want) {
 				t.Errorf("the event lacks %s:\n%s", want, ev)
 			}
+		}
+		// The event is the audited service's: nothing in it names the product.
+		if strings.Contains(ev, `"key":"meerkat.`) {
+			t.Errorf("an attribute still says meerkat.: %s", ev)
 		}
 		if strings.Contains(ev, "hunter2") {
 			t.Errorf("a password left in the audit: %s", ev)
@@ -207,6 +212,39 @@ func TestAnAuditedCallIsKeptWithoutTheCollector(t *testing.T) {
 			if e.Target == store.AuditTargetEndpoint {
 				t.Fatalf("a call came through kind=%s", kind)
 			}
+		}
+	}
+}
+
+// The caller's custom fields leave under their owner, user. or tenant., a list
+// as a list - including one read back from the trail, where JSON made it []any.
+func TestAnAuditedCallCarriesTheCallersOwnFieldsUnderTheirOwner(t *testing.T) {
+	ev := store.AuditEvent{
+		ActorID: "u1", ActorName: "alice", TenantID: "t1", TenantName: "Acme",
+		Data: &store.EndpointCall{
+			Route: "Orders API", Method: "POST", Operation: "/orders", Path: "/api/orders", Status: 201,
+			Roles:  []string{"ROLE_ADMIN"},
+			User:   map[string]any{"employee": "E-42", "regions": []any{"FR", "ES"}},
+			Tenant: customFacts(map[string]string{"plan": "gold", "sites": "LYS,CDG"}, map[string]bool{"sites": true}),
+		},
+	}
+	got := map[string]string{}
+	for _, a := range auditRecordOf(ev, time.Now()).Attrs {
+		got[a.Key] = a.Str + strings.Join(a.Strs, "+")
+	}
+	for k, want := range map[string]string{
+		"user.id": "u1", "user.name": "alice", "user.roles": "ROLE_ADMIN",
+		"tenant.id": "t1", "tenant.name": "Acme", "gateway.route": "Orders API",
+		"user.employee": "E-42", "user.regions": "FR+ES",
+		"tenant.plan": "gold", "tenant.sites": "LYS+CDG",
+	} {
+		if got[k] != want {
+			t.Errorf("%s = %q, want %q", k, got[k], want)
+		}
+	}
+	for k := range got {
+		if strings.HasPrefix(k, "meerkat.") {
+			t.Errorf("%s still says meerkat.", k)
 		}
 	}
 }

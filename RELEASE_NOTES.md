@@ -2,6 +2,20 @@
 
 ## NEXT RELEASE
 
+- **Audit events and traces no longer say Meerkat in their attribute names.** An audit
+  event belongs to the service it audits, so the caller is named as OpenTelemetry names a
+  user, and the tenant the same way: `meerkat.roles` becomes `user.roles`,
+  `meerkat.tenant.id` and `meerkat.tenant.name` become `tenant.id` and `tenant.name`,
+  `meerkat.token` becomes `user.token`, and the route a call came through, `meerkat.route`,
+  becomes `gateway.route`. `meerkat.group` is gone: no route can forward the chosen group,
+  so nothing behind the gateway could read it back, and `user.roles` already says what it
+  gave. Queries and dashboards on the old names need the new ones (in Loki, `tenant_id`,
+  `user_roles`, `gateway_route`...).
+- **An audited call carries the caller's custom fields**: the account's as `user.<name>`,
+  its tenant's as `tenant.<name>`, a list for a multiple choice, as a JWT carries them. A
+  custom field can no longer be named `id`, `name` or `token`, which those owners already
+  carry.
+
 ---
 
 ## 1.26.0

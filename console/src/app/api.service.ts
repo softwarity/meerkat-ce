@@ -1865,9 +1865,11 @@ export interface EndpointCall {
   path: string;
   status: number;
   traceId?: string;
-  group?: string;
   roles?: string[];
   fields?: Record<string, string>;
+  // The caller's custom fields and their tenant's, a list for a multiple choice.
+  user?: Record<string, string | string[]>;
+  tenant?: Record<string, string | string[]>;
   // The JSON request body, masked fields replaced.
   body?: string;
   bodyOmitted?: string;

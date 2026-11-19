@@ -133,7 +133,8 @@ func (rt *Router) auditCallOf(req *http.Request, routeName string, op *auditedOp
 	if d, ok := rt.sessionIdentity(req); ok {
 		ev.ActorID, ev.ActorName = d.UserID, d.Username
 		ev.TenantID, ev.TenantName = d.TenantID, d.Tenant
-		call.Group, call.Roles = d.Group, d.Roles
+		call.Roles = d.Roles
+		call.User, call.Tenant = customFacts(d.Fields, d.Arrays), customFacts(d.TenantFields, d.Arrays)
 	}
 	var parsed any
 	if body != nil {
@@ -170,8 +171,31 @@ func (rt *Router) auditCallOf(req *http.Request, routeName string, op *auditedOp
 	return ev
 }
 
+// customFacts is the installation's own fields as an audit event carries them:
+// a list for a multiple choice or a list, a string otherwise, as a JWT does.
+func customFacts(values map[string]string, arrays map[string]bool) map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(values))
+	for name, v := range values {
+		if v == "" {
+			continue
+		}
+		if arrays[name] {
+			out[name] = strings.Split(v, ",")
+		} else {
+			out[name] = v
+		}
+	}
+	return out
+}
+
 // auditRecordOf is the event as it leaves for the collector, under the names
 // a collector already knows (OpenTelemetry's http.*, user.*, client.address).
+// Nothing says Meerkat: the event is the audited service's, so the caller is
+// user.* and tenant.*, their custom fields under the same two owners, and the
+// door the call came through is gateway.route.
 // At the instant, not the row's second: two calls in one second are two lines
 // to a collector that keeps one per timestamp.
 func auditRecordOf(ev store.AuditEvent, at time.Time) tracing.AuditRecord {
@@ -181,7 +205,7 @@ func auditRecordOf(ev store.AuditEvent, at time.Time) tracing.AuditRecord {
 		tracing.String("audit.action", ev.Action),
 		tracing.String("audit.target", ev.Target),
 		tracing.String("audit.description", ev.TargetName),
-		tracing.String("meerkat.route", c.Route),
+		tracing.String("gateway.route", c.Route),
 		tracing.String("http.request.method", c.Method),
 		tracing.String("http.route", c.Operation),
 		tracing.String("url.path", c.Path),
@@ -191,11 +215,12 @@ func auditRecordOf(ev store.AuditEvent, at time.Time) tracing.AuditRecord {
 	if ev.ActorID != "" {
 		attrs = append(attrs,
 			tracing.String("user.id", ev.ActorID), tracing.String("user.name", ev.ActorName),
-			tracing.String("meerkat.tenant.id", ev.TenantID), tracing.String("meerkat.tenant.name", ev.TenantName),
-			tracing.String("meerkat.group", c.Group))
+			tracing.String("tenant.id", ev.TenantID), tracing.String("tenant.name", ev.TenantName))
 		if len(c.Roles) > 0 {
-			attrs = append(attrs, tracing.Strings("meerkat.roles", c.Roles))
+			attrs = append(attrs, tracing.Strings("user.roles", c.Roles))
 		}
+		attrs = append(attrs, factAttrs("user.", c.User)...)
+		attrs = append(attrs, factAttrs("tenant.", c.Tenant)...)
 	}
 	names := make([]string, 0, len(c.Fields))
 	for n := range c.Fields {
@@ -267,4 +292,32 @@ func masked(v any, mask map[string]bool) any {
 	default:
 		return v
 	}
+}
+
+// factAttrs is one owner's custom fields as attributes, in name order. A value
+// read back from the trail is []any: JSON does not remember []string.
+func factAttrs(owner string, facts map[string]any) []tracing.Attr {
+	names := make([]string, 0, len(facts))
+	for n := range facts {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	attrs := make([]tracing.Attr, 0, len(names))
+	for _, n := range names {
+		switch v := facts[n].(type) {
+		case string:
+			attrs = append(attrs, tracing.String(owner+n, v))
+		case []string:
+			attrs = append(attrs, tracing.Strings(owner+n, v))
+		case []any:
+			list := make([]string, 0, len(v))
+			for _, e := range v {
+				if s, ok := e.(string); ok {
+					list = append(list, s)
+				}
+			}
+			attrs = append(attrs, tracing.Strings(owner+n, list))
+		}
+	}
+	return attrs
 }

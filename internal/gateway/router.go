@@ -834,7 +834,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if r.access.Empty() {
 			// A route with no rule is still a route that was chosen, and the
 			// span should say which one answered.
-			spanEvent(hit.Context(), "route_chosen", tracing.String("meerkat.route", r.name))
+			spanEvent(hit.Context(), "route_chosen", tracing.String("gateway.route", r.name))
 			// And who called it, which nothing here needed to know. Only for a
 			// request being recorded, and only when the spans name the caller:
 			// the session lookup is not free.
@@ -852,7 +852,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// Two instants worth naming inside the span, for the cost of two
 			// names: which route won, and that the door opened. A span apiece
 			// would be thousands per request.
-			spanEvent(hit.Context(), "route_chosen", tracing.String("meerkat.route", r.name))
+			spanEvent(hit.Context(), "route_chosen", tracing.String("gateway.route", r.name))
 			spanEvent(hit.Context(), "access_granted")
 			ww, start := record(w)
 			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
@@ -862,7 +862,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// matches next would turn the one rule written to shut a path into a
 		// rule that merely redirects it.
 		if r.access.Level == store.AccessDeny {
-			spanEvent(hit.Context(), "access_refused", tracing.String("meerkat.route", r.name))
+			spanEvent(hit.Context(), "access_refused", tracing.String("gateway.route", r.name))
 			ww, start := record(w)
 			rt.refuse(ww, hit, r.access, r.isUI, ok, who, d.UserID)
 			observed(r, hit, ww, start)
@@ -873,7 +873,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if cand != nil {
-		spanEvent(candReq.Context(), "access_refused", tracing.String("meerkat.route", cand.name))
+		spanEvent(candReq.Context(), "access_refused", tracing.String("gateway.route", cand.name))
 		ww, start := record(w)
 		rt.refuse(ww, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)
 		observed(cand, candReq, ww, start)
@@ -2449,7 +2449,7 @@ func (rt *Router) answerOrRefuse(ww *watched, hit *http.Request, r *compiledRout
 	// Its headers went into the map before it chose its status: written now,
 	// they would dress the refusal in the other route's answer.
 	clear(ww.Header())
-	spanEvent(candReq.Context(), "access_refused", tracing.String("meerkat.route", cand.name))
+	spanEvent(candReq.Context(), "access_refused", tracing.String("gateway.route", cand.name))
 	slog.Info("refusal restored over an error from the next route",
 		"refused_by", cand.name, "answered_by", r.name, "path", hit.URL.Path)
 	rt.refuse(ww, candReq, cand.access, cand.isUI, candOK, candWho, candUserID)

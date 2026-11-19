@@ -293,3 +293,17 @@ func TestAListKeepsTheOrderTyped(t *testing.T) {
 		t.Fatalf("an empty list was kept: %+v", got)
 	}
 }
+
+// A custom field leaves on an audit event as user.<name> or tenant.<name>:
+// the names those owners already carry are refused, whatever their case.
+func TestACustomFieldCannotTakeANameTheAuditAlreadyCarries(t *testing.T) {
+	for _, name := range []string{"id", "name", "Name", "token"} {
+		_, err := SanitizeUserFields([]UserField{{Name: name, Kind: UserFieldKinds[0]}})
+		if err == nil || !strings.Contains(err.Error(), "user."+name) {
+			t.Errorf("%s: %v, want a refusal naming user.%s", name, err, name)
+		}
+	}
+	if _, err := SanitizeUserFields([]UserField{{Name: "employee", Kind: UserFieldKinds[0]}}); err != nil {
+		t.Errorf("an ordinary name was refused: %v", err)
+	}
+}

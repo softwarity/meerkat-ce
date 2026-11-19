@@ -251,9 +251,8 @@ OpenTelemetry) inscrit l'appelant connecté sur la trace :
 | Attribut | Contenu |
 |---|---|
 | `user.id`, `user.name` | le compte (les noms définis par OpenTelemetry, qu'un backend qui les connaît affiche comme un utilisateur) |
-| `meerkat.tenant.id`, `meerkat.tenant.name` | le tenant actif |
-| `meerkat.group` | le groupe choisi pour la session, dans un tenant qui fonctionne en mode exclusif |
-| `meerkat.roles` | les rôles sur lesquels les règles d'accès ont été évaluées - une liste, et ce qui explique un refus |
+| `user.roles` | les rôles sur lesquels les règles d'accès ont été évaluées - une liste, sous le nom défini par OpenTelemetry, et ce qui explique un refus |
+| `tenant.id`, `tenant.name` | le tenant actif |
 
 Un appel anonyme ne porte rien.
 
