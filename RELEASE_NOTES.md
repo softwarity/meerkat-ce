@@ -2,6 +2,12 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.26.1
+
+<!-- release: built=2026-11-19T04:46:06Z migrates=false -->
+
 - **Audit events and traces no longer say Meerkat in their attribute names.** An audit
   event belongs to the service it audits, so the caller is named as OpenTelemetry names a
   user, and the tenant the same way: `meerkat.roles` becomes `user.roles`,
