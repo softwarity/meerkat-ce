@@ -104,7 +104,13 @@ export class RoutesTableComponent {
   protected accessBadge(r: Route): AccessState {
     const a = r.access;
     return a
-      ? { level: a.level ?? '', tenants: a.tenants ?? [], roles: a.roles ?? [], users: a.users ?? [] }
+      ? {
+          level: a.level ?? '',
+          tenants: a.tenants ?? [],
+          roles: a.roles ?? [],
+          users: a.users ?? [],
+          capabilities: a.capabilities ?? [],
+        }
       : emptyAccess();
   }
 

@@ -1,9 +1,10 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
-import { AccessLevel, Role, Tenant, User } from '../../api.service';
+import { AccessLevel, Capability, Role, Tenant, User } from '../../api.service';
+import { MeService } from '../../me.service';
 
 // The editable, non-optional shape of an access rule inside the editor.
 export interface AccessState {
@@ -11,6 +12,24 @@ export interface AccessState {
   tenants: string[];
   roles: string[];
   users: string[];
+  // A whole route's rule only (see the editor's withCapabilities).
+  capabilities?: Capability[];
+  adminTenants?: string[];
+}
+
+// What a route may ask the account to hold, beside the roles. Root passes
+// wherever one is asked; tenantAdmin is the owner or an ADMIN member of the
+// ACTIVE tenant, and is offered only when there are tenants to administer.
+export const CAPABILITIES: { value: Capability; label: string }[] = [
+  { value: 'root', label: $localize`:@@Cap_root:Root` },
+  { value: 'infraAdmin', label: $localize`:@@Cap_infra_admin:Infra admin` },
+  { value: 'appAdmin', label: $localize`:@@Cap_app_admin:App admin` },
+  { value: 'dev', label: $localize`:@@Cap_dev:Developer` },
+  { value: 'tenantAdmin', label: $localize`:@@Cap_tenant_admin:Tenant admin` },
+];
+
+export function capabilityLabel(c: Capability): string {
+  return CAPABILITIES.find((x) => x.value === c)?.label ?? c;
 }
 
 export function emptyAccess(): AccessState {
@@ -41,6 +60,8 @@ export function levelShort(a: AccessState): string {
       return $localize`:@@Level_short_tenant:TENANT`;
     case 'tenants':
       return $localize`:@@Level_short_tenants:TENANT` + '\u00b7' + a.tenants.length;
+    case 'capabilities':
+      return $localize`:@@Level_short_capabilities:CAP`;
     case 'deny':
       return $localize`:@@Level_short_deny:DENY`;
     default:
@@ -73,6 +94,11 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
     value: 'tenants',
     label: $localize`:@@Access_in_one_of_these:In one of these tenants`,
     hint: $localize`:@@Access_in_one_of_these_hint:The active tenant must be one of those named below.`,
+  },
+  {
+    value: 'capabilities',
+    label: $localize`:@@Access_with_capabilities:With capabilities`,
+    hint: $localize`:@@Access_with_capabilities_hint:The account must hold one of the capabilities below. Roles given by groups do not count.`,
   },
   {
     value: 'deny',
@@ -148,6 +174,7 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
           </mat-form-field>
         }
 
+        @if (value().level !== 'capabilities') {
         <mat-form-field class="field" subscriptSizing="dynamic">
           <mat-label i18n="@@Roles_any_of">Roles (any one grants access)</mat-label>
           <mat-select multiple [value]="value().roles" (selectionChange)="patch({ roles: $event.value })">
@@ -176,6 +203,66 @@ export const ACCESS_LEVELS: { value: AccessLevel; label: string; hint: string }[
           </mat-select>
           <mat-hint align="end" i18n="@@Roles_in_active_org_hint">Held in the active tenant. Left empty, any role passes.</mat-hint>
         </mat-form-field>
+        }
+
+        <!-- A role is granted by a tenant's groups, which its administrator
+             composes: a screen that administers the platform asks for what
+             the account IS instead, which nobody gives himself. -->
+        @if (value().level === 'capabilities') {
+          <mat-form-field class="field" subscriptSizing="dynamic">
+            <mat-label i18n="@@Capabilities_any_of">Capabilities (any one grants access)</mat-label>
+            <mat-select multiple [value]="caps()" (selectionChange)="patch({ capabilities: $event.value })">
+              <mat-select-trigger>
+                @if (caps().length) {
+                <mat-chip-set class="chips">
+                  @for (c of caps(); track c) {
+                    <mat-chip (removed)="drop('capabilities', c)">
+                      {{ capLabel(c) }}
+                      <button matChipRemove (click)="$event.stopPropagation()" [attr.aria-label]="capLabel(c)">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    </mat-chip>
+                  }
+                </mat-chip-set>
+                }
+              </mat-select-trigger>
+              @for (c of capabilities(); track c.value) {
+                <mat-option [value]="c.value">{{ c.label }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint align="end" i18n="@@Capabilities_hint">Root always passes.</mat-hint>
+          </mat-form-field>
+          @if (caps().includes('tenantAdmin')) {
+            <mat-form-field class="field" subscriptSizing="dynamic">
+              <mat-label i18n="@@Admin_of_tenants">Tenant admin of</mat-label>
+              <mat-select multiple [value]="adminTenants()" (selectionChange)="patch({ adminTenants: $event.value })">
+                <mat-select-trigger>
+                  @if (adminTenants().length) {
+                  <mat-chip-set class="chips">
+                    @for (id of adminTenants(); track id) {
+                      <mat-chip (removed)="drop('adminTenants', id)">
+                        {{ tenantName(id) }}
+                        <button matChipRemove (click)="$event.stopPropagation()" [attr.aria-label]="tenantName(id)">
+                          <mat-icon>cancel</mat-icon>
+                        </button>
+                      </mat-chip>
+                    }
+                  </mat-chip-set>
+                  }
+                </mat-select-trigger>
+                @for (t of tenants(); track t.id) {
+                  <mat-option [value]="t.id">
+                    <span class="opt-main">{{ t.name }}</span>
+                    @if (t.description) {
+                      <span class="opt-sub">{{ t.description }}</span>
+                    }
+                  </mat-option>
+                }
+              </mat-select>
+              <mat-hint align="end" i18n="@@Admin_of_tenants_hint">The administrator of the active tenant. Left empty, of any tenant.</mat-hint>
+            </mat-form-field>
+          }
+        }
       </div>
     }
 
@@ -295,7 +382,23 @@ export class AccessEditorComponent {
   readonly users = input<User[]>([]);
   readonly roles = input<Role[]>([]);
   readonly tenants = input<Tenant[]>([]);
+  // Offers the "With capabilities" level: a whole route's rule only. An
+  // endpoint and a limit refuse it (the gateway says so too).
+  readonly withCapabilities = input(false);
   readonly valueChange = output<AccessState>();
+
+  private readonly me = inject(MeService);
+  protected readonly caps = computed(() => this.value().capabilities ?? []);
+  protected readonly adminTenants = computed(() => this.value().adminTenants ?? []);
+  // Tenant admin means something only where there are tenants to administer;
+  // in a single-tenant installation the app admin is that administrator. A
+  // rule saved with it stays listed, so it can be seen and taken back.
+  protected readonly capabilities = computed(() =>
+    CAPABILITIES.filter((c) => c.value !== 'tenantAdmin' || this.me.multiTenant() || this.caps().includes('tenantAdmin')),
+  );
+  protected capLabel(c: Capability): string {
+    return capabilityLabel(c);
+  }
 
   // What the select OFFERS, which is not the same list in the two purposes.
   //
@@ -304,8 +407,15 @@ export class AccessEditorComponent {
   // that it also makes the panel vanish under the mouse. Two controls for one
   // act, one of them by surprise. So the select only ever narrows here, and
   // widening has one door.
+  //
+  // "With capabilities" gates a whole route: an endpoint and a limit do not
+  // offer it (a rule saved with it stays listed, so it reads true).
   protected readonly levels = computed(() =>
-    this.purpose() === 'selects' ? ACCESS_LEVELS.filter((l) => l.value !== '') : ACCESS_LEVELS,
+    ACCESS_LEVELS.filter(
+      (l) =>
+        !(this.purpose() === 'selects' && l.value === '') &&
+        (l.value !== 'capabilities' || this.withCapabilities() || this.value().level === 'capabilities'),
+    ),
   );
   protected readonly pivotLabel = computed(() =>
     this.purpose() === 'selects'
@@ -350,8 +460,9 @@ export class AccessEditorComponent {
   }
 
   // Taking one back from the chips, without reopening the list.
-  protected drop(axis: 'tenants' | 'roles' | 'users', value: string): void {
-    this.patch({ [axis]: this.value()[axis].filter((v) => v !== value) });
+  protected drop(axis: 'tenants' | 'roles' | 'users' | 'capabilities' | 'adminTenants', value: string): void {
+    const cur = (this.value()[axis] ?? []) as string[];
+    this.patch({ [axis]: cur.filter((v) => v !== value) });
   }
 
   // Leaving a level drops what only that level meant: named organisations are
@@ -363,8 +474,12 @@ export class AccessEditorComponent {
     if (next.level !== 'tenants') next.tenants = [];
     // No caller left to filter: everyone is through (delegated) or nobody is
     // (deny). And under delegated a named user excepts them from nothing.
-    if (next.level === '' || next.level === 'deny') next.roles = [];
+    // What the account IS decides at the capabilities level, and nothing
+    // else does: a role filter there would be a second rule out of sight.
+    if (next.level === '' || next.level === 'deny' || next.level === 'capabilities') next.roles = [];
     if (next.level === '') next.users = [];
+    if (next.level !== 'capabilities') next.capabilities = [];
+    if (!next.capabilities?.includes('tenantAdmin')) next.adminTenants = [];
     this.valueChange.emit(next);
   }
 }

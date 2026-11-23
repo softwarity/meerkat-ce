@@ -500,6 +500,11 @@ async function seedEverythingElse(api) {
   await soft('mail relay', () => api.put('/api/settings/mail-relay', {
     data: { host: 'smtp.acme.example', port: 587, security: 'starttls', auth: 'password',
       username: 'gateway@acme.example', password: '$stripe-key', passwordSet: false, from: 'noreply@acme.example' } }));
+  // The export to a collector, with the audit sent: the OpenTelemetry screen
+  // and the route's section read as they do once it is set up.
+  await soft('telemetry', () => api.put('/api/settings/telemetry', {
+    data: { enabled: true, traces: true, metrics: true, endpoint: 'http://otel-collector.observability:4318',
+      sample: 0.1, maxPerSecond: 200, audit: true, auditConsole: true } }));
   await soft('agent', () => api.put('/api/settings/agent', { data: { enabled: true } }));
   await soft('issues', () => api.put('/api/settings/issues', { data: { enabled: true } }));
   for (const t of [
@@ -543,6 +548,13 @@ async function seedEverythingElse(api) {
       { method: 'POST', path: '/orders', inherit: true, limits: [{ per: 'user', requests: 30, window: 'PT1M' }] },
       { method: 'GET', path: '/orders', inherit: true, limits: [{ per: 'user', requests: 300, window: 'PT1M' }] },
       { method: 'GET', path: '/shipments', inherit: true, limits: [{ per: 'ip', requests: 50, window: 'PT1S' }] },
+    ] } }));
+  // Two operations audited: placing and cancelling an order leave an event,
+  // which the route's OpenTelemetry section counts and Endpoint audit shows.
+  await soft('orders audit', () => api.put('/api/routes/orders-api/audit', {
+    data: { endpoints: [
+      { method: 'POST', path: '/orders', description: 'Place an order' },
+      { method: 'DELETE', path: '/orders/{id}', description: 'Cancel an order', fields: [{ name: 'order', from: 'path', key: 'id' }] },
     ] } }));
   // The roles the service declares, tied to the catalogue: one imported under
   // the route's prefix and tag, one onto a role that already exists.
@@ -634,6 +646,24 @@ async function seedFonts(page) {
     const body = readFileSync(`${repo}/internal/fonts/files/${f}`);
     await api.put(`${ADMIN}/api/routes/fonts/files/files/${f}`, { headers: { 'Content-Type': 'font/woff2' }, data: body });
   }
+}
+
+// A members screen kept for those who administer a tenant, whatever roles
+// they hold: the level With capabilities. Laid down for its shot and taken
+// away after it, for the same reason as the fonts route.
+async function seedMembersAdmin(page) {
+  await page.request.put(`${ADMIN}/api/routes/members-admin`, {
+    data: {
+      id: 'members-admin', name: 'Members admin', order: 8, enabled: true, isUi: true,
+      upstream: 'http://members.svc.acme.internal:8080',
+      access: { level: 'capabilities', capabilities: ['tenantAdmin', 'appAdmin'], adminTenants: TENANT ? [TENANT] : [] },
+      predicates: [{ type: 'path', args: { patterns: ['/members/**'] } }],
+    },
+  });
+}
+
+async function dropMembersAdmin(page) {
+  await page.request.delete(`${ADMIN}/api/routes/members-admin`);
 }
 
 // The OpenID provider (SAUTH-05), laid down just before its shots: a public
@@ -955,11 +985,18 @@ const SHOTS = [
     file: 'route-editor-target-missing', path: '/infra/routes/orders-api/target', prepare: seedPickerOrdersDown, settle: 1600,
   },
   { file: 'route-editor-security', path: '/infra/routes/orders-api/security' },
+  {
+    file: 'route-editor-capabilities', path: '/infra/routes/members-admin/security',
+    prepare: seedMembersAdmin, cleanup: dropMembersAdmin, settle: 1600,
+  },
   { file: 'route-editor-predicates', path: '/infra/routes/orders-api/predicates' },
   { file: 'route-editor-filters', path: '/infra/routes/billing/modin' },
   { file: 'route-editor-color-scheme', path: '/infra/routes/billing/scheme' },
   { file: 'route-editor-custom', path: '/infra/routes/billing/custom' },
   { file: 'route-editor-files', path: '/infra/routes/fonts/target', prepare: seedFonts, settle: 1600 },
+  // Traces chosen here, metrics and audit said where they are decided, and
+  // the value the route's audited calls carry, resolved on its service.
+  { file: 'route-editor-telemetry', path: '/infra/routes/orders-api/tracing', settle: 1600 },
   { file: 'endpoint-security', path: '/infra/endpoint-security?route=orders-api', settle: 2000 },
   {
     file: 'endpoint-rule', path: '/infra/endpoint-security?route=orders-api', settle: 2000,
@@ -1056,6 +1093,14 @@ const SHOTS = [
   { file: 'model', path: '/infra/model' },
   { file: 'opentelemetry', path: '/infra/opentelemetry' },
   { file: 'opentelemetry-collector', path: '/infra/opentelemetry', act: click('No collector yet?') },
+  // The Audit tab: its two switches and the selector a log backend keeps it on.
+  {
+    file: 'opentelemetry-audit', path: '/infra/opentelemetry',
+    act: async (page) => {
+      await page.getByRole('tab', { name: 'Audit' }).click();
+      await page.waitForTimeout(900);
+    },
+  },
   { file: 'plug', path: '/infra/plug' },
   { file: 'plug-machine', path: '/infra/plug', act: click("On a developer's machine") },
   // ── Application ──

@@ -193,14 +193,21 @@ export interface SpecDeposit {
 // asks. Whatever is set here, the upstream still applies its own rules
 // afterwards - Meerkat gates IN ADDITION to the service, never instead of it,
 // which is why the open end of the scale is called delegated.
-export type AccessLevel = '' | 'auth' | 'tenant' | 'tenants' | 'deny';
+export type AccessLevel = '' | 'auth' | 'tenant' | 'tenants' | 'capabilities' | 'deny';
 
 export interface Access {
   level?: AccessLevel;
   tenants?: string[];
   roles?: string[];
+  // The 'capabilities' level: what the account must hold, one of them. Posed
+  // on a whole route only, never on an endpoint or a limit.
+  capabilities?: Capability[];
+  // Narrows tenantAdmin to the administrators of these tenants (ids).
+  adminTenants?: string[];
   users?: string[];
 }
+
+export type Capability = 'root' | 'infraAdmin' | 'appAdmin' | 'dev' | 'tenantAdmin';
 
 // One bound on how much a route or an operation carries (ROUTE-08, QUOTA-01).
 //
@@ -466,6 +473,9 @@ export const IDENTITY_FIELDS = [
   'timezone',
   'locale',
   'roles',
+  // What the account holds among the capabilities a route may ask for (a
+  // list, like roles): what an administration page reads to know what to offer.
+  'capabilities',
 ] as const;
 
 // One caller fact forwarded to the upstream, optionally renamed (as = the

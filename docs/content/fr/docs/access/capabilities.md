@@ -10,7 +10,9 @@ summary: Les cinq indicateurs d'un compte qui ouvrent la console et l'API d'admi
 Les rôles décident de ce qu'une personne atteint **à travers** la gateway.
 Les capacités décident de ce qu'elle peut administrer **dans** la gateway.
 Ce sont deux mécanismes distincts : une capacité ouvre la console et l'API
-d'administration, et n'accorde rien sur le plan de données.
+d'administration, et n'accorde rien sur le plan de données - sauf quand une
+route la demande nommément, avec le niveau
+[With capabilities](/docs/access/route-access#with-capabilities).
 
 Ce sont des indicateurs posés sur le compte, que l'on active ou désactive
 depuis sa ligne dans **Application > Users**.
@@ -87,6 +89,10 @@ tenant quand elle en est **propriétaire**, ou qu'elle y détient une
 adhésion **ADMIN** active - voir [Tenants](/docs/access/tenants). La
 console le calcule côté serveur et lui montre les sections des tenants
 concernés, et rien d'autre - voir [Administrateur de tenant](/docs/access/tenant-admin).
+
+Une route peut pourtant l'exiger : le niveau
+[With capabilities](/docs/access/route-access#with-capabilities) propose
+**Tenant admin**, établi de la même façon, dans le tenant actif.
 
 ## La navigation est un confort, l'API est le contrat
 

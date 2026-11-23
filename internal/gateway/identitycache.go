@@ -99,6 +99,7 @@ func (rt *Router) rememberIdentity(key identityKey, e identityEntry, epoch uint6
 func (d identityData) clone() identityData {
 	d.Roles = slices.Clone(d.Roles)
 	d.Memberships = slices.Clone(d.Memberships)
+	d.Capabilities = slices.Clone(d.Capabilities)
 	d.Fields = maps.Clone(d.Fields)
 	d.TenantFields = maps.Clone(d.TenantFields)
 	d.Arrays = maps.Clone(d.Arrays)

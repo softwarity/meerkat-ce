@@ -115,6 +115,8 @@ function fromWire(a: Access | undefined): AccessState {
     tenants: a?.tenants ?? [],
     roles: a?.roles ?? [],
     users: a?.users ?? [],
+    capabilities: a?.capabilities ?? [],
+    adminTenants: a?.adminTenants ?? [],
   };
 }
 
@@ -651,7 +653,10 @@ export class EndpointSecurityComponent {
       // two axes, and losing a limit because somebody stopped narrowing who
       // may call the operation would be a deletion nobody asked for.
       if (!on) return { ...s, [k]: { ...cur, override: false, access: emptyAccess() } };
-      const seed = isEmpty(cur.access) ? { ...this.routeAccess() } : cur.access;
+      // Capabilities stay on the route: an operation cannot pose them.
+      const seed = isEmpty(cur.access)
+        ? { ...this.routeAccess(), capabilities: [], adminTenants: [] }
+        : cur.access;
       return { ...s, [k]: { ...cur, override: true, access: seed } };
     });
     this.scheduleSave();
@@ -697,6 +702,10 @@ export class EndpointSecurityComponent {
         ...(ra.tenants.length ? { tenants: ra.tenants } : {}),
         ...(ra.roles.length ? { roles: ra.roles } : {}),
         ...(ra.users.length ? { users: ra.users } : {}),
+        // Carried back as read: this screen does not edit them, and saving
+        // the endpoints must not take them off the route.
+        ...(ra.capabilities?.length ? { capabilities: ra.capabilities } : {}),
+        ...(ra.adminTenants?.length ? { adminTenants: ra.adminTenants } : {}),
       },
       endpoints,
     };

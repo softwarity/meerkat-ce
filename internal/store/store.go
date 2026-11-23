@@ -1681,6 +1681,13 @@ const (
 	AccessAuth      = "auth"
 	AccessTenant    = "tenant"
 	AccessTenants   = "tenants"
+	// capabilities: the account holds one of the rule's Capabilities - what
+	// the account IS (root, an administrator, a developer, the administrator
+	// of the active tenant), not a role a tenant's groups give. The level an
+	// administration screen asks for: a tenant administrator composes his
+	// groups, ROLE_ADMIN included, and gives himself no capability. Posed on a
+	// whole route only (see NoCapabilities).
+	AccessCapable = "capabilities"
 	// deny: nobody, except the users named on the rule. The closed end of the
 	// scale, and what makes Users mean something - an exception needs a
 	// condition to be an exception TO.
@@ -1703,11 +1710,60 @@ const (
 // Users is the exception, not a level: whoever is named passes whatever the
 // level requires (a service account, a support login, a UI dedicated to one
 // person). It is ORed with the rest.
+//
+// Capabilities (+ AdminTenants) belong to the "capabilities" level, and
+// nowhere else; that level poses no role.
 type Access struct {
-	Level   string   `json:"level,omitempty"`
-	Tenants []string `json:"tenants,omitempty"` // tenant ids, when Level is "tenants"
-	Roles   []string `json:"roles,omitempty"`   // allowed effective role names
-	Users   []string `json:"users,omitempty"`   // always allowed, whatever the level
+	Level        string   `json:"level,omitempty"`
+	Tenants      []string `json:"tenants,omitempty"`      // tenant ids, when Level is "tenants"
+	Roles        []string `json:"roles,omitempty"`        // allowed effective role names
+	Capabilities []string `json:"capabilities,omitempty"` // when Level is "capabilities" (CapabilityNames)
+	// AdminTenants narrows the tenantAdmin capability to the administrators of
+	// these tenants (ids); empty, the administrator of any tenant passes. The
+	// tenant administered is always the ACTIVE one.
+	AdminTenants []string `json:"adminTenants,omitempty"`
+	Users        []string `json:"users,omitempty"` // always allowed, whatever the level
+}
+
+// The capabilities a route may ask for. Root passes wherever one is asked.
+const (
+	CapRoot        = "root"
+	CapInfraAdmin  = "infraAdmin"
+	CapAppAdmin    = "appAdmin"
+	CapDev         = "dev"
+	CapTenantAdmin = "tenantAdmin" // owner or ADMIN member of the active tenant
+)
+
+// CapabilityNames is the roster, named in every refusal.
+var CapabilityNames = []string{CapRoot, CapInfraAdmin, CapAppAdmin, CapDev, CapTenantAdmin}
+
+// UserCapabilities lists what an account holds among CapabilityNames,
+// tenantAdmin aside: that one depends on the active tenant, not on the
+// account. Root implies the two administrations, as everywhere else.
+func UserCapabilities(u User) []string {
+	var out []string
+	if u.Root {
+		out = append(out, CapRoot)
+	}
+	if u.Root || u.InfraAdmin {
+		out = append(out, CapInfraAdmin)
+	}
+	if u.Root || u.AppAdmin {
+		out = append(out, CapAppAdmin)
+	}
+	if u.Dev {
+		out = append(out, CapDev)
+	}
+	return out
+}
+
+// NoCapabilities refuses capabilities where a rule may not pose them: they
+// gate a whole route, not one operation and not the callers a limit counts.
+func NoCapabilities(a Access) error {
+	if a.Level == AccessCapable {
+		return fmt.Errorf("the level %q is posed on the whole route, not here: use another level, or roles", AccessCapable)
+	}
+	return nil
 }
 
 // Caller is what a rule is evaluated against: the resolved session, or the
@@ -1717,6 +1773,9 @@ type Caller struct {
 	Username      string
 	TenantID      string   // the ACTIVE organisation, "" when none is chosen
 	Roles         []string // effective role names IN that organisation
+	// Capabilities are what the account holds among CapabilityNames, plus
+	// tenantAdmin when it administers the ACTIVE tenant.
+	Capabilities []string
 	// Memberships are the organisations this caller could switch to. They do
 	// not grant anything by themselves; they are what tells a refusal that is
 	// final ("you are not in Acme") from one a tenant switch would fix.
@@ -1740,7 +1799,7 @@ func (a Access) Empty() bool {
 
 // AccessLevels are the levels a rule may take, in the order a form offers
 // them: from the one that poses no condition to the one that refuses everyone.
-var AccessLevels = []string{AccessDelegated, AccessAuth, AccessTenant, AccessTenants, AccessDeny}
+var AccessLevels = []string{AccessDelegated, AccessAuth, AccessTenant, AccessTenants, AccessCapable, AccessDeny}
 
 // SanitizeAccess drops what a rule cannot use, so the stored rule says exactly
 // what the engine reads - and the screens showing it stop describing a
@@ -1765,6 +1824,28 @@ func SanitizeAccess(a *Access) error {
 	a.Roles = nonEmpty(a.Roles)
 	a.Users = nonEmpty(a.Users)
 	a.Tenants = nonEmpty(a.Tenants)
+	a.Capabilities = nonEmpty(a.Capabilities)
+	a.AdminTenants = nonEmpty(a.AdminTenants)
+	if a.Level == AccessCapable {
+		if len(a.Capabilities) == 0 {
+			return fmt.Errorf("access level %q names at least one capability: allowed are %s",
+				AccessCapable, strings.Join(CapabilityNames, ", "))
+		}
+		for _, c := range a.Capabilities {
+			if !slices.Contains(CapabilityNames, c) {
+				return fmt.Errorf("capability %q: allowed are %s", c, strings.Join(CapabilityNames, ", "))
+			}
+		}
+		// What the account is decides: a role filter beside it would be a
+		// second rule nobody sees on the screen.
+		a.Roles = nil
+	} else {
+		a.Capabilities = nil
+	}
+	// The tenants narrow the tenant administrators, and nobody else.
+	if !slices.Contains(a.Capabilities, CapTenantAdmin) {
+		a.AdminTenants = nil
+	}
 	// A tenant list belongs to the level that reads it, and nowhere else.
 	if a.Level != AccessTenants {
 		a.Tenants = nil
@@ -1812,6 +1893,8 @@ func (a Access) Grants(c Caller) bool {
 		if c.TenantID == "" || !slices.Contains(a.Tenants, c.TenantID) {
 			return false
 		}
+	case AccessCapable:
+		return a.capabilityGrants(c)
 	}
 	// Roles are the second axis: named, the caller must hold one of them IN the
 	// active organisation (which is why an empty TenantID holds no role).
@@ -1824,6 +1907,30 @@ func (a Access) Grants(c Caller) bool {
 		return false
 	}
 	return true
+}
+
+// capabilityGrants reports whether the caller holds one of the capabilities
+// the rule asks for. Root passes wherever one is asked.
+func (a Access) capabilityGrants(c Caller) bool {
+	if len(a.Capabilities) == 0 {
+		return false
+	}
+	if slices.Contains(c.Capabilities, CapRoot) {
+		return true
+	}
+	for _, want := range a.Capabilities {
+		if !slices.Contains(c.Capabilities, want) {
+			continue
+		}
+		// The tenant administered is the ACTIVE one: no tenant, no
+		// administrator of it.
+		if want == CapTenantAdmin && (c.TenantID == "" ||
+			len(a.AdminTenants) > 0 && !slices.Contains(a.AdminTenants, c.TenantID)) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // Switchable reports whether a refusal would be lifted by choosing another
@@ -2185,8 +2292,9 @@ type RouteUI struct {
 }
 
 // IdentityFields are the signed-in user's facts a route may forward to its
-// upstream service. "roles" is the only multi-valued one (see IdentityAttr).
-var IdentityFields = []string{"username", "userid", "fullname", "tenant", "tenantid", "email", "timezone", "locale", "roles"}
+// upstream service. "roles" and "capabilities" are the multi-valued ones (see
+// IdentityAttr): a list in a token, comma-separated in a header.
+var IdentityFields = []string{"username", "userid", "fullname", "tenant", "tenantid", "email", "timezone", "locale", "roles", "capabilities"}
 
 // IdentityForward sends the signed-in caller to the upstream service. Mechanism
 // picks the transport; the SAME selected Attributes (and their per-attribute
@@ -2419,6 +2527,9 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 	if err := SanitizeCircuitBreaker(r.Breaker); err != nil {
 		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
 	}
+	if err := SanitizeStream("auditStream", &r.AuditStream); err != nil {
+		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
+	}
 	if r.UI != nil {
 		if err := CheckInjections(r.UI.Injections); err != nil {
 			return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
@@ -2426,9 +2537,13 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 	}
 	if r.API != nil && r.API.Security != nil {
 		for i := range r.API.Security.Endpoints {
-			if err := SanitizeAccess(&r.API.Security.Endpoints[i].Access); err != nil {
-				return invalidf(fmt.Errorf("%s %s: %w",
-					r.API.Security.Endpoints[i].Method, r.API.Security.Endpoints[i].Path, err))
+			e := &r.API.Security.Endpoints[i]
+			err := SanitizeAccess(&e.Access)
+			if err == nil {
+				err = NoCapabilities(e.Access)
+			}
+			if err != nil {
+				return invalidf(fmt.Errorf("%s %s: %w", e.Method, e.Path, err))
 			}
 		}
 	}
@@ -2457,9 +2572,6 @@ func (s *Store) SaveRoute(ctx context.Context, r Route) error {
 			return fmt.Errorf("store: route %q: %w", r.Name, err)
 		}
 		api = string(b)
-	}
-	if err := SanitizeStream("auditStream", &r.AuditStream); err != nil {
-		return invalidf(fmt.Errorf("route %q: %w", r.Name, err))
 	}
 	if r.UI != nil {
 		b, err := json.Marshal(r.UI)

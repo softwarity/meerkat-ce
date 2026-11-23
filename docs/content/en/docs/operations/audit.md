@@ -145,7 +145,7 @@ nobody's fault in particular.
   password and second-factor changes, and the calls of the operations audited
   in **Endpoint audit**, which are kept in Meerkat either way and sent to the
   collector only while it is on;
-- *Send Meerkat's console audit too*: the changes made in the console and the
+- *Also send the console audit*: the changes made in the console and the
   sign-ins to it.
 
 Each event also leaves as an OpenTelemetry **log** whose resource says what it
@@ -183,8 +183,8 @@ on the same screen (**Keep operations for**): seven days to a year, apart from
 the year the changes are kept. An application administrator reads every call;
 a tenant's administrator, the calls made in their tenant.
 
-On the community image the screen is locked, and so is the route editor's
-upload: an event nothing would ever send is a trail that looks kept and is not.
+On the community image the screen is locked: an event nothing would ever send
+is a trail that looks kept and is not.
 Rules a configuration brings over from the Enterprise image are kept with the
 route and not applied, and can still be removed.
 
@@ -223,11 +223,15 @@ events give `meerkat`. A line under the value shows it resolved on one of your
 services. For your log backend to select on it, index the attribute: in Loki,
 an `index_label` entry for `audit` in `otlp_config`.
 
+![The Audit tab: its two switches, then the selector, the attribute audit and the value {servicename}, with the value resolved on one of the services below it](img/console/opentelemetry-audit.webp)
+
 A route sets its own value in the **Audit** part of its **OpenTelemetry**
 section, `audit = [ ... ]`, the installation's value resolved for that route as
 the placeholder. The field is there only when the route has an OpenAPI
 contract. The rules travel with the [configuration](/docs/console/configuration)
 export.
+
+![The OpenTelemetry section of Orders API: the traces chosen here, where metrics and audit are decided, two audited operations, and the value its calls carry, audit=orders](img/console/route-editor-telemetry.webp)
 
 ## Filters, retention, and what is missing
 

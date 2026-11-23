@@ -141,12 +141,13 @@
         "properties": {
           "level": {
             "type": "string",
-            "description": "Empty: no check. `auth`: signed in. `tenant`: with an active tenant. `tenants`: an active tenant among `tenants`. `deny`: only the named users.",
+            "description": "Empty: no check. `auth`: signed in. `tenant`: with an active tenant. `tenants`: an active tenant among `tenants`. `capabilities`: the account holds one of `capabilities` (a route's own rule only). `deny`: only the named users.",
             "enum": [
               "",
               "auth",
               "tenant",
               "tenants",
+              "capabilities",
               "deny"
             ]
           },
@@ -164,6 +165,21 @@
             },
             "description": "Role names; the caller needs one of them in the active tenant, besides the level."
           },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["root", "infraAdmin", "appAdmin", "dev", "tenantAdmin"]
+            },
+            "description": "For `level` `capabilities` only: the account must hold one of them, and root passes wherever one is asked. `tenantAdmin` is the owner or an ADMIN member of the active tenant."
+          },
+          "adminTenants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tenant ids narrowing `tenantAdmin` to their administrators; empty, the administrator of any tenant."
+          },
           "users": {
             "type": "array",
             "items": {
@@ -172,7 +188,7 @@
             "description": "Usernames always let through."
           }
         },
-        "description": "Level and roles must both be met; named users always pass. Empty: no check."
+        "description": "Level and roles must both be met (the `capabilities` level poses no role); named users always pass. Empty: no check."
       },
       "RateLimit": {
         "type": "object",

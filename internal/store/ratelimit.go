@@ -124,6 +124,9 @@ func SanitizeRateLimits(limits []RateLimit) error {
 		if err := SanitizeAccess(&l.Applies); err != nil {
 			return fmt.Errorf("rate limit %d (per %s): applies to: %w", i+1, l.Per, err)
 		}
+		if err := NoCapabilities(l.Applies); err != nil {
+			return fmt.Errorf("rate limit %d (per %s): applies to: %w", i+1, l.Per, err)
+		}
 	}
 	return nil
 }

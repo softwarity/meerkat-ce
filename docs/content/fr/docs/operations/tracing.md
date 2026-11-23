@@ -91,7 +91,7 @@ Quatre onglets précisent ensuite ce qui est envoyé :
 |---|---|
 | **Traces** | un interrupteur : les traces dont parle cette page |
 | **Metrics** | un interrupteur : les compteurs de la gateway, poussés toutes les 30 secondes. C'est leur seule façon de sortir de la gateway (voir les [métriques](/docs/operations/metrics)) |
-| **Audit** | deux interrupteurs : **Send the audit logs** (connexions, refus, changements d'identifiants, opérations d'[Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)) et **Send Meerkat's console audit too** (voir l'[audit](/docs/operations/audit)) |
+| **Audit** | deux interrupteurs : **Send the audit logs** (connexions, refus, changements d'identifiants, opérations d'[Endpoint audit](/docs/operations/audit#auditer-les-oprations-dune-route)) et **Also send the console audit**, puis le sélecteur sur lequel un backend de logs garde l'audit (voir l'[audit](/docs/operations/audit)) |
 | **Logs** | un mode parmi trois, décrits ci-dessous |
 
 L'onglet **Logs** propose trois modes (voir les [journaux](/docs/operations/logs)) :

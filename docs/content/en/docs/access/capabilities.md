@@ -10,7 +10,8 @@ summary: The five flags on an account that open the console and the admin API, a
 Roles decide what someone reaches **through** the gateway. Capabilities decide
 what they may administer **of** the gateway. They are separate mechanisms: a
 capability opens the console and the admin API, and grants nothing on the data
-plane.
+plane - unless a route asks for it by name, with the level
+[With capabilities](/docs/access/route-access#with-capabilities).
 
 They are flags on the account, toggled from the row in **Application > Users**.
 
@@ -84,6 +85,10 @@ There is no *tenant admin* flag. Somebody administers a tenant when they
 [Tenants](/docs/access/tenants). The console computes that server-side and
 shows them the sections of the tenants concerned, and nothing else - see
 [Tenant administrator](/docs/access/tenant-admin).
+
+A route can still ask for one: the level
+[With capabilities](/docs/access/route-access#with-capabilities) offers
+**Tenant admin**, worked out the same way, in the active tenant.
 
 ## Navigation is comfort, the API is the contract
 

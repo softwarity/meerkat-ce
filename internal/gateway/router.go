@@ -1656,6 +1656,11 @@ type identityData struct {
 	// from the definitions.
 	Arrays map[string]bool
 	Roles  []string
+	// Capabilities are what the account holds among store.CapabilityNames,
+	// plus tenantAdmin when it administers the ACTIVE tenant (its owner, or an
+	// enabled ADMIN member): what a route's rule may ask for beside roles, and
+	// a fact a route may forward.
+	Capabilities []string
 	// Memberships are the organisations this account is an ENABLED member of,
 	// whichever one the session is in: an access rule naming an organisation
 	// admits its members (store.Caller). Read with the rest, so the rule does
@@ -1725,12 +1730,11 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 	}
 	d := identityData{UserID: u.ID, Username: u.Username, Fullname: u.Fullname,
 		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields,
-		Arrays: rt.arrayFields(req.Context())}
-	if ms, err := rt.st.ListUserTenants(req.Context(), u.ID); err == nil {
-		for _, m := range ms {
-			if m.Enabled {
-				d.Memberships = append(d.Memberships, m.TenantID)
-			}
+		Arrays: rt.arrayFields(req.Context()), Capabilities: store.UserCapabilities(u)}
+	ms, _ := rt.st.ListUserTenants(req.Context(), u.ID)
+	for _, m := range ms {
+		if m.Enabled {
+			d.Memberships = append(d.Memberships, m.TenantID)
 		}
 	}
 	// A session opened before this account joined an organisation carries
@@ -1739,9 +1743,19 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 	tenantID := rt.st.SessionTenant(req.Context(), u.ID, sess.TenantID)
 	if tenantID != "" {
 		d.TenantID = tenantID
+		admin := false
 		if t, err := rt.st.GetTenant(req.Context(), tenantID); err == nil {
 			d.Tenant = t.Name
 			d.TenantFields = t.Fields
+			admin = t.OwnerID == u.ID
+		}
+		for _, m := range ms {
+			if m.TenantID == tenantID && m.Enabled && m.Type == store.MemberAdmin {
+				admin = true
+			}
+		}
+		if admin {
+			d.Capabilities = append(d.Capabilities, store.CapTenantAdmin)
 		}
 		if sess.GroupID != "" {
 			if g, err := rt.st.GetGroup(req.Context(), sess.GroupID); err == nil {
@@ -1874,6 +1888,10 @@ func userFieldValue(d identityData, field string) string {
 		return d.TenantID
 	case "timezone":
 		return d.Timezone
+	case "capabilities":
+		// What the caller holds among the capabilities a route may ask for,
+		// so a page knows which administration to offer.
+		return strings.Join(d.Capabilities, ",")
 	case "locale":
 		// The language this page was SERVED in, not the raw preference: an
 		// application reading it at bootstrap wants to know what to render,
@@ -1899,7 +1917,7 @@ func fieldClaim(d identityData, field string) (any, bool) {
 	if v == "" {
 		return nil, false
 	}
-	if d.Arrays[field] {
+	if field == "capabilities" || d.Arrays[field] {
 		return strings.Split(v, ","), true
 	}
 	return v, true
@@ -2504,6 +2522,8 @@ func refusalCode(a store.Access, c store.Caller) string {
 	switch {
 	case a.Level == store.AccessTenants && !slices.Contains(a.Tenants, c.TenantID):
 		return "tenant" // this page belongs to another organisation
+	case a.Level == store.AccessCapable:
+		return "access" // none of the capabilities it asks for
 	case len(a.Roles) > 0:
 		return "roles" // right organisation, none of the roles it asks for
 	case len(a.Users) > 0:
@@ -2535,10 +2555,25 @@ func refusalReason(a store.Access, c store.Caller) string {
 		return "forbidden: no tenant is active on this session - choose one first"
 	case a.Level == store.AccessTenants && !slices.Contains(a.Tenants, c.TenantID):
 		return "forbidden: this endpoint is reserved to another tenant"
+	case a.Level == store.AccessCapable:
+		return "forbidden: this endpoint requires " + capabilityWants(a)
 	case len(a.Roles) > 0:
 		return "forbidden: this endpoint requires one of the roles " + strings.Join(a.Roles, ", ")
 	}
 	return "forbidden: you may not call this endpoint"
+}
+
+// capabilityWants names what a rule at the capabilities level accepts, in the
+// words of a refusal.
+func capabilityWants(a store.Access) string {
+	var parts []string
+	for _, c := range a.Capabilities {
+		if c == store.CapTenantAdmin && len(a.AdminTenants) > 0 {
+			c += " (of tenants " + strings.Join(a.AdminTenants, ", ") + ", active)"
+		}
+		parts = append(parts, c)
+	}
+	return "one of the capabilities " + strings.Join(parts, ", ")
 }
 
 // caller assembles what a rule is evaluated against. Memberships are read only
@@ -2549,7 +2584,7 @@ func (rt *Router) caller(_ *http.Request, d identityData, ok bool) store.Caller 
 		return store.Caller{}
 	}
 	return store.Caller{Authenticated: true, Username: d.Username, TenantID: d.TenantID,
-		Roles: d.Roles, Memberships: d.Memberships}
+		Roles: d.Roles, Capabilities: d.Capabilities, Memberships: d.Memberships}
 }
 
 // endpointGuard enforces per-operation security (RBAC-07) inside an API route.
@@ -2869,6 +2904,7 @@ var sampleIdentity = identityData{
 	UserID: "usr_123", Username: "jdoe", Fullname: "Jane Doe",
 	Email: "jdoe@example.com", Timezone: "Europe/Paris",
 	TenantID: "tnt_123", Tenant: "acme", Roles: []string{"role-a", "role-b"},
+	Capabilities: []string{"tenantAdmin"},
 }
 
 // PreviewHeaders renders the headers cfg would send for the sample caller.

@@ -569,8 +569,8 @@
     "CE",
     "EE"
    ],
-   "en": "Route access levels (public, signed in, tenant, role) on the data plane of the image.",
-   "fr": "Les niveaux d'accès d'une route (public, connecté, tenant, rôle) sur le plan de données de l'image."
+   "en": "Route access levels (public, signed in, tenant, role, capabilities) on the data plane of the image; a role, ROLE_ADMIN included, does not open a route asking for a capability.",
+   "fr": "Les niveaux d'accès d'une route (public, connecté, tenant, rôle, capabilities) sur le plan de données de l'image ; un rôle, ROLE_ADMIN compris, n'ouvre pas une route qui exige une capability."
   },
   {
    "id": "RBAC-07",
@@ -2828,6 +2828,50 @@
    "fr": "Les composants Softwarity s'affichent."
   },
   {
+   "id": "MOBILE-01",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (the mobile companion app).",
+   "fr": "Non construite (l'application mobile compagnon)."
+  },
+  {
+   "id": "MOBILE-02",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (pairing a device from the profile).",
+   "fr": "Non construite (appairage d'un appareil depuis le profil)."
+  },
+  {
+   "id": "MOBILE-03",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (the mobile portal).",
+   "fr": "Non construite (le portail mobile)."
+  },
+  {
+   "id": "MOBILE-04",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (native notifications through the push relay).",
+   "fr": "Non construite (notifications natives par le relais)."
+  },
+  {
    "id": "QUOTA-01",
    "priority": "P2",
    "feasibility": "medium",
@@ -2933,8 +2977,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Audit events reach an OpenTelemetry Collector on the platform (file exporter checked).",
-   "fr": "Les événements d'audit arrivent à un OpenTelemetry Collector sur la plateforme (vérifié par son exporteur fichier)."
+   "en": "Audit events reach an OpenTelemetry Collector on the platform (file exporter checked), each resource carrying the audit attribute with the audited service (meerkat for the gateway's own events), and log lines carrying none.",
+   "fr": "Les événements d'audit arrivent à un OpenTelemetry Collector sur la plateforme (vérifié par son exporteur fichier), chaque ressource portant l'attribut audit avec le service audité (meerkat pour les événements de la passerelle), et les lignes de log aucun."
   },
   {
    "id": "AUD-04",
@@ -2946,8 +2990,8 @@
    "editions": [
     "EE"
    ],
-   "en": "Endpoint audit records chosen operations to the collector; CE keeps rules unapplied.",
-   "fr": "L'audit des endpoints envoie au collecteur les opérations choisies ; CE conserve les règles sans les appliquer."
+   "en": "Endpoint audit records chosen operations to the collector under the service behind the route, or the route's own value; CE keeps rules unapplied.",
+   "fr": "L'audit des endpoints envoie au collecteur les opérations choisies, sous le service derrière la route ou la valeur propre de la route ; CE conserve les règles sans les appliquer."
   },
   {
    "id": "ISSUE-01",

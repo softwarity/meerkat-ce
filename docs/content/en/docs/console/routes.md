@@ -117,8 +117,13 @@ The name sits in the header. The left column lists the sections, grouped:
 
 **Identity** is what the route knows about the caller. Two sections spend it:
 **Auth forward** sends it to the service, **User info** puts it on the page.
-**OpenTelemetry** decides whether the route is traced (see
-[traces](/docs/operations/tracing#choosing-which-routes-are-traced)).
+**OpenTelemetry** reads Traces, Metrics, Audit. The traces are chosen there (see
+[traces](/docs/operations/tracing#choosing-which-routes-are-traced)); metrics
+follow them, and the audit counts the operations chosen in **Endpoint audit**,
+with the value its events carry when the route has an OpenAPI contract (see
+[audit](/docs/operations/audit#what-an-event-says-it-audits)).
+
+![The OpenTelemetry section of Orders API: the traces chosen here, where metrics and audit are decided, two audited operations, and the value its calls carry, audit=orders](img/console/route-editor-telemetry.webp)
 
 ### Reading the marks
 
@@ -128,7 +133,7 @@ The name sits in the header. The left column lists the sections, grouped:
   the gap is filled.
 - **A number in brackets** is how many items a section holds (three predicates,
   two gates).
-- **The Security section** carries the level it poses (`AUTH`, `ORG`, `DENY`, or
+- **The Security section** carries the level it poses (`AUTH`, `TENANT`, `CAP`, `DENY`, or
   a dot when nothing is posed but users are excepted), so an open route and a
   closed one do not read alike in the list.
 

@@ -86,7 +86,7 @@ Four tabs then say what is sent:
 |---|---|
 | **Traces** | one switch: the traces this page is about |
 | **Metrics** | one switch: the gateway's counters, pushed every 30 seconds. It is the only way they leave the gateway (see [metrics](/docs/operations/metrics)) |
-| **Audit** | two switches: **Send the audit logs** (sign-ins, refusals, credential changes, [Endpoint audit](/docs/operations/audit#auditing-a-routes-operations) operations) and **Send Meerkat's console audit too** (see [audit](/docs/operations/audit)) |
+| **Audit** | two switches: **Send the audit logs** (sign-ins, refusals, credential changes, [Endpoint audit](/docs/operations/audit#auditing-a-routes-operations) operations) and **Also send the console audit**, then the selector a log backend keeps the audit on (see [audit](/docs/operations/audit#what-an-event-says-it-audits)) |
 | **Logs** | one of three modes, below |
 
 The **Logs** tab has three modes (see [logs](/docs/operations/logs)):

@@ -55,6 +55,9 @@ type ProbeAs struct {
 	TenantID    string   `json:"tenantId,omitempty"`
 	Roles       []string `json:"roles,omitempty"`
 	Memberships []string `json:"memberships,omitempty"`
+	// Capabilities the caller holds (store.CapabilityNames); tenantAdmin
+	// means administering TenantID.
+	Capabilities []string `json:"capabilities,omitempty"`
 	// SignedIn says there is a session at all. Set on its own it probes
 	// "somebody, in no organisation" - the state a fresh account is in.
 	SignedIn bool `json:"signedIn,omitempty"`
@@ -62,14 +65,14 @@ type ProbeAs struct {
 
 // caller turns the description into what a rule is evaluated against.
 func (p ProbeAs) caller() store.Caller {
-	authed := p.SignedIn || p.Username != "" || p.TenantID != "" || len(p.Roles) > 0
+	authed := p.SignedIn || p.Username != "" || p.TenantID != "" || len(p.Roles) > 0 || len(p.Capabilities) > 0
 	ms := p.Memberships
 	if ms == nil && p.TenantID != "" {
 		ms = []string{p.TenantID}
 	}
 	return store.Caller{
 		Authenticated: authed, Username: p.Username, TenantID: p.TenantID,
-		Roles: p.Roles, Memberships: ms,
+		Roles: p.Roles, Capabilities: p.Capabilities, Memberships: ms,
 	}
 }
 

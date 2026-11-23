@@ -2,6 +2,15 @@
 
 ## NEXT RELEASE
 
+- **A route can be kept for those who administer, not for a role.** Who may call it offers
+  a new level, *With capabilities*: root, infra admin, app admin, developer, and with
+  several tenants, tenant admin (the owner of the active tenant or one of its ADMIN
+  members), of any tenant or of the ones named. Root always passes. No role opens such a
+  route, `ROLE_ADMIN` included, since a tenant administrator can put any role in a group.
+  The level is posed on the whole route; an endpoint override or a rate limit refuses it.
+- **A service can learn what its caller is**: Auth forward offers the `capabilities`
+  attribute, a list in a JWT and a comma-separated value in a header.
+
 ---
 
 ## 1.26.1

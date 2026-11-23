@@ -55,6 +55,10 @@ Le tiroir comporte un seul interrupteur, **Override the route config**.
 | **In one of these tenants** | Le tenant actif doit faire partie de ceux qui sont nommés |
 | **Nobody** | Refusé avant même que le service soit appelé |
 
+La règle propre à la route propose un niveau de plus, **With capabilities**
+([La règle d'accès d'une route](/docs/access/route-access#with-capabilities)).
+Il se pose sur la route entière, jamais sur une opération.
+
 ![Le même éditeur d'accès, dans la section Security d'une route : un niveau, une liste de rôles et une exception pour des utilisateurs nommés](img/console/route-editor-security.webp)
 
 Le même éditeur, ici sur la route *Orders API* : le niveau, les rôles (un seul suffit

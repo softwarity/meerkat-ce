@@ -2,7 +2,7 @@
 title: La règle d'accès d'une route
 section: Contrôle d'accès
 order: 134
-summary: La règle unique qui dit qui peut atteindre une route - niveau, rôles, utilisateurs nommés - et ce qui se passe quand une route ne dit rien.
+summary: La règle unique qui dit qui peut atteindre une route - niveau, rôles ou capacités, utilisateurs nommés - et ce qui se passe quand une route ne dit rien.
 ---
 
 # La règle d'accès d'une route
@@ -25,6 +25,7 @@ ajoutent par un **OU**, par-dessus le tout.
 | **Signed in** | toute personne qui a un compte - y compris un compte qui n'appartient encore à aucun tenant |
 | **In a tenant** | une session qui a un tenant actif. Écarte un compte encore en attente d'accès |
 | **In one of these tenants** | le tenant actif doit faire partie de ceux que vous nommez |
+| **With capabilities** | un compte qui détient l'une des capacités choisies. Les rôles n'y comptent pas (voir [plus bas](#with-capabilities)) |
 | **Nobody** | refusé avant tout appel au service. Seuls les utilisateurs nommés passent |
 
 Il n'existe pas de niveau *public*, parce que déléguer en est déjà un, et qu'un
@@ -59,6 +60,39 @@ seul.
 > l'ayez précisé ou non : les rôles n'existent qu'à l'intérieur d'un
 > tenant. En pratique, choisissez *In a tenant* dès que vous
 > nommez un rôle.
+
+## With capabilities
+
+Certaines pages ne sont pas faites pour qui détient un rôle, mais pour qui
+administre : un écran des membres, une page d'exploitation. Un administrateur de
+tenant peut mettre n'importe quel rôle du catalogue dans un groupe, `ROLE_ADMIN`
+compris : un rôle ne peut donc pas garder une telle page. Le niveau **With
+capabilities** demande plutôt ce que le compte **est** :
+
+![La route d'un écran des membres réservée à l'administrateur d'Acme Logistics et aux administrateurs de l'application : le niveau With capabilities, ses capacités et le tenant auquel il se limite](img/console/route-editor-capabilities.webp)
+
+| Capacité | Qui la détient |
+|---|---|
+| **Root** | root |
+| **Infra admin** | un compte qui a la capacité infra admin, ou root |
+| **App admin** | un compte qui a la capacité app admin, ou root |
+| **Developer** | un compte qui a la capacité dev |
+| **Tenant admin** | le propriétaire du tenant actif, ou un membre **ADMIN** actif de ce tenant. Proposée quand l'installation sert plusieurs tenants |
+
+- **Il suffit de détenir l'une des capacités choisies**, et root passe toujours.
+- **Ce niveau ne demande aucun rôle** : dans l'éditeur, les rôles laissent la
+  place aux capacités.
+- **Tenant admin of** restreint l'administrateur de tenant. Vide, c'est
+  l'administrateur du tenant actif, quel qu'il soit ; avec des tenants nommés,
+  seulement l'administrateur de l'un d'eux, et ce tenant doit être le tenant
+  actif. Un administrateur sans tenant actif est refusé.
+- **La route entière seulement** : la surcharge d'une opération et une limite de
+  débit ne proposent pas ce niveau, et l'API l'y refuse.
+- Les utilisateurs nommés passent toujours par-dessus.
+
+La route peut aussi dire à son service ce qu'est l'appelant : **Auth forward**
+propose l'attribut `capabilities`, une liste dans un JWT et des valeurs séparées
+par des virgules dans un en-tête, pour que la page sache quelles actions montrer.
 
 ## Les utilisateurs nommés
 
@@ -115,6 +149,7 @@ n'est faite que si un autre tenant auquel la personne appartient
 satisferait effectivement la règle.
 
 Sur une **route de service**, la réponse est un `403` accompagné d'une phrase
-qui nomme ce qui manquait - le tenant, l'un de ces rôles, cet endpoint est
+qui nomme ce qui manquait - le tenant, l'un de ces rôles, l'une de ces
+capacités, cet endpoint est
 fermé - ou un `401` avec `WWW-Authenticate: Session` quand il n'y a aucune
 session. Personne ne lit une page HTML dans un `curl`.

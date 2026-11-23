@@ -2,7 +2,7 @@
 title: A route's access rule
 section: Access control
 order: 134
-summary: The one rule that says who may reach a route - level, roles, named users - and what happens when a route says nothing.
+summary: The one rule that says who may reach a route - level, roles or capabilities, named users - and what happens when a route says nothing.
 ---
 
 # A route's access rule
@@ -24,6 +24,7 @@ The level and the roles are **ANDed**. The named users are **ORed over the top**
 | **Signed in** | anybody with an account - including one that belongs to no tenant yet |
 | **In a tenant** | a session with an active tenant. Turns away an account still awaiting access |
 | **In one of these tenants** | the active tenant must be one of those you name |
+| **With capabilities** | an account holding one of the capabilities you pick. Roles do not count here (see [below](#with-capabilities)) |
 | **Nobody** | refused before the service is called. Only the named users get through |
 
 There is no *public* level, because delegating already is one, and a level named
@@ -56,6 +57,38 @@ Leaving the roles empty means any role passes - the level alone decides.
 > A rule asking for a role always needs a tenant too, whether or not you
 > said so: roles only exist inside one. In practice, choose *In a tenant*
 > whenever you name a role.
+
+## With capabilities
+
+Some pages are not for whoever holds a role, but for whoever administers: a
+members screen, an operations page. A tenant administrator can put any role of
+the catalogue in a group, `ROLE_ADMIN` included, so a role cannot guard such a
+page. The level **With capabilities** asks what the account **is** instead:
+
+![A members screen's route kept for the administrator of Acme Logistics and for application administrators: the level With capabilities, its capabilities, and the tenant it is narrowed to](img/console/route-editor-capabilities.webp)
+
+| Capability | Who holds it |
+|---|---|
+| **Root** | root |
+| **Infra admin** | an account with the infra admin capability, or root |
+| **App admin** | an account with the app admin capability, or root |
+| **Developer** | an account with the dev capability |
+| **Tenant admin** | the owner of the active tenant, or an enabled **ADMIN** member of it. Offered when the installation runs several tenants |
+
+- **Any one of those you pick grants access**, and root always passes.
+- **The level asks no role**: in the editor, the roles give way to the
+  capabilities.
+- **Tenant admin of** narrows the tenant administrator. Left empty, it is the
+  administrator of whichever tenant is active; with tenants named, only the
+  administrator of one of them, and that tenant must be the active one. An
+  administrator with no active tenant is refused.
+- **The whole route only**: an operation's override and a rate limit do not
+  offer this level, and the API refuses it there.
+- Named users still pass over the top.
+
+The route can also tell its service what the caller is: **Auth forward** offers
+the `capabilities` attribute, a list in a JWT and a comma-separated value in a
+header, so the page knows which actions to show.
 
 ## Named users
 
@@ -106,6 +139,7 @@ The offer to switch tenant is filtered against reality: it is only made
 when another tenant the person belongs to would actually satisfy the rule.
 
 On a **service route**, the answer is a `403` with a sentence naming what was
-missing - the tenant, one of these roles, this endpoint is closed - or a
+missing - the tenant, one of these roles, one of these capabilities, this
+endpoint is closed - or a
 `401` with `WWW-Authenticate: Session` when there is no session at all. Nobody
 reads an HTML page in a `curl`.

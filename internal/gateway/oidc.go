@@ -91,7 +91,7 @@ func (p Person) TenantID() string { return p.d.TenantID }
 // builds it.
 func (p Person) Caller() store.Caller {
 	return store.Caller{Authenticated: true, Username: p.d.Username, TenantID: p.d.TenantID,
-		Roles: p.d.Roles, Memberships: p.d.Memberships}
+		Roles: p.d.Roles, Capabilities: p.d.Capabilities, Memberships: p.d.Memberships}
 }
 
 // PersonOf resolves a stored session the way a request carrying it would be

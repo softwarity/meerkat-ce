@@ -127,8 +127,13 @@ regroupées ainsi :
 
 **Identity** contient ce que la route sait de l'appelant. Deux sections
 l'exploitent : **Auth forward** le transmet au service, **User info** l'affiche
-sur la page. **OpenTelemetry** décide si la route est tracée (voir
-[les traces](/docs/operations/tracing#choisir-les-routes-traces)).
+sur la page. **OpenTelemetry** se lit Traces, Metrics, Audit. Les traces s'y choisissent (voir
+[les traces](/docs/operations/tracing#choisir-les-routes-traces)) ; les métriques
+les suivent, et l'audit compte les opérations choisies dans **Endpoint audit**, avec la
+valeur que portent ses événements quand la route a un contrat OpenAPI (voir
+[l'audit](/docs/operations/audit)).
+
+![La section OpenTelemetry d'Orders API : les traces choisies ici, où se décident les métriques et l'audit, deux opérations auditées, et la valeur que portent ses appels, audit=orders](img/console/route-editor-telemetry.webp)
 
 ### Lire les marques
 
@@ -138,7 +143,7 @@ sur la page. **OpenTelemetry** décide si la route est tracée (voir
   disparaît une fois le manque comblé.
 - **Un nombre entre parenthèses** donne le nombre d'éléments que contient la
   section (trois prédicats, deux gates).
-- **La section Security** affiche le niveau qu'elle impose (`AUTH`, `ORG`, `DENY`,
+- **La section Security** affiche le niveau qu'elle impose (`AUTH`, `TENANT`, `CAP`, `DENY`,
   ou un point quand elle n'impose rien mais que des utilisateurs font exception) :
   une route ouverte et une route fermée ne se présentent ainsi pas de la même
   façon dans la liste.

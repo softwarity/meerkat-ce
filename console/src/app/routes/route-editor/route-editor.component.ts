@@ -385,8 +385,9 @@ function toAccessState(a: Access | undefined): AccessState {
   // Normalised on the way IN: exceptions with nothing to except them from are
   // dropped, so a leftover list stops showing a rule that conditions nothing -
   // and stops being saved back the next time the route is touched.
-  const users = level === "" && roles.length === 0 ? [] : (a.users ?? []);
-  return { level, tenants: a.tenants ?? [], roles, users };
+  const capabilities = a.capabilities ?? [];
+  const users = level === "" && roles.length === 0 && capabilities.length === 0 ? [] : (a.users ?? []);
+  return { level, tenants: a.tenants ?? [], roles, users, capabilities, adminTenants: a.adminTenants ?? [] };
 }
 
 // The editable shape of one route: every field the drawer can change, with the
@@ -606,6 +607,8 @@ export class RouteEditorComponent {
     // claim a rule the engine ignores.
     if (a.roles?.length)
       bits.push($localize`:@@N_roles:${a.roles.length}:COUNT: roles`);
+    if (a.capabilities?.length)
+      bits.push($localize`:@@N_capabilities:${a.capabilities.length}:COUNT: capabilities`);
     if (a.users?.length)
       bits.push($localize`:@@N_users:${a.users.length}:COUNT: users`);
     const endpoints = this.route()?.api?.security?.endpoints?.length ?? 0;

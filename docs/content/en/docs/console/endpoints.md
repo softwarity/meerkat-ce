@@ -51,6 +51,10 @@ The drawer carries one switch, **Override the route config**.
 | **In one of these tenants** | The active tenant must be one of those named |
 | **Nobody** | Refused before the service is called |
 
+The route's own rule offers one more level, **With capabilities**
+([A route's access rule](/docs/access/route-access#with-capabilities)). It is
+posed on the whole route, never on one operation.
+
 ![The same access editor, on a route's Security section: a level, a list of roles, and an exception for named users](img/console/route-editor-security.webp)
 
 The same editor, here on the *Orders API* route: the level, the roles (any one

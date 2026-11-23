@@ -598,6 +598,12 @@ func accessSummary(a store.Access) string {
 		parts = append(parts, "signed in with a tenant chosen")
 	case store.AccessTenants:
 		parts = append(parts, "tenant in "+strings.Join(a.Tenants, ", "))
+	case store.AccessCapable:
+		caps := "capabilities " + strings.Join(a.Capabilities, ", ")
+		if len(a.AdminTenants) > 0 {
+			caps += " (tenantAdmin of " + strings.Join(a.AdminTenants, ", ") + ")"
+		}
+		parts = append(parts, caps)
 	case store.AccessDeny:
 		parts = append(parts, "nobody")
 	default:

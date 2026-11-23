@@ -2,7 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ACCESS_LEVELS, AccessState, isEmpty, levelShort } from './access-editor.component';
+import { ACCESS_LEVELS, AccessState, capabilityLabel, isEmpty, levelShort } from './access-editor.component';
 
 // The rule at a glance. The LEVEL is written, not drawn: a lit padlock said
 // "some rule" and left "signed in", "in an organisation" and "in one of these
@@ -33,8 +33,8 @@ import { ACCESS_LEVELS, AccessState, isEmpty, levelShort } from './access-editor
       <span class="d d-users" [class.on]="namedUsers()" [matTooltip]="usersTip()">
         <mat-icon>group</mat-icon><span class="n">{{ namedUsers() || '' }}</span>
       </span>
-      <span class="d d-roles" [class.on]="access().roles.length > 0" [matTooltip]="rolesTip()">
-        <mat-icon>badge</mat-icon><span class="n">{{ access().roles.length || '' }}</span>
+      <span class="d d-roles" [class.on]="grantCount() > 0" [matTooltip]="rolesTip()">
+        <mat-icon>badge</mat-icon><span class="n">{{ grantCount() || '' }}</span>
       </span>
       @if (limits() !== null) {
         <span
@@ -237,8 +237,17 @@ export class AccessBadgesComponent {
     }
     return u.length ? $localize`:@@Users:Users` + ': ' + u.join(', ') : $localize`:@@Users:Users`;
   });
+  // Roles and capabilities are one axis - any one of them grants - so they
+  // share the badge, and the tooltip tells them apart.
+  protected readonly grantCount = computed(
+    () => this.access().roles.length + (this.access().capabilities?.length ?? 0),
+  );
   protected readonly rolesTip = computed(() => {
     const r = this.access().roles;
-    return r.length ? $localize`:@@Roles:Roles` + ': ' + r.join(', ') : $localize`:@@Roles:Roles`;
+    const c = this.access().capabilities ?? [];
+    const parts: string[] = [];
+    if (r.length) parts.push($localize`:@@Roles:Roles` + ': ' + r.join(', '));
+    if (c.length) parts.push($localize`:@@Capabilities:Capabilities` + ': ' + c.map(capabilityLabel).join(', '));
+    return parts.length ? parts.join(' / ') : $localize`:@@Roles:Roles`;
   });
 }

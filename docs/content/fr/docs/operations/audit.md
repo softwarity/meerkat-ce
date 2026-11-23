@@ -146,7 +146,7 @@ capacités, sans que ce soit la faute de qui que ce soit en particulier.
   changements de mot de passe et de second facteur, ainsi que les appels aux opérations
   auditées dans **Endpoint audit**, conservés dans Meerkat dans tous les cas et envoyés
   au collecteur seulement quand cet interrupteur est activé ;
-- *Send Meerkat's console audit too* : les modifications faites dans la console et les
+- *Also send the console audit* : les modifications faites dans la console et les
   connexions à celle-ci.
 
 Chaque événement part aussi sous la forme d'un **log** OpenTelemetry dont la ressource dit ce
@@ -184,9 +184,8 @@ leur propre durée de conservation, un mois par défaut, que root règle sur le 
 laquelle on garde les modifications. Un administrateur des applications lit tous les appels ;
 l'administrateur d'un tenant, ceux faits dans son tenant.
 
-Sur l'image Community, l'écran est verrouillé, tout comme le téléversement dans l'éditeur de
-route : un événement que rien n'enverrait jamais, c'est un journal qui semble tenu et qui ne
-l'est pas. Les règles qu'une configuration apporte depuis l'image Enterprise sont conservées
+Sur l'image Community, l'écran est verrouillé : un événement que rien n'enverrait jamais,
+c'est un journal qui semble tenu et qui ne l'est pas. Les règles qu'une configuration apporte depuis l'image Enterprise sont conservées
 avec la route sans être appliquées, et vous pouvez toujours les supprimer.
 
 ![Endpoint audit : les opérations de la spec d'une route, et celles qui laissent un événement d'audit](img/console/endpoint-audit.webp)
@@ -224,10 +223,14 @@ plusieurs routes vers un même service le partagent ; les événements de la pas
 backend de logs sélectionne dessus, indexez l'attribut : dans Loki, une entrée `index_label`
 pour `audit` dans `otlp_config`.
 
+![L'onglet Audit : ses deux interrupteurs, puis le sélecteur, l'attribut audit et la valeur {servicename}, avec dessous la valeur résolue sur l'un des services](img/console/opentelemetry-audit.webp)
+
 Une route règle sa propre valeur dans la partie **Audit** de sa section **OpenTelemetry**,
 `audit = [ ... ]`, avec en placeholder la valeur de l'installation résolue pour cette route.
 Le champ n'apparaît que si la route a un contrat OpenAPI. Les règles voyagent avec l'export de
 la [configuration](/docs/console/configuration).
+
+![La section OpenTelemetry d'Orders API : les traces choisies ici, où se décident les métriques et l'audit, deux opérations auditées, et la valeur que portent ses appels, audit=orders](img/console/route-editor-telemetry.webp)
 
 ## Filtres, rétention, et ce qui manque
 
