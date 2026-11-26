@@ -129,7 +129,12 @@
     <mat-list-option value="scheme" [selected]="section() === 'scheme'" [disabled]="!draft().isUi" i18n="@@Section_color_scheme">Color scheme</mat-list-option>
     <mat-list-option value="button" [selected]="section() === 'button'" [disabled]="!draft().isUi" i18n="@@Section_user_button">User button</mat-list-option>
     <mat-list-option value="userinfo" [selected]="section() === 'userinfo'" [disabled]="!draft().isUi" i18n="@@Section_user_info">User info</mat-list-option>
-    <mat-list-option value="custom" [selected]="section() === 'custom'" [disabled]="!draft().isUi" i18n="@@Section_custom">Custom</mat-list-option>
+    <mat-list-option value="custom" [selected]="section() === 'custom'" [disabled]="!draft().isUi">
+      <span i18n="@@Section_custom">Custom</span>
+      @if (strays().length && !route()?.ui?.rootPaths) {
+        <mat-icon class="stray-mark" i18n-matTooltip="@@Route_strays_mark" matTooltip="Its pages ask for addresses outside this route">warning</mat-icon>
+      }
+    </mat-list-option>
   </mat-selection-list>
 
   <!-- Flush for the sections whose content is a palette drawer: the drawer
@@ -1453,7 +1458,7 @@
         <!-- Four signals, one place to read where each is decided. Only the
              traces are chosen per route: the rest is said, briefly, with the
              screen that does decide it. -->
-        <h3 class="sub" i18n="@@Section_traces">Traces</h3>
+        <h3 class="sub next" i18n="@@Section_traces">Traces</h3>
         <!-- Shown whatever the installation's tracing setting says: a field
              that vanishes teaches nothing about why it is not there. Offered on
              every route, not only the UI ones - a service route has the
@@ -1462,10 +1467,11 @@
           [checked]="draft().telemetry"
           [disabled]="!telemetryOn()"
           (change)="setFlag('telemetry', $event.checked)"
+          class="switch"
         >
-          <ng-container i18n="@@Route_tracing_toggle">Include this route in OpenTelemetry</ng-container>
+          <span class="toggle-label" i18n="@@Route_tracing_toggle">Include this route in OpenTelemetry</span>
         </mat-slide-toggle>
-        <p class="section-hint" i18n="@@Route_tracing_push_hint">
+        <p class="section-hint toggle-hint" i18n="@@Route_tracing_push_hint">
           Sends its traces and metrics. Off, it only counts in the gateway's totals, which suits an
           admin interface or a health probe.
         </p>
@@ -1477,15 +1483,16 @@
           [disabled]="!telemetryOn() || !draft().telemetry || !draft().isUi"
           [matTooltip]="uiTraceTip()"
           (change)="setFlag('telemetryUi', $event.checked)"
+          class="switch"
         >
-          <ng-container i18n="@@Route_tracing_ui_toggle">Start the trace from the UI</ng-container>
+          <span class="toggle-label" i18n="@@Route_tracing_ui_toggle">Start the trace from the UI</span>
         </mat-slide-toggle>
-        <p class="section-hint" i18n="@@Route_tracing_ui_hint">
+        <p class="section-hint toggle-hint" i18n="@@Route_tracing_ui_hint">
           The trace starts at the <b>click</b>, in the page. Leave it off if the application already
           has its own OpenTelemetry agent.
         </p>
 
-        <h3 class="sub" i18n="@@Section_metrics">Metrics</h3>
+        <h3 class="sub next" i18n="@@Section_metrics">Metrics</h3>
         <p class="section-hint" i18n="@@Route_metrics_where">
           This route's series follow the switch above. Turned on for the installation in
           <b>Infra, OpenTelemetry, Metrics</b>.
@@ -1495,7 +1502,7 @@
              screen, which lists the operations of the SAVED spec: no spec, no
              link to a screen that would not offer this route. Kept in Meerkat's
              own trail whatever the switch above says. -->
-        <h3 class="sub" i18n="@@Section_audit">Audit</h3>
+        <h3 class="sub next" i18n="@@Section_audit">Audit</h3>
         <p class="section-hint off-note">
           @if (mode() === 'redirect') {
             <span>{{ noAuditTip }}</span>
@@ -1539,6 +1546,60 @@
         }
       }
       @case ('custom') {
+        <!-- Two subjects, each under its own heading: where the application's
+             addresses point (routing/rootpaths.go), then the route's own code. -->
+        <h3 class="sub" i18n="@@Section_addresses">Addresses</h3>
+        <!-- An application written for the root, under a stripped prefix.
+             Disabled rather than hidden where nothing is stripped, so the
+             reason is where the question is. -->
+        <div class="root-paths">
+          <mat-slide-toggle
+            [checked]="draft().rootPaths && strips()"
+            [disabled]="!strips()"
+            (change)="setFlag('rootPaths', $event.checked)"
+          >
+            <span class="toggle-label" i18n="@@Route_root_paths_toggle">App written for the root</span>
+          </mat-slide-toggle>
+          <mat-icon
+            class="info"
+            i18n-matTooltip="@@Route_root_paths_info"
+            matTooltip="The gateway adds the prefix this route strips to the links of the application's pages and stylesheets, and to the calls its scripts make (fetch, XHR, WebSocket). An address a script sets on an element or on location stays out of reach: such an application needs a host of its own."
+            >info</mat-icon
+          >
+        </div>
+        <p class="section-hint toggle-hint">
+          @if (strips()) {
+            <span i18n="@@Route_root_paths_hint2">For an application that writes <code>/static/app.js</code> rather than <code>static/app.js</code>.</span>
+          } @else {
+            <span i18n="@@Route_root_paths_nostrip2">Only for a route that strips a prefix.</span>
+          }
+        </p>
+        @if (strays().length) {
+          <div class="strays">
+            <p>
+              <mat-icon>warning</mat-icon>
+              @if (route()?.ui?.rootPaths) {
+                <span i18n="@@Route_strays_on">Since this route was saved, its pages still asked for {{ strayCount() }} addresses outside it. The switch cannot reach these: they are set by a script. Publish the application under a host of its own.</span>
+              } @else {
+                <span i18n="@@Route_strays_off">Since this route was saved, its pages asked for {{ strayCount() }} addresses outside it, answered by another route or by nobody. The application writes them from the root: turn the switch on, or publish it under a host of its own.</span>
+              }
+            </p>
+            <ul>
+              @for (s of strays(); track s.path) {
+                <li>
+                  <code>{{ s.example }}</code> &times;{{ s.count }}
+                  @if (s.landedOn) {
+                    <span class="landed" i18n="@@Route_stray_landed">answered by {{ s.landedOn }} ({{ s.status }})</span>
+                  } @else {
+                    <span class="landed" i18n="@@Route_stray_nobody">no route ({{ s.status }})</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <h3 class="sub next" i18n="@@Section_injections">Injections</h3>
         <p class="section-hint" i18n="@@Custom_hint3">
           Your own CSS and JavaScript, added to this application's pages in list order.
         </p>

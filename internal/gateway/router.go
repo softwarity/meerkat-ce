@@ -121,6 +121,10 @@ type Router struct {
 	// id. Written by Reload under the same lock, read by Problems.
 	problems map[string]string
 	needDraw bool // at least one route uses weight predicates
+	// watches are the UI routes publishing under a stripped prefix, and
+	// strays what their pages asked for outside it (strays.go).
+	watches []*strayWatch
+	strays  strayBook
 	// assets are the files a UI route's custom code names, by route id then
 	// name, served at store.RouteAssetPath (injections.go).
 	assets map[string]map[string]store.RouteFile
@@ -208,6 +212,10 @@ type compiledRoute struct {
 	// one of its clients (oidc.go): the base access rule and the identity
 	// section, vault references expanded. Nil for every other route.
 	oidc *OIDCRoute
+	// catchAll: the route takes any path ("/**", or no path predicate). A
+	// request from another route's page landing here was not addressed to
+	// it (strays.go).
+	catchAll bool
 }
 
 // New builds a Router over the store. sm may be nil when no route requires
@@ -317,6 +325,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	assets := map[string]map[string]store.RouteFile{}
 	compiled := make([]compiledRoute, 0, len(stored))
 	var allPreds []*routing.CompiledPredicates
+	var watches []*strayWatch
 	needDraw := false
 	for _, raw := range stored {
 		if !raw.Enabled {
@@ -372,6 +381,9 @@ func (rt *Router) Reload(ctx context.Context) error {
 		}
 		compiled = append(compiled, cr)
 		allPreds = append(allPreds, &compiled[len(compiled)-1].preds)
+		if w := watchOf(r); w != nil {
+			watches = append(watches, w)
+		}
 		needDraw = needDraw || cr.preds.HasWeight()
 		if named := injectedFiles(r, files[raw.ID]); named != nil {
 			assets[raw.ID] = named
@@ -440,6 +452,7 @@ func (rt *Router) Reload(ctx context.Context) error {
 	rt.problems = problems
 	rt.assets = assets
 	rt.needDraw = needDraw
+	rt.watches = watches
 	rt.signing = sset
 	rt.maintenance, rt.maintenancePage = maint, renderMaintenance(maint)
 	if simKey != nil {
@@ -843,6 +856,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			ww, start := record(w)
 			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
+			rt.noteStray(hit, r, ww.status)
 			return
 		}
 		d, ok := rt.sessionIdentity(hit)
@@ -856,6 +870,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			spanEvent(hit.Context(), "access_granted")
 			ww, start := record(w)
 			rt.answerOrRefuse(ww, hit, r, start, cand, candReq, candOK, candWho, candUserID)
+			rt.noteStray(hit, r, ww.status)
 			return
 		}
 		// A closed door stays closed. Falling through a "deny" to whatever
@@ -886,6 +901,7 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ww, start := record(w)
 	rt.notFound(ww, req)
 	writeAccess(req, "", "", ww.status, ww.bytes, time.Since(start))
+	rt.noteStray(req, nil, ww.status)
 	// Not traced: tracing is each route's answer, and no route answered. A
 	// 404 is nobody's journey - an asset a front end asks for at the root, a
 	// path that used to exist - and it was what filled the backend with
@@ -951,6 +967,15 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 		// The literal head of the route's path patterns is where the language
 		// gets inserted - see insertLocale.
 		localeForwardFilter(localeCodes, localeCfg, routing.PathPrefixes(r.Predicates)))
+
+	// An application written for the root, published under a prefix it
+	// strips (routing/rootpaths.go): its pages, stylesheets and calls get the
+	// prefix back. FIRST among the gateway's own response filters, so what the
+	// gateway injects after it - the user button, the portal, the route's
+	// blocks - is never mistaken for the application's.
+	if r.IsUI && r.UI != nil && r.UI.RootPaths {
+		filters.Response = append(filters.Response, rootPathsFilters()...)
+	}
 
 	// What the gateway adds to a UI route's HTML pages, at the TOP OF THE BODY:
 	// a custom element inside <head> closes it where it stands, and everything
@@ -1232,7 +1257,7 @@ func (rt *Router) compile(r store.Route, deposited []byte, files []store.RouteFi
 	}
 	return compiledRoute{id: r.ID, name: r.Name, preds: preds, handler: handler, breaker: cfg,
 		access: selectAccess, isUI: r.IsUI, noTrace: noTracing(r), counters: rt.routeCounters(r),
-		ops: ops, upstream: upstream, oidc: oidcRouteOf(r)}, nil
+		ops: ops, upstream: upstream, oidc: oidcRouteOf(r), catchAll: takesEverything(r)}, nil
 }
 
 // noTracing reads the route's tracing switch. A route that never mentioned the
@@ -1635,9 +1660,18 @@ type identityData struct {
 	Fullname string
 	Email    string
 	Timezone string
-	Locale   string
-	TenantID string
-	Tenant   string
+	// Currency is the person's ISO 4217 code. It and Timezone are empty when
+	// Infra > Model switched the preference off (store.AccountPreferences).
+	// A person who chose none gets the one the request's browser points to
+	// (currencyFromBrowser), set per request after the cache.
+	Currency string
+	// currencyFromBrowser: the preference is on and the account holds no
+	// currency, so each request derives one from its Accept-Language. Not a
+	// fact of the account: two browsers of the same person may differ.
+	currencyFromBrowser bool
+	Locale              string
+	TenantID            string
+	Tenant              string
 	// Group is the session's chosen group (exclusive mode, RBAC-03), by name.
 	Group string
 	// Fields are the installation's own facts about this person (store's
@@ -1718,7 +1752,11 @@ func (rt *Router) identityOfSession(req *http.Request, sess store.Session) (iden
 	if !e.owner.Enabled || !e.owner.ValidAt(now) {
 		return identityData{}, false
 	}
-	return e.data.clone(), true
+	d := e.data.clone()
+	if d.currencyFromBrowser {
+		d.Currency = store.CurrencyOfLanguages(req.Header.Get("Accept-Language"))
+	}
+	return d, true
 }
 
 // readIdentity is what sessionIdentity used to do on every request: the
@@ -1729,8 +1767,19 @@ func (rt *Router) readIdentity(req *http.Request, sess store.Session) (identityE
 		return identityEntry{}, false
 	}
 	d := identityData{UserID: u.ID, Username: u.Username, Fullname: u.Fullname,
-		Email: u.Email, Timezone: u.Timezone, Locale: u.Locale, Fields: u.Fields,
+		Email: u.Email, Timezone: u.Timezone, Currency: u.Currency, Locale: u.Locale, Fields: u.Fields,
 		Arrays: rt.arrayFields(req.Context()), Capabilities: store.UserCapabilities(u)}
+	// A preference switched off carries nothing, whatever the row still
+	// holds: the value comes back the day it is switched on again.
+	prefs := rt.st.AccountPreferences(req.Context())
+	if prefs.Off(store.PrefTimezone) {
+		d.Timezone = ""
+	}
+	if prefs.Off(store.PrefCurrency) {
+		d.Currency = ""
+	} else if d.Currency == "" {
+		d.currencyFromBrowser = true
+	}
 	ms, _ := rt.st.ListUserTenants(req.Context(), u.ID)
 	for _, m := range ms {
 		if m.Enabled {
@@ -1888,6 +1937,8 @@ func userFieldValue(d identityData, field string) string {
 		return d.TenantID
 	case "timezone":
 		return d.Timezone
+	case "currency":
+		return d.Currency
 	case "capabilities":
 		// What the caller holds among the capabilities a route may ask for,
 		// so a page knows which administration to offer.
@@ -2902,7 +2953,7 @@ func renderRoles(expr string, d identityData) (string, error) {
 // infra admin forge a token for anyone the upstream trusts.
 var sampleIdentity = identityData{
 	UserID: "usr_123", Username: "jdoe", Fullname: "Jane Doe",
-	Email: "jdoe@example.com", Timezone: "Europe/Paris",
+	Email: "jdoe@example.com", Timezone: "Europe/Paris", Currency: "EUR",
 	TenantID: "tnt_123", Tenant: "acme", Roles: []string{"role-a", "role-b"},
 	Capabilities: []string{"tenantAdmin"},
 }
@@ -3648,7 +3699,7 @@ func (rt *Router) withIdentity(next http.Handler) http.Handler {
 			id = routing.Identity{
 				Username: d.Username, UserID: d.UserID, Fullname: d.Fullname,
 				Email: d.Email, Tenant: d.Tenant, TenantID: d.TenantID,
-				Timezone: d.Timezone, Roles: d.Roles,
+				Timezone: d.Timezone, Currency: d.Currency, Roles: d.Roles,
 			}
 		}
 		next.ServeHTTP(w, req.WithContext(routing.WithIdentity(req.Context(), id)))

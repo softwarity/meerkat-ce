@@ -81,7 +81,7 @@
   @if (data().bar && !data().special && data().kind !== 'container') {
     <div class="room">
       <mat-slide-toggle [checked]="room()" (change)="room.set($event.checked)">
-        <span i18n="@@Portal_make_room">Make room for the bar</span>
+        <span class="toggle-label" i18n="@@Portal_make_room">Make room for the bar</span>
       </mat-slide-toggle>
       <!-- The explanation is the tooltip's, as on the fields: the name says
            what it does, the detail is there for whoever asks. -->

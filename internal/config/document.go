@@ -178,6 +178,9 @@ var ExportedSettings = []string{
 	// The organisations' own (MODEL-03), for the same reason: the routes
 	// that name them travel, and so do the organisations holding the values.
 	store.SettingTenantFields,
+	// Which preferences an account carries, for the same reason again: a
+	// route forwarding `currency` means nothing where it is switched off.
+	store.SettingAccountPreferences,
 	store.SettingExpiryDigest,
 	// What the gateway will hold in memory while it proxies (PERF-02). It
 	// travels because it describes the SHAPE of the installation, not its

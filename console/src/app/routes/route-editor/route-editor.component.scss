@@ -176,14 +176,17 @@ app-form-field.height-field {
 .locale-row .ln {
   color: var(--mat-sys-on-surface-variant);
 }
+/* On the left edge, like the list it adds to: centred in the column, it
+   stood indented from everything around it. */
 .add-locale {
-  align-self: center;
+  align-self: flex-start;
   width: 100%;
   max-width: 560px;
 }
 /* The languages take whatever height is left: twenty of them, and the field
    above must not walk off the top when one scrolls to the twenty-first. */
 .locale-set {
+  box-sizing: border-box;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -616,8 +619,7 @@ mat-selection-list .ui-toggle {
 }
 .locales-pane .forwarding {
   flex: none;
-  padding-top: 4px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  margin-top: 20px;
 }
 
 // The mechanism names what travels AND what the page does, so the field is
@@ -769,4 +771,85 @@ mat-form-field.namespace {
 .upstream-pick .sep {
   margin-right: 6px;
   color: var(--mat-sys-on-surface-variant);
+}
+
+/* What the route's pages asked for outside it (strays): a callout marked by
+   its edge and its icon, not a red slab; the addresses in the font of code. */
+.strays {
+  margin: 4px 0 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid var(--mat-sys-error);
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+  p {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin: 0;
+  }
+  p mat-icon {
+    flex: 0 0 auto;
+    color: var(--mat-sys-error);
+  }
+  ul {
+    margin: 8px 0 0 34px;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    padding: 2px 0;
+  }
+  .landed {
+    margin-left: 8px;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+.stray-mark {
+  color: var(--mat-sys-error);
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+/* The switch and its explanation, on one line, with room around it; its hint
+   sits under the label it explains, not under the switch. */
+.root-paths {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 6px;
+  .toggle-label {
+    margin-left: 10px;
+  }
+  .info {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--mat-sys-on-surface-variant);
+    cursor: help;
+  }
+}
+/* A switch standing on its own line, its label off the thumb. */
+mat-slide-toggle.switch {
+  display: block;
+  margin: 14px 0 6px;
+  .toggle-label {
+    margin-left: 10px;
+  }
+}
+.section-hint.toggle-hint {
+  margin: 0 0 18px 62px;
+}
+/* A second part of the same section: as much air above its heading as the
+   heading has below it, and more. */
+.sub.next {
+  margin-top: 36px;
+}
+.sub.next + .section-hint {
+  margin-bottom: 18px;
+}
+.strays {
+  font-size: 0.9rem;
 }

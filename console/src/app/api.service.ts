@@ -394,6 +394,7 @@ export const PAGE_USER_FIELDS = [
   'tenant',
   'tenantid',
   'timezone',
+  'currency',
   'locale',
 ] as const;
 
@@ -450,6 +451,17 @@ export interface Injection {
 
 // UI-route options: color-scheme interaction, roles/user-info injections,
 // user button, and free CSS/JS blocks injected into the pages.
+// An address a UI route's pages asked for outside its prefix, folded to its
+// first segment (GET /api/routes/{id}/strays).
+export interface RouteStray {
+  path: string;
+  example: string;
+  count: number;
+  landedOn?: string;
+  status: number;
+  last: string;
+}
+
 export interface RouteUIOptions {
   scheme?: SchemeConfig;
   roles?: RolesConfig;
@@ -457,6 +469,9 @@ export interface RouteUIOptions {
   userButton: UserButtonOptions;
   // The route's own CSS and JavaScript, in order (see Injection).
   injections?: Injection[];
+  // The application writes its addresses from the root although the route
+  // strips a prefix: the gateway puts the prefix back in its links and calls.
+  rootPaths?: boolean;
   // The app's menu label: when set, the route shows in the user's apps menu
 }
 
@@ -471,6 +486,7 @@ export const IDENTITY_FIELDS = [
   'tenantid',
   'email',
   'timezone',
+  'currency',
   'locale',
   'roles',
   // What the account holds among the capabilities a route may ask for (a
@@ -1225,6 +1241,9 @@ export interface User {
   appAdmin: boolean;
   locale: string;
   timezone: string;
+  // ISO 4217 code ('EUR'), '' for none: chosen on the profile when Infra >
+  // Model switches the currency on (AccountPreferences).
+  currency?: string;
   // Per-user second-factor policy (MFA-04): '' inherits the global setting,
   // 'true'/'false' force it for this user.
   mfaRequired: string;
@@ -1521,6 +1540,13 @@ export interface UserFieldDef {
   label?: string;
   kind: UserFieldKind;
   choices?: string[];
+}
+
+// The preferences an account carries (Infra > Model): one switch each. On,
+// the person chooses the value on their profile, and routes forward it.
+export interface AccountPreferences {
+  timezone: boolean;
+  currency: boolean;
 }
 
 // A new account, and how its owner gets in (AUTH-25): the one-time password,
@@ -3436,6 +3462,20 @@ export class ApiService {
     return this.http.put<{ fields: UserFieldDef[]; routes?: string[] }>('/api/model/user-fields', {
       fields,
     });
+  }
+
+  accountPreferences(): Observable<AccountPreferences> {
+    return this.http.get<AccountPreferences>('/api/model/account-preferences');
+  }
+
+  // `routes` names the routes the change was carried to, as for the fields.
+  saveAccountPreferences(
+    preferences: AccountPreferences,
+  ): Observable<{ preferences: AccountPreferences; routes?: string[] }> {
+    return this.http.put<{ preferences: AccountPreferences; routes?: string[] }>(
+      '/api/model/account-preferences',
+      preferences,
+    );
   }
 
   // The same model for an organisation (MODEL-03): defined beside the

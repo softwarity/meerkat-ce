@@ -40,6 +40,7 @@ import { DialogsService } from "../../shared/dialogs.service";
 import { LOCALE_ID } from "@angular/core";
 import {
   Access,
+  AccountPreferences,
   ApiService,
   CatalogEntry,
   DiscoveredService,
@@ -57,6 +58,7 @@ import {
   RateLimit,
   Role,
   Route,
+  RouteStray,
   SigningKeys,
   Tenant,
   User,
@@ -479,6 +481,8 @@ function draftOf(r: Route | null, custom: readonly string[] = []) {
     localesParam: r?.locales?.param ?? "",
     localesOnChange: r?.locales?.onChange ?? "",
     injections: r?.ui?.injections ?? ([] as Injection[]),
+    // The application writes its addresses from the root (routing/rootpaths.go).
+    rootPaths: r?.ui?.rootPaths ?? false,
     // The app's menu label: when set, the route shows in the user's apps menu
     // (subject to access). Empty = the app is reachable but not listed.
     // The route's place in the telemetry (OBS-04). Two answers: whether this
@@ -821,8 +825,21 @@ export class RouteEditorComponent {
     ...(this.customRes.value()?.fields ?? []).map((f) => f.name),
     ...this.tenantFields(),
   ]);
+  // The preferences Infra > Model switched off are not facts here: nothing
+  // carries them, so they are neither offered nor sent.
+  private readonly prefsRes = httpResource<AccountPreferences>(
+    () => "/api/model/account-preferences",
+  );
+  private readonly prefsOff = computed(() => {
+    const p = this.prefsRes.value();
+    const off = new Set<string>();
+    // Until the answer comes, what an installation that never chose has.
+    if (p && !p.timezone) off.add("timezone");
+    if (!p || !p.currency) off.add("currency");
+    return off;
+  });
   protected readonly identityFields = computed(() => [
-    ...IDENTITY_FIELDS,
+    ...IDENTITY_FIELDS.filter((f) => !this.prefsOff().has(f)),
     ...this.customFields(),
   ]);
   // In single-organisation mode the tenant is implicit and never named, so
@@ -855,7 +872,7 @@ export class RouteEditorComponent {
   protected readonly pageUserFields = computed(() => {
     const declared = this.draft().identityAttrs;
     return [...PAGE_USER_FIELDS, ...this.customFields()].filter(
-      (f) => f !== "roles" && declared[f]?.selected,
+      (f) => f !== "roles" && declared[f]?.selected && !this.prefsOff().has(f),
     );
   });
   // The scheme the built-in pages impose, if any: offering a switch on the
@@ -1296,6 +1313,8 @@ export class RouteEditorComponent {
         return "tnt_123";
       case "timezone":
         return u?.timezone || "Europe/Paris";
+      case "currency":
+        return u?.currency || "EUR";
       case "locale":
         return u?.locale || "fr";
     }
@@ -1531,11 +1550,27 @@ export class RouteEditorComponent {
       | "btnEnabled"
       | "btnInFrame"
       | "telemetry"
-      | "telemetryUi",
+      | "telemetryUi"
+      | "rootPaths",
     value: boolean,
   ): void {
     this.draft.update((d) => ({ ...d, [flag]: value }));
   }
+
+  // A prefix is stripped: the application behind sees "/" where the caller
+  // asked "/app/", and may write its addresses from that root.
+  protected readonly strips = computed(() => this.draft().filters.some((f) => f.type === "strip-prefix"));
+  // What the route's pages asked for outside its prefix (gateway/strays.go),
+  // read for a saved UI route that strips one. Re-read when the route is
+  // saved: a new revision starts clean.
+  private readonly straysRes = httpResource<{ strays: RouteStray[] }>(() => {
+    const r = this.route();
+    return r?.id && r.isUi && r.filters?.some((f) => f.type === "strip-prefix")
+      ? `/api/routes/${encodeURIComponent(r.id)}/strays?rev=${r.rev ?? 0}`
+      : undefined;
+  });
+  protected readonly strays = computed(() => this.straysRes.value()?.strays ?? []);
+  protected readonly strayCount = computed(() => this.strays().reduce((n, s) => n + s.count, 0));
 
   // The UI toggle: a route is always a service, UI options come on top. The
   // path locale mechanism is a UI privilege and drops with the toggle.
@@ -2479,6 +2514,8 @@ export class RouteEditorComponent {
           inFrame: d.btnInFrame,
         },
         injections: d.injections.length ? d.injections : undefined,
+        // Only where a prefix is stripped: elsewhere the gateway ignores it.
+        rootPaths: d.rootPaths && this.strips() ? true : undefined,
       };
     }
     const identity = this.buildIdentity();

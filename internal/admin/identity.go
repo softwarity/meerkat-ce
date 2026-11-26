@@ -438,6 +438,10 @@ func (a *API) createUser(w http.ResponseWriter, r *http.Request, actor store.Use
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	if err := checkedPreferences(u); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	// The account's own working hours: the same rule as on an update. Created
 	// with a window of its own, the account skipped both the Enterprise check
 	// and the time-zone one, and a zone nobody knows fails open at sign-in.
@@ -559,6 +563,10 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request, actor store.Use
 	}
 	u.Fields = fields
 	if err := store.ValidFromUntil(u.ValidFrom, u.ValidUntil); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err := checkedPreferences(u); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -1612,4 +1620,16 @@ func randomSecret() (string, error) {
 		return "", fmt.Errorf("admin: secret entropy unavailable: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// checkedPreferences refuses a time zone or a currency an application could
+// not read: an IANA name, an ISO 4217 code, or nothing. Checked whether the
+// preference is on or not - a value stored now travels the day it is.
+func checkedPreferences(u store.User) error {
+	if u.Timezone != "" {
+		if _, err := time.LoadLocation(u.Timezone); err != nil {
+			return fmt.Errorf("time zone %q is not allowed: an IANA name such as Europe/Paris or UTC", u.Timezone)
+		}
+	}
+	return store.ValidCurrency(u.Currency)
 }

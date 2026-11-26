@@ -68,7 +68,7 @@ var respondFuncs = template.FuncMap{
 // what is available and shows the one mistake worth warning about.
 const bodyDoc = "Go text/template. The caller is available as " +
 	"{{.Username}} {{.UserID}} {{.Fullname}} {{.Email}} {{.Tenant}} {{.TenantID}} " +
-	"{{.Timezone}} {{.Roles}}, plus {{.SignedIn}} (false when nobody is signed in). " +
+	"{{.Timezone}} {{.Currency}} {{.Roles}}, plus {{.SignedIn}} (false when nobody is signed in). " +
 	"Functions: json (renders a value as JSON, quotes and escaping included), " +
 	"join (e.g. {{join \",\" .Roles}}) and wrap, which turns a list into one-key " +
 	"objects: {{json (wrap \"authority\" .Roles)}} gives [{\"authority\":\"A\"}]. " +
@@ -153,7 +153,7 @@ func readableTemplateError(err error) string {
 // lists them. Kept beside the error message that quotes it.
 var IdentityFields = []string{
 	".Username", ".UserID", ".Fullname", ".Email", ".Tenant", ".TenantID",
-	".Timezone", ".Roles", ".SignedIn",
+	".Timezone", ".Currency", ".Roles", ".SignedIn",
 }
 
 // PreviewRespond renders a template against the witness caller, exactly as the

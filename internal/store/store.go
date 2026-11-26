@@ -338,6 +338,9 @@ CREATE TABLE IF NOT EXISTS users (
   -- gateway serves, and both follow the PERSON rather than the machine.
   scheme               TEXT NOT NULL DEFAULT '',
   timezone             TEXT NOT NULL DEFAULT '',
+  -- The currency amounts are shown in for this person, ISO 4217 ("EUR"):
+  -- empty is no choice. Offered only when Infra > Model turns it on.
+  currency             TEXT NOT NULL DEFAULT '',
   created_at           BIGINT NOT NULL DEFAULT 0,
   updated_at           BIGINT NOT NULL DEFAULT 0,
   last_connection_at   BIGINT NOT NULL DEFAULT 0,
@@ -1522,7 +1525,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // pass, empty - every client declared before keeps its secret as a hash.
 // 105 carries no step: routes.audit_stream is filled in by the additive
 // pass, empty - every route follows the installation's stream.
-const schemaVersion = 105
+// 106 carries no step: users.currency is filled in by the additive pass,
+// empty - no account had chosen one.
+const schemaVersion = 106
 
 func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()
@@ -2189,7 +2194,7 @@ type RolesConfig struct {
 // page as attribute names, and an HTML attribute is case-insensitive and
 // normalised to lower case by the DOM. Spelling one "tenantId" here would
 // promise a casing the browser does not keep.
-var PageUserFields = []string{"username", "userid", "fullname", "email", "tenant", "tenantid", "timezone", "locale"}
+var PageUserFields = []string{"username", "userid", "fullname", "email", "tenant", "tenantid", "timezone", "currency", "locale"}
 
 // UserInfoConfig exposes the signed-in user's identity to the page - the
 // SELECTED fields land as attributes on a chosen tag (default body) or as
@@ -2289,12 +2294,19 @@ type RouteUI struct {
 	// Injections are the route's own CSS and JavaScript, in the order they
 	// land in each place of the page (see Injection).
 	Injections []Injection `json:"injections,omitempty"`
+	// RootPaths says the application writes its addresses from the root
+	// ("/static/app.js", fetch("/api/x")) although the route publishes it
+	// under a prefix it strips. The gateway then puts the prefix back: in the
+	// links of its pages and stylesheets, and in the calls its scripts make
+	// (routing/rootpaths.go). Without effect on a route that strips nothing:
+	// there the application knows its path.
+	RootPaths bool `json:"rootPaths,omitempty"`
 }
 
 // IdentityFields are the signed-in user's facts a route may forward to its
 // upstream service. "roles" and "capabilities" are the multi-valued ones (see
 // IdentityAttr): a list in a token, comma-separated in a header.
-var IdentityFields = []string{"username", "userid", "fullname", "tenant", "tenantid", "email", "timezone", "locale", "roles", "capabilities"}
+var IdentityFields = []string{"username", "userid", "fullname", "tenant", "tenantid", "email", "timezone", "currency", "locale", "roles", "capabilities"}
 
 // IdentityForward sends the signed-in caller to the upstream service. Mechanism
 // picks the transport; the SAME selected Attributes (and their per-attribute
@@ -2819,8 +2831,12 @@ type User struct {
 	// the language it is written by the person alone (SetUserScheme), and
 	// deliberately absent from UpdateUser: an administrator's save carries no
 	// value for it, and would blank what its owner picked.
-	Scheme           string `json:"scheme"`
-	Timezone         string `json:"timezone"`
+	Scheme   string `json:"scheme"`
+	Timezone string `json:"timezone"`
+	// Currency is the person's ISO 4217 code ("EUR"), "" for none: a
+	// preference like the zone, offered when Infra > Model turns it on
+	// (AccountPreferences), and forwarded like any other fact.
+	Currency         string `json:"currency"`
 	CreatedAt        int64  `json:"createdAt"`
 	UpdatedAt        int64  `json:"updatedAt"`
 	LastConnectionAt int64  `json:"lastConnectionAt"`
@@ -2866,7 +2882,7 @@ type User struct {
 }
 
 const userCols = `id, username, password_hash, fullname, email, enabled,
-	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone,
+	root, dev, tenant_creator, infra_admin, app_admin, locale, scheme, timezone, currency,
 	created_at, updated_at, last_connection_at, must_change_password, mfa_required,
 	email_verified, self_registered, password_changed_at, password_temporary, fields, valid_from, valid_until, business_access, rev`
 
@@ -2874,7 +2890,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var fields, ba string
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Fullname, &u.Email, &u.Enabled,
-		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone,
+		&u.Root, &u.Dev, &u.TenantCreator, &u.InfraAdmin, &u.AppAdmin, &u.Locale, &u.Scheme, &u.Timezone, &u.Currency,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastConnectionAt, &u.MustChangePassword, &u.MFARequired,
 		&u.EmailVerified, &u.SelfRegistered, &u.PasswordChangedAt, &u.PasswordTemporary, &fields, &u.ValidFrom, &u.ValidUntil, &ba, &u.Rev)
 	u.Fields = decodeFields(fields)
@@ -2893,13 +2909,13 @@ func (s *Store) CreateUser(ctx context.Context, u User) error {
 	now := time.Now().Unix()
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO users (id, username, password_hash, fullname, email, enabled,
-		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone,
+		   root, dev, tenant_creator, infra_admin, app_admin, locale, timezone, currency,
 		   created_at, updated_at, must_change_password, mfa_required,
 		   email_verified, self_registered, fields, valid_from, valid_until,
 		   password_changed_at, password_temporary, business_access, rev)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
 		u.ID, u.Username, u.PasswordHash, u.Fullname, u.Email, u.Enabled,
-		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
+		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone, u.Currency,
 		now, now, u.MustChangePassword, u.MFARequired,
 		u.EmailVerified, u.SelfRegistered, encodeFields(u.Fields), u.ValidFrom, u.ValidUntil,
 		// A password set at creation has a known age from now on; and one an
@@ -2925,11 +2941,11 @@ func (s *Store) UpdateUser(ctx context.Context, u User) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE users SET username = ?, fullname = ?, email = ?, enabled = ?,
 		   root = ?, dev = ?, tenant_creator = ?, infra_admin = ?, app_admin = ?,
-		   locale = ?, timezone = ?, mfa_required = ?, updated_at = ?,
+		   locale = ?, timezone = ?, currency = ?, mfa_required = ?, updated_at = ?,
 		   fields = ?, valid_from = ?, valid_until = ?, business_access = ?, rev = rev + 1
 		 WHERE id = ?`,
 		u.Username, u.Fullname, u.Email, u.Enabled,
-		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone,
+		u.Root, u.Dev, u.TenantCreator, u.InfraAdmin, u.AppAdmin, u.Locale, u.Timezone, u.Currency,
 		u.MFARequired, time.Now().Unix(), encodeFields(u.Fields), u.ValidFrom, u.ValidUntil,
 		encodeBusinessAccess(u.BusinessAccess), u.ID)
 	if err != nil {
@@ -3244,6 +3260,21 @@ func (s *Store) SetUserTimezone(ctx context.Context, id, tz string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE users SET timezone = ? WHERE id = ?`, tz, id)
 	if err != nil {
 		return fmt.Errorf("store: set timezone: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoRows
+	}
+	return nil
+}
+
+// SetUserCurrency stores a user's own currency (self-service, from the profile
+// page). The code is validated by the caller (ValidCurrency); empty is "no
+// choice".
+func (s *Store) SetUserCurrency(ctx context.Context, id, code string) error {
+	code = strings.TrimSpace(code)
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET currency = ? WHERE id = ?`, code, id)
+	if err != nil {
+		return fmt.Errorf("store: set currency: %w", err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNoRows

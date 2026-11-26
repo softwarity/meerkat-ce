@@ -307,3 +307,42 @@ func TestACustomFieldCannotTakeANameTheAuditAlreadyCarries(t *testing.T) {
 		t.Errorf("an ordinary name was refused: %v", err)
 	}
 }
+
+func TestValidCurrency(t *testing.T) {
+	for _, ok := range []string{"", "EUR", "USD", "JPY", "CHF"} {
+		if err := ValidCurrency(ok); err != nil {
+			t.Errorf("%q refused: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"eur", "EURO", "XYZ", "€"} {
+		if err := ValidCurrency(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if p := (AccountPreferences{}); !p.Off(PrefCurrency) || !p.Off(PrefTimezone) || DefaultAccountPreferences.Off(PrefTimezone) {
+		t.Fatalf("switches: %+v", p)
+	}
+}
+
+// A person who chose no currency gets the one their browser's languages point
+// to: the first language naming a country, else the likeliest country of the
+// first language.
+func TestTheCurrencyFollowsTheBrowser(t *testing.T) {
+	for header, want := range map[string]string{
+		"fr-FR,fr;q=0.9,en;q=0.8": "EUR",
+		"de-CH":                   "CHF",
+		"fr-CA,fr;q=0.9":          "CAD",
+		"en-GB,en;q=0.9":          "GBP",
+		"en-US":                   "USD",
+		"ja":                      "JPY",
+		"fr":                      "EUR",
+		"en;q=0.9,fr-BE;q=0.8":    "EUR",
+		"es-419":                  "",
+		"*":                       "",
+		"":                        "",
+	} {
+		if got := CurrencyOfLanguages(header); got != want {
+			t.Errorf("Accept-Language %q: currency %q, want %q", header, got, want)
+		}
+	}
+}

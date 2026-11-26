@@ -220,3 +220,48 @@ func TestARemovedFieldLeavesThePage(t *testing.T) {
 		t.Fatalf("moved=%v, fields=%v, original=%v", moved, got.UI.UserInfo.Fields, r.UI.UserInfo.Fields)
 	}
 }
+
+// The account preferences move the routes like a field does: the currency
+// switched on is ticked on a route that declares what it knows, switched off
+// it leaves; an installation that never chose keeps the time zone on its
+// profile and has no currency.
+func TestThePreferencesFollowTheRoutes(t *testing.T) {
+	f := setupBare(t)
+	ctx := t.Context()
+	pred := []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/a/**"}}}}
+	if err := f.api.st.SaveRoute(ctx, store.Route{ID: "fwd", Name: "fwd", Enabled: true, Upstream: "http://svc:80",
+		Predicates: pred, Identity: &store.IdentityForward{Mechanism: "headers",
+			Attributes: []store.IdentityAttr{{Field: "username"}, {Field: "timezone"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := f.call(t, "GET", "/api/model/account-preferences", "", f.rootC); code != http.StatusOK ||
+		!strings.Contains(body, `"timezone":true`) || !strings.Contains(body, `"currency":false`) {
+		t.Fatalf("the defaults: %d %s", code, body)
+	}
+	code, body := f.call(t, "PUT", "/api/model/account-preferences",
+		`{"timezone":false,"currency":true}`, f.rootC)
+	if code != http.StatusOK || !strings.Contains(body, `"routes":["fwd"]`) || !strings.Contains(body, `"timezone":false`) {
+		t.Fatalf("switching the currency on and the zone off: %d %s", code, body)
+	}
+	fwd, _ := f.api.st.GetRoute(ctx, "fwd")
+	var names []string
+	for _, a := range fwd.Identity.Attributes {
+		names = append(names, a.Field)
+	}
+	if strings.Join(names, ",") != "username,currency" {
+		t.Fatalf("the route did not follow: %v", names)
+	}
+}
+
+// An administrator gives an account a currency an application can read, or
+// none; anything else is refused with what is allowed.
+func TestAnAccountCurrencyIsAnISOCode(t *testing.T) {
+	f := setupBare(t)
+	code, body := f.call(t, "POST", "/api/users", `{"username":"ann","enabled":true,"currency":"euro"}`, f.rootC)
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "ISO 4217") {
+		t.Fatalf("a currency that is not a code: %d %s", code, body)
+	}
+	if code, body := f.call(t, "POST", "/api/users", `{"username":"ann","enabled":true,"currency":"EUR"}`, f.rootC); code != http.StatusCreated && code != http.StatusOK {
+		t.Fatalf("EUR: %d %s", code, body)
+	}
+}

@@ -29,6 +29,51 @@ func (a *API) registerUserModel(mux Mux) {
 	// here and filled on the tenant's General screen.
 	mux.Handle("GET /api/model/tenant-fields", a.authed(a.getTenantFields))
 	mux.Handle("PUT /api/model/tenant-fields", a.infraAdmin(a.putTenantFields))
+	// The preferences an account carries (store/accountprefs.go): the time
+	// zone and the currency, each switched on here and chosen by the person
+	// on their profile.
+	mux.Handle("GET /api/model/account-preferences", a.authed(a.getAccountPreferences))
+	mux.Handle("PUT /api/model/account-preferences", a.infraAdmin(a.putAccountPreferences))
+}
+
+// getAccountPreferences is readable by any signed-in caller, for the reason
+// getUserFields gives: the accounts screen draws its form from it, and the
+// route editor offers only the preferences that are on.
+func (a *API) getAccountPreferences(w http.ResponseWriter, r *http.Request, _ store.User) {
+	writeJSON(w, http.StatusOK, a.st.AccountPreferences(r.Context()))
+}
+
+func (a *API) putAccountPreferences(w http.ResponseWriter, r *http.Request, actor store.User) {
+	var body store.AccountPreferences
+	if err := decodeStrict(r, &body); err != nil {
+		writeErr(w, http.StatusBadRequest, "malformed preferences: "+err.Error())
+		return
+	}
+	after := body
+	before := a.st.AccountPreferences(r.Context())
+	if err := a.st.SetSetting(r.Context(), store.SettingAccountPreferences, after); err != nil {
+		a.internal(w, err)
+		return
+	}
+	a.auditUpdate(r.Context(), actor, "model.account-preferences", "settings", "", "", "", before, after)
+	// A preference switched on or off moves the routes the way a field
+	// added or removed does: ticked where routes declare what they know about
+	// the caller, gone from every route when it stops meaning anything.
+	routes, err := a.followModel(r.Context(), actor, prefFields(before), prefFields(after))
+	if err != nil {
+		a.internal(w, fmt.Errorf("preferences saved, but the routes were not brought along: %w", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"preferences": after, "routes": routes})
+}
+
+// prefFields is the preferences switched on, in the shape followModel reads.
+func prefFields(p store.AccountPreferences) []store.UserField {
+	var out []store.UserField
+	for _, n := range p.Names() {
+		out = append(out, store.UserField{Name: n})
+	}
+	return out
 }
 
 // getUserFields is readable by any signed-in caller, and deliberately so: the

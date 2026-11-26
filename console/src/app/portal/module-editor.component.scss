@@ -193,10 +193,16 @@ mat-form-field {
 }
 
 // The make-room toggle and its info marker, on one line.
+/* A switch between two rows of fields: air above and below, so it reads as
+   a line of its own rather than the hint of the field above. */
 .room {
   display: flex;
   align-items: center;
   gap: 2px;
+  margin: 12px 0 20px;
+  .toggle-label {
+    margin-left: 10px;
+  }
 }
 .field-info {
   flex: none;

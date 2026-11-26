@@ -157,6 +157,14 @@ func InjectAfterHeadFunc(f func(*http.Response) string) func(*http.Response) err
 	}
 }
 
+// AfterHead inserts frag after the first <head> of a body already in hand -
+// for a RewriteHTMLFunc that edits the page and adds to it in one pass -
+// admitted by the page's Content-Security-Policy like every other injection.
+func AfterHead(res *http.Response, body, frag []byte) []byte {
+	body, frag = admitScripts(res, body, frag)
+	return injectAfterHead(body, frag)
+}
+
 // RewriteHTMLFunc buffers each HTML response and hands the DECODED bytes to f,
 // which returns the rewritten bytes (used for server-side stamping that must
 // edit an existing tag, not just insert after <head>). gate, when non-nil,

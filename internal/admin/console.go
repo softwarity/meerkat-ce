@@ -276,6 +276,12 @@ func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) str
 	if p, err := st.PrimaryTenant(r.Context()); err == nil {
 		primary = p.ID
 	}
+	// The zone only while Infra > Model keeps it on: switched off, the person
+	// can no longer see or change it, so it must not keep deciding dates.
+	zone := user.Timezone
+	if st.AccountPreferences(r.Context()).Off(store.PrefTimezone) {
+		zone = ""
+	}
 	for _, kv := range [][2]string{
 		{"user-id", user.ID},
 		{"username", user.Username},
@@ -285,7 +291,7 @@ func consoleBodyAttrs(r *http.Request, st *store.Store, sm *session.Manager) str
 		// scheduler's hours, and whatever reads them next. Stamped like the
 		// rest: the screens that show a time must show the right one on the
 		// first paint, not after a round trip.
-		{"timezone", user.Timezone},
+		{"timezone", zone},
 		{"primary-tenant", primary},
 		// The name of this installation's readable session deadline: suffixed
 		// per installation, so the console cannot spell it itself.

@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"strings"
 	"time"
+
+	"github.com/softwarity/meerkat/internal/store"
 )
 
 // Every moment a page shows a person, written ONE way - the console's:
@@ -74,6 +76,11 @@ func sample(text string) moment { return moment{Text: text} }
 func (h *Handler) readerZone(ctx context.Context, userID string) *time.Location {
 	u, err := h.st.GetUserByID(ctx, userID)
 	if err != nil || u.Timezone == "" {
+		return nil
+	}
+	// Switched off in Infra > Model: the person can no longer see or change
+	// it, so a zone stored before must not keep deciding their dates.
+	if h.st.AccountPreferences(ctx).Off(store.PrefTimezone) {
 		return nil
 	}
 	loc, err := time.LoadLocation(u.Timezone)

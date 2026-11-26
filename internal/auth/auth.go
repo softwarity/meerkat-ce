@@ -1530,6 +1530,7 @@ const profileBody = `    <style>
       </dd></div>
       {{if .TenantName}}<div><dt>{{.T.factOrganisation}}</dt><dd>{{.TenantName}}</dd></div>{{end}}
     </dl>
+    {{if .TimezoneOn}}
     <form method="post" action="/profile/timezone" class="tz-form" id="tz-form">
       <label class="tz-title" for="tz">{{.T.timezone}}</label>
       <div class="tz-row">
@@ -1542,6 +1543,19 @@ const profileBody = `    <style>
         <button type="submit" class="tz-btn tz-save" id="tz-save">{{.T.tzSave}}</button>
       </div>
     </form>
+    {{end}}
+    {{if .CurrencyOn}}
+    <form method="post" action="/profile/currency" class="tz-form" id="cur-form">
+      <label class="tz-title" for="cur">{{.T.currency}}</label>
+      <div class="tz-row">
+        <span class="tz-field"><select name="currency" id="cur" class="tz-select"><option value="">{{.T.currencyBrowser}}{{if .CurrencyBrowser}} ({{.CurrencyBrowser}}){{end}}</option>{{if .Currency}}<option value="{{.Currency}}" selected>{{.Currency}}</option>{{end}}</select></span>
+      </div>
+      <div class="tz-actions">
+        <span class="tz-now" id="cur-sample"></span>
+        <button type="submit" class="tz-btn tz-save" id="cur-save">{{.T.tzSave}}</button>
+      </div>
+    </form>
+    {{end}}
     </div>
     <dialog id="em-dialog" class="em-dialog">
       <form method="post" action="/profile/email">
@@ -1578,6 +1592,7 @@ const profileBody = `    <style>
          switch. It used to be hidden here, back when the console read every
          date the browser's way and this would have been a setting with no
          visible effect on the screen offering it. -->
+    {{if .TimezoneOn}}
     <script>
     (() => {
       // The zone list comes from the BROWSER (Intl.supportedValuesOf), not from
@@ -1653,6 +1668,49 @@ const profileBody = `    <style>
       setInterval(tick, 30000);
     })();
     </script>
+    {{end}}
+    {{if .CurrencyOn}}
+    <script>
+    (() => {
+      // The codes come from the browser too (Intl.supportedValuesOf), named
+      // in the page's language; the server checks the code is ISO 4217.
+      const sel = document.getElementById('cur');
+      const sample = document.getElementById('cur-sample');
+      const save = document.getElementById('cur-save');
+      const saved = {{.Currency}};
+      const lang = document.documentElement.lang || 'en';
+      const codes = (Intl.supportedValuesOf ? Intl.supportedValuesOf('currency') : []).slice();
+      if (codes.length) {
+        if (saved && !codes.includes(saved)) codes.push(saved);
+        let names = null;
+        try { names = new Intl.DisplayNames([lang], { type: 'currency' }); } catch {}
+        const none = sel.options[0];
+        sel.replaceChildren(none, ...codes.sort().map(c => {
+          const o = document.createElement('option');
+          o.value = c;
+          const n = names ? names.of(c) : '';
+          o.textContent = n && n !== c ? c + ' - ' + n : c;
+          return o;
+        }));
+        sel.value = saved;
+      }
+      // An amount written in the chosen currency, the way an application
+      // using this language would write it: the choice, seen.
+      const browser = {{.CurrencyBrowser}};
+      const refresh = () => {
+        let t = '';
+        const c = sel.value || browser;
+        if (c) {
+          try { t = new Intl.NumberFormat(lang, { style: 'currency', currency: c }).format(1234.5); } catch {}
+        }
+        sample.textContent = t;
+        save.disabled = sel.value === saved;
+      };
+      sel.onchange = refresh;
+      refresh();
+    })();
+    </script>
+    {{end}}
     <a class="mfa-link" href="/profile/security">
       <span class="mfa-label">{{.T.security}}</span>
       <span class="mfa-state">&rsaquo;</span>
@@ -2439,6 +2497,7 @@ func (h *Handler) Register(raw Mux) {
 	mux.HandleFunc("GET /profile", h.showProfile)
 	mux.HandleFunc("POST /profile/avatar", h.doProfileAvatar)
 	mux.HandleFunc("POST /profile/timezone", h.doProfileTimezone)
+	mux.HandleFunc("POST /profile/currency", h.doProfileCurrency)
 	mux.HandleFunc("POST /profile/email", h.doProfileEmail)
 	mux.HandleFunc("POST /profile/email/code", h.doEmailChangeCode)
 	mux.HandleFunc("GET /profile/password", h.showProfilePassword)
@@ -3139,10 +3198,20 @@ type profileData struct {
 	Fullname   string
 	Email      string
 	TenantName string
-	// Timezone is the caller's own, editable from this page: it is what every
-	// date an application shows them should be rendered in.
-	Timezone string
-	IsDev    bool
+	// Timezone is the caller's own, editable from this page when TimezoneOn:
+	// it is what every date an application shows them should be rendered in.
+	// Empty when Infra > Model switched the preference off.
+	Timezone   string
+	TimezoneOn bool
+	// Currency is the caller's ISO 4217 code, editable here when CurrencyOn
+	// (store.AccountPreferences): what amounts are shown to them in.
+	Currency   string
+	CurrencyOn bool
+	// CurrencyBrowser is what an account with no currency gets: the one this
+	// browser's languages point to (store.CurrencyOfLanguages), named on the
+	// "browser" option so the person sees the guess and can correct it.
+	CurrencyBrowser string
+	IsDev           bool
 	// Apps is the one way back into the applications (profileapps.go): a
 	// button, or a list. Nil on the admin plane, which has Console instead.
 	Apps *appsControl
@@ -3425,6 +3494,10 @@ func (h *Handler) doProfileTimezone(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
+	if !h.st.AccountPreferences(r.Context()).Timezone {
+		http.Error(w, "the time zone is switched off on this gateway (Infra > Model)", http.StatusForbidden)
+		return
+	}
 	// Empty is "no choice": every screen then uses the browser's zone.
 	tz := strings.TrimSpace(r.PostFormValue("timezone"))
 	if _, err := time.LoadLocation(tz); tz != "" && err != nil {
@@ -3433,6 +3506,38 @@ func (h *Handler) doProfileTimezone(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.st.SetUserTimezone(r.Context(), sess.UserID, tz); err != nil {
 		h.renderProfile(w, r, sess, h.tr(r, "errBadTimezone"), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/profile", http.StatusSeeOther)
+}
+
+// doProfileCurrency saves the caller's own currency, when Infra > Model
+// switches it on.
+//
+// The list the page offers comes from the browser (Intl.supportedValuesOf),
+// like the zones; the server only has to agree that the code is ISO 4217.
+func (h *Handler) doProfileCurrency(w http.ResponseWriter, r *http.Request) {
+	sess, err := h.sm.Resolve(r.Context(), r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	if !h.st.AccountPreferences(r.Context()).Currency {
+		http.Error(w, "the currency is switched off on this gateway (Infra > Model)", http.StatusForbidden)
+		return
+	}
+	// Empty is "no choice": the applications then use their own default.
+	code := strings.TrimSpace(r.PostFormValue("currency"))
+	if err := store.ValidCurrency(code); err != nil {
+		h.renderProfile(w, r, sess, h.tr(r, "errBadCurrency"), http.StatusBadRequest)
+		return
+	}
+	if err := h.st.SetUserCurrency(r.Context(), sess.UserID, code); err != nil {
+		h.renderProfile(w, r, sess, h.tr(r, "errBadCurrency"), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
@@ -3603,7 +3708,16 @@ func (h *Handler) renderProfileWith(w http.ResponseWriter, r *http.Request, sess
 		data.Email = u.Email
 		data.HasPassword = u.PasswordHash != ""
 		data.Initials = initials(u)
-		data.Timezone = u.Timezone
+		// A preference switched off is not offered, and its value stops
+		// deciding anything.
+		prefs := h.st.AccountPreferences(r.Context())
+		if prefs.Timezone {
+			data.Timezone = u.Timezone
+		}
+		data.TimezoneOn = prefs.Timezone
+		data.Currency = u.Currency
+		data.CurrencyOn = prefs.Currency
+		data.CurrencyBrowser = store.CurrencyOfLanguages(r.Header.Get("Accept-Language"))
 		// The developer tooling is about the APPLICATIONS: a certificate the
 		// services authenticate, the UI test mode, the substitution plug uses.
 		// None of it means anything from the console, and its pages are not

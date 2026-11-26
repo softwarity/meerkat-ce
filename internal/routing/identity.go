@@ -17,6 +17,7 @@ type Identity struct {
 	Tenant   string
 	TenantID string
 	Timezone string
+	Currency string
 	Roles    []string
 }
 
@@ -55,5 +56,6 @@ var SampleIdentity = Identity{
 	Tenant:   "Acme",
 	TenantID: "tnt_123",
 	Timezone: "Europe/Paris",
+	Currency: "EUR",
 	Roles:    []string{"ROLE_A", "ROLE_B"},
 }

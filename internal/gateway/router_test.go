@@ -2469,3 +2469,68 @@ func TestTheUpstreamIsToldTheBrowsersScheme(t *testing.T) {
 		t.Errorf("a stranger's chain was passed on: %q", f)
 	}
 }
+
+// A person who chose no currency gets the one each request's browser points
+// to, read past the identity cache: the same session from two browsers
+// carries two currencies. A chosen one wins over any browser.
+func TestTheCurrencyFollowsTheBrowserUntilChosen(t *testing.T) {
+	st, err := store.OpenAt(t.TempDir(), dbtest.URL(t))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	ctx := context.Background()
+	if err := st.CreateUser(ctx, store.User{ID: "u1", Username: "neo", Enabled: true, PasswordHash: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, store.SettingAccountPreferences, store.AccountPreferences{Timezone: true, Currency: true}); err != nil {
+		t.Fatal(err)
+	}
+	sm := session.NewManager(st)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.Header.Get("currency"))
+	}))
+	t.Cleanup(upstream.Close)
+	route := store.Route{ID: "r", Name: "r", Enabled: true, Upstream: upstream.URL,
+		Predicates: []routing.Spec{{Type: "path", Args: map[string]any{"patterns": []any{"/**"}}}},
+		Identity:   &store.IdentityForward{Mechanism: "headers", Attributes: []store.IdentityAttr{{Field: "currency"}}}}
+	if err := st.SaveRoute(ctx, route); err != nil {
+		t.Fatal(err)
+	}
+	rt := New(st, sm)
+	if err := rt.Reload(ctx); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(rt)
+	t.Cleanup(srv.Close)
+	rec := httptest.NewRecorder()
+	if _, err := sm.Issue(ctx, rec, httptest.NewRequest("POST", "/login", nil), "u1"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	cookie := rec.Result().Cookies()[0]
+	call := func(languages string) string {
+		req, _ := http.NewRequest("GET", srv.URL+"/get", nil)
+		req.Header.Set("Accept-Language", languages)
+		req.AddCookie(cookie)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		return string(body)
+	}
+	if got := call("de-CH,de;q=0.9"); got != "CHF" {
+		t.Fatalf("a Swiss browser carries %q, want CHF", got)
+	}
+	if got := call("fr-FR,fr;q=0.9"); got != "EUR" {
+		t.Fatalf("the same session from a French browser carries %q, want EUR", got)
+	}
+	if err := st.SetUserCurrency(ctx, "u1", "JPY"); err != nil {
+		t.Fatal(err)
+	}
+	rt.ForgetIdentities()
+	if got := call("de-CH"); got != "JPY" {
+		t.Fatalf("a chosen currency gave way to the browser: %q", got)
+	}
+}

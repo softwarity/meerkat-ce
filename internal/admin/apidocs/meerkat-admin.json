@@ -661,6 +661,41 @@
         ],
         "description": "Custom CSS or JavaScript, 32 per route at most."
       },
+      "RouteStray": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The first segment of the addresses (/static), or the whole path when it has one segment (/spec.json)."
+          },
+          "example": {
+            "type": "string",
+            "description": "The last full path seen."
+          },
+          "count": {
+            "type": "integer"
+          },
+          "landedOn": {
+            "type": "string",
+            "description": "The route that answered instead, by name; absent when none did."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The status of the last answer."
+          },
+          "last": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "path",
+          "example",
+          "count",
+          "status",
+          "last"
+        ]
+      },
       "RouteUI": {
         "type": "object",
         "properties": {
@@ -682,6 +717,10 @@
               "$ref": "#/components/schemas/Injection"
             },
             "description": "Added in this order at each place."
+          },
+          "rootPaths": {
+            "type": "boolean",
+            "description": "The application writes its addresses from the root although the route strips a prefix: the gateway puts the prefix back in the links of its pages and stylesheets, and in the calls its scripts make. Without effect on a route that strips nothing."
           }
         },
         "required": [
@@ -2200,6 +2239,24 @@
           "entries"
         ]
       },
+      "AccountPreferences": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "boolean",
+            "description": "Accounts carry a time zone, chosen by the person on their profile"
+          },
+          "currency": {
+            "type": "boolean",
+            "description": "Accounts carry an ISO 4217 currency, chosen by the person on their profile"
+          }
+        },
+        "required": [
+          "timezone",
+          "currency"
+        ],
+        "description": "The preferences an account carries, each chosen by the person on their profile. Never set: the time zone on, the currency off."
+      },
       "ModelField": {
         "type": "object",
         "properties": {
@@ -2599,6 +2656,10 @@
             "type": "string",
             "description": "IANA time zone chosen on the profile; empty when none is chosen, and the browser's zone applies"
           },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code (EUR); empty when none is chosen. Chosen on the profile when the account model switches it on"
+          },
           "createdAt": {
             "type": "integer",
             "description": "Unix seconds",
@@ -2697,6 +2758,7 @@
           "locale",
           "scheme",
           "timezone",
+          "currency",
           "createdAt",
           "updatedAt",
           "lastConnectionAt",
@@ -17201,6 +17263,93 @@
         }
       }
     },
+    "/api/model/account-preferences": {
+      "get": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Read the account preferences",
+        "operationId": "getAccountPreferences",
+        "description": "Which preferences accounts carry (time zone, currency). Any signed-in caller.",
+        "responses": {
+          "200": {
+            "description": "The preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Replace the account preferences",
+        "operationId": "saveAccountPreferences",
+        "description": "A preference switched on is added to the routes that send identity attributes; switched off, it leaves every route. Root or infra-admin.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPreferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preferences, and routes updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "preferences": {
+                      "$ref": "#/components/schemas/AccountPreferences"
+                    },
+                    "routes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Routes updated."
+                    }
+                  },
+                  "required": [
+                    "preferences",
+                    "routes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "tags": [
@@ -19500,6 +19649,50 @@
           },
           "422": {
             "$ref": "#/components/responses/Invalid"
+          }
+        }
+      }
+    },
+    "/api/routes/{id}/strays": {
+      "get": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "List what the route's pages asked for outside it",
+        "operationId": "listRouteStrays",
+        "description": "A UI route that strips a prefix: the addresses its pages asked for outside that prefix which landed on a route taking every path, on a 404, or on no route. The sign of an application written for the root. Folded to the first segment, since the route's current revision, counted on the node that answers. Root or infra-admin.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The strays, most frequent first; empty for a route that strips nothing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "strays": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RouteStray"
+                      }
+                    }
+                  },
+                  "required": [
+                    "strays"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

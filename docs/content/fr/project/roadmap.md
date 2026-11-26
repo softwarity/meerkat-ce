@@ -108,6 +108,19 @@ indique, ligne par ligne, ce qui manque à chacune.
 
 ## Ensuite
 
+- **Une application mobile que vous n'avez pas à publier** (Enterprise) : une seule
+  application sur l'App Store et Google Play, publiée par nous, que n'importe
+  quelle gateway Meerkat remplit. La personne l'installe, scanne un QR code
+  affiché dans son profil, y recopie le code que le téléphone affiche, et
+  l'appareil est appairé : déverrouillé par la biométrie du téléphone, listé
+  avec ses sessions ouvertes, révocable comme elles, avec une icône sur l'écran
+  d'accueil au nom et au logo de l'application de l'intégrateur. L'application affiche
+  alors le portail mobile que l'intégrateur a déclaré dans la console, après
+  l'avoir vu dans un aperçu de téléphone, les
+  écrans que ses rôles lui ouvrent et rien d'autre, et les notifications que
+  les services envoient déjà arrivent en notifications natives, application
+  fermée. L'intégrateur n'écrit aucun code mobile et ne passe par aucune revue
+  de store.
 - **Un assistant de découverte** : la gateway sait déjà lire le socket Docker
   et un namespace Kubernetes. Il manque l'écran qui en fait "analyser, choisir un
   conteneur, obtenir une route".
@@ -119,9 +132,6 @@ indique, ligne par ligne, ce qui manque à chacune.
   est retiré à l'aller ; il reste à réécrire ce que l'application renvoie.
 - **gRPC pour de bon** : la sécurité par méthode, et gRPC-Web. Les compteurs
   lisent déjà `grpc-status`.
-- **Un portail par tenant** : une icône, un titre et un agencement propres à
-  chaque client. Ce serait la première personnalisation visuelle par tenant
-  du produit.
 - **HTTP/3**, le jour où le gain se mesurera au lieu de se raconter.
 - **Un coffre externe** : HashiCorp Vault, les secrets Kubernetes et les secrets
   Docker, pour les installations qui en ont déjà un et n'en veulent pas un second.

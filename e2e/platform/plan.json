@@ -688,6 +688,21 @@
    "fr": "Un champ de tenant posé par root arrive à l'amont d'une route qui le nomme ; un administrateur du tenant ne peut pas le changer."
   },
   {
+   "id": "MODEL-04",
+   "priority": "P3",
+   "feasibility": "easy",
+   "targets": [
+    "U",
+    "I"
+   ],
+   "editions": [
+    "CE",
+    "EE"
+   ],
+   "en": "With the currency switch on, a person who chose none reaches the upstream with their browser's currency (de-CH gives CHF), and with their own once chosen on the profile; switched off, the route no longer sends it nor the time zone.",
+   "fr": "Devise activée : sans choix, l'amont reçoit celle du navigateur (de-CH donne CHF), puis celle choisie sur le profil ; désactivée, la route ne l'envoie plus, ni le fuseau."
+  },
+  {
    "id": "TENANT-01",
    "priority": "P1",
    "feasibility": "easy",
@@ -1217,8 +1232,8 @@
     "CE",
     "EE"
    ],
-   "en": "An app published under a prefix loads its assets (mount slash redirect).",
-   "fr": "Une application publiée sous un préfixe charge ses ressources (redirection vers le chemin de montage avec la barre oblique finale)."
+   "en": "An app published under a prefix loads its assets (mount slash redirect); one written for the root loads its assets and its fetch calls under the prefix once App written for the root is on, and its strays are listed while it is off.",
+   "fr": "Une application publiée sous un préfixe charge ses ressources (redirection vers le chemin de montage avec la barre oblique finale) ; une application écrite pour la racine charge ses ressources et ses appels fetch sous le préfixe une fois App written for the root activé, et ses requêtes égarées sont listées tant qu'il est coupé."
   },
   {
    "id": "UIF-02",
@@ -2870,6 +2885,17 @@
    ],
    "en": "Not built (native notifications through the push relay).",
    "fr": "Non construite (notifications natives par le relais)."
+  },
+  {
+   "id": "MOBILE-05",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (web or mobile channel of a notification, one link per channel).",
+   "fr": "Non construite (canal web ou mobile d'une notification, un lien par canal)."
   },
   {
    "id": "QUOTA-01",

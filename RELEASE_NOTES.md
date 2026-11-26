@@ -10,6 +10,26 @@
   The level is posed on the whole route; an endpoint override or a rate limit refuses it.
 - **A service can learn what its caller is**: Auth forward offers the `capabilities`
   attribute, a list in a JWT and a comma-separated value in a header.
+- **The time zone is optional, and a currency joins it.** Infra > Model, Account fields,
+  has a switch for each. On, the person chooses it on their profile page (a currency
+  shows an amount written in it), and it is ticked on the routes that already forward
+  facts about the caller: `timezone`, `currency` (an ISO 4217 code such as `EUR`). Off,
+  the profile no longer offers it, it leaves every route and stops deciding anything.
+  A person who chose no currency gets the one their browser's language points to
+  (`fr-FR` is EUR, `de-CH` is CHF), read on each request; the profile names it on its
+  "browser" option. An installation that never chose keeps the time zone, as before,
+  and has no currency.
+- **An application written for the root can live under a prefix.** A UI route that strips
+  a prefix has a switch, *App written for the root* (Custom section): the gateway then puts
+  the prefix back in the links of its pages (`href`, `src`, `action`, `srcset`, inline
+  styles), in the `url()` and `@import` of its stylesheets, and in the calls its scripts
+  make (`fetch`, XHR, WebSocket, EventSource). An address a script sets on an element or
+  on `location` stays out of reach: such an application needs a host of its own.
+- **A route says when its pages ask for addresses outside it.** Requests coming from a
+  page of a UI route that strips a prefix, which leave that prefix and land on a route
+  taking every path, on a 404 or on no route, are listed on the route's screen with the
+  route that answered instead, until the route is saved again. Also in
+  `GET /api/routes/{id}/strays` and in the `get_route` agent tool.
 
 ---
 

@@ -169,7 +169,7 @@ var previewErrors = map[string][]string{
 	"register-code":       {"errSigninCode", "errTooManyAttempts"},
 	"email-change-code":   {"errSigninCode", "errTooManyAttempts"},
 	"register":            {"errRegisterMissing", "errPwMismatch", "errBadEmail", "errTooManyAttempts", "errCaptcha"},
-	"profile":             {"errBadEmail", "errEmailTaken", "errBadTimezone", "errAvatarSize", "errAvatarType", "errPwCurrentWrong", "errTooManyAttempts"},
+	"profile":             {"errBadEmail", "errEmailTaken", "errBadTimezone", "errBadCurrency", "errAvatarSize", "errAvatarType", "errPwCurrentWrong", "errTooManyAttempts"},
 	"profile-password":    {"errPwCurrentWrong", "errPwPolicy", "errPwMismatch", "errPwReused"},
 	"profile-authorities": {"errSignInUnavailable", "errIdentityTaken", "errLastWayIn"},
 	"profile-tokens":      {"errTokenName"},
@@ -334,7 +334,11 @@ var PreviewPages = []PreviewPage{
 		return profilePage, profileData{
 			flowChrome: c, Error: c.PreviewErrors, Initials: "AM", Username: "alice",
 			Fullname: "Alice Martin", Email: "alice@acme.example",
-			TenantName: "Acme Corporation", Timezone: "Europe/Paris",
+			TenantName: "Acme Corporation", Timezone: "Europe/Paris", TimezoneOn: true,
+			// The currency on too, though it is off by default: a preview
+			// shows every line a page may carry, so each has a screen to be
+			// read and translated on.
+			Currency: "EUR", CurrencyOn: true, CurrencyBrowser: "EUR",
 			// The address dialog asks for the current password: shown, so
 			// its label has a screen to be read and translated on.
 			HasPassword: true,

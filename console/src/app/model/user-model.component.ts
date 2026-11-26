@@ -3,7 +3,8 @@ import { concat, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ApiService, UserFieldDef } from '../api.service';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { AccountPreferences, ApiService, UserFieldDef } from '../api.service';
 import { MeService } from '../me.service';
 import { LiveChangesService } from '../shared/live-changes.service';
 import { FieldDefsComponent } from './field-defs.component';
@@ -19,7 +20,7 @@ import { FieldDefsComponent } from './field-defs.component';
 // trusts.
 @Component({
   selector: 'app-user-model',
-  imports: [FieldDefsComponent, MatButtonModule, MatIconModule],
+  imports: [FieldDefsComponent, MatButtonModule, MatIconModule, MatSlideToggleModule],
   template: `
     <div class="banner">
       <h1 i18n="@@Model">Model</h1>
@@ -34,6 +35,22 @@ import { FieldDefsComponent } from './field-defs.component';
         per account under Application, Users; routes can forward them to applications. All are
         optional.
       </p>
+      <!-- The built-in preferences first: a time zone and a currency are
+           facts the PERSON chooses, on their profile. A switch each: on, the
+           profile offers it and routes forward it like any field. -->
+      @for (p of prefRows(); track p.key) {
+        <div class="pref">
+          <mat-icon>{{ p.icon }}</mat-icon>
+          <span class="pref-label">{{ p.label }}</span>
+          <code>{{ p.key }}</code>
+          <span class="grow"></span>
+          <mat-slide-toggle
+            [checked]="p.on"
+            (change)="setPref(p.key, $event.checked)"
+            [attr.aria-label]="p.label"
+          />
+        </div>
+      }
       <app-field-defs [(fields)]="userFields" />
 
       <!-- Only where there are organisations to tell apart: a single one
@@ -92,6 +109,22 @@ import { FieldDefsComponent } from './field-defs.component';
     .second {
       margin-top: 32px;
     }
+    .pref {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+    }
+    .pref-label {
+      font-weight: 500;
+    }
+    .pref code {
+      color: var(--mat-sys-on-surface-variant);
+    }
     .hint {
       color: var(--mat-sys-on-surface-variant);
       font-size: 0.85rem;
@@ -114,13 +147,35 @@ export class UserModelComponent {
 
   protected readonly userFields = signal<UserFieldDef[]>([]);
   protected readonly tenantFields = signal<UserFieldDef[]>([]);
+  // What an installation that never chose has, until the server answers.
+  protected readonly prefs = signal<AccountPreferences>({ timezone: true, currency: false });
+  private readonly savedPrefs = signal<string>('');
+  private readonly prefsDirty = computed(
+    () => this.savedPrefs() !== '' && JSON.stringify(this.prefs()) !== this.savedPrefs(),
+  );
+  // Each one a line of the account's list, with its switch: on, the person
+  // chooses it on their profile.
+  protected readonly prefRows = computed(() => [
+    {
+      key: 'timezone' as const,
+      icon: 'schedule',
+      label: $localize`:@@Time_zone:Time zone`,
+      on: this.prefs().timezone,
+    },
+    {
+      key: 'currency' as const,
+      icon: 'payments',
+      label: $localize`:@@Currency:Currency`,
+      on: this.prefs().currency,
+    },
+  ]);
   private readonly savedUser = signal<string>('[]');
   private readonly savedTenant = signal<string>('[]');
   protected readonly saving = signal(false);
   protected readonly error = signal('');
   private readonly userDirty = computed(() => JSON.stringify(this.userFields()) !== this.savedUser());
   private readonly tenantDirty = computed(() => JSON.stringify(this.tenantFields()) !== this.savedTenant());
-  protected readonly dirty = computed(() => this.userDirty() || this.tenantDirty());
+  protected readonly dirty = computed(() => this.userDirty() || this.tenantDirty() || this.prefsDirty());
 
   constructor() {
     this.load();
@@ -132,7 +187,20 @@ export class UserModelComponent {
     live.on('settings', (change) => live.offer(change, () => this.load()));
   }
 
+  protected setPref(key: keyof AccountPreferences, on: boolean): void {
+    this.prefs.update((p) => ({ ...p, [key]: on }));
+  }
+
+  private seedPrefs(p: AccountPreferences): void {
+    this.prefs.set(p);
+    this.savedPrefs.set(JSON.stringify(p));
+  }
+
   private load(): void {
+    this.api.accountPreferences().subscribe({
+      next: (p) => this.seedPrefs(p),
+      error: () => undefined,
+    });
     this.api.userFields().subscribe({
       next: (r) => this.seed(this.userFields, this.savedUser, r.fields),
       error: () => undefined,
@@ -160,6 +228,17 @@ export class UserModelComponent {
     // field ticked on routes nobody opened is a change to what services get.
     const moved = new Set<string>();
     const calls = [
+      // The preferences, each list sent only when it changed.
+      ...(this.prefsDirty()
+        ? [
+            this.api.saveAccountPreferences(this.prefs()).pipe(
+              tap((r) => {
+                this.seedPrefs(r.preferences);
+                (r.routes ?? []).forEach((n) => moved.add(n));
+              }),
+            ),
+          ]
+        : []),
       ...(this.userDirty()
         ? [
             this.api.saveUserFields(this.userFields()).pipe(

@@ -105,6 +105,7 @@ var notAnAPI = map[string]map[string]string{
 		"POST /profile/password":        "the form of the page GET /profile/password",
 		"POST /profile/sessions":        "the close buttons of the page GET /profile/sessions",
 		"POST /profile/timezone":        "the time-zone form of the page GET /profile",
+		"POST /profile/currency":        "the currency form of the page GET /profile",
 		"POST /profile/tokens":          "the form of the page GET /profile/tokens (mint, disable, delete a token)",
 		"POST /register":                "the form of the page GET /register",
 		"POST /reset-password":          "the form of the page GET /reset-password",

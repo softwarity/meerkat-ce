@@ -13,6 +13,7 @@ import (
 	"github.com/softwarity/meerkat/internal/discovery"
 	"github.com/softwarity/meerkat/internal/edition"
 	"github.com/softwarity/meerkat/internal/filters"
+	"github.com/softwarity/meerkat/internal/gateway"
 	"github.com/softwarity/meerkat/internal/logging"
 	"github.com/softwarity/meerkat/internal/mcp"
 	"github.com/softwarity/meerkat/internal/metrics"
@@ -223,7 +224,10 @@ func (a *API) tools() []mcp.Tool {
 		{
 			Name: "get_route", Allow: administersRouting, Title: "Get one route", ReadOnly: true,
 			Description: "The complete definition of one route: predicates, filters, target, access rule, " +
-				"identity forwarding, per-endpoint security and OpenAPI declaration.",
+				"identity forwarding, per-endpoint security and OpenAPI declaration. For a UI route that strips " +
+				"a prefix, `strays` lists what its pages asked for OUTSIDE the route since it was last saved " +
+				"(landing on a catch-all, a 404 or no route): an application writing its addresses from the root, " +
+				"which `ui.rootPaths` or a host of its own fixes.",
 			Schema: object(map[string]any{
 				"id": str("The route id, as given by list_routes."),
 			}, "id"),
@@ -450,6 +454,14 @@ func (a *API) toolGetRoute(ctx context.Context, args json.RawMessage) (any, erro
 	route, err := a.st.GetRoute(ctx, in.ID)
 	if err != nil {
 		return nil, fmt.Errorf("no route %q: call list_routes for the ids", in.ID)
+	}
+	if a.router != nil {
+		if strays := a.router.Strays(in.ID); len(strays) > 0 {
+			return struct {
+				store.Route
+				Strays []gateway.Stray `json:"strays"`
+			}{route, strays}, nil
+		}
 	}
 	return route, nil
 }

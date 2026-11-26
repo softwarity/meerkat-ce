@@ -191,9 +191,9 @@ export class ModuleEditorComponent implements OnInit {
   protected readonly moveLeft = $localize`:@@Move_left:Move left`;
   protected readonly moveRight = $localize`:@@Move_right:Move right`;
   protected readonly noContainer = $localize`:@@Portal_no_container:No container yet: add one first`;
-  protected readonly labelHint = $localize`:@@Portal_module_label_hint:Leave empty to use the route's name.`;
+  protected readonly labelHint = $localize`:@@Portal_module_label_hint2:Empty: the route's name.`;
   protected readonly containerLabelHint = $localize`:@@Portal_container_label_hint:Required for a container.`;
-  protected readonly notificationsLabelHint = $localize`:@@Portal_notifications_label_hint:Leave empty for Notifications, in each user's language.`;
+  protected readonly notificationsLabelHint = $localize`:@@Portal_notifications_label_hint2:Empty: Notifications, translated.`;
   protected readonly notificationsName = $localize`:@@Portal_notifications:Notifications`;
 
 

@@ -278,6 +278,9 @@ func (a *API) register(mux Mux) {
 	mux.Handle("POST /api/routes/respond-preview", a.infraAdmin(a.previewRespond))
 	mux.Handle("POST /api/routes/version-preview", a.infraAdmin(a.previewVersion))
 	mux.Handle("GET /api/routes/{id}", a.gw(a.getRoute))
+	// What the route's pages asked for outside it (gateway/strays.go): the
+	// sign of an application written for the root, on this node.
+	mux.Handle("GET /api/routes/{id}/strays", a.gw(a.getRouteStrays))
 	mux.Handle("PUT /api/routes/{id}", a.infraAdmin(a.putRoute))
 	mux.Handle("DELETE /api/routes/{id}", a.infraAdmin(a.deleteRoute))
 	a.registerOpenAPI(mux)
@@ -760,4 +763,14 @@ func conflict(w http.ResponseWriter, err error) bool {
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// getRouteStrays answers the addresses the route's pages asked for outside
+// its prefix since its current revision, counted on the node that answers.
+func (a *API) getRouteStrays(w http.ResponseWriter, r *http.Request) {
+	strays := []gateway.Stray{}
+	if a.router != nil {
+		strays = a.router.Strays(r.PathValue("id"))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"strays": strays})
 }

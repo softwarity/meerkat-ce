@@ -491,6 +491,16 @@
   },
   {
     "method": "GET",
+    "path": "/api/model/account-preferences",
+    "guard": "authed"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/model/account-preferences",
+    "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
     "path": "/api/model/tenant-fields",
     "guard": "authed"
   },
@@ -713,6 +723,11 @@
     "method": "PUT",
     "path": "/api/routes/{id}/spec",
     "guard": "infraAdmin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/routes/{id}/strays",
+    "guard": "gw"
   },
   {
     "method": "GET",

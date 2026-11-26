@@ -99,6 +99,17 @@ line, what is missing from each.
 
 ## Next
 
+- **A mobile app you do not have to publish** (Enterprise): one app on the App Store and
+  Google Play, published by us, that any Meerkat gateway can fill. A person
+  installs it, scans a QR code shown on their profile, types back the code the
+  phone displays, and the device is paired: unlocked by the phone's biometrics,
+  listed with their open sessions, revocable like any of them, with an icon on
+  the home screen in the name and logo of the integrator's application. The app then
+  shows the mobile portal the integrator declared in the console, previewed
+  there in a phone frame before anything goes in, the screens
+  their roles open and nothing else, and the notifications services already
+  send arrive as native ones, app closed. The integrator writes no mobile code
+  and goes through no store review.
 - **A discovery wizard**: the gateway can already read the Docker socket and a
   Kubernetes namespace. Turning that into "scan, pick a container, get a route"
   is the screen that is missing.
@@ -111,8 +122,6 @@ line, what is missing from each.
   rewritten.
 - **gRPC properly**: per-method security, and gRPC-Web. The counters already
   read `grpc-status`.
-- **A per-tenant portal**: each customer's own icon, title and
-  arrangement. It would be the product's first per-tenant visual override.
 - **HTTP/3**, once the gain can be measured rather than described.
 - **An external vault**: HashiCorp Vault, Kubernetes secrets and Docker
   secrets, for installations that already run one and do not want a second.

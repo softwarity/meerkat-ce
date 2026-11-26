@@ -214,4 +214,24 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     where: '/system/audit',
     whereLabel: $localize`:@@Audit:Audit`,
   },
+  'MOBILE-01': {
+    label: $localize`:@@EE_MOBILE_01:Companion app`,
+    what: $localize`:@@EE_MOBILE_01_what:One mobile app, published by Softwarity, that your gateway fills: no mobile code, no store review.`,
+  },
+  'MOBILE-02': {
+    label: $localize`:@@EE_MOBILE_02:Device pairing`,
+    what: $localize`:@@EE_MOBILE_02_what:A person pairs a phone from their profile with a QR code, and can revoke it like a session.`,
+  },
+  'MOBILE-03': {
+    label: $localize`:@@EE_MOBILE_03:Mobile portal`,
+    what: $localize`:@@EE_MOBILE_03_what:Phone and tablet portals, each with its own entries, shown in the companion app.`,
+  },
+  'MOBILE-04': {
+    label: $localize`:@@EE_MOBILE_04:Native notifications`,
+    what: $localize`:@@EE_MOBILE_04_what:Notifications reach the phone as native ones, even with the app closed.`,
+  },
+  'MOBILE-05': {
+    label: $localize`:@@EE_MOBILE_05:Notification channel`,
+    what: $localize`:@@EE_MOBILE_05_what:A service says whether a notification goes to the web, the phone, or both.`,
+  },
 };
