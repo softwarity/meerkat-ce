@@ -30,6 +30,22 @@
   taking every path, on a 404 or on no route, are listed on the route's screen with the
   route that answered instead, until the route is saved again. Also in
   `GET /api/routes/{id}/strays` and in the `get_route` agent tool.
+- **Notifications have a bell in the portal bar.** In portal mode, a bell with the unread
+  count sits just before the color-scheme switch (at the foot of the rail, at the right of
+  the header). A click opens a drawer against the bar, over the page: each notification
+  with its level, its title, its text cut at two lines (a chevron unfolds it), who sent it
+  and when; a click on the text marks it read, a cross deletes it, and under it its
+  action, Open and Acknowledge. The drawer links to the notifications page. The bar no
+  longer serves the special Notifications entry of the catalogue.
+- **The notifications page shows its rows the same way**: actions, Open and Acknowledge
+  always visible, Delete as a cross at the end of the title.
+- **A reader sees the notifications of their session's tenant only.** Those of their
+  other tenants wait there and appear when they switch (list, badge, snackbar, desktop).
+  A message sent to every tenant is still one item, read, deleted and acknowledged at
+  once in all of them.
+- **A deleted notification can be restored** until it expires: the page has a *Deleted*
+  chip that lists them with Restore (`POST /meerkat/notifications/{id}/restore`, and
+  `?deleted=1` on the list).
 
 ---
 

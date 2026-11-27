@@ -2088,7 +2088,7 @@
         ],
         "summary": "List my notifications",
         "operationId": "listMyNotifications",
-        "description": "Newest first, in the reader's language: from every tenant of theirs with notifications on, those they can still open there, with the actions they may use. `here` is false for one of another tenant than the current one: read or delete it here, open it or run its actions after switching to its tenant. A message sent to all of the reader's tenants is one item naming each of them in `tenants`. For an application with its own list.",
+        "description": "Newest first, in the reader's language: those of the session's tenant, when its notifications are on, that the reader can still open, with the actions they may use. A notification sent in another of the reader's tenants is listed once they switch to it. For an application with its own list.",
         "security": [
           {
             "session": []
@@ -2103,6 +2103,15 @@
             "in": "query",
             "required": false,
             "description": "1 or true: only the unread ones.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "required": false,
+            "description": "1 or true: what the reader deleted instead, until it expires, to restore it.",
             "schema": {
               "type": "string"
             }
@@ -2387,7 +2396,7 @@
         ],
         "summary": "Delete a notification",
         "operationId": "deleteMyNotification",
-        "description": "For you only and for good: the sender and the other readers keep theirs. A message sent to several of your tenants goes from all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it.",
+        "description": "For you only: the sender and the other readers keep theirs. It stays yours until it expires, listed with `?deleted=1` and restored with `POST /meerkat/notifications/{id}/restore`. A message sent to several of your tenants goes from all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it.",
         "security": [
           {
             "session": []
@@ -2605,6 +2614,75 @@
         },
         "x-meerkat-edition": "enterprise",
         "description": "For one that asks to be acknowledged; it is read too. From a session in any of your tenants. A message sent to several of your tenants is acknowledged in all of them; asked of one reader (single), your acknowledgement closes it for everyone, every copy of it. Done already: nothing changes. The other readers' pages update at once."
+      }
+    },
+    "/meerkat/notifications/{id}/restore": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Restore a deleted notification",
+        "operationId": "restoreMyNotification",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Restored"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off, or no deleted notification of yours by this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise",
+        "description": "Gives back what you deleted, read as it was, until it expires. A message sent to several of your tenants comes back in all of them."
       }
     },
     "/meerkat/notify-sw.js": {

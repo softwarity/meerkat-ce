@@ -189,31 +189,26 @@ type NotifyPlace struct {
 	Page string
 	// Route is the integrator's route serving Page, "" for the built-in page.
 	Route store.Route
-	// InBar says the bar carries the notifications entry for this reader:
-	// portal mode, the entry placed, and the integrator's route open to them.
+	// InBar says the bar carries the notifications for this reader: in portal
+	// mode, its bell (beside the colour scheme) opens them in a drawer.
 	InBar bool
 }
 
 // NotifyPlace resolves it for a caller. A reader the integrator's route
-// refuses is led to the built-in page, through the user button: the bar's
-// entry is filtered like any other. A route turned off, gone or no longer UI
-// leads everybody to the built-in page, and the entry stays where it is.
+// refuses is led to the built-in page, and so is everybody when the route is
+// turned off, gone or no longer UI.
 func (h *Handler) NotifyPlace(ctx context.Context, caller store.Caller) NotifyPlace {
 	cfg := h.st.Portal(ctx)
 	place := NotifyPlace{Page: NotificationsPagePath}
-	allowed := true
 	if np := cfg.NotifyPage; np.RouteID != "" {
 		if rt, err := h.st.GetRoute(ctx, np.RouteID); err == nil && rt.IsUI {
 			entry := routeEntryPath(rt)
-			switch {
-			case !rt.Access.Grants(caller):
-				allowed = false
-			case rt.Enabled && entry != "":
+			if rt.Access.Grants(caller) && rt.Enabled && entry != "" {
 				place.Page, place.Route = NotifyHref(entry, np.Path), rt
 			}
 		}
 	}
-	place.InBar = allowed && !h.adminPlane && cfg.Mode == store.PortalModePortal && cfg.NotificationsEntry()
+	place.InBar = !h.adminPlane && cfg.Mode == store.PortalModePortal
 	return place
 }
 

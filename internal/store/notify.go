@@ -919,6 +919,9 @@ type ReceivedFilter struct {
 	Level  string
 	// TenantID keeps only what was sent in one tenant; "" is every tenant.
 	TenantID string
+	// Deleted lists what the reader deleted instead (DeleteReceived), until it
+	// expires: what RestoreReceived can give back.
+	Deleted bool
 	// Before pages: only what was created before this instant.
 	Before int64
 	Limit  int
@@ -934,9 +937,13 @@ func (s *Store) ReceivedNotifications(ctx context.Context, userID string, f Rece
 	for _, c := range strings.Split(cols, ",") {
 		prefixed = append(prefixed, "n."+strings.TrimSpace(c))
 	}
+	held := `r.hidden_at = 0`
+	if f.Deleted {
+		held = `r.hidden_at > 0`
+	}
 	q := `SELECT ` + strings.Join(prefixed, ", ") + `, r.read_at, r.acked_at FROM notification_recipients r
 		JOIN notifications n ON n.id = r.notification_id
-		WHERE r.user_id = ? AND r.hidden_at = 0 AND n.expires_at > ?`
+		WHERE r.user_id = ? AND ` + held + ` AND n.expires_at > ?`
 	args := []any{userID, time.Now().Unix()}
 	// An ended one stays listed, marked, and is never unread: nothing waits
 	// for its reader any more.
@@ -1147,10 +1154,10 @@ const owed = `n.ack <> '' AND n.withdrawn_at = 0 AND n.expires_at > ?
 // them: the sender's message and every other reader's copy are untouched.
 // A copy of a message sent to every tenant goes with every other copy the
 // reader holds of it: one item for them, one Delete.
-// It is for good. The row stays, flagged (hidden_at), so what the sender is
-// told - who was told, who read - stays true; but nothing reads a flagged row
-// for its reader again: ReceivedNotifications leaves it out, and no write
-// clears the flag. Deleting reads it too: what is gone is not waiting to be
+// The row stays, flagged (hidden_at), so what the sender is told - who was
+// told, who read - stays true. ReceivedNotifications leaves it out, unless it
+// is asked for what was deleted, and RestoreReceived clears the flag: the
+// reader keeps what they deleted until it expires, and may take it back. Deleting reads it too: what is gone is not waiting to be
 // read. Deleting one already deleted is not found, as for anybody else.
 // One that waits for an acknowledgement the reader owes is refused
 // (ErrNotificationOwed): what asks for proof is not thrown away before it.
@@ -1171,6 +1178,23 @@ func (s *Store) DeleteReceived(ctx context.Context, userID, id string) error {
 		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND hidden_at = 0`, now, now, id, id, userID, userID)
 	if err != nil {
 		return fmt.Errorf("store: delete notification %q of %q: %w", id, userID, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotificationNotFound
+	}
+	return nil
+}
+
+// RestoreReceived gives a reader back what they deleted, a message sent to
+// every tenant with every copy of it, read as it was when deleted. One not
+// deleted, or expired, is not found.
+func (s *Store) RestoreReceived(ctx context.Context, userID, id string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE notification_recipients SET hidden_at = 0
+		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND hidden_at > 0
+		AND notification_id IN (SELECT id FROM notifications WHERE expires_at > ?)`,
+		id, id, userID, userID, time.Now().Unix())
+	if err != nil {
+		return fmt.Errorf("store: restore notification %q of %q: %w", id, userID, err)
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return ErrNotificationNotFound
