@@ -3197,29 +3197,7 @@ func userButtonFragment(r store.Route, localeCodes []string) string {
 		return ""
 	}
 	btn := r.UI.UserButton
-	height := btn.Height
-	if height == 0 {
-		height = 24
-	}
-	position := btn.Position
-	if position == "" {
-		position = "top-right"
-	}
-	// The route id feeds the developer bar (uisim.go): the UI test is scoped
-	// to THIS route. Server-generated id, HTML-safe.
-	attrs := fmt.Sprintf(` height="%d" position="%s" route="%s"`, height, position, htmlEscape(r.ID))
-	if btn.PadX != 0 {
-		attrs += fmt.Sprintf(` pad-x="%d"`, btn.PadX)
-	}
-	if btn.PadY != 0 {
-		attrs += fmt.Sprintf(` pad-y="%d"`, btn.PadY)
-	}
-	if btn.Shape == "square" {
-		attrs += ` shape="square"`
-	}
-	if btn.Name != "" {
-		attrs += fmt.Sprintf(` name="%s"`, btn.Name)
-	}
+	attrs := auth.UserButtonAttrs(btn, r.ID)
 	// The component keeps itself out of a framed page unless this says
 	// otherwise; the markup is the same either way, so nothing varies per
 	// context and no cache can serve one context the other's page.

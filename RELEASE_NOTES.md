@@ -57,6 +57,13 @@
   its place. One a stored catalogue or an older configuration still holds is ignored, and
   dropped at the next save. The Portal screen, the agent tool and the admin API no longer
   offer it: a `special` sent on a portal entry is dropped.
+- **The account button opens the notifications drawer** when there is no portal bar: it
+  wears the unread count, and its Notifications entry opens the same drawer as the bar's
+  bell, along the side of the page opposite the button. The drawer is one component for
+  both, carried by the Enterprise image only.
+- **The notifications page wears the account button** without the portal bar: the one of
+  the application the reader came from, where it sits there, and its back arrow leads to
+  the page they left, even when the browser keeps no way back.
 
 ---
 

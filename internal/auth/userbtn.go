@@ -108,7 +108,20 @@ func containsFold(list []string, v string) bool {
 func userButtonScript() string {
 	return strings.NewReplacer("__MK_EVAL_CSS__", evalmark.Shown(evalmark.MenuCSS), "__MK_EVAL__", evalmark.Shown(evalmark.MenuEntry),
 		"__MK_SNACKBAR__", snackbarJS,
-		"__MK_NOTIFY_SW_SCOPE__", NotificationsWorkerScope, "__MK_NOTIFY_SW__", NotificationsWorkerPath).Replace(userButtonJS)
+		"__MK_NOTIFY_SW_SCOPE__", NotificationsWorkerScope, "__MK_NOTIFY_SW__", NotificationsWorkerPath).Replace(userButtonJS) +
+		notifyDrawer
+}
+
+// notifyDrawer is the <meerkat-notify-drawer> component (NOTIF-05), which
+// ee/notify registers: it rides in this script, so the account button and
+// the portal bar both have it, and the community image carries none of it.
+var notifyDrawer string
+
+// RegisterNotifyDrawer installs the drawer's script. Called from ee/notify's
+// init(), before any handler exists.
+func RegisterNotifyDrawer(js string) {
+	notifyDrawer = "\n" + js
+	ChromeVersion = chromeVersion()
 }
 
 func (h *Handler) userButtonJS(w http.ResponseWriter, _ *http.Request) {
@@ -286,6 +299,14 @@ func userButtonMenuLabels(t map[string]string) map[string]string {
 		// Notifications given after their publication, once the reader's
 		// rights moved: one news for them all.
 		"notifMissed": t["notifMissed"],
+		// The drawer the entry opens (Enterprise): its head and its rows.
+		"notifBoard":     t["notifBoard"],
+		"notifCloseOwed": t["notifCloseOwed"],
+		"notifEmpty":     t["notifEmpty"],
+		"notifUnfold":    t["notifUnfold"],
+		"notifFold":      t["notifFold"],
+		"notifWithdrawn": t["notifWithdrawn"],
+		"notifUnread":    t["notifUnread"],
 	}
 	return labels
 }
@@ -871,10 +892,14 @@ const userButtonJS = `(() => {
         // they are on for this tenant. Not when the portal bar this button
         // rides in carries its own entry (inBar), which leads there with the
         // same count: one entry, one badge.
+        // With the drawer (Enterprise), the entry opens it along the side of
+        // the page opposite the button; the drawer leads to the page.
         if (notifHere) {
           const n = data.notifications.total || 0;
-          items.push('<a class="item" href="' + esc(data.notifications.page) + '"><span>' + esc(L.notifications || 'Notifications') + '</span>' +
-            (n ? '<span class="count">' + n + '</span>' : '') + '</a>');
+          const inner = '<span>' + esc(L.notifications || 'Notifications') + '</span>' + (n ? '<span class="count">' + n + '</span>' : '');
+          items.push(customElements.get('meerkat-notify-drawer')
+            ? '<button class="item" data-notify-drawer>' + inner + '</button>'
+            : '<a class="item" href="' + esc(data.notifications.page) + '">' + inner + '</a>');
         }
         // The fronted applications this session may open; the current one is
         // ticked (matched on its entry path). Suppressed inside the portal bar,
@@ -1206,6 +1231,23 @@ const userButtonJS = `(() => {
           const was = box.classList.contains('open');
           closeSubs();
           if (!was) box.classList.add('open');
+        });
+      }
+
+      // The notifications drawer, along the side of the page opposite the
+      // button, which it leaves in sight with its count: the menu closes as
+      // it opens.
+      const nd = this.shadowRoot.querySelector('[data-notify-drawer]');
+      if (nd) {
+        nd.addEventListener('click', () => {
+          closeSubs();
+          menu.classList.remove('open');
+          const dr = this.notifyDrawer || (this.notifyDrawer = document.createElement('meerkat-notify-drawer'));
+          dr.open({
+            labels: L, themeCss: data.themeCss, opener: this,
+            place: align === 'left' ? { top: 0, bottom: 0, right: 0, side: 'r' } : { top: 0, bottom: 0, left: 0, side: 'l' },
+            board: data.notifications.page, route: this.getAttribute('route') || '',
+          });
         });
       }
 

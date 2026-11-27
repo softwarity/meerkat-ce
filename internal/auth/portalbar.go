@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -321,6 +322,67 @@ func (h *Handler) BehindPortal(r *http.Request, c FlowChrome) FlowChrome {
 		`<style>:root:has(> body.mk-scheme-light) { color-scheme: light; } :root:has(> body.mk-scheme-dark) { color-scheme: dark; }</style>` +
 		PortalRoomCSS
 	c.BodyStart = template.HTML(agent + portalBar.Fragment(store.Route{IsUI: true}, langs)) //nolint:gosec // constants, and language codes validated and escaped
+	c.SchemeSwitch = false
+	c.Langs = nil
+	return c
+}
+
+// UserButtonAttrs are the attributes that place and size a
+// <meerkat-user-button> as btn says: height, corner, gaps, shape and where
+// the name shows, and the route it stands on (routeID, which feeds the
+// developer bar and the notifications page's way back to its button).
+func UserButtonAttrs(btn store.UserButton, routeID string) string {
+	height := btn.Height
+	if height == 0 {
+		height = 24
+	}
+	position := btn.Position
+	if position == "" {
+		position = "top-right"
+	}
+	attrs := fmt.Sprintf(` height="%d" position="%s" route="%s"`, height, template.HTMLEscapeString(position),
+		template.HTMLEscapeString(routeID))
+	if btn.PadX != 0 {
+		attrs += fmt.Sprintf(` pad-x="%d"`, btn.PadX)
+	}
+	if btn.PadY != 0 {
+		attrs += fmt.Sprintf(` pad-y="%d"`, btn.PadY)
+	}
+	if btn.Shape == "square" {
+		attrs += ` shape="square"`
+	}
+	if btn.Name != "" {
+		attrs += fmt.Sprintf(` name="%s"`, template.HTMLEscapeString(btn.Name))
+	}
+	return attrs
+}
+
+// BehindButton gives a page of the gateway's own (the notifications page)
+// the account button when no portal bar stands above it: the one of the
+// application the reader came from (routeID), where that application wears
+// it, or the default one. The page agent comes with it, and the button then
+// carries the language and the colour scheme the page drew itself.
+func (h *Handler) BehindButton(r *http.Request, c FlowChrome, routeID string) FlowChrome {
+	if h.adminPlane || c.BodyStart != "" {
+		return c
+	}
+	btn := store.UserButton{Enabled: true}
+	if routeID != "" {
+		if rt, err := h.st.GetRoute(r.Context(), routeID); err == nil && rt.IsUI && rt.UI != nil && rt.UI.UserButton.Enabled {
+			btn = rt.UI.UserButton
+		} else {
+			routeID = ""
+		}
+	}
+	langs := h.offeredLanguages()
+	agent := `<script defer src="/meerkat/page.js?v=` + ChromeVersion + `" data-scheme="select"` +
+		` data-scheme-mechanism="class" data-scheme-tag="body" data-scheme-light="mk-scheme-light" data-scheme-dark="mk-scheme-dark"` +
+		` data-languages="` + template.HTMLEscapeString(strings.Join(langs, ",")) + `"></script>` +
+		`<style>:root:has(> body.mk-scheme-light) { color-scheme: light; } :root:has(> body.mk-scheme-dark) { color-scheme: dark; }</style>`
+	button := `<script defer src="/meerkat/user-button.js?v=` + ChromeVersion + `"></script>` +
+		`<meerkat-user-button` + UserButtonAttrs(btn, routeID) + ` scheme="select"` +
+		` languages="` + template.HTMLEscapeString(strings.Join(langs, ",")) + `"></meerkat-user-button>`
+	c.BodyStart = template.HTML(agent + button) //nolint:gosec // constants, and every value escaped
 	c.SchemeSwitch = false
 	c.Langs = nil
 	return c
