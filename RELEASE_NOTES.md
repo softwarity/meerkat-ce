@@ -34,18 +34,29 @@
   count sits just before the color-scheme switch (at the foot of the rail, at the right of
   the header). A click opens a drawer against the bar, over the page: each notification
   with its level, its title, its text cut at two lines (a chevron unfolds it), who sent it
-  and when; a click on the text marks it read, a cross deletes it, and under it its
+  and when; a click on the text marks it read, a cross closes it, and under it its
   action, Open and Acknowledge. The drawer links to the notifications page. The bar no
   longer serves the special Notifications entry of the catalogue.
 - **The notifications page shows its rows the same way**: actions, Open and Acknowledge
-  always visible, Delete as a cross at the end of the title.
+  always visible, Delete and Close at the end of the title.
 - **A reader sees the notifications of their session's tenant only.** Those of their
   other tenants wait there and appear when they switch (list, badge, snackbar, desktop).
   A message sent to every tenant is still one item, read, deleted and acknowledged at
   once in all of them.
-- **A deleted notification can be restored** until it expires: the page has a *Deleted*
-  chip that lists them with Restore (`POST /meerkat/notifications/{id}/restore`, and
-  `?deleted=1` on the list).
+- **Two levels to put a notification away.** The cross closes it, in the drawer as on the
+  notifications page: gone from both, read, and kept until it expires. The page's *Closed*
+  chip lists them with Reopen. The trash of the page deletes for good, open or
+  closed, and Delete all is for good too. On the data plane API, `POST
+  /meerkat/notifications/{id}/close` and `.../reopen` are new, `?closed=1` lists what was
+  closed, and `DELETE /meerkat/notifications/{id}` is now for good.
+- **A built-in palette can be made live.** Activating one (Crimson, Forest...) used to
+  fail with "no such theme": it is now stored under its name and the stored theme made
+  live. Activating it again makes live the same copy; a name another palette already
+  holds gets a number ("Crimson 2").
+- **The portal catalogue no longer has a Notifications entry**: the bell of the bar took
+  its place. One a stored catalogue or an older configuration still holds is ignored, and
+  dropped at the next save. The Portal screen, the agent tool and the admin API no longer
+  offer it: a `special` sent on a portal entry is dropped.
 
 ---
 

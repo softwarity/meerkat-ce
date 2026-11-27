@@ -303,9 +303,12 @@ export class BuiltInPagesScope {
       });
   }
 
+  // A built-in is stored by the server and the stored theme activated: the
+  // selection moves to it, the one now live.
   activate(t: Theme): void {
     this.api.activateTheme(t.id).subscribe({
-      next: () => {
+      next: (live) => {
+        this.selectedId.set(live.id);
         this.snack.open(
           $localize`:@@Theme_is_now_live:This theme now applies to the built-in pages`,
           undefined,

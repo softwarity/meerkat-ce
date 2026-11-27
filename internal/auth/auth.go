@@ -4204,9 +4204,7 @@ func (h *Handler) catalogueAt(ctx context.Context, grants func(store.Route) bool
 	}
 	var modules []module
 	for i, e := range cfg.Entries {
-		// The notifications entry is no application: the user button carries
-		// its own when the bar does not.
-		if e.Disabled || e.Special != "" {
+		if e.Disabled {
 			continue
 		}
 		if !e.IsContainer() {
@@ -4214,7 +4212,7 @@ func (h *Handler) catalogueAt(ctx context.Context, grants func(store.Route) bool
 			continue
 		}
 		for _, c := range e.Children {
-			if !c.Disabled && c.Special == "" {
+			if !c.Disabled {
 				modules = append(modules, module{routeID: c.RouteID, label: c.Label, group: e.Label, run: i + 1})
 			}
 		}

@@ -2698,10 +2698,6 @@ export interface NotifyPage {
   path?: string;
 }
 
-// The one entry the gateway provides rather than a route: it opens the
-// notifications page and wears the unread badge.
-export type PortalSpecial = 'notifications';
-
 // A top-level module: a full application (a route), which may gather children
 // shown in the secondary surface. label/icon override what the route offers.
 // `icon` is an SVG string (from the icon bank), not a font name.
@@ -2719,8 +2715,6 @@ export interface PortalEntry {
   // the application making the room itself.
   overlay?: boolean;
   children?: PortalSubEntry[];
-  // The notifications entry: no route, no children.
-  special?: PortalSpecial;
 }
 
 // A sub-module of a parent, shown in the secondary surface.
@@ -2731,7 +2725,6 @@ export interface PortalSubEntry {
   description?: string;
   disabled?: boolean;
   overlay?: boolean;
-  special?: PortalSpecial;
 }
 
 export const PORTAL_LAYOUTS = ['header', 'rail'] as const;

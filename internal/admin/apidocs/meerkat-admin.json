@@ -3960,11 +3960,11 @@
       },
       "PortalSubEntry": {
         "type": "object",
-        "description": "A module in a container, or the notifications entry.",
+        "description": "A module in a container.",
         "properties": {
           "routeId": {
             "type": "string",
-            "description": "UI route it opens; empty for the notifications entry"
+            "description": "UI route it opens"
           },
           "icon": {
             "type": "string",
@@ -3985,23 +3985,16 @@
           "overlay": {
             "type": "boolean",
             "description": "True lets the bar draw over this module's pages, the application making the room itself from the --meerkat-top, --meerkat-left and --meerkat-right properties. False (default): the bar moves the whole page clear of it, fixed elements included. A route in no entry is never moved."
-          },
-          "special": {
-            "type": "string",
-            "enum": [
-              "notifications"
-            ],
-            "description": "The notifications entry: no route, opens the notifications page with the unread badge (Enterprise edition). Once in the catalogue"
           }
         }
       },
       "PortalEntry": {
         "type": "object",
-        "description": "A module (bound to a UI route), a container of modules, or the notifications entry.",
+        "description": "A module (bound to a UI route) or a container of modules.",
         "properties": {
           "routeId": {
             "type": "string",
-            "description": "UI route it opens; empty for a container and the notifications entry"
+            "description": "UI route it opens; empty for a container"
           },
           "icon": {
             "type": "string",
@@ -4029,13 +4022,6 @@
               "$ref": "#/components/schemas/PortalSubEntry"
             },
             "description": "A container's modules"
-          },
-          "special": {
-            "type": "string",
-            "enum": [
-              "notifications"
-            ],
-            "description": "The notifications entry: no route, no children, opens the notifications page with the unread badge (Enterprise edition). Once in the catalogue"
           }
         }
       },

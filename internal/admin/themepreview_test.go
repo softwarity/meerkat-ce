@@ -146,3 +146,44 @@ func TestAPreviewWearsItsDraft(t *testing.T) {
 		t.Errorf("a malformed draft: %d %s", r.StatusCode, body)
 	}
 }
+
+// A built-in palette is code, not a row: activating it stores it under its
+// name and activates what was stored, and activating it again activates the
+// same row rather than a second copy. A name taken by another palette gets a
+// number; an unknown built-in is refused, naming the ones there are.
+func TestActivatingABuiltInStoresIt(t *testing.T) {
+	f := setupBare(t)
+	ctx := context.Background()
+	activate := func(id string) store.Theme {
+		t.Helper()
+		code, body := f.call(t, "POST", "/api/themes/"+url.PathEscape(id)+"/activate", "", f.rootC)
+		if code != http.StatusOK {
+			t.Fatalf("activate %s: %d %s", id, code, body)
+		}
+		var live store.Theme
+		if err := json.Unmarshal([]byte(body), &live); err != nil {
+			t.Fatal(err)
+		}
+		return live
+	}
+	first := activate(presetIDPrefix + "crimson")
+	if first.Name != "Crimson" || !first.Active || strings.HasPrefix(first.ID, presetIDPrefix) {
+		t.Fatalf("the built-in should be stored and live: %+v", first)
+	}
+	if again := activate(presetIDPrefix + "crimson"); again.ID != first.ID {
+		t.Fatalf("a second activation made a second copy: %s then %s", first.ID, again.ID)
+	}
+	// The same name, other colours: the built-in gets a name of its own.
+	other := first
+	other.ID, other.Name, other.Active, other.Rev = "mine", "Forest", false, 0
+	other.Colors = m3color.Core{Primary: "#123456"}
+	if err := f.api.st.SaveTheme(ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	if forest := activate(presetIDPrefix + "forest"); forest.Name != "Forest 2" {
+		t.Fatalf("a taken name should get a number, got %q", forest.Name)
+	}
+	if code, body := f.call(t, "POST", "/api/themes/"+url.PathEscape(presetIDPrefix+"weather")+"/activate", "", f.rootC); code != http.StatusNotFound || !strings.Contains(body, "crimson") {
+		t.Fatalf("an unknown built-in: %d %s", code, body)
+	}
+}

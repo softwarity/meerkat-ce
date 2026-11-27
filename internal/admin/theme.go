@@ -196,7 +196,20 @@ func (a *API) deleteTheme(w http.ResponseWriter, r *http.Request, actor store.Us
 }
 
 func (a *API) activateTheme(w http.ResponseWriter, r *http.Request, actor store.User) {
-	if err := a.st.ActivateTheme(r.Context(), r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	// A built-in palette is code, not a row: activating one stores it first,
+	// under its own name, and activates what was stored. A copy already
+	// stored with its name and its colours is the one activated, so a second
+	// click does not make a second copy.
+	if key, ok := strings.CutPrefix(id, presetIDPrefix); ok {
+		stored, err := a.storedPreset(r.Context(), actor, key)
+		if err != nil {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		id = stored
+	}
+	if err := a.st.ActivateTheme(r.Context(), id); err != nil {
 		if errors.Is(err, store.ErrNoRows) {
 			writeErr(w, http.StatusNotFound, "theme not found")
 			return
@@ -211,6 +224,51 @@ func (a *API) activateTheme(w http.ResponseWriter, r *http.Request, actor store.
 	}
 	a.auditEvent(r.Context(), actor, "theme.activate", "theme", t.ID, t.Name, "", "")
 	writeJSON(w, http.StatusOK, t)
+}
+
+// storedPreset returns the id of the stored theme that is the built-in
+// palette key: a theme of its name and its colours, or a new one saved for
+// the purpose, named after it ("Crimson 2" when a different "Crimson" is
+// already there).
+func (a *API) storedPreset(ctx context.Context, actor store.User, key string) (string, error) {
+	var preset store.Theme
+	found := false
+	for _, p := range store.PresetThemes() {
+		if p.ID == key {
+			preset, found = p, true
+			break
+		}
+	}
+	if !found {
+		names := make([]string, 0, len(store.PresetThemes()))
+		for _, p := range store.PresetThemes() {
+			names = append(names, p.ID)
+		}
+		return "", fmt.Errorf("no built-in palette %q: allowed are %s", key, strings.Join(names, ", "))
+	}
+	themes, err := a.st.ListThemes(ctx)
+	if err != nil {
+		return "", err
+	}
+	taken := map[string]bool{}
+	for _, t := range themes {
+		if t.Name == preset.Name && t.Colors == preset.Colors && t.Contrast == preset.Contrast &&
+			t.ColorMatch == preset.ColorMatch && !t.Flat && t.Fonts == preset.Fonts {
+			return t.ID, nil
+		}
+		taken[t.Name] = true
+	}
+	name := preset.Name
+	for n := 2; taken[name]; n++ {
+		name = fmt.Sprintf("%s %d", preset.Name, n)
+	}
+	t := store.Theme{ID: newID(), Name: name, Colors: preset.Colors, Contrast: preset.Contrast,
+		ColorMatch: preset.ColorMatch, Fonts: preset.Fonts}
+	if err := a.st.SaveTheme(ctx, t); err != nil {
+		return "", err
+	}
+	a.auditEvent(ctx, actor, "theme.create", "theme", t.ID, t.Name, "", "")
+	return t.ID, nil
 }
 
 // previewTheme renders the flow-page specimen in the given theme, one scheme

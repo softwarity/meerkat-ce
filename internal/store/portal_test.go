@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -229,44 +230,32 @@ func TestPortalLogoRadiusHasTwoEnds(t *testing.T) {
 	}
 }
 
-// The notifications entry (NOTIF-05) is offered once, wherever it is placed,
-// opens no route and holds nothing; it wears the bell when no icon is chosen.
-func TestTheNotificationsEntry(t *testing.T) {
+// The notifications entry left the catalogue for the bell of the bar: one a
+// stored catalogue or an older configuration still carries is dropped on
+// save, wherever it sits, and the rest saves as it is.
+func TestARetiredNotificationsEntryIsDropped(t *testing.T) {
 	cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{
 		{RouteID: "a"},
-		{Label: "Tools", Children: []PortalSubEntry{{RouteID: "b"}, {Special: PortalSpecialNotifications, Label: " Inbox "}}},
-		{Special: PortalSpecialNotifications}, // a second one: dropped
+		{Label: "Tools", Children: []PortalSubEntry{{RouteID: "b"}, {Special: "notifications", Label: "Inbox"}}},
+		{Special: "notifications"},
 	}}
 	if err := SanitizePortalConfig(&cfg, portalRoutes(), nil); err != nil {
-		t.Fatalf("the notifications entry was refused: %v", err)
+		t.Fatalf("a catalogue holding the retired entry was refused: %v", err)
 	}
-	if len(cfg.Entries) != 2 || len(cfg.Entries[1].Children) != 2 {
-		t.Fatalf("the second notifications entry should be dropped, got %+v", cfg.Entries)
-	}
-	bell := cfg.Entries[1].Children[1]
-	if bell.Label != "Inbox" || !strings.Contains(bell.Icon, "<svg") {
-		t.Fatalf("the entry keeps its label and wears the bell, got %+v", bell)
-	}
-	if !cfg.NotificationsEntry() {
-		t.Fatal("the catalogue places the entry")
-	}
-	cfg.Entries[1].Disabled = true
-	if cfg.NotificationsEntry() {
-		t.Fatal("inside a container turned off, the entry is not placed")
-	}
-	if cfg.Entries[1].IsContainer() != true || (PortalEntry{Special: PortalSpecialNotifications}).IsContainer() {
-		t.Fatal("the notifications entry is no container, its own container is one")
+	if len(cfg.Entries) != 2 || len(cfg.Entries[1].Children) != 1 || cfg.Entries[1].Children[0].RouteID != "b" {
+		t.Fatalf("the retired entry should be dropped, got %+v", cfg.Entries)
 	}
 
-	for name, bad := range map[string]PortalEntry{
-		"unknown":  {Special: "weather"},
-		"route":    {Special: PortalSpecialNotifications, RouteID: "a"},
-		"children": {Special: PortalSpecialNotifications, Children: []PortalSubEntry{{RouteID: "a"}}},
-	} {
-		cfg := PortalConfig{Layout: PortalHeader, Entries: []PortalEntry{bad}}
-		if err := SanitizePortalConfig(&cfg, portalRoutes(), nil); err == nil {
-			t.Errorf("%s: a special entry %+v should be refused", name, bad)
-		}
+	// Stored before it was retired: read without it.
+	s := openTemp(t)
+	ctx := context.Background()
+	if err := s.SetSetting(ctx, SettingPortal, PortalConfig{Mode: PortalModeLinks, Entries: []PortalEntry{
+		{Special: "notifications"}, {Label: "Tools", Children: []PortalSubEntry{{Special: "notifications"}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Portal(ctx); len(got.Entries) != 1 || len(got.Entries[0].Children) != 0 {
+		t.Fatalf("a stored retired entry should not be read, got %+v", got.Entries)
 	}
 }
 

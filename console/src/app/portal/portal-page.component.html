@@ -187,11 +187,6 @@
             <mat-icon>smartphone</mat-icon>
           </mat-button-toggle>
         </mat-button-toggle-group>
-        @if (notifyOn() && !hasNotifyEntry()) {
-          <button matButton (click)="addNotifications()">
-            <mat-icon>notifications</mat-icon><span i18n="@@Portal_add_notifications">Add notifications</span>
-          </button>
-        }
         <button matButton (click)="addContainer()">
           <mat-icon>folder</mat-icon><span i18n="@@Portal_add_container">Add a container</span>
         </button>
@@ -239,9 +234,6 @@
                     @if (!(e.children ?? []).length) {
                       <span class="text-muted path" i18n="@@Portal_container_empty">empty, not shown</span>
                     }
-                  } @else if (e.special) {
-                    <b>{{ label(e) }}</b>
-                    <span class="text-muted path" i18n="@@Portal_bar_only">portal bar only</span>
                   } @else {
                     <b>{{ e.label || routeNameOf(e.routeId) }}</b>
                     <span class="text-muted path">{{ routeNameOf(e.routeId) }}</span>
@@ -264,14 +256,9 @@
                   <div class="link-row sub" [class.off]="e.disabled || c.disabled">
                     <span class="pos">{{ i + 1 }}.{{ j + 1 }}</span>
                     <span class="grow">
-                      @if (c.special) {
-                        <b>{{ label(c) }}</b>
-                        <span class="text-muted path" i18n="@@Portal_bar_only">portal bar only</span>
-                      } @else {
-                        <b>{{ c.label || routeNameOf(c.routeId) }}</b>
-                        <span class="text-muted path">{{ routeNameOf(c.routeId) }}</span>
-                      }
-                      @if (!c.special && routeOff(c.routeId)) {
+                      <b>{{ c.label || routeNameOf(c.routeId) }}</b>
+                      <span class="text-muted path">{{ routeNameOf(c.routeId) }}</span>
+                      @if (routeOff(c.routeId)) {
                         <span class="text-muted path" i18n="@@Portal_route_off">route turned off</span>
                       } @else if (routeGone(c.routeId)) {
                         <span class="text-muted path" i18n="@@Portal_route_gone">route not found</span>

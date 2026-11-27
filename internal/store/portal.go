@@ -90,29 +90,27 @@ type NotifyPage struct {
 	Path string `json:"path,omitempty"`
 }
 
-// PortalSpecialNotifications is the notifications entry (NOTIF-05): an entry
-// of the catalogue that opens no route but the notifications page, and wears
-// the unread badge. Placed, moved and removed like the others; its presence
-// is what puts it in the bar.
-const PortalSpecialNotifications = "notifications"
-
-// NotificationsEntry says the catalogue places the notifications entry where
-// the bar shows it: not turned off, nor inside a container turned off.
-func (c PortalConfig) NotificationsEntry() bool {
+// dropRetired removes the entries the catalogue no longer holds: the
+// notifications entry, which the bell of the bar replaced (NOTIF-05). A
+// catalogue stored before, or an older configuration imported, may still
+// carry one; it is dropped where it is read and where it is saved, so it
+// never reaches a visitor nor stops a save.
+func (c *PortalConfig) dropRetired() {
+	entries := c.Entries[:0]
 	for _, e := range c.Entries {
-		if e.Disabled {
+		if e.Special != "" {
 			continue
 		}
-		if e.Special == PortalSpecialNotifications {
-			return true
-		}
+		children := e.Children[:0]
 		for _, ch := range e.Children {
-			if !ch.Disabled && ch.Special == PortalSpecialNotifications {
-				return true
+			if ch.Special == "" {
+				children = append(children, ch)
 			}
 		}
+		e.Children = children
+		entries = append(entries, e)
 	}
-	return false
+	c.Entries = entries
 }
 
 // PortalEntry is one entry of the catalogue, and it is one of two things.
@@ -154,14 +152,13 @@ type PortalEntry struct {
 	Overlay bool `json:"overlay,omitempty"`
 	// Children are a container's modules, its sub-modules. Empty on a module.
 	Children []PortalSubEntry `json:"children,omitempty"`
-	// Special makes the entry one the gateway provides rather than a route:
-	// "notifications" (PortalSpecialNotifications) is the only one. It has no
-	// route and no children.
+	// Special is retired: it marked the notifications entry, which the bell
+	// of the bar replaced. Read only to drop such an entry (dropRetired).
 	Special string `json:"special,omitempty"`
 }
 
 // IsContainer says the entry is a container rather than a module.
-func (e PortalEntry) IsContainer() bool { return e.RouteID == "" && e.Special == "" }
+func (e PortalEntry) IsContainer() bool { return e.RouteID == "" }
 
 // PortalSubEntry is a module inside a container, shown in the secondary
 // surface.
@@ -175,8 +172,7 @@ type PortalSubEntry struct {
 	Disabled bool `json:"disabled,omitempty"`
 	// Overlay: see PortalEntry.Overlay.
 	Overlay bool `json:"overlay,omitempty"`
-	// Special: see PortalEntry.Special. The notifications entry may sit in a
-	// container too.
+	// Special: retired, see PortalEntry.Special.
 	Special string `json:"special,omitempty"`
 }
 
@@ -241,6 +237,7 @@ func DefaultPortalConfig() PortalConfig {
 func (s *Store) Portal(ctx context.Context) PortalConfig {
 	cfg := DefaultPortalConfig()
 	_ = s.GetSetting(ctx, SettingPortal, &cfg)
+	cfg.dropRetired()
 	if cfg.Mode == PortalModePortal && !portalBar {
 		cfg.Mode = PortalModeLinks
 	}
@@ -351,53 +348,13 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfi
 		return err
 	}
 
-	// The notifications entry is offered once: a second one is dropped, the
-	// first wins, like a route listed twice.
-	seenSpecial := false
-	special := func(kind, name, routeID string, children int) (keep bool, err error) {
-		if name != PortalSpecialNotifications {
-			return false, fmt.Errorf("portal %s special %q: allowed is %s", kind, name, PortalSpecialNotifications)
-		}
-		if routeID != "" {
-			return false, fmt.Errorf("portal %s %q: it opens the notifications page, not a route - leave its route empty", kind, name)
-		}
-		if children > 0 {
-			return false, fmt.Errorf("portal %s %q: it holds no modules - add a container and move it in", kind, name)
-		}
-		if seenSpecial {
-			return false, nil
-		}
-		seenSpecial = true
-		return true, nil
-	}
-	// The bell when no icon was chosen: the entry is drawn like any other,
-	// and an entry without an icon is drawn with the label's initial.
-	specialIcon := func(icon string) string {
-		if icon = icons.Resolve(icon); icon != "" {
-			return icon
-		}
-		return icons.Resolve("notifications")
-	}
-
+	cfg.dropRetired()
 	seenEntries := map[string]bool{}
 	entries := cfg.Entries[:0]
 	for i := range cfg.Entries {
 		p := cfg.Entries[i]
 		p.RouteID = strings.TrimSpace(p.RouteID)
 		p.Label = strings.TrimSpace(p.Label)
-		p.Special = strings.TrimSpace(p.Special)
-		if p.Special != "" {
-			keep, err := special("entry", p.Special, p.RouteID, len(p.Children))
-			if err != nil {
-				return err
-			}
-			if keep {
-				p.Icon = specialIcon(p.Icon)
-				p.Description = strings.TrimSpace(p.Description)
-				entries = append(entries, p)
-			}
-			continue
-		}
 		if p.IsContainer() {
 			// A container has no route to name it, so it needs a label of its
 			// own: an untitled heading is one nobody can find again.
@@ -430,19 +387,6 @@ func SanitizePortalConfig(cfg *PortalConfig, routes []Route, stored *PortalConfi
 		for j := range p.Children {
 			c := p.Children[j]
 			c.RouteID = strings.TrimSpace(c.RouteID)
-			if c.Special = strings.TrimSpace(c.Special); c.Special != "" {
-				keep, err := special("sub-entry", c.Special, c.RouteID, 0)
-				if err != nil {
-					return err
-				}
-				if keep {
-					c.Icon = specialIcon(c.Icon)
-					c.Label = strings.TrimSpace(c.Label)
-					c.Description = strings.TrimSpace(c.Description)
-					children = append(children, c)
-				}
-				continue
-			}
 			if err := checkRoute("sub-entry", c.RouteID); err != nil {
 				return err
 			}

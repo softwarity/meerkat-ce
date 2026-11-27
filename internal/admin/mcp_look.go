@@ -114,22 +114,17 @@ func describeSVG(svg string) string {
 // line is neither an icon name nor an SVG, so it resolved to nothing, and one
 // added module wiped the icon of every entry of the bar.
 //
-// The entry is found again by what it is - its route, the special entry it is,
-// or a container's label - not by its place, since an agent may have moved it.
+// The entry is found again by what it is - its route or a container's label - not by its place, since an agent may have moved it.
 // A summary no stored entry answers to is dropped: there is no drawing to keep.
 func keepDescribedIcons(in *store.PortalConfig, before store.PortalConfig) {
 	described := func(icon string) bool {
 		return strings.HasPrefix(icon, "<svg, ") && strings.HasSuffix(icon, ">")
 	}
-	key := func(route, special, label string) string {
-		switch {
-		case route != "":
+	key := func(route, label string) string {
+		if route != "" {
 			return "route:" + route
-		case special != "":
-			return "special:" + special
-		default:
-			return "container:" + label
 		}
+		return "container:" + label
 	}
 	stored := map[string]string{}
 	keep := func(k, icon string) {
@@ -138,9 +133,9 @@ func keepDescribedIcons(in *store.PortalConfig, before store.PortalConfig) {
 		}
 	}
 	for _, e := range before.Entries {
-		keep(key(e.RouteID, e.Special, e.Label), e.Icon)
+		keep(key(e.RouteID, e.Label), e.Icon)
 		for _, c := range e.Children {
-			keep(key(c.RouteID, c.Special, c.Label), c.Icon)
+			keep(key(c.RouteID, c.Label), c.Icon)
 		}
 	}
 	restore := func(icon *string, k string) {
@@ -150,10 +145,10 @@ func keepDescribedIcons(in *store.PortalConfig, before store.PortalConfig) {
 	}
 	for i := range in.Entries {
 		e := &in.Entries[i]
-		restore(&e.Icon, key(e.RouteID, e.Special, e.Label))
+		restore(&e.Icon, key(e.RouteID, e.Label))
 		for j := range e.Children {
 			c := &e.Children[j]
-			restore(&c.Icon, key(c.RouteID, c.Special, c.Label))
+			restore(&c.Icon, key(c.RouteID, c.Label))
 		}
 	}
 }

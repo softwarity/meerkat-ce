@@ -1383,8 +1383,13 @@ CREATE TABLE IF NOT EXISTS notification_recipients (
   notification_id TEXT NOT NULL,
   user_id         TEXT NOT NULL,
   read_at         BIGINT NOT NULL DEFAULT 0,
-  -- Hidden by its reader: gone from their page, not from anybody else's.
+  -- Closed by its reader: gone from their list, not from anybody else's,
+  -- and theirs to reopen until it expires.
   hidden_at       BIGINT NOT NULL DEFAULT 0,
+  -- Deleted by its reader for good (v107): never shown nor reopened again.
+  -- The row stays, closed too, so the sender's counts stay true and the
+  -- readers given a notification later do not get it back.
+  deleted_at      BIGINT NOT NULL DEFAULT 0,
   -- When this reader acknowledged it (v97), 0 while they have not.
   acked_at        BIGINT NOT NULL DEFAULT 0,
   -- This reader's mail, a durable queue (v100): '' when none is asked,
@@ -1527,7 +1532,10 @@ CREATE INDEX IF NOT EXISTS idx_notifications_sender ON notifications (sender, re
 // pass, empty - every route follows the installation's stream.
 // 106 carries no step: users.currency is filled in by the additive pass,
 // empty - no account had chosen one.
-const schemaVersion = 106
+// 107 carries no step: notification_recipients.deleted_at is filled in by
+// the additive pass, 0 - what a reader had deleted until then was only
+// closed, and stays theirs to reopen.
+const schemaVersion = 107
 
 func (s *Store) migrate(check MigrationCheck) error {
 	v, err := s.db.schemaVersion()

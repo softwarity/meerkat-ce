@@ -919,9 +919,10 @@ type ReceivedFilter struct {
 	Level  string
 	// TenantID keeps only what was sent in one tenant; "" is every tenant.
 	TenantID string
-	// Deleted lists what the reader deleted instead (DeleteReceived), until it
-	// expires: what RestoreReceived can give back.
-	Deleted bool
+	// Closed lists what the reader closed instead (CloseReceived), until it
+	// expires: what ReopenReceived can give back. What they deleted for good
+	// is never listed.
+	Closed bool
 	// Before pages: only what was created before this instant.
 	Before int64
 	Limit  int
@@ -938,8 +939,8 @@ func (s *Store) ReceivedNotifications(ctx context.Context, userID string, f Rece
 		prefixed = append(prefixed, "n."+strings.TrimSpace(c))
 	}
 	held := `r.hidden_at = 0`
-	if f.Deleted {
-		held = `r.hidden_at > 0`
+	if f.Closed {
+		held = `r.hidden_at > 0 AND r.deleted_at = 0`
 	}
 	q := `SELECT ` + strings.Join(prefixed, ", ") + `, r.read_at, r.acked_at FROM notification_recipients r
 		JOIN notifications n ON n.id = r.notification_id
@@ -1150,33 +1151,53 @@ func (s *Store) MarkAllNotificationsRead(ctx context.Context, userID, tenantID s
 const owed = `n.ack <> '' AND n.withdrawn_at = 0 AND n.expires_at > ?
 	AND ((n.ack = 'single' AND n.ack_complete_at = 0) OR (n.ack <> 'single' AND r.acked_at = 0))`
 
-// DeleteReceived deletes one notification for one reader, and only for
-// them: the sender's message and every other reader's copy are untouched.
-// A copy of a message sent to every tenant goes with every other copy the
-// reader holds of it: one item for them, one Delete.
+// CloseReceived closes one notification for one reader, and only for them:
+// the sender's message and every other reader's copy are untouched. A copy
+// of a message sent to every tenant goes with every other copy the reader
+// holds of it: one item for them, one Close.
 // The row stays, flagged (hidden_at), so what the sender is told - who was
 // told, who read - stays true. ReceivedNotifications leaves it out, unless it
-// is asked for what was deleted, and RestoreReceived clears the flag: the
-// reader keeps what they deleted until it expires, and may take it back. Deleting reads it too: what is gone is not waiting to be
-// read. Deleting one already deleted is not found, as for anybody else.
-// One that waits for an acknowledgement the reader owes is refused
-// (ErrNotificationOwed): what asks for proof is not thrown away before it.
-func (s *Store) DeleteReceived(ctx context.Context, userID, id string) error {
+// is asked for what was closed, and ReopenReceived clears the flag: the
+// reader keeps what they closed until it expires, and may take it back.
+// Closing reads it too: what is put away is not waiting to be read. Closing
+// one already closed is not found, as for anybody else. One that waits for
+// an acknowledgement the reader owes is refused (ErrNotificationOwed): what
+// asks for proof is not put away before it.
+func (s *Store) CloseReceived(ctx context.Context, userID, id string) error {
 	now := time.Now().Unix()
-	var waiting int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notification_recipients r
-		JOIN notifications n ON n.id = r.notification_id
-		WHERE r.notification_id IN (`+copiesHeld+`) AND r.user_id = ? AND r.hidden_at = 0 AND `+owed,
-		id, id, userID, userID, now).Scan(&waiting); err != nil {
-		return fmt.Errorf("store: delete notification %q of %q: %w", id, userID, err)
-	}
-	if waiting > 0 {
-		return ErrNotificationOwed
+	if err := s.owedHere(ctx, userID, id, now, "close"); err != nil {
+		return err
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE notification_recipients SET hidden_at = ?,
 		read_at = CASE WHEN read_at = 0 THEN ? ELSE read_at END
 		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND hidden_at = 0`, now, now, id, id, userID, userID)
 	if err != nil {
+		return fmt.Errorf("store: close notification %q of %q: %w", id, userID, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotificationNotFound
+	}
+	return nil
+}
+
+// DeleteReceived deletes one notification for one reader, for good, open or
+// closed: never listed again, nor reopened. The row stays, closed and
+// flagged (deleted_at), so the sender's counts and acknowledgements stay
+// true and a reader given notifications later does not get it back. A
+// message sent to every tenant goes with all its copies; one deleted already
+// is not found; one that waits for an acknowledgement the reader owes is
+// refused (ErrNotificationOwed).
+func (s *Store) DeleteReceived(ctx context.Context, userID, id string) error {
+	now := time.Now().Unix()
+	if err := s.owedHere(ctx, userID, id, now, "delete"); err != nil {
+		return err
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE notification_recipients SET deleted_at = ?,
+		hidden_at = CASE WHEN hidden_at = 0 THEN ? ELSE hidden_at END,
+		read_at = CASE WHEN read_at = 0 THEN ? ELSE read_at END
+		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND deleted_at = 0`,
+		now, now, now, id, id, userID, userID)
+	if err != nil {
 		return fmt.Errorf("store: delete notification %q of %q: %w", id, userID, err)
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
@@ -1185,16 +1206,32 @@ func (s *Store) DeleteReceived(ctx context.Context, userID, id string) error {
 	return nil
 }
 
-// RestoreReceived gives a reader back what they deleted, a message sent to
-// every tenant with every copy of it, read as it was when deleted. One not
-// deleted, or expired, is not found.
-func (s *Store) RestoreReceived(ctx context.Context, userID, id string) error {
+// owedHere refuses (ErrNotificationOwed) to put away a notification the
+// reader still owes an acknowledgement, any copy of it they hold.
+func (s *Store) owedHere(ctx context.Context, userID, id string, now int64, what string) error {
+	var waiting int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notification_recipients r
+		JOIN notifications n ON n.id = r.notification_id
+		WHERE r.notification_id IN (`+copiesHeld+`) AND r.user_id = ? AND r.deleted_at = 0 AND `+owed,
+		id, id, userID, userID, now).Scan(&waiting); err != nil {
+		return fmt.Errorf("store: %s notification %q of %q: %w", what, id, userID, err)
+	}
+	if waiting > 0 {
+		return ErrNotificationOwed
+	}
+	return nil
+}
+
+// ReopenReceived gives a reader back what they closed, a message sent to
+// every tenant with every copy of it, read as it was when closed. One not
+// closed, deleted for good, or expired, is not found.
+func (s *Store) ReopenReceived(ctx context.Context, userID, id string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE notification_recipients SET hidden_at = 0
-		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND hidden_at > 0
+		WHERE notification_id IN (`+copiesHeld+`) AND user_id = ? AND hidden_at > 0 AND deleted_at = 0
 		AND notification_id IN (SELECT id FROM notifications WHERE expires_at > ?)`,
 		id, id, userID, userID, time.Now().Unix())
 	if err != nil {
-		return fmt.Errorf("store: restore notification %q of %q: %w", id, userID, err)
+		return fmt.Errorf("store: reopen notification %q of %q: %w", id, userID, err)
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return ErrNotificationNotFound
@@ -1202,8 +1239,8 @@ func (s *Store) RestoreReceived(ctx context.Context, userID, id string) error {
 	return nil
 }
 
-// DeleteAllReceived is DeleteReceived for everything a reader still holds
-// from one tenant, a message sent to every tenant with all its copies
+// DeleteAllReceived is DeleteReceived, for good, for everything a reader
+// still holds open from one tenant, a message sent to every tenant with all its copies
 // (sentIn), or from every tenant when tenantID is "": the list they read, not
 // only the part of it a page loaded. What waits for an acknowledgement the
 // reader owes is kept. It answers how many rows it deleted, and how many
@@ -1221,12 +1258,12 @@ func (s *Store) DeleteAllReceived(ctx context.Context, userID, tenantID string) 
 		append([]any{userID, now}, scopeArgs...)...).Scan(&kept); err != nil {
 		return 0, 0, fmt.Errorf("store: delete every notification of %q (tenant %q): %w", userID, tenantID, err)
 	}
-	q := `UPDATE notification_recipients SET hidden_at = ?,
+	q := `UPDATE notification_recipients SET hidden_at = ?, deleted_at = ?,
 		read_at = CASE WHEN read_at = 0 THEN ? ELSE read_at END
 		WHERE user_id = ? AND hidden_at = 0 AND notification_id NOT IN (SELECT r.notification_id
 		FROM notification_recipients r JOIN notifications n ON n.id = r.notification_id
 		WHERE r.user_id = ? AND ` + owed + `)`
-	args := []any{now, now, userID, userID, now}
+	args := []any{now, now, now, userID, userID, now}
 	if tenantID != "" {
 		q += ` AND notification_id IN (` + sentIn + `)`
 		args = append(args, tenantID, tenantID, userID)

@@ -18,6 +18,8 @@ type Entry = {
   label?: string;
   description?: string;
   disabled?: boolean;
+  // Retired: the notifications entry an older configuration may still hold.
+  // The gateway drops it, so the preview does too.
   special?: string;
   children?: Entry[];
 };
@@ -107,7 +109,7 @@ export class PortalPreviewComponent {
   protected readonly height = computed(() => {
     const p = this.portal();
     if (p?.['layout'] !== 'rail') return 360;
-    const entries = Array.isArray(p['entries']) ? (p['entries'] as Entry[]) : [];
+    const entries = (Array.isArray(p['entries']) ? (p['entries'] as Entry[]) : []).filter((e) => !e.special);
     const i = Number((this.selected() ?? '0').split('/')[0]);
     const open = entries[i]?.children?.length ?? 0;
     return Math.max(360, 216 + 64 * (entries.length + open));
@@ -117,8 +119,8 @@ export class PortalPreviewComponent {
     const p = this.portal();
     if (!p) return null;
     const names = this.routeNames();
-    const label = (m: Entry) => (m.label || '').trim() || (m.special ? 'Notifications' : names.get(m.routeId ?? '') || m.routeId || '');
-    const entries = Array.isArray(p['entries']) ? (p['entries'] as Entry[]) : [];
+    const label = (m: Entry) => (m.label || '').trim() || names.get(m.routeId ?? '') || m.routeId || '';
+    const entries = (Array.isArray(p['entries']) ? (p['entries'] as Entry[]) : []).filter((e) => !e.special);
     return {
       layout: p['layout'] ?? 'header',
       side: p['side'] ?? 'left',
@@ -135,15 +137,13 @@ export class PortalPreviewComponent {
         description: e.description ?? '',
         disabled: !!e.disabled,
         off: false,
-        ...(e.special ? { badge: '3' } : {}),
-        children: (e.children ?? []).map((c, j) => ({
+        children: (e.children ?? []).filter((c) => !c.special).map((c, j) => ({
           id: `${i}/${j}`,
           label: label(c),
           icon: c.icon ?? '',
           description: c.description ?? '',
           disabled: !!c.disabled,
           off: false,
-          ...(c.special ? { badge: '3' } : {}),
         })),
       })),
     };

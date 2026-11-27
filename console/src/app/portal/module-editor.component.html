@@ -48,16 +48,10 @@
 <div class="body">
   <!-- A container has no route: it is a label, an icon and the modules put in
        it, and clicking it opens the first of them the visitor may open. -->
-  @if (data().special) {
-    <p class="hint text-muted" i18n="@@Portal_notifications_entry_hint">
-      Opens the notifications page and shows the unread count.
-    </p>
-  }
-
   <!-- A module's route and its label on one line: the label falls back to
        the route's name, so the two are read together. -->
   <div class="row">
-    @if (!data().special && data().kind !== 'container') {
+    @if (data().kind !== 'container') {
       <mat-form-field>
         <mat-label i18n="@@Portal_module_route">Application (route)</mat-label>
         <mat-select [value]="routeId()" (selectionChange)="routeId.set($event.value)">
@@ -71,14 +65,14 @@
     <mat-form-field>
       <mat-label i18n="@@Portal_module_label">Label</mat-label>
       <input matInput [value]="label()" (input)="label.set($any($event.target).value)"
-        [placeholder]="data().special ? notificationsName : routeName()" />
-      <mat-hint>{{ data().special ? notificationsLabelHint : data().kind === 'container' ? containerLabelHint : labelHint }}</mat-hint>
+        [placeholder]="routeName()" />
+      <mat-hint>{{ data().kind === 'container' ? containerLabelHint : labelHint }}</mat-hint>
     </mat-form-field>
   </div>
 
   <!-- Whether the bar moves this application's pages clear of it. Only a
        module has pages, and only a bar takes room. -->
-  @if (data().bar && !data().special && data().kind !== 'container') {
+  @if (data().bar && data().kind !== 'container') {
     <div class="room">
       <mat-slide-toggle [checked]="room()" (change)="room.set($event.checked)">
         <span class="toggle-label" i18n="@@Portal_make_room">Make room for the bar</span>

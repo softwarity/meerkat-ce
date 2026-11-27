@@ -794,17 +794,6 @@ async function layNotifications(api) {
     }));
   }
 
-  // The portal bar gets its Notifications entry, wearing the bell the
-  // console's Add notifications gives it.
-  const bell = ((await json(await soft('bell', () => api.get(`${ADMIN}/api/portal/icons?q=notifications&limit=20`)))) ?? [])
-    .find((i) => i.name === 'notifications')?.svg ?? '';
-  const settings = await json(await soft('settings', () => api.get(`${ADMIN}/api/settings`)));
-  if (settings) {
-    await soft('portal notifications entry', () => api.put(`${ADMIN}/api/settings`, {
-      data: { ...settings, portal: { ...PORTAL, entries: [...PORTAL.entries, { special: 'notifications', icon: bell }] } },
-    }));
-  }
-
   // Two services, each with its token on the internal plane.
   const services = {};
   for (const name of ['invoicing', 'warehouse']) {

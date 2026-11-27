@@ -1974,7 +1974,7 @@
         ],
         "summary": "Delete all my notifications",
         "operationId": "deleteAllMyNotifications",
-        "description": "Every notification you hold, in all your tenants or in the one `tenant` names, not only the ones a page loaded. For you only and for good: the senders and the other readers keep theirs. Other tabs and devices update at once. What waits for your acknowledgement is kept, and the answer says how many. With unread or q, it acts on what the list shows with the same parameters, and nothing else.",
+        "description": "Every notification you hold open, in all your tenants or in the one `tenant` names, not only the ones a page loaded, or with closed, every one you closed. For you only and for good: the senders and the other readers keep theirs. Other tabs and devices update at once. What waits for your acknowledgement is kept, and the answer says how many. With unread, closed or q, it acts on what the list shows with the same parameters, and nothing else.",
         "security": [
           {
             "session": []
@@ -1998,6 +1998,15 @@
             "in": "query",
             "required": false,
             "description": "1 or true: only the unread ones.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "closed",
+            "in": "query",
+            "required": false,
+            "description": "1 or true: what you closed, all of it.",
             "schema": {
               "type": "string"
             }
@@ -2108,10 +2117,10 @@
             }
           },
           {
-            "name": "deleted",
+            "name": "closed",
             "in": "query",
             "required": false,
-            "description": "1 or true: what the reader deleted instead, until it expires, to restore it.",
+            "description": "1 or true: what the reader closed instead, until it expires, to reopen or delete it.",
             "schema": {
               "type": "string"
             }
@@ -2394,9 +2403,9 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Delete a notification",
+        "summary": "Delete a notification for good",
         "operationId": "deleteMyNotification",
-        "description": "For you only: the sender and the other readers keep theirs. It stays yours until it expires, listed with `?deleted=1` and restored with `POST /meerkat/notifications/{id}/restore`. A message sent to several of your tenants goes from all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it.",
+        "description": "For you only and for good, open or closed: the sender and the other readers keep theirs, and it is never listed nor reopened again. A message sent to several of your tenants goes from all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it.",
         "security": [
           {
             "session": []
@@ -2616,13 +2625,13 @@
         "description": "For one that asks to be acknowledged; it is read too. From a session in any of your tenants. A message sent to several of your tenants is acknowledged in all of them; asked of one reader (single), your acknowledgement closes it for everyone, every copy of it. Done already: nothing changes. The other readers' pages update at once."
       }
     },
-    "/meerkat/notifications/{id}/restore": {
+    "/meerkat/notifications/{id}/close": {
       "post": {
         "tags": [
           "Notifications"
         ],
-        "summary": "Restore a deleted notification",
-        "operationId": "restoreMyNotification",
+        "summary": "Close a notification",
+        "operationId": "closeMyNotification",
         "security": [
           {
             "session": []
@@ -2638,7 +2647,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Restored"
+            "description": "Closed"
           },
           "401": {
             "description": "Not signed in",
@@ -2661,7 +2670,17 @@
             }
           },
           "404": {
-            "description": "Notifications off, or no deleted notification of yours by this id",
+            "description": "Notifications off, or no open notification of yours by this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It waits for your acknowledgement",
             "content": {
               "application/json": {
                 "schema": {
@@ -2682,7 +2701,76 @@
           }
         },
         "x-meerkat-edition": "enterprise",
-        "description": "Gives back what you deleted, read as it was, until it expires. A message sent to several of your tenants comes back in all of them."
+        "description": "For you only: it leaves your list, read, and stays yours until it expires, listed with `?closed=1` and reopened with `POST /meerkat/notifications/{id}/reopen`. A message sent to several of your tenants is closed in all of them. Other tabs and devices update at once. One that waits for your acknowledgement is refused until you give it."
+      }
+    },
+    "/meerkat/notifications/{id}/reopen": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Reopen a closed notification",
+        "operationId": "reopenMyNotification",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Reopened"
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site write refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notifications off, or no closed notification of yours by this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-meerkat-edition": "enterprise",
+        "description": "Gives back what you closed, read as it was, until it expires. One deleted for good does not come back. A message sent to several of your tenants comes back in all of them."
       }
     },
     "/meerkat/notify-sw.js": {

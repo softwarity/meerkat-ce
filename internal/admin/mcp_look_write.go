@@ -65,24 +65,21 @@ func portalSchema() map[string]any {
 	overlay := map[string]any{"type": "boolean", "description": "A module's: true lets the bar draw over its pages, " +
 		"the application making room itself from the --meerkat-top/left/right CSS properties. Left out, the bar moves " +
 		"the whole page clear of it, fixed elements included."}
-	special := str("\"notifications\" makes this the notifications entry (Enterprise edition): no route, no children, " +
-		"it opens the notifications page and wears the unread badge. Once in the whole catalogue.")
 	sub := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"routeId":     str("The id of a UI route, from list_routes. Required, except on the notifications entry. A route turned off is shown greyed out until it is back on."),
+			"routeId":     str("The id of a UI route, from list_routes. Required. A route turned off is shown greyed out until it is back on."),
 			"label":       str("What the bar shows. Empty uses the route's own name."),
 			"icon":        str("A Material Symbols name, e.g. storefront, receipt_long, apartment."),
 			"description": str("The entry's tooltip."),
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
 			"overlay":     overlay,
-			"special":     special,
 		},
 	}
 	entry := map[string]any{
 		"type": "object",
-		"description": "A MODULE (routeId set, no children), a CONTAINER (no routeId, a label, and its modules " +
-			"in children) or the notifications entry (special). A container opens its first module the visitor " +
+		"description": "A MODULE (routeId set, no children) or a CONTAINER (no routeId, a label, and its modules " +
+			"in children). A container opens its first module the visitor " +
 			"may open, and is not shown when the visitor may open none of them.",
 		"properties": map[string]any{
 			"routeId":     str("A module's route: the id of a UI route, from list_routes. Leave out for a container. A route turned off is shown greyed out until it is back on."),
@@ -92,7 +89,6 @@ func portalSchema() map[string]any {
 			"disabled":    map[string]any{"type": "boolean", "description": "Kept in the catalogue but not served."},
 			"overlay":     overlay,
 			"children":    map[string]any{"type": "array", "description": "A container's modules, in order. Never on a module.", "items": sub},
-			"special":     special,
 		},
 	}
 	return object(map[string]any{

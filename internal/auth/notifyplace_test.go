@@ -19,7 +19,6 @@ func TestNotifyPlaceLeadsWhereTheReaderMayGo(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := st.SetSetting(ctx, store.SettingPortal, store.PortalConfig{Mode: store.PortalModePortal,
-		Entries:    []store.PortalEntry{{Special: store.PortalSpecialNotifications}},
 		NotifyPage: store.NotifyPage{RouteID: "app", Path: "/#/inbox"}}); err != nil {
 		t.Fatal(err)
 	}

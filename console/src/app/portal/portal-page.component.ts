@@ -99,13 +99,6 @@ export class PortalPageComponent {
   protected readonly notifyCustom = signal(false);
   protected readonly notifyRoute = signal('');
   protected readonly notifyPath = signal('');
-  // The catalogue holds the notifications entry, at either level.
-  protected readonly hasNotifyEntry = computed(() =>
-    this.entries().some((e) => e.special === 'notifications' || (e.children ?? []).some((c) => c.special === 'notifications')),
-  );
-  // The bell, from the icon bank: the entry wears it from the moment it is
-  // added, as the gateway stores it.
-  private bell = '';
 
   // Only UI routes can wear the bar; those are what a module binds to. A
   // route turned off stays bindable: the bar greys its entry until it is back.
@@ -141,7 +134,7 @@ export class PortalPageComponent {
     const out: { name: string; href: string; group?: string; head?: boolean }[] = [];
     let last = 0;
     const push = (m: PortalEntry | PortalSubEntry, group: string, run: number) => {
-      if (m.special || m.disabled || this.routeOff(m.routeId) || this.routeGone(m.routeId)) return;
+      if (m.disabled || this.routeOff(m.routeId) || this.routeGone(m.routeId)) return;
       out.push({ name: this.label(m), href: '#', ...(group ? { group } : {}), ...(run !== last ? { head: true } : {}) });
       last = run;
     };
@@ -239,9 +232,7 @@ export class PortalPageComponent {
           icon: c.icon ?? '',
           description: c.description ?? '',
           disabled: !!c.disabled,
-          off: !c.special && this.routeOff(c.routeId),
-          // The notifications entry wears a sample count, to see where it lands.
-          ...(c.special ? { badge: '3' } : {}),
+          off: this.routeOff(c.routeId),
         }));
         // A container is greyed out when every module it shows is.
         const shown = children.filter((c) => !c.disabled);
@@ -251,8 +242,7 @@ export class PortalPageComponent {
           icon: p.icon ?? '',
           description: p.description ?? '',
           disabled: !!p.disabled,
-          off: this.isContainer(p) ? shown.length > 0 && shown.every((c) => c.off) : !p.special && this.routeOff(p.routeId),
-          ...(p.special || children.some((c) => c.badge) ? { badge: '3' } : {}),
+          off: this.isContainer(p) ? shown.length > 0 && shown.every((c) => c.off) : this.routeOff(p.routeId),
           children,
         };
       }),
@@ -290,7 +280,6 @@ export class PortalPageComponent {
         error: () => this.notifyOn.set(false),
       });
     }
-    this.api.searchIcons('notifications').subscribe((r) => (this.bell = r.find((i) => i.name === 'notifications')?.svg ?? ''));
     this.api.branding().subscribe({
       next: (b) => this.brandLogo.set(b.logo || ''),
       error: () => this.brandLogo.set(''),
@@ -384,14 +373,13 @@ export class PortalPageComponent {
   }
 
   protected label(m: PortalEntry | PortalSubEntry): string {
-    return (m.label || '').trim() || (m.special ? this.notificationsName : this.routeName(m.routeId ?? ''));
+    return (m.label || '').trim() || this.routeName(m.routeId ?? '');
   }
 
   protected isContainer(e: PortalEntry): boolean {
-    return !e.routeId && !e.special;
+    return !e.routeId;
   }
 
-  protected readonly notificationsName = $localize`:@@Portal_notifications:Notifications`;
   protected readonly savedOnceChosen = $localize`:@@Portal_notify_route_hint:Saved once a route is chosen.`;
 
   // ── layout controls ─────────────────────────────────────────────────────
@@ -482,14 +470,6 @@ export class PortalPageComponent {
       this.entries.update((ps) => [...ps, entryFromDraft(m)]);
       this.selected.set(String(this.entries().length - 1)); // keep the new one selected
     });
-  }
-
-  // The notifications entry: no route, at the end of the top level, where it
-  // can be moved like any other.
-  protected addNotifications(): void {
-    this.entries.update((ps) => [...ps, { special: 'notifications', icon: this.bell }]);
-    this.persist();
-    this.editParent(this.entries().length - 1);
   }
 
   // A container is a label, an icon and the modules put in it: no route.
@@ -647,9 +627,8 @@ export class PortalPageComponent {
       .filter((p) => p.container && (!path || p.index !== path.pi))
       .map(({ index, name }) => ({ index, name }));
     this.editing.set({
-      title: m?.special ? this.notificationsName : title,
+      title,
       kind,
-      special: !!m?.special,
       bar: this.isBar(),
       existing: path !== null,
       canUp,
