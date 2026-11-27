@@ -305,7 +305,6 @@ func userButtonMenuLabels(t map[string]string) map[string]string {
 		"notifEmpty":     t["notifEmpty"],
 		"notifUnfold":    t["notifUnfold"],
 		"notifFold":      t["notifFold"],
-		"notifWithdrawn": t["notifWithdrawn"],
 		"notifUnread":    t["notifUnread"],
 	}
 	return labels

@@ -109,16 +109,15 @@ seul réglage pour toute la barre. Le nom de l'application défini dans la marqu
 peut figurer à côté du logo ; il est désactivé par défaut, car le logo seul
 suffit à faire la marque.
 
-## L'entrée Notifications
+## La cloche
 
-Avec les [notifications](/docs/console/notifications) activées (Enterprise), le
-catalogue peut contenir une entrée spéciale, **Notifications** : sans route,
-elle ouvre la page des notifications de la personne, et porte l'**unique badge**
-de ses non lues, en direct. Elle s'ajoute avec **Add notifications** en mode
-Portal, puis se place, se déplace et se retire comme n'importe quelle entrée ;
-laissée sans libellé, elle se lit Notifications dans la langue de chacun. Sans
-elle, l'entrée et le badge sont sur le bouton de compte. Les entrées des
-applications ne portent pas de badge.
+Avec les [notifications](/docs/console/notifications) activées (Enterprise), la
+barre porte une **cloche** à une place fixe, juste avant le sélecteur de
+color-scheme : en bas du rail, au bout à droite de l'en-tête. Elle porte
+l'**unique badge** des non lues de la personne, en direct, et ouvre ses
+notifications dans un tiroir contre la barre. Ce n'est pas une entrée du
+catalogue, qui ne tient que des applications. Sans la barre, le bouton de
+compte porte le badge, et son entrée Notifications ouvre le même tiroir.
 
 ## Ce que la barre remplace
 

@@ -402,7 +402,6 @@
   "notifAckAsked": "Väntar på din kvittering",
   "notifDeleteOwed": "Kvittera den innan du raderar den.",
   "notifKept": "Behållna: %s väntar på din kvittering.",
-  "notifWithdrawn": "Den här aviseringen har dragits tillbaka",
   "notifExercise": "ÖVNING",
   "notifMissed": "Aviseringar som du har missat: %s",
   "notifSearch": "Sök aviseringar, eller nyckel=värde",

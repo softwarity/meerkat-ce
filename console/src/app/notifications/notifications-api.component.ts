@@ -133,6 +133,23 @@ curl -X DELETE "${this.origin()}/api/notifications?meta.station=42" -H "$AUTH"
 # {"withdrawn":["5f0c2b8e-...","9b2d7c41-..."]}`,
   );
 
+  protected readonly doneCmd = computed(
+    () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
+
+# One validation is enough: closed for every reader.
+curl -X POST ${this.origin()}/api/notifications/fd-101/close -H "$AUTH"
+# {"id":"fd-101","readers":3}
+
+# Each must validate: closed for the one who did.
+curl -X POST "${this.origin()}/api/notifications/fd-102/close?user=alice" -H "$AUTH"
+
+# Read for every reader, out of the counts but still listed.
+curl -X POST ${this.origin()}/api/notifications/fd-103/read -H "$AUTH"
+
+# Deleted for one reader; without ?user=, withdrawn for all.
+curl -X DELETE "${this.origin()}/api/notifications/fd-104?user=alice" -H "$AUTH"`,
+  );
+
   protected readonly replaceCmd = computed(
     () => `AUTH="Authorization: Bearer $MEERKAT_TOKEN"
 

@@ -402,7 +402,6 @@
   "notifAckAsked": "Waiting for your acknowledgement",
   "notifDeleteOwed": "Acknowledge it before deleting it.",
   "notifKept": "Kept %s waiting for your acknowledgement.",
-  "notifWithdrawn": "This notification was withdrawn",
   "notifExercise": "EXERCISE",
   "notifMissed": "Notifications you missed: %s",
   "notifSearch": "Search notifications, or key=value",

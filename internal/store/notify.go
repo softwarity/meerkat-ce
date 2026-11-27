@@ -1222,6 +1222,93 @@ func (s *Store) owedHere(ctx context.Context, userID, id string, now int64, what
 	return nil
 }
 
+// SenderMarks are what a sender may say of the notifications it sent, for
+// every reader or for one: read, closed, deleted - the reader's own three
+// states, set from the service that knows the work is done.
+const (
+	MarkRead   = "read"
+	MarkClose  = "close"
+	MarkDelete = "delete"
+)
+
+// MarkCopies sets one of the readers' states (MarkRead, MarkClose or
+// MarkDelete) on the copies ids, for every reader who holds one or for
+// userID alone, and answers the readers it changed. Unlike the reader's own
+// Close and Delete, an acknowledgement still owed does not hold it back: the
+// sender is the one who knows it no longer matters.
+func (s *Store) MarkCopies(ctx context.Context, ids []string, userID, mark string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	now := time.Now().Unix()
+	var set, still string
+	switch mark {
+	case MarkRead:
+		set, still = `read_at = ?`, `read_at = 0`
+	case MarkClose:
+		set, still = `hidden_at = ?, read_at = CASE WHEN read_at = 0 THEN ? ELSE read_at END`, `hidden_at = 0`
+	case MarkDelete:
+		set, still = `deleted_at = ?, hidden_at = CASE WHEN hidden_at = 0 THEN ? ELSE hidden_at END,
+			read_at = CASE WHEN read_at = 0 THEN ? ELSE read_at END`, `deleted_at = 0`
+	default:
+		return nil, fmt.Errorf("store: mark %q: allowed are read, close, delete", mark)
+	}
+	in := `?` + strings.Repeat(`, ?`, len(ids)-1)
+	where := `notification_id IN (` + in + `) AND ` + still
+	args := make([]any, 0, len(ids)+1)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	if userID != "" {
+		where += ` AND user_id = ?`
+		args = append(args, userID)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("store: mark %s: %w", mark, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT user_id FROM notification_recipients WHERE `+where, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: mark %s: %w", mark, err)
+	}
+	users := []string{}
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	_ = rows.Close()
+	stamps := strings.Count(set, "?")
+	setArgs := make([]any, 0, stamps+len(args))
+	for range stamps {
+		setArgs = append(setArgs, now)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE notification_recipients SET `+set+` WHERE `+where,
+		append(setArgs, args...)...); err != nil {
+		return nil, fmt.Errorf("store: mark %s: %w", mark, err)
+	}
+	return users, tx.Commit()
+}
+
+// HoldsCopy says userID is a reader of one of the copies ids.
+func (s *Store) HoldsCopy(ctx context.Context, ids []string, userID string) (bool, error) {
+	if len(ids) == 0 {
+		return false, nil
+	}
+	args := []any{userID}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notification_recipients WHERE user_id = ?
+		AND notification_id IN (?`+strings.Repeat(`, ?`, len(ids)-1)+`)`, args...).Scan(&n)
+	return n > 0, err
+}
+
 // ReopenReceived gives a reader back what they closed, a message sent to
 // every tenant with every copy of it, read as it was when closed. One not
 // closed, deleted for good, or expired, is not found.

@@ -85,7 +85,7 @@ A service tells its users something, and they see it in whichever application th
 
 Read more: [Notifying your users](/docs/operations/notifications).
 
-- **One request from the service**: a title, a text, a link to the detail and up to five actions, named by the service and the path it already knows; the gateway finds the public address.
+- **One request from the service**: a title, a text, a link to the detail and one action, named by the service and the path it already knows; the gateway finds the public address.
 - **Seen where people work**: a count on the account button or the portal bar, a snackbar on the page in front of them, a desktop notification when the tab is in the background, a mail if asked, and a page that lists them all.
 - **Only to those who may act on it**: the audience is the tenant's members, narrowed to roles or names, and to the people who may open what it leads to.
 - **Acknowledged when it matters**: by one reader for everyone, or by each of them; the service is called back at each acknowledgement, and the audit trail keeps who and when.

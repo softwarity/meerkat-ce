@@ -402,7 +402,6 @@
   "notifAckAsked": "等待你确认",
   "notifDeleteOwed": "请先确认，再删除。",
   "notifKept": "已保留 %s 条等待你确认的通知。",
-  "notifWithdrawn": "此通知已撤回",
   "notifExercise": "演练",
   "notifMissed": "您错过的通知：%s",
   "notifSearch": "搜索通知，或 键=值",

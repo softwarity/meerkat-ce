@@ -218,6 +218,8 @@ export class PortalPageComponent {
       showName: this.showAppName(),
       hideLogo: !this.showLogo(),
       logoRadius: this.logoRadius(),
+      // With the notifications on, the bar's bell, wearing a sample count.
+      ...(this.notifyOn() ? { notifications: { total: 3, inBar: true, page: '/meerkat/notifications' } } : {}),
       // Editing is only offered at full width: the narrower device previews are
       // there to WATCH the bar respond, not to click through it.
       edit: this.previewWidth() === 0,

@@ -37,7 +37,7 @@
   and when; a click on the text marks it read, a cross closes it, and under it its
   action, Open and Acknowledge. The drawer links to the notifications page. The bar no
   longer serves the special Notifications entry of the catalogue.
-- **The notifications page shows its rows the same way**: actions, Open and Acknowledge
+- **The notifications page shows its rows the same way**: the action, Open and Acknowledge
   always visible, Delete and Close at the end of the title.
 - **A reader sees the notifications of their session's tenant only.** Those of their
   other tenants wait there and appear when they switch (list, badge, snackbar, desktop).
@@ -64,6 +64,17 @@
 - **The notifications page wears the account button** without the portal bar: the one of
   the application the reader came from, where it sits there, and its back arrow leads to
   the page they left, even when the browser keeps no way back.
+- **A service says the work is done.** On the internal plane, `POST
+  /api/notifications/{id}/read` and `POST /api/notifications/{id}/close` mark a
+  notification read or closed for every reader, or for the one `?user=` names (an id
+  or a user name); `DELETE /api/notifications/{id}?user=` deletes it for that reader
+  only. An acknowledgement still owed does not hold them back. Close and delete are on
+  the audit trail (`notification.close`, `notification.delete`).
+- **A withdrawn notification leaves no placeholder.** It now leaves every reader's
+  list and count, the way a replaced one does; the row *This notification was
+  withdrawn* is gone.
+- **A notification carries one action at most.** A second one is refused on the
+  `actions` field; put the others in the page Open leads to.
 
 ---
 

@@ -60,9 +60,10 @@ Une fois les [notifications](/docs/console/notifications) activées par root
   ou **Your page**, une route UI et un chemin dessous. Tout ce qui mène aux
   notifications mène là ; qui ne peut pas ouvrir cette route reçoit la page
   intégrée ;
-- en mode Portal, **Add notifications** à côté d'Add a container : une entrée
-  Notifications pour la barre, qui porte l'unique badge des non lues. Sans elle,
-  le bouton de compte porte l'entrée et le badge.
+- en mode Portal, la **cloche** de la barre, à côté du sélecteur de
+  color-scheme, avec l'unique badge des non lues : elle fait partie de la
+  barre, ce n'est pas une entrée à ajouter. Sans la barre, le bouton de compte
+  porte le badge et l'entrée.
 
 ## Une entrée
 

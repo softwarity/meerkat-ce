@@ -107,18 +107,18 @@ Quand root a activé les notifications, **Application, Portal** montre une carte
   chemin dessous comme `/#/inbox`. Elle est enregistrée dès qu'une route est
   choisie.
 
-La barre, le menu du compte, le snackbar et les mails mènent à cette page. Une
+Le tiroir, le snackbar et les mails mènent à cette page. Une
 personne qui ne peut pas ouvrir sa route reçoit la page intégrée, qui reste
 ouverte à tous.
 
-**Une entrée, un badge.** En mode Portal, **Add notifications** place une entrée
-**Notifications** dans la barre. Elle se place, se déplace et se retire comme les
-autres, et un libellé vide se lit Notifications dans la langue de chacun. C'est
-elle qui porte l'unique badge des non lues. Sans elle - en mode Links ou None,
-ou dans une barre qui ne l'a pas - l'entrée et le badge sont sur le bouton de
-compte. Les entrées des applications elles-mêmes ne portent pas de badge.
+**Une cloche, un badge.** En mode Portal, la barre porte une **cloche** à une
+place fixe, à côté du sélecteur de color-scheme, avec l'unique badge des non
+lues ; elle les ouvre dans un tiroir contre la barre. En mode Links ou None, le
+bouton de compte porte le badge, et son entrée Notifications ouvre le même
+tiroir, le long du bord de la page opposé au bouton. Rien ne s'ajoute pour cela
+au catalogue, et les entrées des applications ne portent pas de badge.
 
-![L'écran Portal avec la carte Notifications page, et la barre qui porte l'entrée Notifications et son badge](img/console/portal-notifications.webp)
+![L'écran Portal avec la carte Notifications page, et la barre qui porte la cloche et son badge](img/console/portal-notifications.webp)
 
 La page des notifications fait aussi partie des
 [pages intégrées](/docs/console/built-in-pages) que prévisualise l'éditeur de
@@ -174,7 +174,7 @@ des notifications, et a deux onglets.
   s'exercer (ses lecteurs le voient étiqueté EXERCICE), le titre et le texte.
 - **Detail** - aucun, une route et un chemin dessous, ou une adresse https. Le
   champ montre l'adresse que le lecteur ouvrira.
-- **Actions** - jusqu'à cinq boutons : un libellé, une route et un chemin ou une
+- **Actions** - un bouton au plus : un libellé, une route et un chemin ou une
   adresse https, et devant eux la **Method** : GET, ou POST, PUT, PATCH ou
   DELETE. Toute autre méthode que GET ouvre **Body (JSON)**, un éditeur JSON ;
   un JSON invalide est signalé sur le champ et retient Send. Le corps parvient

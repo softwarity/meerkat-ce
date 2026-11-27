@@ -402,7 +402,6 @@
   "notifAckAsked": "Menunggu konfirmasi Anda",
   "notifDeleteOwed": "Konfirmasi dulu sebelum menghapusnya.",
   "notifKept": "%s disimpan karena menunggu konfirmasi Anda.",
-  "notifWithdrawn": "Notifikasi ini telah ditarik",
   "notifExercise": "LATIHAN",
   "notifMissed": "Notifikasi yang terlewat: %s",
   "notifSearch": "Cari notifikasi, atau kunci=nilai",

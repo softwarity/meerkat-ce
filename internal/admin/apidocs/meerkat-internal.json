@@ -324,13 +324,22 @@
         ],
         "summary": "Withdraw a notification",
         "operationId": "withdrawMyNotification",
-        "description": "Withdraws the notification your id names: every copy of one sent to every tenant. Its readers see a row saying it was withdrawn, with nothing of what it said, out of their unread count; its mails not sent yet are cancelled. An id none of your notifications carries yet is kept (202) for the life expires gives (30 days by default, 90 at most): the notification arrives withdrawn, and nobody is told.",
+        "description": "Withdraws the notification your id names: every copy of one sent to every tenant. It is gone from its readers' lists and counts, with nothing left in its place; its mails not sent yet are cancelled. An id none of your notifications carries yet is kept (202) for the life expires gives (30 days by default, 90 at most): the notification arrives withdrawn, and nobody is told. With user, it is deleted for that one reader only, the others keep it: the answer is then the one of read and close.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
             "description": "The notification's id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "description": "One reader, by id or user name: the notification is deleted for them alone. Without it, it is withdrawn for everybody.",
             "schema": {
               "type": "string"
             }
@@ -378,6 +387,138 @@
           },
           "500": {
             "description": "Not withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark a notification read",
+        "operationId": "readMyNotification",
+        "description": "The work it asked for is seen to: it is read for every reader, or for the one user names, and leaves their unread count. It stays in their lists. Every copy of one sent to every tenant. The readers' pages follow at once; a read is no event of the audit trail.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "description": "One reader, by id or user name. Without it, every reader.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done: how many readers it changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationMarked"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "None of your notifications by this id, or a user who reads none of it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/CallerUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CallerRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/ClusterUnavailable"
+          }
+        },
+        "x-meerkat-edition": "enterprise"
+      }
+    },
+    "/api/notifications/{id}/close": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Close a notification",
+        "operationId": "closeMyNotification",
+        "description": "The work it asked for is done: it leaves the drawer and the list of every reader, or of the one user names, read, kept under Closed on their notifications page until it expires. An acknowledgement still owed does not hold it back. Every copy of one sent to every tenant. The readers' pages follow at once; recorded in the audit trail.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "description": "One reader, by id or user name. Without it, every reader.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done: how many readers it changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationMarked"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "None of your notifications by this id, or a user who reads none of it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Not changed",
             "content": {
               "application/json": {
                 "schema": {
@@ -2104,7 +2245,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationAction"
             },
-            "description": "Buttons, 5 at most."
+            "description": "One button at most."
           },
           "meta": {
             "type": "object",
@@ -2663,7 +2804,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationActionInput"
             },
-            "description": "Buttons, 5 at most."
+            "description": "One button at most."
           },
           "mail": {
             "type": "boolean",
@@ -2944,6 +3085,23 @@
           "acknowledged",
           "recipients",
           "complete"
+        ]
+      },
+      "NotificationMarked": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Your id."
+          },
+          "readers": {
+            "type": "integer",
+            "description": "The readers it changed: 0 when there was nothing left to change."
+          }
+        },
+        "required": [
+          "id",
+          "readers"
         ]
       },
       "NotificationWithdrawn": {

@@ -1318,16 +1318,22 @@ const SHOTS = [
       await page.waitForTimeout(1000);
     },
   },
-  // The Notifications page card, and the bar's Notifications entry with its
-  // sample count.
+  // The Notifications page card, and the bar's bell with its sample count.
   { file: 'portal-notifications', path: '/application/portal', prepare: seedNotifications, settle: 3500 },
   {
-    // alice's own page, on the data plane: two tenants, the message sent to
-    // both on one row, the floor plan she still owes, the invoice unfolded.
+    // alice's own page, on the data plane: the rows as the drawer draws them,
+    // with Delete and Close at the end of the title, and under each its
+    // action, Open and Acknowledge; the floor plan she still owes.
     file: 'notifications-page', as: 'alice', path: '/meerkat/notifications', prepare: seedNotifications, settle: 1600,
+  },
+  {
+    // The bell of the bar opened over an application: the drawer under the
+    // header, against the right edge.
+    file: 'notifications-drawer', as: 'alice', path: '/billing/', prepare: seedNotifications, settle: 2000,
     act: async (page) => {
-      await page.getByText(NOTE.invoice).first().click();
-      await page.waitForTimeout(900);
+      await page.locator('meerkat-portal-nav .bell').click();
+      await page.locator('meerkat-notify-drawer .nr').first().waitFor({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(700);
     },
   },
   // The page a browser gets where no route serves - last, since the

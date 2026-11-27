@@ -57,9 +57,9 @@ Once root has turned [notifications](/docs/console/notifications) on
 - a **Notifications page** card: **Built-in**, the page the gateway serves, or
   **Your page**, a UI route and a path under it. Everything that leads to the
   notifications leads there; who may not open that route gets the built-in page;
-- in Portal mode, **Add notifications** beside Add a container: a Notifications
-  entry for the bar, which carries the one badge of unread notifications.
-  Without it, the account button carries the entry and the badge.
+- in Portal mode, the bar's **bell**, beside the colour scheme switch, with the
+  one badge of unread notifications: it is part of the bar, not an entry to
+  add. Without the bar, the account button carries the badge and the entry.
 
 ## An entry
 

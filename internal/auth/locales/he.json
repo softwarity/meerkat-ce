@@ -402,7 +402,6 @@
   "notifAckAsked": "ממתין לאישור שלך",
   "notifDeleteOwed": "יש לאשר אותה לפני המחיקה.",
   "notifKept": "נשמרו %s שממתינות לאישור שלך.",
-  "notifWithdrawn": "התראה זו נמשכה",
   "notifExercise": "תרגיל",
   "notifMissed": "התראות שפספסת: %s",
   "notifSearch": "חיפוש בהתראות, או מפתח=ערך",

@@ -19,8 +19,16 @@ The screens an administrator uses are on
 
 ## What your users see
 
-- **A count** on the account button, or on the **Notifications** entry of the
-  portal bar when the catalogue has one. One count for all their tenants.
+- **A count** on the bell of the portal bar, or, without the bar, on the
+  account button: the notifications of the tenant they are signed in to.
+- **A drawer**, over the page, when they press the bell or the account
+  button's **Notifications** entry: beside the bar, or along the side of the
+  page opposite the account button, which stays in sight. Each notification
+  shows its level, its title (bold while unread), its text cut at two lines
+  (a chevron unfolds it), who sent it and when. A press on the text marks it
+  read, the cross **closes** it. Under it, on the right, each in its place:
+  your action, **Open** and **Acknowledge**. Its head leads to the
+  notifications page, which then leads back to where they were.
 - **A snackbar** on the page in front of them when a notification arrives: the
   level's icon, the title, **Open**, and **Acknowledge** when it asks for it.
   It goes away after 6 seconds, waits while the pointer or the focus is on it,
@@ -29,19 +37,20 @@ The screens an administrator uses are on
   turned it on with **Show on my desktop** (the bell in the top bar of their
   notifications page), and only
   on a secure address (https, or localhost). Its buttons are **Open**, then your
-  actions, run in the background with the result shown on the notification,
+  action, run in the background with the result shown on the notification,
   and **Acknowledge** when asked. A click on it opens the notifications page.
 - **The notifications page**, `/meerkat/notifications`, or the application's
   own page when the administrator chose one. A list, newest first, each day
-  on a card, unread notifications on a tone of their own: each notification
-  shows the icon of its level, its title (bold while unread) and the first two
-  lines of its text, and at the row's end who sent it and in which tenant,
-  with the time it came under them (and a dot while unread); on a phone,
-  these go on one small line under the text. Only the list scrolls: the top
-  bar, the search and the filters stay at the top of the window, the foot of
-  the page at its bottom. A click marks it read and unfolds it when there is more to see (a
-  chevron says so): the whole text, **Open** for the detail, and your actions,
-  each showing its result. The sender is named for the reader: a service by its short
+  on a card, unread notifications on a tone of their own, each row drawn like
+  the drawer's: the icon of its level, its title (bold while unread), two
+  lines of its text (a chevron unfolds the rest), who sent it and when; at
+  the end of the title **Delete** (the trash) and **Close** (the cross); under
+  it, always shown, your action with its result, **Open** and
+  **Acknowledge**. A press on the text marks it read. Only the list scrolls:
+  the top bar, the search and the filters stay at the top of the window, the
+  foot of the page at its bottom. Without the portal bar the page wears the
+  account button of the application the reader came from, where it sits
+  there, and its back arrow leads to the page they left. The sender is named for the reader: a service by its short
   name (`station-registry` for the workload `ns/Deployment/station-registry`),
   a token by its name, an administrator who sent it from the console by the
   name their account shows.
@@ -50,7 +59,8 @@ The screens an administrator uses are on
   and the tenants when there are several. **Mark all as read**, **Show on my
   desktop** and **Delete all** are icons in the top bar, named when the pointer
   rests on them or the keyboard reaches them; on a phone, Delete all and the
-  desktop move to the bar's menu (the three dots).
+  desktop move to the bar's menu (the three dots). **Closed** lists what the
+  reader closed.
   They combine, and the address keeps them, so a reload or a link keeps the
   same list. The search looks for every word typed, without case or accents,
   in the title, the text, and the metadata you attached; it runs on the
@@ -63,33 +73,35 @@ The screens an administrator uses are on
 - **The label EXERCISE** before the title, everywhere it shows, on a
   notification sent [to practise](#exercises).
 
-![The notifications page of a reader in two tenants: the top bar with its actions, the search bar, Unread only and the tenant chips; the overdue invoice unfolded with Open and its action; a message sent to both tenants on one row, an exercise, an alarm another reader acknowledged, a withdrawn notification, and one waiting for her acknowledgement](img/console/notifications-page.webp)
+![The drawer opened from the bell of the portal bar: each notification with its level, its title, two lines of text, who sent it and when, the cross that closes it, and under it the action, Open and Acknowledge](img/console/notifications-drawer.webp)
 
-A notification its sender **withdrew** stays in the list the way a deleted
-message does in a chat: a row saying *This notification was withdrawn*, with
-none of what it said (no title, text, link, action or tenant), read, out of the
-count, never on a snackbar or the desktop. It leaves the list when it expires,
-or when the reader deletes it. A notification its sender **replaced** is not
-shown at all: the replacement stands in its place.
+![The notifications page: the top bar with its actions, the search bar, Unread only and Closed; each row with its level, title, text, sender and time, the trash and the cross at the end of the title, and under it the action, Open and Acknowledge](img/console/notifications-page.webp)
 
-On the page, **Delete** takes a notification off the reader's list for good;
-the sender and the other readers keep theirs. **Mark all as read** and
-**Delete all** act on what the list shows: narrowed by a tenant, Unread only
-or a search, they take that and nothing else, and Delete all asks first,
-saying so. Everything follows live, in every
-tab and on every device of the reader.
+**Read, closed, deleted.** A reader has three ways to be done with a
+notification, theirs alone - the sender and the other readers keep theirs:
 
-**Several tenants.** A reader receives the notifications of all their tenants.
-Each row then names its tenant, and a filter narrows the list to one. A
-notification from another tenant than the one they are working in can be read
-and deleted; its detail and its actions wait until they switch to that tenant,
-and the button says so. A message sent to every tenant is **one** row naming
-them, counted once, read and deleted once.
+| | How | Where it goes |
+|---|---|---|
+| **Read** | a press on its text, Open, or Mark all as read | out of the count, still listed |
+| **Closed** | the cross, in the drawer or on the page | out of the drawer and the list, read; listed under **Closed** on the page, where **Reopen** brings it back, until it expires |
+| **Deleted** | the trash on the page, open or closed | gone for good |
 
-**Withdraw and Delete are not the same thing.** Withdraw is the sender's, or an
-administrator's: the notification turns into the placeholder on every reader's
-page at once and leaves their count. Delete is the reader's: it leaves their
-own list and nobody else's.
+**Mark all as read** and **Delete all** act on what the list shows: narrowed
+by Unread only, Closed or a search, they take that and nothing else, and
+Delete all asks first, saying so. Everything follows live, in every tab and on
+every device of the reader. A notification that waits for the reader's
+acknowledgement can be neither closed nor deleted until they give it.
+
+A notification its sender **withdrew** or **replaced** leaves every reader's
+list and count, with nothing in its place: a replacement stands where the one
+it replaced was. Your service may also say, for every reader or for one,
+that a notification is read, closed or deleted: see
+[When the work is done](#when-the-work-is-done).
+
+**Several tenants.** A reader sees the notifications of the tenant they are
+signed in to; those of their other tenants wait there, and show when they
+switch. A message sent to every tenant is **one** notification for them, read,
+closed, deleted and acknowledged once for all its copies.
 
 ## Who receives it
 
@@ -103,7 +115,7 @@ keeps only the people who may **open what it leads to**:
 | The notification has | It goes to |
 |---|---|
 | a detail on a route | those the route lets in |
-| actions on routes, and no detail | those who may use at least one action |
+| an action on a route, and no detail | those who may use the action |
 | neither, or links outside the gateway only | everyone named |
 
 Rights are checked again each time a page shows it: someone who left the
@@ -148,7 +160,9 @@ the gateway's internal name, never from a browser.
 | `POST /api/notifications` | publish |
 | `GET /api/notifications` | yours that are still live, newest first, filtered by `meta.<key>` |
 | `GET /api/notifications/{id}/acks` | who acknowledged one of yours, and who has not yet |
-| `DELETE /api/notifications/{id}` | withdraw one of yours by its id: every copy of one sent to every tenant |
+| `POST /api/notifications/{id}/read` | mark one of yours read, for every reader or for `?user=` |
+| `POST /api/notifications/{id}/close` | close one of yours, for every reader or for `?user=` |
+| `DELETE /api/notifications/{id}` | withdraw one of yours by its id: every copy of one sent to every tenant; with `?user=`, delete it for that reader only |
 | `DELETE /api/notifications?meta.<key>=<value>` | withdraw every one of yours that matches |
 
 **Who may call it** is set in the console, **Data plane, Notifications,
@@ -176,7 +190,7 @@ means sent under that name.
 | `level` | `info` (default), `success`, `warning` or `error` |
 | `exercise` | `true` for a message sent to practise. See [Exercises](#exercises) |
 | `detail` | where it leads: a [link](#links-a-service-and-a-path), on a UI route |
-| `actions` | buttons, 5 at most: a `label` (60 characters), a link, and [how to call it](#actions-a-method-and-a-body) |
+| `actions` | one button at most: a `label` (60 characters), a link, and [how to call it](#actions-a-method-and-a-body) |
 | `mail` | `true` to send it by mail too. Refused when no mail relay is configured. See [Mail](#mail) |
 | `expires` | a duration (`P7D`, `PT12H`) or a date (`2026-11-01T08:00:00Z`): 30 days by default, 90 at most. Then it leaves every list |
 | `id` | required, a UUID of your choice: it lets you retry without duplicates, replace or withdraw the notification, and follow its acknowledgements and mails. 200 characters at most, letters, digits and `-_.:`. See [Its id](#its-id-replacing-and-withdrawing) |
@@ -304,9 +318,9 @@ and it asks for no acknowledgement any more. The answer says what it ended, in
 `"existing": true` and ends nothing more.
 
 **Withdrawing.** `DELETE /api/notifications/{id}` ends it as **withdrawn**:
-the readers see the placeholder, its mails not sent yet are cancelled. An id
-sent to every tenant withdraws every copy. The answer says whether it ended
-now, or had ended before:
+it leaves every reader's list and count, with nothing in its place, and its
+mails not sent yet are cancelled. An id sent to every tenant withdraws every
+copy. The answer says whether it ended now, or had ended before:
 
 ```json
 { "withdrawn": ["job-7-80"] }
@@ -326,11 +340,40 @@ withdrawal 30 days unless `?expires=` says otherwise (90 at most).
 | A notification is | On the reader's page | In the count |
 |---|---|---|
 | live | as sent | while unread |
-| withdrawn | the placeholder *This notification was withdrawn*, nothing of what it said | no |
+| withdrawn | not shown | no |
 | replaced | not shown: its replacement stands in its place | no |
 | expired | gone, with every reader's state | no |
 
 The console shows every one of them with its state, its sender and its id.
+
+### When the work is done
+
+A notification often asks for work your service sees done: a document to
+validate, validated in your own screens, maybe several at once, maybe by
+another reader. Your service says so with the reader's own words, for every
+reader or for the one `?user=` names (an id or a user name: the one it saw do
+the work):
+
+| | |
+|---|---|
+| `POST /api/notifications/{id}/read` | read: out of the count, still listed |
+| `POST /api/notifications/{id}/close` | closed: out of the drawers and the lists, kept under Closed on the notifications page |
+| `DELETE /api/notifications/{id}?user=<who>` | deleted for that reader; without `user`, the notification is withdrawn for everybody |
+
+```bash
+# One validation is enough: closed for every reader.
+curl -X POST http://meerkat:7070/api/notifications/fd-101/close -H "$AUTH"
+# {"id":"fd-101","readers":3}
+
+# Each reader validates their own: closed for the one who did.
+curl -X POST "http://meerkat:7070/api/notifications/fd-102/close?user=alice" -H "$AUTH"
+```
+
+The answer says how many readers changed (0 when nothing was left to change).
+An acknowledgement still owed does not hold it back: your service is the one
+who knows it no longer matters. A message sent to every tenant changes in all
+of them. The readers' pages follow at once. A user who reads none of it, or an
+id that is none of yours, answers `404`.
 
 ### A full example
 
@@ -414,7 +457,7 @@ When no tenant received it, the answer is a `422` naming each tenant and why.
   one did, as for a safety instruction.
 
 While a reader owes it, the row has a bar along its edge, carries **Acknowledge**, and cannot
-be deleted; **Delete all** keeps it and says how many it kept, and **Mark all
+be closed or deleted by the reader; **Delete all** keeps it and says how many it kept, and **Mark all
 as read** never acknowledges. The snackbar and the desktop notification carry
 **Acknowledge** too. Once done, the row says when, and in `single` the other
 readers see who did, live. A message sent to every tenant is acknowledged whole,
@@ -465,9 +508,9 @@ curl -X DELETE "http://meerkat:7070/api/notifications?meta.invoice=INV-2026-0142
 `meta.<key>=<value>` matches a value, `meta.<key>=~<regex>` a regular
 expression (RE2), and every condition must match. Withdrawing by filter needs at
 least one: everything a sender ever sent is not one request. The answer lists
-what was withdrawn, `{"withdrawn": ["<id>", ...], "count": 2}`, and those notifications show
-as withdrawn on every reader's page at once. The console keeps them, marked
-Withdrawn, with who read them.
+what was withdrawn, `{"withdrawn": ["<id>", ...], "count": 2}`, and those notifications leave
+every reader's page at once. The console keeps them, marked Withdrawn, with who
+read them.
 
 ## Mail
 
@@ -524,12 +567,14 @@ notification's tenant:
 | `notification.publish` | a notification is published: its sender, its tenant, how many recipients, whether it is an exercise, and whether it arrived already withdrawn or replaced. Sent to every tenant, one line per copy |
 | `notification.replace` | a notification is replaced, naming the one that replaced it |
 | `notification.withdraw` | a notification is withdrawn, by its sender or an administrator |
+| `notification.close` | its sender closes a notification, for every reader or for one, named in the line |
+| `notification.delete` | its sender deletes a notification for one reader, named in the line |
 | `notification.mail` | a notification's mailing is over: one line for the notification, never one per recipient, with how many mails the relay accepted, how many failed, how many readers had no address, and how many were cancelled |
 | `notification.given` | notifications were given to someone after their publication, having joined the tenant or been granted a role, or on opening their list: one line naming the person and the notifications, the gateway as the actor |
 | `notification.ack` | a reader acknowledges one: one line per acknowledgement, the reader as the actor, kept after the notification expired |
 
-Reading and deleting are the reader's, kept on their line of the notification,
-and are not on the trail. The console's **Data plane,
+Reading, closing and deleting are the reader's, kept on their line of the
+notification, and are not on the trail; a read the sender marks is not either. The console's **Data plane,
 Notifications** screen and the tenant's **Notifications** section follow every
 publication live, the internal plane's as much as the console's.
 
@@ -538,7 +583,7 @@ publication live, the internal plane's as much as the console's.
 The built-in page is one choice. An application may show the notifications in
 its own screens: the administrator then points the gateway at that page
 (**Application, Portal, Notifications page**: a UI route and a path under it),
-and the bar, the account menu, the snackbar and the mails lead there. Someone
+and the drawer, the snackbar and the mails lead there. Someone
 who may not open that route still gets the built-in page, which stays open to
 everyone.
 
@@ -546,11 +591,12 @@ Your page reads the reader's notifications on the data plane, with the session:
 
 | | |
 |---|---|
-| `GET /meerkat/notifications.json` | a page of the reader's notifications, from all their tenants. `?tenant=`, `?unread=1` and `?q=` narrow it; `?q=` searches the title, the text and the metadata on the server and answers the whole match at once, never the metadata itself |
+| `GET /meerkat/notifications.json` | a page of the reader's notifications, in the tenant of their session. `?unread=1`, `?closed=1` (what they closed) and `?q=` narrow it; `?q=` searches the title, the text and the metadata on the server and answers the whole match at once, never the metadata itself |
 | `GET /meerkat/notifications/counts` | the unread count |
 | `POST /meerkat/notifications/{id}/read` | mark one read; `POST /meerkat/notifications/read` marks them all, or what `?tenant=`, `?unread=1` and `?q=` show |
 | `POST /meerkat/notifications/{id}/ack` | acknowledge one |
-| `DELETE /meerkat/notifications/{id}` | delete one for this reader; `DELETE /meerkat/notifications` deletes them all, or what `?tenant=`, `?unread=1` and `?q=` show, except what waits for an acknowledgement |
+| `POST /meerkat/notifications/{id}/close` | close one for this reader; `POST /meerkat/notifications/{id}/reopen` brings it back |
+| `DELETE /meerkat/notifications/{id}` | delete one for this reader, for good; `DELETE /meerkat/notifications` deletes them all, or what `?unread=1`, `?closed=1` and `?q=` show, except what waits for an acknowledgement |
 
 Each action in the list comes with its method and body, ready to send. The
 full contract is in the data plane's API reference (**Meerkat, API reference**

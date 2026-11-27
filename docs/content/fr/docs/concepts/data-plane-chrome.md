@@ -33,9 +33,9 @@ Le bouton utilisateur donne aussi accès à ce que la gateway détient pour
 cette personne : ses applications, son profil, et **Signaler un problème**
 lorsque le signalement de problèmes est activé. Avec les
 [notifications](/docs/operations/notifications) activées (Enterprise), il porte
-son entrée **Notifications** et le nombre de ses non lues - sauf si la barre de
-portail porte cette entrée - et c'est lui qui affiche un snackbar à l'arrivée
-d'une notification.
+le nombre de ses non lues et une entrée **Notifications** qui les ouvre dans
+un tiroir - sauf si la barre de portail porte sa cloche - et c'est lui qui
+affiche un snackbar à l'arrivée d'une notification.
 
 ## Le menu Developer
 

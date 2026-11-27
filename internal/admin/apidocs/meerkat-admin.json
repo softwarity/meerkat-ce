@@ -10174,7 +10174,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationAction"
             },
-            "description": "Buttons, 5 at most."
+            "description": "One button at most."
           },
           "meta": {
             "type": "object",
@@ -10815,7 +10815,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationActionInput"
             },
-            "description": "Buttons, 5 at most."
+            "description": "One button at most."
           },
           "mail": {
             "type": "boolean",

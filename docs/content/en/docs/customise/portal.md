@@ -104,15 +104,15 @@ Entries render as the icon alone, the label alone, or both - one setting for the
 whole bar. The brand's application name can sit beside the logo; it is off by
 default, because the logo alone is the mark.
 
-## The Notifications entry
+## The bell
 
-With [notifications](/docs/console/notifications) on (Enterprise), the
-catalogue may hold one special entry, **Notifications**: no route, it opens the
-person's notifications page, and it carries the **one badge** of their unread
-notifications, live. It is added with **Add notifications** in Portal mode, then
-placed, moved and removed like any other entry; left without a label, it reads
-Notifications in each user's language. Without it, the entry and the badge are
-on the account button. The entries of the applications carry no badge.
+With [notifications](/docs/console/notifications) on (Enterprise), the bar
+carries a **bell** at a fixed place, just before the colour scheme switch: at
+the foot of the rail, at the right end of the header. It wears the **one
+badge** of the person's unread notifications, live, and opens their
+notifications in a drawer against the bar. It is not an entry of the
+catalogue, which only holds applications. Without the bar, the account button
+wears the badge, and its Notifications entry opens the same drawer.
 
 ## What the bar replaces
 

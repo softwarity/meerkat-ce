@@ -1,6 +1,6 @@
-import { expect, Locator, request, test } from '@playwright/test';
+import { APIRequestContext, expect, Locator, request, test } from '@playwright/test';
 import { ADMIN_URL, DATA_URL, HTTPBIN_URL } from '../playwright.config';
-import { ENTERPRISE, authFile } from '../lib/fixtures';
+import { ENTERPRISE, authDataFile, authFile, seeded } from '../lib/fixtures';
 
 // The portal's rail, measured in a browser (2026-10-15). Collapsed, a module's
 // glyph sat 3px left of its pill and of the burger, and its label was cut to
@@ -222,6 +222,164 @@ test('portal: an entry turned off in the portal is crossed out in the preview', 
     expect(back.ok(), await back.text()).toBeTruthy();
     await root.dispose();
   }
+});
+
+// The notifications (NOTIF-05), from where a reader meets them: the bell of
+// the bar and its drawer, the account button's entry and the same drawer
+// when there is no bar, and the notifications page that the drawer leads to,
+// with the two ways to put one away - Close, which the page lists again
+// under Closed until it is reopened, and Delete, for good.
+test.describe.serial('notifications: the bell, the drawer and the page', () => {
+  test.skip(!ENTERPRISE, 'the notifications are Enterprise');
+  let root: APIRequestContext;
+  let before: any;
+  let notify: any;
+  let demo: any;
+  const sent: string[] = [];
+  const publish = async (title: string, extra: Record<string, unknown> = {}) => {
+    const id = `e2e-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+    const res = await root.post(`/api/tenants/${seeded().tenantId}/notifications`, {
+      data: { id, level: 'info', title, body: 'Sent by the end-to-end suite.', ...extra },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    sent.push(id);
+    return id;
+  };
+  const portal = async (mode: string) => {
+    const settings = structuredClone(before);
+    settings.portal = { ...(before.portal ?? {}), mode, layout: 'header',
+      entries: [{ routeId: 'demo', label: 'References' }] };
+    const saved = await root.put('/api/settings', { data: settings });
+    expect(saved.ok(), await saved.text()).toBeTruthy();
+  };
+
+  test.beforeAll(async () => {
+    root = await request.newContext({ baseURL: ADMIN_URL, storageState: authFile('root') });
+    before = await (await root.get('/api/settings')).json();
+    notify = await (await root.get('/api/notifications/settings')).json();
+    const on = await root.put('/api/notifications/settings', { data: { enabled: true } });
+    expect(on.ok(), await on.text()).toBeTruthy();
+    // The demo application wears the account button, at the bottom left.
+    demo = await (await root.get('/api/routes/demo')).json();
+    const worn = await root.put('/api/routes/demo', {
+      data: { ...demo, ui: { ...(demo.ui ?? {}), userButton: { enabled: true, position: 'bottom-left', height: 32 } } },
+    });
+    expect(worn.ok(), await worn.text()).toBeTruthy();
+  });
+  test.afterAll(async () => {
+    for (const id of sent) await root.delete(`/api/tenants/${seeded().tenantId}/notifications/${id}`);
+    await root.put('/api/routes/demo', { data: demo });
+    await root.put('/api/notifications/settings', { data: { enabled: !!notify.enabled } });
+    await root.put('/api/settings', { data: before });
+    await root.dispose();
+  });
+
+  test('the bar carries the bell, and its drawer closes a notification', async ({ browser }) => {
+    await portal('portal');
+    const title = 'Bell e2e';
+    await publish(title);
+    const context = await browser.newContext({ storageState: authDataFile('user') });
+    const page = await context.newPage();
+    await page.goto(`${DATA_URL}/demo/html`);
+    const bell = page.locator('meerkat-portal-nav .bell');
+    await expect(bell.locator('.badge')).toBeVisible();
+    await bell.click();
+    const drawer = page.locator('meerkat-notify-drawer .ndr');
+    await expect(drawer).toBeVisible();
+    // Under the header, against the right edge.
+    const box = (await drawer.boundingBox())!;
+    expect(Math.abs(box.x + box.width - page.viewportSize()!.width)).toBeLessThan(2);
+    const row = drawer.locator('.nr', { hasText: title });
+    await expect(row).toBeVisible();
+    // A press on its text reads it, the cross closes it.
+    await row.locator('.ntx').click();
+    await expect(row).not.toHaveClass(/\bu\b/);
+    await row.getByRole('button', { name: new RegExp('^Close: ' + title) }).click();
+    await expect(drawer.locator('.nr', { hasText: title })).toHaveCount(0);
+    // Escape shuts the drawer.
+    await page.keyboard.press('Escape');
+    await expect(drawer).toHaveCount(0);
+    // Closed, it is kept, read, for the page's Closed list.
+    const data = await request.newContext({ baseURL: DATA_URL, storageState: authDataFile('user') });
+    const closed = await (await data.get('/meerkat/notifications.json?closed=1')).json();
+    expect(closed.items.map((i: any) => i.title)).toContain(title);
+    await data.dispose();
+    await context.close();
+  });
+
+  test('without the bar, the account button opens the drawer opposite itself, which leads to the page', async ({ browser }) => {
+    await portal('links');
+    const title = 'Button e2e';
+    await publish(title);
+    const context = await browser.newContext({ storageState: authDataFile('user') });
+    const page = await context.newPage();
+    await page.goto(`${DATA_URL}/demo/html`);
+    const button = page.locator('meerkat-user-button');
+    await expect(button.locator('.nb')).toBeVisible();
+    await button.locator('#toggle').click();
+    await button.locator('[data-notify-drawer]').click();
+    const drawer = page.locator('meerkat-notify-drawer .ndr');
+    await expect(drawer).toBeVisible();
+    // The button sits bottom left: the drawer runs along the right edge,
+    // leaving it in sight.
+    const box = (await drawer.boundingBox())!;
+    expect(Math.abs(box.x + box.width - page.viewportSize()!.width)).toBeLessThan(2);
+    await expect(button.locator('#toggle')).toBeInViewport();
+    await expect(drawer.locator('.nr', { hasText: title })).toBeVisible();
+
+    // All notifications: the page, told where the reader came from.
+    await drawer.locator('.ndh a').click();
+    await expect(page).toHaveURL(/\/meerkat\/notifications\?back=%2Fdemo%2Fhtml&from=demo/);
+    // It wears the application's button where the application wears it.
+    await expect(page.locator('meerkat-user-button')).toHaveAttribute('position', 'bottom-left');
+    await expect(page.locator('meerkat-user-button')).toHaveAttribute('route', 'demo');
+    const back = page.locator('#nx-back');
+    await expect(back).toBeVisible();
+    await back.click();
+    await expect(page).toHaveURL(/\/demo\/html$/);
+    await context.close();
+  });
+
+  test('the page closes, reopens and deletes for good', async ({ browser }) => {
+    await portal('links');
+    const title = 'Board e2e';
+    await publish(title);
+    const context = await browser.newContext({ storageState: authDataFile('user') });
+    const page = await context.newPage();
+    await page.goto(`${DATA_URL}/meerkat/notifications`);
+    const row = () => page.locator('.ntf', { hasText: title });
+    await expect(row()).toBeVisible();
+    // Close: out of the list, into Closed.
+    await row().locator('[data-k="close"]').click();
+    await expect(row()).toHaveCount(0);
+    await page.locator('#ntf-closed').click();
+    await expect(page).toHaveURL(/closed=1/);
+    await expect(row()).toBeVisible();
+    // Reopen: back in the list.
+    await row().locator('[data-k="reopen"]').click();
+    await expect(row()).toHaveCount(0);
+    await page.locator('#ntf-closed').click();
+    await expect(row()).toBeVisible();
+    // Delete: gone from the list and from Closed, for good.
+    await row().locator('[data-k="del"]').click();
+    await expect(row()).toHaveCount(0);
+    await page.locator('#ntf-closed').click();
+    await expect(row()).toHaveCount(0);
+    const data = await request.newContext({ baseURL: DATA_URL, storageState: authDataFile('user') });
+    const id = sent[sent.length - 1];
+    expect((await data.post(`/meerkat/notifications/${encodeURIComponent(id)}/reopen`)).status(), 'not to be reopened').toBe(404);
+    await data.dispose();
+    await context.close();
+  });
+
+  test('a notification carries one action at most', async () => {
+    const res = await root.post(`/api/tenants/${seeded().tenantId}/notifications`, {
+      data: { id: `e2e-two-actions-${Date.now()}`, level: 'info', title: 'Two actions',
+        actions: [{ label: 'A', url: 'https://example.com/a' }, { label: 'B', url: 'https://example.com/b' }] },
+    });
+    expect(res.status()).toBe(422);
+    expect(await res.text()).toContain('one at most');
+  });
 });
 
 // The community image does not carry the bar: a write asking for it is refused

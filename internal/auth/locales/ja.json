@@ -402,7 +402,6 @@
   "notifAckAsked": "あなたの確認待ち",
   "notifDeleteOwed": "削除する前に確認済みにしてください。",
   "notifKept": "確認待ちの %s 件は残しました。",
-  "notifWithdrawn": "この通知は取り下げられました",
   "notifExercise": "訓練",
   "notifMissed": "見逃した通知: %s",
   "notifSearch": "通知を検索、または キー=値",

@@ -490,8 +490,8 @@ type composeMember struct {
 }
 
 // composeMaxActions is the internal plane's bound (ee/notify), said to the
-// builder so it stops offering a sixth.
-const composeMaxActions = 5
+// builder so it stops offering a second.
+const composeMaxActions = 1
 
 func (a *API) composeOptions(w http.ResponseWriter, r *http.Request, _ store.User) {
 	ctx := r.Context()

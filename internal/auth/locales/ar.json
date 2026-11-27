@@ -402,7 +402,6 @@
   "notifAckAsked": "بانتظار تأكيدك",
   "notifDeleteOwed": "أكّده قبل حذفه.",
   "notifKept": "تم الإبقاء على %s بانتظار تأكيدك.",
-  "notifWithdrawn": "تم سحب هذا الإشعار",
   "notifExercise": "تمرين",
   "notifMissed": "إشعارات فاتتك: %s",
   "notifSearch": "البحث في الإشعارات، أو مفتاح=قيمة",

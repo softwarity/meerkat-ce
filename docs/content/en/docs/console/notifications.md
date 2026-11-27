@@ -103,18 +103,19 @@ When root turned notifications on, **Application, Portal** shows a
 - **Your page** - a page of one of your applications: a UI route, and a path
   under it such as `/#/inbox`. It is saved once a route is chosen.
 
-The bar, the account menu, the snackbar and the mails lead to that page. A
+The drawer, the snackbar and the mails lead to that page. A
 person who may not open its route gets the built-in page, which stays open to
 everyone.
 
-**One entry, one badge.** In Portal mode, **Add notifications** puts a
-**Notifications** entry in the bar. It is placed, moved and removed like the
-others, and an empty label reads Notifications in each user's language. That
-entry carries the one badge of unread notifications. Without it - in Links or
-None mode, or a bar without the entry - the entry and the badge are on the
-account button. The entries of the applications themselves carry no badge.
+**One bell, one badge.** In Portal mode the bar carries a **bell** at a fixed
+place, beside the colour scheme switch, with the one badge of unread
+notifications; it opens them in a drawer against the bar. In Links or None
+mode, the account button wears the badge, and its Notifications entry opens
+the same drawer, along the side of the page opposite the button. Nothing is
+added to the catalogue for it, and the entries of the applications carry no
+badge.
 
-![The Portal screen with the Notifications page card, and the bar carrying the Notifications entry with its badge](img/console/portal-notifications.webp)
+![The Portal screen with the Notifications page card, and the bar carrying the bell with its badge](img/console/portal-notifications.webp)
 
 The notifications page is also among the
 [built-in pages](/docs/console/built-in-pages) the theme editor previews, with
@@ -168,7 +169,7 @@ and has two tabs.
   (its readers see it labelled EXERCISE), the title and the text.
 - **Detail** - none, a route and a path under it, or an https address. The
   field shows the address the reader will open.
-- **Actions** - up to five buttons: a label, a route and a path or an https
+- **Actions** - one button at most: a label, a route and a path or an https
   address, and in front of them the **Method**: GET, or POST, PUT, PATCH or
   DELETE. Any method but GET opens **Body (JSON)**, a JSON editor; invalid JSON
   is shown on the field and holds Send back. The body reaches the reader's

@@ -30,9 +30,9 @@ language picker without anyone opening its source.
 The user button also carries the entry points to what the gateway holds for that
 person: their applications, their profile, and **Report a problem** when the
 issue-reporting switch is on. With [notifications](/docs/operations/notifications)
-on (Enterprise), it carries their **Notifications** entry and its count of
-unread ones - unless the portal bar holds that entry - and it is what shows a
-snackbar when one arrives.
+on (Enterprise), it carries their count of unread ones and a **Notifications**
+entry that opens them in a drawer - unless the portal bar carries its bell -
+and it is what shows a snackbar when one arrives.
 
 ## The Developer menu
 

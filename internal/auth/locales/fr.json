@@ -402,7 +402,6 @@
   "notifAckAsked": "En attente de votre acquittement",
   "notifDeleteOwed": "Acquittez-la avant de la supprimer.",
   "notifKept": "Conservées : %s en attente de votre acquittement.",
-  "notifWithdrawn": "Cette notification a été retirée",
   "notifExercise": "EXERCICE",
   "notifMissed": "Notifications manquées : %s",
   "notifSearch": "Rechercher dans les notifications, ou clé=valeur",
