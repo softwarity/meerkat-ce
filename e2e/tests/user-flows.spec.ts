@@ -159,6 +159,9 @@ test('uf-change-password: the current password is asked, then the old one no lon
 // ── a second factor ──────────────────────────────────────────────────────────
 
 test('uf-totp: set up an authenticator, then sign in with a code and with a backup code', async ({ page, browser }) => {
+  // nextTotp waits for the next 30 s step, up to 30 s on its own: within the
+  // default 30 s budget the test failed whenever it started late in a step.
+  test.setTimeout(90_000);
   const root = await rootApi();
   const u = await readyAccount(root, 'uf-totp');
   await root.dispose();
