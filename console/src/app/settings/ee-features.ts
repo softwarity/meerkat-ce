@@ -234,4 +234,8 @@ export const EE_FEATURES: Record<string, EeFeatureCopy> = {
     label: $localize`:@@EE_MOBILE_05:Notification channel`,
     what: $localize`:@@EE_MOBILE_05_what:A service says whether a notification goes to the web, the phone, or both.`,
   },
+  'MOBILE-06': {
+    label: $localize`:@@EE_MOBILE_06:Sign-in approval`,
+    what: $localize`:@@EE_MOBILE_06_what:A sign-in made in any browser is approved on the paired phone, by typing the number the page shows.`,
+  },
 };

@@ -2898,6 +2898,17 @@
    "fr": "Non construite (canal web ou mobile d'une notification, un lien par canal)."
   },
   {
+   "id": "MOBILE-06",
+   "priority": "-",
+   "feasibility": "blocked",
+   "targets": [],
+   "editions": [
+    "EE"
+   ],
+   "en": "Not built (approving a sign-in on the paired phone, with the number to copy).",
+   "fr": "Non construite (approbation d'une connexion sur le téléphone appairé, avec le nombre à recopier)."
+  },
+  {
    "id": "QUOTA-01",
    "priority": "P2",
    "feasibility": "medium",
