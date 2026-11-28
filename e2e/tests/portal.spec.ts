@@ -1,4 +1,4 @@
-import { APIRequestContext, expect, Locator, request, test } from '@playwright/test';
+import { APIRequestContext, expect, Locator, Page, request, test } from '@playwright/test';
 import { ADMIN_URL, DATA_URL, HTTPBIN_URL } from '../playwright.config';
 import { ENTERPRISE, authDataFile, authFile, seeded } from '../lib/fixtures';
 
@@ -245,6 +245,12 @@ test.describe.serial('notifications: the bell, the drawer and the page', () => {
     sent.push(id);
     return id;
   };
+  // How far the drawer's right edge stands from the window's, or Infinity
+  // while it is not laid out.
+  const rightGap = async (page: Page, drawer: Locator) => {
+    const box = await drawer.boundingBox();
+    return box ? Math.abs(box.x + box.width - page.viewportSize()!.width) : Infinity;
+  };
   const portal = async (mode: string) => {
     const settings = structuredClone(before);
     settings.portal = { ...(before.portal ?? {}), mode, layout: 'header',
@@ -286,11 +292,11 @@ test.describe.serial('notifications: the bell, the drawer and the page', () => {
     await bell.click();
     const drawer = page.locator('meerkat-notify-drawer .ndr');
     await expect(drawer).toBeVisible();
-    // Under the header, against the right edge.
-    const box = (await drawer.boundingBox())!;
-    expect(Math.abs(box.x + box.width - page.viewportSize()!.width)).toBeLessThan(2);
     const row = drawer.locator('.nr', { hasText: title });
     await expect(row).toBeVisible();
+    // Under the header, against the right edge. The drawer paints its list
+    // when it arrives: measure once it is there, and again if it repaints.
+    await expect.poll(() => rightGap(page, drawer)).toBeLessThan(2);
     // A press on its text reads it, the cross closes it.
     await row.locator('.ntx').click();
     await expect(row).not.toHaveClass(/\bu\b/);
@@ -322,10 +328,9 @@ test.describe.serial('notifications: the bell, the drawer and the page', () => {
     await expect(drawer).toBeVisible();
     // The button sits bottom left: the drawer runs along the right edge,
     // leaving it in sight.
-    const box = (await drawer.boundingBox())!;
-    expect(Math.abs(box.x + box.width - page.viewportSize()!.width)).toBeLessThan(2);
-    await expect(button.locator('#toggle')).toBeInViewport();
     await expect(drawer.locator('.nr', { hasText: title })).toBeVisible();
+    await expect.poll(() => rightGap(page, drawer)).toBeLessThan(2);
+    await expect(button.locator('#toggle')).toBeInViewport();
 
     // All notifications: the page, told where the reader came from.
     await drawer.locator('.ndh a').click();
