@@ -2,6 +2,14 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.27.0
+
+<!-- release: built=2026-11-28T01:46:33Z migrates=true -->
+- **This version migrates the database** (schema 105 to 107). An older version no longer opens it
+  afterwards: take a backup before you update.
+
 - **A route can be kept for those who administer, not for a role.** Who may call it offers
   a new level, *With capabilities*: root, infra admin, app admin, developer, and with
   several tenants, tenant admin (the owner of the active tenant or one of its ADMIN
